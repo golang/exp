@@ -1,16 +1,18 @@
-This is an empty Go subrepository.  To create a new subrepository,
-visit http://code.google.com/p/go/adminSource and under repositories,
-type the new name, check [x] Clone contents and select [empty] as
-the one you want to clone.
+This subrepository holds experimental and deprecated (in the "old"
+directory) packages.
 
-Then execute:
-	go get code.google.com/p/go.newrepo
-	cd $(go list -e -f '{{.Dir}}' code.google.com/p/go.newrepo)
+The idea for this subrepository originated as the "pkg/exp" directory
+of the main repository, but its presence there made it unavailable
+to users of the binary downloads of the Go installation. The
+subrepository has therefore been created to make it possible to "go
+get" these packages.
 
-The go get will complain about not finding source code, but it will
-successfully check out the repository.
+Warning: Packages here are experimental and unreliable. Some may
+one day be promoted to the main repository or other subrepository,
+or they may be modified arbitrarily or even disappear altogether.
 
-Edit the README (this file) to describe the new subrepository, and then
-use the usual hg change, mail, submit to send in the change.
-You will need to follow http://golang.org/doc/contribute.html#Code_review
-to enable the Code Review extension (pointing into your Go root).
+In short, code in this subrepository is not subject to the Go 1
+compatibility promise. (No subrepo is, but the promise is even more
+likely to be violated by go.exp than the others.)
+
+Caveat emptor.
