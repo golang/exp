@@ -3,7 +3,6 @@
 package interp_test
 
 import (
-	"flag"
 	"fmt"
 	"go/build"
 	"os"
@@ -14,29 +13,6 @@ import (
 	"code.google.com/p/go.exp/ssa"
 	"code.google.com/p/go.exp/ssa/interp"
 )
-
-// ANSI terminal sequences.
-const (
-	ansiRed   = "\x1b[1;31m"
-	ansiGreen = "\x1b[1;32m"
-	ansiReset = "\x1b[0m"
-)
-
-var color = flag.Bool("color", false, "Emit color codes for an ANSI terminal.")
-
-func red(s string) string {
-	if *color {
-		return ansiRed + s + ansiReset
-	}
-	return s
-}
-
-func green(s string) string {
-	if *color {
-		return ansiGreen + s + ansiReset
-	}
-	return s
-}
 
 // Each line contains a space-separated list of $GOROOT/test/
 // filenames comprising the main package of a program.
@@ -174,10 +150,10 @@ func run(t *testing.T, dir, input string) bool {
 	var hint string
 	defer func() {
 		if hint != "" {
-			fmt.Println(red("FAIL"))
+			fmt.Println("FAIL")
 			fmt.Println(hint)
 		} else {
-			fmt.Println(green("PASS"))
+			fmt.Println("PASS")
 		}
 	}()
 
