@@ -5,13 +5,14 @@
 package main
 
 import (
-	"exp/norm"
 	"math"
 	"math/rand"
 	"strings"
 	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 // parent computes the parent locale for the given locale.

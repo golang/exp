@@ -6,7 +6,6 @@ package main
 
 import (
 	"bytes"
-	"exp/norm"
 	"flag"
 	"fmt"
 	"io"
@@ -18,6 +17,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 var (

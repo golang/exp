@@ -5,11 +5,11 @@
 package collate
 
 import (
-	"exp/norm"
 	"testing"
 
 	"code.google.com/p/go.exp/locale/collate/build"
 	"code.google.com/p/go.exp/locale/collate/colltab"
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 type ColElems []Weights

@@ -9,9 +9,9 @@ package collate
 
 import (
 	"bytes"
-	"exp/norm"
 
 	"code.google.com/p/go.exp/locale/collate/colltab"
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 // AlternateHandling identifies the various ways in which variables are handled.

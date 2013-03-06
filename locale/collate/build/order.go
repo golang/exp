@@ -5,7 +5,6 @@
 package build
 
 import (
-	"exp/norm"
 	"fmt"
 	"log"
 	"sort"
@@ -13,6 +12,7 @@ import (
 	"unicode"
 
 	"code.google.com/p/go.exp/locale/collate/colltab"
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 type logicalAnchor int

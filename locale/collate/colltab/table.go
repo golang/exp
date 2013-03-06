@@ -5,8 +5,9 @@
 package colltab
 
 import (
-	"exp/norm"
 	"unicode/utf8"
+
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 // table holds all collation data for a given collation ordering.

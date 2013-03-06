@@ -5,7 +5,6 @@
 package build
 
 import (
-	"exp/norm"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"code.google.com/p/go.exp/locale/collate/colltab"
+	"code.google.com/p/go.text/unicode/norm"
 )
 
 // TODO: optimizations:
