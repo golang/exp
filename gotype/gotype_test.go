@@ -117,8 +117,9 @@ var tests = []string{
 	"flag",
 	"fmt",
 
-	"code.google.com/p/go.exp/go/types",
-	"code.google.com/p/go.exp/gotype",
+	// TODO: Since the builders do not install these packages, this test cannot use them.
+	//	"code.google.com/p/go.exp/go/types",
+	//	"code.google.com/p/go.exp/gotype",
 
 	"go/ast",
 	"go/build",
