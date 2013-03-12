@@ -28,11 +28,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 var (

@@ -40,9 +40,10 @@ package ssa
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"math/big"
 	"os"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 // If true, perform sanity checking and show diagnostic information at

@@ -5,10 +5,11 @@ package ssa
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"io"
 	"os"
 	"reflect"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 func unreachable() {

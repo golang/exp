@@ -5,9 +5,10 @@ package ssa
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"io"
 	"os"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 // addEdge adds a control-flow graph edge from from to to.

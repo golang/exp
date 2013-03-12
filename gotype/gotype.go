@@ -11,11 +11,12 @@ import (
 	"go/parser"
 	"go/scanner"
 	"go/token"
-	"go/types"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 var (

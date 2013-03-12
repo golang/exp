@@ -47,11 +47,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"reflect"
 	"runtime"
 
+	"code.google.com/p/go.exp/go/types"
 	"code.google.com/p/go.exp/ssa"
 )
 

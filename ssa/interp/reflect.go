@@ -8,10 +8,10 @@ package interp
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
 	"unsafe"
 
+	"code.google.com/p/go.exp/go/types"
 	"code.google.com/p/go.exp/ssa"
 )
 

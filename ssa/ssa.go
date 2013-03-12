@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"sync"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 // A Program is a partial or complete Go program converted to SSA form.

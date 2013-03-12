@@ -32,12 +32,12 @@ package interp
 import (
 	"bytes"
 	"fmt"
-	"go/types"
 	"io"
 	"reflect"
 	"strings"
 	"unsafe"
 
+	"code.google.com/p/go.exp/go/types"
 	"code.google.com/p/go.exp/ssa"
 )
 

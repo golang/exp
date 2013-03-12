@@ -4,7 +4,8 @@ package ssa
 
 import (
 	"go/token"
-	"go/types"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 // emitNew emits to f a new (heap Alloc) instruction allocating an

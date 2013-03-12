@@ -3,12 +3,12 @@ package interp
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"os"
 	"runtime"
 	"strings"
 	"unsafe"
 
+	"code.google.com/p/go.exp/go/types"
 	"code.google.com/p/go.exp/ssa"
 )
 

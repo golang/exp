@@ -4,7 +4,7 @@ package ssa
 // expressions.
 
 import (
-	"go/types"
+	"code.google.com/p/go.exp/go/types"
 )
 
 // An lvalue represents an assignable location that may appear on the

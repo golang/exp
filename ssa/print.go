@@ -7,9 +7,10 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
-	"go/types"
 	"io"
 	"sort"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 func (id Id) String() string {

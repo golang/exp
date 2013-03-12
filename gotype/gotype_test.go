@@ -117,6 +117,7 @@ var tests = []string{
 	"flag",
 	"fmt",
 
+	"code.google.com/p/go.exp/go/types",
 	"code.google.com/p/go.exp/gotype",
 
 	"go/ast",
@@ -127,7 +128,6 @@ var tests = []string{
 	"go/printer",
 	"go/scanner",
 	"go/token",
-	"go/types",
 
 	"hash/adler32",
 	"hash/crc32",

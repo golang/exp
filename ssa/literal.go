@@ -4,9 +4,10 @@ package ssa
 
 import (
 	"fmt"
-	"go/types"
 	"math/big"
 	"strconv"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 var complexZero = types.Complex{

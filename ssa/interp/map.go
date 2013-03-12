@@ -8,7 +8,7 @@ package interp
 // concurrent map access.
 
 import (
-	"go/types"
+	"code.google.com/p/go.exp/go/types"
 )
 
 type hashable interface {

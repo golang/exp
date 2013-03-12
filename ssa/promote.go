@@ -7,7 +7,8 @@ package ssa
 
 import (
 	"fmt"
-	"go/types"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 // anonFieldPath is a linked list of anonymous fields entered by

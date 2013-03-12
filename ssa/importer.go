@@ -9,9 +9,10 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
+
+	"code.google.com/p/go.exp/go/types"
 )
 
 // Prototype of a function that locates, reads and parses a set of
