@@ -40,6 +40,8 @@ func shifts2() {
 		o = 1<<s == 2<<s   // 1 and 2 have type int; o == true if ints are 32bits in size
 		p = 1<<s == 1<<33  // illegal if ints are 32bits in size: 1 has type int, but 1<<33 overflows int
 		u = 1.0 /* ERROR "must be integer" */ <<s         // illegal: 1.0 has type float64, cannot shift
+		u1 = 1.0 /* ERROR "must be integer" */ <<s != 0   // illegal: 1.0 has type float64, cannot shift
+		u2 = 1 /* ERROR "must be integer" */ <<s != 1.0   // illegal: 1 has type float64, cannot shift
 		v float32 = 1 /* ERROR "must be integer" */ <<s   // illegal: 1 has type float32, cannot shift
 		w int64 = 1.0<<33  // 1.0<<33 is a constant shift expression
 	)
@@ -195,6 +197,31 @@ func shifts7() {
 }
 
 func shifts8() {
+	// shift examples from shift discussion: better error messages
+	var s uint
+	_ = 1.0 /* ERROR "shifted operand 1.0 \(type float64\) must be integer" */ <<s == 1
+	_ = 1.0 /* ERROR "shifted operand 1.0 \(type float64\) must be integer" */ <<s == 1.0
+	_ = 1 /* ERROR "shifted operand 1 \(type float64\) must be integer" */ <<s == 1.0
+	_ = 1 /* ERROR "shifted operand 1 \(type float64\) must be integer" */ <<s + 1.0 == 1
+	_ = 1 /* ERROR "shifted operand 1 \(type float64\) must be integer" */ <<s + 1.1 == 1
+	_ = 1 /* ERROR "shifted operand 1 \(type float64\) must be integer" */ <<s + 1 == 1.0
+
+	// additional cases
+	_ = complex(1.0 /* ERROR "shifted operand 1.0 \(type float64\) must be integer" */ <<s, 1)
+	_ = complex(1.0, 1 /* ERROR "shifted operand 1 \(type float64\) must be integer" */ <<s)
+
+	// TODO(gri): enable tests using conversions (the spec is unclear)
+	// _ = int(1.<<s)
+	// _ = int(1.1<<s)
+	// _ = float32(1<<s)
+	// _ = float32(1.<<s)
+	// _ = float32(1.1<<s)
+	// _ = complex64(1<<s)
+	// _ = complex64(1.<<s)
+	// _ = complex64(1.1<<s)
+}
+
+func shifts9() {
 	// various originally failing snippets of code from the std library
 	// from src/pkg/compress/lzw/reader.go:90
 	{

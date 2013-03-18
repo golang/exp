@@ -173,9 +173,16 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 			goto Error
 		}
 
-		// arguments have final type
-		check.updateExprType(args[0], typ, true)
-		check.updateExprType(args[1], typ, true)
+		if x.mode != constant {
+			// The arguments have now their final types, which at run-
+			// time will be materialized. Update the expression trees.
+			// If the current types are untyped, the materialized type
+			// is the respective default type.
+			// (If the result is constant, the arguments are never
+			// materialized and there is nothing to do.)
+			check.updateExprType(args[0], defaultType(typ), true)
+			check.updateExprType(args[1], defaultType(typ), true)
+		}
 
 	case _Copy:
 		var y operand

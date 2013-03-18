@@ -531,17 +531,20 @@ func (check *checker) comparison(x, y *operand, op token.Token) {
 
 	if x.mode == constant && y.mode == constant {
 		x.val = compareConst(x.val, y.val, op)
+		// The operands are never materialized; no need to update
+		// their types.
 	} else {
 		x.mode = value
+		// The operands have now their final types, which at run-
+		// time will be materialized. Update the expression trees.
+		// If the current types are untyped, the materialized type
+		// is the respective default type.
+		check.updateExprType(x.expr, defaultType(x.typ), true)
+		check.updateExprType(y.expr, defaultType(y.typ), true)
 	}
 
-	// The result type of a comparison is always boolean and
-	// independent of the argument types. They have now their
-	// final types (untyped or typed): update the respective
-	// expression trees.
-	check.updateExprType(x.expr, x.typ, true)
-	check.updateExprType(y.expr, y.typ, true)
-
+	// spec: "Comparison operators compare two operands and yield
+	//        an untyped boolean value."
 	x.typ = Typ[UntypedBool]
 }
 
