@@ -13,7 +13,10 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
-	"encoding/xml"
+	"code.google.com/p/go.exp/locale/cldr"
+	"code.google.com/p/go.exp/locale/collate"
+	"code.google.com/p/go.exp/locale/collate/build"
+	"code.google.com/p/go.exp/locale/collate/colltab"
 	"flag"
 	"fmt"
 	"io"
@@ -28,10 +31,6 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"code.google.com/p/go.exp/locale/collate"
-	"code.google.com/p/go.exp/locale/collate/build"
-	"code.google.com/p/go.exp/locale/collate/colltab"
 )
 
 var (
@@ -39,7 +38,7 @@ var (
 		"http://unicode.org/Public/UCA/"+unicode.Version+"/CollationAuxiliary.zip",
 		`URL of the Default Unicode Collation Element Table (DUCET). This can be a zip
 file containing the file allkeys_CLDR.txt or an allkeys.txt file.`)
-	cldr = flag.String("cldr",
+	cldrzip = flag.String("cldr",
 		"http://www.unicode.org/Public/cldr/22/core.zip",
 		"URL of CLDR archive.")
 	test = flag.Bool("test", false,
@@ -170,14 +169,20 @@ func skipLang(l string) bool {
 	return exclude.contains(l)
 }
 
-func skipAlt(a string) bool {
-	if *draft && a == "proposed" {
-		return false
+// altInclude returns a list of alternatives (for the LDML alt attribute)
+// in order of preference.  An empty string in this list indicates the
+// default entry.
+func altInclude() []string {
+	l := []string{}
+	if *short {
+		l = append(l, "short")
 	}
-	if *short && a == "short" {
-		return false
+	l = append(l, "")
+	// TODO: handle draft using cldr.SetDraftLevel
+	if *draft {
+		l = append(l, "proposed")
 	}
-	return true
+	return l
 }
 
 func failOnError(e error) {
@@ -308,108 +313,8 @@ func convHex(line int, s string) int {
 
 var testInput = stringSet{}
 
-// LDML holds all collation information parsed from an LDML XML file.
-// The format of these files is defined in http://unicode.org/reports/tr35/.
-type LDML struct {
-	XMLName   xml.Name `xml:"ldml"`
-	Language  Attr     `xml:"identity>language"`
-	Territory Attr     `xml:"identity>territory"`
-	Chars     *struct {
-		ExemplarCharacters []AttrValue `xml:"exemplarCharacters"`
-		MoreInformaton     string      `xml:"moreInformation,omitempty"`
-	} `xml:"characters"`
-	Default    Attr        `xml:"collations>default"`
-	Collations []Collation `xml:"collations>collation"`
-}
-
-type Attr struct {
-	XMLName xml.Name
-	Attr    string `xml:"type,attr"`
-}
-
-func (t Attr) String() string {
-	return t.Attr
-}
-
-type AttrValue struct {
-	Type  string `xml:"type,attr"`
-	Key   string `xml:"key,attr,omitempty"`
-	Draft string `xml:"draft,attr,omitempty"`
-	Value string `xml:",innerxml"`
-}
-
-type Collation struct {
-	Type                string    `xml:"type,attr"`
-	Alt                 string    `xml:"alt,attr"`
-	SuppressContraction string    `xml:"suppress_contractions,omitempty"`
-	Settings            *Settings `xml:"settings"`
-	Optimize            string    `xml:"optimize"`
-	Rules               Rules     `xml:"rules"`
-}
-
-type Optimize struct {
-	XMLName xml.Name `xml:"optimize"`
-	Data    string   `xml:"chardata"`
-}
-
-type Suppression struct {
-	XMLName xml.Name `xml:"suppress_contractions"`
-	Data    string   `xml:"chardata"`
-}
-
-type Settings struct {
-	Strength            string `xml:"strenght,attr,omitempty"`
-	Backwards           string `xml:"backwards,attr,omitempty"`
-	Normalization       string `xml:"normalization,attr,omitempty"`
-	CaseLevel           string `xml:"caseLevel,attr,omitempty"`
-	CaseFirst           string `xml:"caseFirst,attr,omitempty"`
-	HiraganaQuarternary string `xml:"hiraganaQuartenary,attr,omitempty"`
-	Numeric             string `xml:"numeric,attr,omitempty"`
-	VariableTop         string `xml:"variableTop,attr,omitempty"`
-}
-
-type Rules struct {
-	XMLName xml.Name   `xml:"rules"`
-	Any     []RuleElem `xml:",any"`
-}
-
-type RuleElem struct {
-	XMLName xml.Name
-	Value   string     `xml:",innerxml"`
-	Before  string     `xml:"before,attr"`
-	Any     []RuleElem `xml:",any"` // for <x> elements
-}
-
 var charRe = regexp.MustCompile(`&#x([0-9A-F]*);`)
 var tagRe = regexp.MustCompile(`<([a-z_]*)  */>`)
-
-func (r *RuleElem) rewrite() {
-	// Convert hexadecimal Unicode codepoint notation to a string.
-	if m := charRe.FindAllStringSubmatch(r.Value, -1); m != nil {
-		runes := []rune{}
-		for _, sa := range m {
-			runes = append(runes, rune(convHex(-1, sa[1])))
-		}
-		r.Value = string(runes)
-	}
-	// Strip spaces from reset positions.
-	if m := tagRe.FindStringSubmatch(r.Value); m != nil {
-		r.Value = fmt.Sprintf("<%s/>", m[1])
-	}
-	for _, rr := range r.Any {
-		rr.rewrite()
-	}
-}
-
-func decodeXML(f *zip.File) *LDML {
-	r, err := f.Open()
-	failOnError(err)
-	d := xml.NewDecoder(r)
-	var x LDML
-	err = d.Decode(&x)
-	failOnError(err)
-	return &x
-}
 
 var mainLocales = []string{}
 
@@ -451,28 +356,36 @@ func printExemplarCharacters(w io.Writer) {
 	fmt.Fprintln(w, "}")
 }
 
-var mainRe = regexp.MustCompile(`.*/main/(.*)\.xml`)
+func decodeCLDR(d *cldr.Decoder) *cldr.CLDR {
+	r, err := openReader(cldrzip)
+	failOnError(err)
+	data, err := d.DecodeZip(r)
+	failOnError(err)
+	return data
+}
 
 // parseMain parses XML files in the main directory of the CLDR core.zip file.
 func parseMain() {
-	for _, f := range openArchive(cldr).File {
-		if m := mainRe.FindStringSubmatch(f.Name); m != nil {
-			locale := m[1]
-			x := decodeXML(f)
-			if skipLang(x.Language.Attr) {
-				continue
-			}
-			if x.Chars != nil {
-				for _, ec := range x.Chars.ExemplarCharacters {
-					if ec.Draft != "" {
-						continue
-					}
-					if _, ok := localeChars[locale]; !ok {
-						mainLocales = append(mainLocales, locale)
-						localeChars[locale] = make(charSets)
-					}
-					localeChars[locale][ec.Type] = parseCharacters(ec.Value)
+	d := &cldr.Decoder{}
+	d.SetDirFilter("main")
+	d.SetSectionFilter("characters")
+	data := decodeCLDR(d)
+	for _, locale := range data.Locales() {
+		x := data.RawLDML(locale)
+		if skipLang(x.Identity.Language.Type) {
+			continue
+		}
+		if x.Characters != nil {
+			x, _ = data.LDML(locale)
+			for _, ec := range x.Characters.ExemplarCharacters {
+				if ec.Draft != "" {
+					continue
 				}
+				if _, ok := localeChars[locale]; !ok {
+					mainLocales = append(mainLocales, locale)
+					localeChars[locale] = make(charSets)
+				}
+				localeChars[locale][ec.Type] = parseCharacters(ec.Data())
 			}
 		}
 	}
@@ -481,21 +394,15 @@ func parseMain() {
 func parseCharacters(chars string) []string {
 	parseSingle := func(s string) (r rune, tail string, escaped bool) {
 		if s[0] == '\\' {
-			if s[1] == 'u' || s[1] == 'U' {
-				r, _, tail, err := strconv.UnquoteChar(s, 0)
-				failOnError(err)
-				return r, tail, false
-			} else if strings.HasPrefix(s[1:], "&amp;") {
-				return '&', s[6:], false
-			}
 			return rune(s[1]), s[2:], true
-		} else if strings.HasPrefix(s, "&quot;") {
-			return '"', s[6:], false
 		}
 		r, sz := utf8.DecodeRuneInString(s)
 		return r, s[sz:], false
 	}
-	chars = strings.Trim(chars, "[ ]")
+	chars = strings.TrimSpace(chars)
+	if n := len(chars) - 1; chars[n] == ']' && chars[0] == '[' {
+		chars = chars[1:n]
+	}
 	list := []string{}
 	var r, last, end rune
 	for len(chars) > 0 {
@@ -540,118 +447,59 @@ var fileRe = regexp.MustCompile(`.*/collation/(.*)\.xml`)
 
 // parseCollation parses XML files in the collation directory of the CLDR core.zip file.
 func parseCollation(b *build.Builder) {
-	for _, f := range openArchive(cldr).File {
-		if m := fileRe.FindStringSubmatch(f.Name); m != nil {
-			lang := m[1]
-			x := decodeXML(f)
-			if skipLang(x.Language.Attr) {
-				continue
+	d := &cldr.Decoder{}
+	d.SetDirFilter("collation")
+	data := decodeCLDR(d)
+	for _, loc := range data.Locales() {
+		x, err := data.LDML(loc)
+		failOnError(err)
+		if skipLang(x.Identity.Language.Type) {
+			continue
+		}
+		cs := x.Collations.Collation
+		sl := cldr.MakeSlice(&cs)
+		if !types.all {
+			sl.SelectAnyOf("type", append(types.s, x.Collations.Default())...)
+		}
+		sl.SelectOnePerGroup("alt", altInclude())
+
+		for _, c := range cs {
+			locale := loc
+			if c.Type != x.Collations.Default() {
+				locale += "_u_co_" + c.Type
 			}
-			def := "standard"
-			if x.Default.Attr != "" {
-				def = x.Default.Attr
-			}
-			todo := make(map[string]Collation)
-			for _, c := range x.Collations {
-				if c.Type != def && !types.contains(c.Type) {
-					continue
-				}
-				if c.Alt != "" && skipAlt(c.Alt) {
-					continue
-				}
-				for j := range c.Rules.Any {
-					c.Rules.Any[j].rewrite()
-				}
-				locale := lang
-				if c.Type != def {
-					locale += "_u_co_" + c.Type
-				}
-				_, exists := todo[locale]
-				if c.Alt != "" || !exists {
-					todo[locale] = c
-				}
-			}
-			for _, c := range x.Collations {
-				locale := lang
-				if c.Type != def {
-					locale += "_u_co_" + c.Type
-				}
-				if d, ok := todo[locale]; ok && d.Alt == c.Alt {
-					insertCollation(b, locale, &c)
-				}
-			}
+			t := b.Tailoring(locale)
+			c.Process(processor{t})
 		}
 	}
 }
 
-var lmap = map[byte]colltab.Level{
-	'p': colltab.Primary,
-	's': colltab.Secondary,
-	't': colltab.Tertiary,
-	'i': colltab.Identity,
+type processor struct {
+	t *build.Tailoring
 }
 
-// cldrIndex is a Unicode-reserved sentinel value used.
-// We ignore any rule that starts with this rune.
-// See http://unicode.org/reports/tr35/#Collation_Elements for details.
-const cldrIndex = 0xFDD0
-
-func insertTailoring(t *build.Tailoring, r RuleElem, context, extend string) {
-	switch l := r.XMLName.Local; l {
-	case "p", "s", "t", "i":
-		if []rune(r.Value)[0] != cldrIndex {
-			str := context + r.Value
-			if *test {
-				testInput.add(str)
-			}
-			err := t.Insert(lmap[l[0]], str, context+extend)
-			failOnError(err)
-		}
-	case "pc", "sc", "tc", "ic":
-		level := lmap[l[0]]
-		for _, s := range r.Value {
-			str := context + string(s)
-			if *test {
-				testInput.add(str)
-			}
-			err := t.Insert(level, str, context+extend)
-			failOnError(err)
-		}
-	default:
-		log.Fatalf("unsupported tag: %q", l)
+func (p processor) Reset(anchor string, before int) (err error) {
+	if before != 0 {
+		err = p.t.SetAnchorBefore(anchor)
+	} else {
+		err = p.t.SetAnchor(anchor)
 	}
+	failOnError(err)
+	return nil
 }
 
-func insertCollation(builder *build.Builder, locale string, c *Collation) {
-	t := builder.Tailoring(locale)
-	for _, r := range c.Rules.Any {
-		switch r.XMLName.Local {
-		case "reset":
-			if r.Before == "" {
-				failOnError(t.SetAnchor(r.Value))
-			} else {
-				failOnError(t.SetAnchorBefore(r.Value))
-			}
-		case "x":
-			var context, extend string
-			for _, r1 := range r.Any {
-				switch r1.XMLName.Local {
-				case "context":
-					context = r1.Value
-				case "extend":
-					extend = r1.Value
-				}
-			}
-			for _, r1 := range r.Any {
-				if t := r1.XMLName.Local; t == "context" || t == "extend" {
-					continue
-				}
-				insertTailoring(t, r1, context, extend)
-			}
-		default:
-			insertTailoring(t, r, "", "")
-		}
+func (p processor) Insert(level int, str, context, extend string) error {
+	str = context + str
+	if *test {
+		testInput.add(str)
 	}
+	// TODO: mimic bug in old maketables: remove.
+	err := p.t.Insert(colltab.Level(level-1), str, context+extend)
+	failOnError(err)
+	return nil
+}
+
+func (p processor) Index(id string) {
 }
 
 func testCollator(c *collate.Collator) {
@@ -685,7 +533,7 @@ func main() {
 	if *root != "" {
 		parseUCA(b)
 	}
-	if *cldr != "" {
+	if *cldrzip != "" {
 		if tables.contains("chars") {
 			parseMain()
 		}
@@ -699,7 +547,7 @@ func main() {
 		testCollator(collate.NewFromTable(c))
 	} else {
 		fmt.Println("// Generated by running")
-		fmt.Printf("//  maketables -root=%s -cldr=%s\n", *root, *cldr)
+		fmt.Printf("//  maketables -root=%s -cldr=%s\n", *root, *cldrzip)
 		fmt.Println("// DO NOT EDIT")
 		fmt.Println("// TODO: implement more compact representation for sparse blocks.")
 		if *tags != "" {
