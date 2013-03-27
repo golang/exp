@@ -122,10 +122,8 @@ func (ss *stringSet) clone() stringSet {
 }
 
 func (ss *stringSet) setType(t setType) {
-	if ss.typ != t {
-		if ss.typ != 0 {
-			log.Panicf("type %d cannot be assigned as it was already %d", t, ss.typ)
-		}
+	if ss.typ != t && ss.typ != 0 {
+		log.Panicf("type %d cannot be assigned as it was already %d", t, ss.typ)
 	}
 }
 
