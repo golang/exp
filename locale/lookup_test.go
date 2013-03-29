@@ -21,22 +21,24 @@ var strdata = []string{
 	"xxxx",
 }
 
-var strtests = map[string]int{
-	"    ": 0,
-	"a":    0,
-	"aa":   0,
-	"aaa":  4,
-	"aa ":  0,
-	"aaaa": 8,
-	"aaab": 12,
-	"aaax": 16,
-	"b":    24,
-	"ba":   24,
-	"bbbb": 28,
+func strtests() map[string]int {
+	return map[string]int{
+		"    ": 0,
+		"a":    0,
+		"aa":   0,
+		"aaa":  4,
+		"aa ":  0,
+		"aaaa": 8,
+		"aaab": 12,
+		"aaax": 16,
+		"b":    24,
+		"ba":   24,
+		"bbbb": 28,
+	}
 }
 
 func TestSearch(t *testing.T) {
-	for k, v := range strtests {
+	for k, v := range strtests() {
 		if i := search(strings.Join(strdata, ""), k); i != v {
 			t.Errorf("%s: found %d; want %d", k, i, v)
 		}
@@ -44,6 +46,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestIndex(t *testing.T) {
+	strtests := strtests()
 	strtests["    "] = -1
 	strtests["aaax"] = -1
 	strtests["bbbb"] = -1
