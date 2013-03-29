@@ -185,7 +185,7 @@ func TestInterp(t *testing.T) {
 	var failures []string
 
 	for _, input := range testdataTests {
-		if !run(t, filepath.Join(build.Default.GOPATH, "src/code.google.com/p/go.exp/ssa/interp/testdata")+slash, input) {
+		if !run(t, "testdata"+slash, input) {
 			failures = append(failures, input)
 		}
 	}
