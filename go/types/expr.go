@@ -1145,11 +1145,14 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 		if ident, ok := e.X.(*ast.Ident); ok {
 			if pkg, ok := check.lookup(ident).(*Package); ok {
 				exp := pkg.Scope.Lookup(sel)
-				// gcimported package scopes contain non-exported
-				// objects such as types used in partially exported
-				// objects - do not accept them
-				if exp == nil || !ast.IsExported(exp.GetName()) {
-					check.errorf(e.Pos(), "cannot refer to unexported %s", e)
+				if exp == nil {
+					check.errorf(e.Pos(), "%s not declared by package %s", sel, ident)
+					goto Error
+				} else if !ast.IsExported(exp.GetName()) {
+					// gcimported package scopes contain non-exported
+					// objects such as types used in partially exported
+					// objects - do not accept them
+					check.errorf(e.Pos(), "%s not exported by package %s", sel, ident)
 					goto Error
 				}
 				check.register(e.Sel, exp)
