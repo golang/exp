@@ -91,13 +91,16 @@ func (obj *Var) GetType() Type      { return obj.Type }
 func (obj *Func) GetType() Type     { return obj.Type }
 
 func (obj *Package) GetPos() token.Pos {
-	if obj.spec != nil {
-		return obj.spec.Pos()
+	if obj.spec == nil {
+		return token.NoPos
 	}
-	return token.NoPos
+	return obj.spec.Pos()
 }
 
 func (obj *Const) GetPos() token.Pos {
+	if obj.spec == nil {
+		return token.NoPos
+	}
 	for _, n := range obj.spec.Names {
 		if n.Name == obj.Name {
 			return n.Pos()
@@ -106,10 +109,10 @@ func (obj *Const) GetPos() token.Pos {
 	return token.NoPos
 }
 func (obj *TypeName) GetPos() token.Pos {
-	if obj.spec != nil {
-		return obj.spec.Pos()
+	if obj.spec == nil {
+		return token.NoPos
 	}
-	return token.NoPos
+	return obj.spec.Pos()
 }
 
 func (obj *Var) GetPos() token.Pos {
