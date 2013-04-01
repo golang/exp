@@ -9,6 +9,34 @@
 //
 package types
 
+// Most correct programs should now be accepted by the types package,
+// but there are several known bugs which permit incorrect programs to
+// pass without errors. Please do not file issues against these for now
+// since they are known already:
+//
+// BUG(gri): Method sets are computed loosely and don't distinguish between ptr vs non-pointer receivers.
+// BUG(gri): Method expressions and method values work accidentally and may not be fully checked.
+// BUG(gri): Conversions of constants only change the type, not the value (e.g., int(1.1) is wrong).
+// BUG(gri): Some built-ins don't check parameters fully, yet (e.g. append).
+// BUG(gri): Use of labels is not checked.
+// BUG(gri): Unused variables and imports are not reported.
+// BUG(gri): Unterface vs non-interface comparisons are not correctly implemented.
+// BUG(gri): Switch statements don't check correct use of 'fallthrough'.
+// BUG(gri): Switch statements don't check duplicate cases for all types for which it is required.
+// BUG(gri): Some built-ins may not be callable if in statement-context.
+// BUG(gri): Duplicate declarations in different files may not be reported.
+// BUG(gri): The type-checker assumes that the input *ast.Files were created by go/parser.
+
+// The API is still slightly in flux and the following changes are considered:
+//
+// API(gri): Provide accessors uniformly to all fields and do not export fields directly.
+// API(gri): Provide scope information for all objects.
+// API(gri): Provide position information for all objects.
+// API(gri): The semantics of QualifiedIdent needs to be revisited.
+// API(gri): Context.Expr needs to distinguish between constants that have unknown value and nil.
+// API(gri): Constants need to be passed via a specific Const type rather than interface{}.
+// API(gri): The GcImporter should probably be in its own package - it is only one of possible importers.
+
 import (
 	"go/ast"
 	"go/token"

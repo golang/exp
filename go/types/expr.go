@@ -12,7 +12,7 @@ import (
 	"strconv"
 )
 
-// TODO(gri) Cleanups
+// TODO(gri) Internal cleanups
 // - don't print error messages referring to invalid types (they are likely spurious errors)
 // - simplify invalid handling: maybe just use Typ[Invalid] as marker, get rid of invalid Mode for values?
 // - rethink error handling: should all callers check if x.mode == valid after making a call?
@@ -20,8 +20,7 @@ import (
 // - use "" or "_" consistently for anonymous identifiers? (e.g. reeceivers that have no name)
 // - consider storing error messages in invalid operands for better error messages/debugging output
 
-// TODO(gri) API issues
-// - clients need access to builtins type information
+// TODO(gri) Test issues
 // - API tests are missing (e.g., identifiers should be handled as expressions in callbacks)
 
 /*
@@ -913,7 +912,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 		if cycleOk {
 			c = " ⨁"
 		}
-		check.trace(e.Pos(), "%s (%s, %d%s)", e, typeString(hint), iota, c)
+		check.trace(e.Pos(), "%s%s", e, c)
 		defer check.untrace("=> %s", x)
 	}
 

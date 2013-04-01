@@ -61,8 +61,7 @@ func (check *checker) conversion(x *operand, conv *ast.CallExpr, typ Type, iota 
 	}
 
 	// the conversion argument types are final; for now we just use x.typ
-	// TODO(gri) What should the type used here be? The spec is unclear.
-	//           See also disabled test cases in testdata/shifts.src, shifts8().
+	// TODO(gri) Fix this. For untyped constants, the type should be typ.
 	check.updateExprType(x.expr, x.typ, true)
 
 	check.conversions[conv] = true // for cap/len checking

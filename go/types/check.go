@@ -199,6 +199,7 @@ func (check *checker) object(obj Object, cycleOk bool) {
 	switch obj := obj.(type) {
 	case *Package:
 		// nothing to do
+
 	case *Const:
 		if obj.Type != nil {
 			return // already checked
