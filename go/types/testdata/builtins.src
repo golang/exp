@@ -94,6 +94,12 @@ func _complex() {
 
 	const _ int = complex /* ERROR "int" */ (1.1, 0)
 	const _ float32 = complex /* ERROR "float32" */ (1, 2)
+
+	// untyped values
+	var s uint
+	_ = complex(1 /* ERROR "integer" */ <<s, 0)
+	const _ = complex /* ERROR "not constant" */ (1 /* ERROR "integer" */ <<s, 0)
+	var _ int = complex /* ERROR "cannot initialize" */ (1 /* ERROR "integer" */ <<s, 0)
 }
 
 func _copy() {

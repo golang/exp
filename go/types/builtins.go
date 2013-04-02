@@ -167,7 +167,15 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 		case Float64:
 			x.typ = Typ[Complex128]
 		case UntypedInt, UntypedRune, UntypedFloat:
-			x.typ = Typ[UntypedComplex]
+			if x.mode == constant {
+				typ = defaultType(typ).(*Basic)
+				x.typ = Typ[UntypedComplex]
+			} else {
+				// untyped but not constant; probably because one
+				// operand is a non-constant shift of untyped lhs
+				typ = Typ[Float64]
+				x.typ = Typ[Complex128]
+			}
 		default:
 			check.invalidArg(x.pos(), "float32 or float64 arguments expected")
 			goto Error
@@ -180,8 +188,8 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 			// is the respective default type.
 			// (If the result is constant, the arguments are never
 			// materialized and there is nothing to do.)
-			check.updateExprType(args[0], defaultType(typ), true)
-			check.updateExprType(args[1], defaultType(typ), true)
+			check.updateExprType(args[0], typ, true)
+			check.updateExprType(args[1], typ, true)
 		}
 
 	case _Copy:
