@@ -269,6 +269,10 @@ func getScriptID(s string) scriptID {
 	return unknownScript
 }
 
+func (s scriptID) String() string {
+	return script[int(s)<<2:][:4]
+}
+
 type currencyID uint16
 
 func getCurrencyID(s string) currencyID {
