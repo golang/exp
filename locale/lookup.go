@@ -10,13 +10,18 @@ import (
 	"strconv"
 )
 
+// get gets the string of length n for id from the given 4-byte string index.
+func get(idx string, id, n int) string {
+	return idx[id<<2:][:n]
+}
+
 // search searchs for the insertion point of key in smap, which is a
 // string with consecutive 4-byte entries. Only the first len(key)
 // bytes from the start of the 4-byte entries will be considered.
 func search(smap, key string) int {
 	n := len(key)
 	return sort.Search(len(smap)>>2, func(i int) bool {
-		return smap[i<<2:][:n] >= key
+		return get(smap, i, n) >= key
 	}) << 2
 }
 
@@ -159,12 +164,13 @@ func (id langID) String() string {
 	return l[:2]
 }
 
+// ISO3 returns the ISO 639-3 language code.
 func (id langID) iso3() string {
 	l := lang[id<<2:]
 	if l[3] == 0 {
 		return l[:3]
 	} else if l[2] == 0 {
-		return mappedLang[l[3]<<2:][:3]
+		return get(mappedLang, int(l[3]), 3)
 	}
 	// This allocation will only happen for 3-letter ISO codes
 	// that are non-canonical BCP47 language identifiers.
@@ -234,7 +240,7 @@ func (r regionID) String() string {
 		return fmt.Sprintf("%03d", r.m49())
 	}
 	r -= isoRegionOffset
-	return regionISO[r<<2:][:2]
+	return get(regionISO, int(r), 2)
 }
 
 // The use of this is uncommon.
@@ -262,30 +268,30 @@ type scriptID uint8
 
 // getScriptID returns the script id for string s. It assumes that s
 // is of the format [A-Z][a-z]{3}.
-func getScriptID(s string) scriptID {
-	if i := index(script, fixCase("Zzzz", s)); i != -1 {
+func getScriptID(idx, s string) scriptID {
+	if i := index(idx, fixCase("Zzzz", s)); i != -1 {
 		return scriptID(i >> 2)
 	}
 	return unknownScript
 }
 
 func (s scriptID) String() string {
-	return script[int(s)<<2:][:4]
+	return get(script, int(s), 4)
 }
 
 type currencyID uint16
 
-func getCurrencyID(s string) currencyID {
-	if i := index(currency, fixCase("XXX", s)); i != -1 {
+func getCurrencyID(idx, s string) currencyID {
+	if i := index(idx, fixCase("XXX", s)); i != -1 {
 		return currencyID(i >> 2)
 	}
 	return unknownCurrency
 }
 
-func (c currencyID) round() int {
-	return int(currency[c<<2+3] >> 2)
+func round(index string, c currencyID) int {
+	return int(index[c<<2+3] >> 2)
 }
 
-func (c currencyID) decimals() int {
-	return int(currency[c<<2+3] & 0x03)
+func decimals(index string, c currencyID) int {
+	return int(index[c<<2+3] & 0x03)
 }

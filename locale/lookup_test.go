@@ -174,7 +174,7 @@ func TestRegionID(t *testing.T) {
 }
 
 func TestScript(t *testing.T) {
-	script = "BbbbDdddEeeeZzzz\xff\xff\xff\xff"
+	idx := "BbbbDdddEeeeZzzz\xff\xff\xff\xff"
 	const und = 3
 	tests := []struct {
 		in  string
@@ -192,7 +192,7 @@ func TestScript(t *testing.T) {
 		{"Zzzz", 3},
 	}
 	for i, tt := range tests {
-		if id := getScriptID(tt.in); id != tt.out {
+		if id := getScriptID(idx, tt.in); id != tt.out {
 			t.Errorf("%d:%s: found %d; want %d", i, tt.in, id, tt.out)
 		}
 	}
@@ -202,7 +202,7 @@ func TestCurrency(t *testing.T) {
 	curInfo := func(round, dec int) string {
 		return string(round<<2 + dec)
 	}
-	currency = strings.Join([]string{
+	idx := strings.Join([]string{
 		"BBB" + curInfo(5, 2),
 		"DDD\x00",
 		"XXX\x00",
@@ -227,14 +227,14 @@ func TestCurrency(t *testing.T) {
 		{"Zzz", 3, 0, 0},
 	}
 	for i, tt := range tests {
-		id := getCurrencyID(tt.in)
+		id := getCurrencyID(idx, tt.in)
 		if id != tt.out {
 			t.Errorf("%d:%s: found %d; want %d", i, tt.in, id, tt.out)
 		}
-		if d := id.decimals(); d != tt.dec {
+		if d := decimals(idx, id); d != tt.dec {
 			t.Errorf("%d:dec(%s): found %d; want %d", i, tt.in, d, tt.dec)
 		}
-		if d := id.round(); d != tt.round {
+		if d := round(idx, id); d != tt.round {
 			t.Errorf("%d:round(%s): found %d; want %d", i, tt.in, d, tt.round)
 		}
 	}
