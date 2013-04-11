@@ -134,6 +134,7 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 	case *Lookup:
 	case *MakeChan:
 	case *MakeClosure:
+		// TODO(adonovan): check FreeVars count matches.
 	case *MakeInterface:
 	case *MakeMap:
 	case *MakeSlice:

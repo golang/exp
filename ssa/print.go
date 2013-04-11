@@ -28,12 +28,16 @@ func (id Id) String() string {
 func relName(v Value, i Instruction) string {
 	switch v := v.(type) {
 	case *Global:
-		if v.Pkg == i.Block().Func.Pkg {
+		if i != nil && v.Pkg == i.Block().Func.Pkg {
 			return v.Name()
 		}
 		return v.FullName()
 	case *Function:
-		return v.fullName(i.Block().Func.Pkg)
+		var pkg *Package
+		if i != nil {
+			pkg = i.Block().Func.Pkg
+		}
+		return v.fullName(pkg)
 	}
 	return v.Name()
 }
@@ -113,7 +117,7 @@ func (v *Phi) String() string {
 func printCall(v *CallCommon, prefix string, instr Instruction) string {
 	var b bytes.Buffer
 	b.WriteString(prefix)
-	if v.Func != nil {
+	if !v.IsInvoke() {
 		b.WriteString(relName(v.Func, instr))
 	} else {
 		name := underlyingType(v.Recv.Type()).(*types.Interface).Methods[v.Method].Name
@@ -131,6 +135,10 @@ func printCall(v *CallCommon, prefix string, instr Instruction) string {
 	}
 	b.WriteString(")")
 	return b.String()
+}
+
+func (c *CallCommon) String() string {
+	return printCall(c, "", nil)
 }
 
 func (v *Call) String() string {
@@ -374,6 +382,7 @@ func (p *Package) DumpTo(w io.Writer) {
 			// are a superset of Methods' keys, though the
 			// methods themselves may differ,
 			// e.g. different bridge methods.
+			// TODO(adonovan): show pointerness of receivers.
 			var keys ids
 			for id := range mem.PtrMethods {
 				keys = append(keys, id)
@@ -381,7 +390,7 @@ func (p *Package) DumpTo(w io.Writer) {
 			sort.Sort(keys)
 			for _, id := range keys {
 				method := mem.PtrMethods[id]
-				fmt.Fprintf(w, "    method %s %s\n", id, method.Signature)
+				fmt.Fprintf(w, "    method %s %s %s\n", id, method.Signature)
 			}
 
 		case *Global:

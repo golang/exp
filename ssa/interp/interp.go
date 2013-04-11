@@ -105,6 +105,8 @@ type frame struct {
 func (fr *frame) get(key ssa.Value) value {
 	switch key := key.(type) {
 	case nil:
+		// Hack; simplifies handling of optional attributes
+		// such as ssa.Slice.{Low,High}.
 		return nil
 	case *ssa.Function, *ssa.Builtin:
 		return key
@@ -379,8 +381,7 @@ func prepareCall(fr *frame, call *ssa.CallCommon) (fn value, args []value) {
 		if recv.t == nil {
 			panic("method invoked on nil interface")
 		}
-		meth := underlyingType(call.Recv.Type()).(*types.Interface).Methods[call.Method]
-		id := ssa.IdFromQualifiedName(meth.QualifiedName)
+		id := call.MethodId()
 		m := findMethodSet(fr.i, recv.t)[id]
 		if m == nil {
 			// Unreachable in well-typed programs.

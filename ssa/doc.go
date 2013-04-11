@@ -1,7 +1,7 @@
 // Package ssa defines a representation of the elements of Go programs
 // (packages, types, functions, variables and constants) using a
 // static single-assignment (SSA) form intermediate representation
-// (IR) for the the bodies of functions.
+// (IR) for the bodies of functions.
 //
 // THIS INTERFACE IS EXPERIMENTAL AND IS LIKELY TO CHANGE.
 //

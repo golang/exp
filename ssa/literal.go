@@ -29,7 +29,9 @@ func intLiteral(i int64) *Literal {
 	return newLiteral(i, types.Typ[types.UntypedInt])
 }
 
-// nilLiteral returns a nil literal of the specified (reference) type.
+// nilLiteral returns a nil literal of the specified type, which may
+// be any reference type, including interfaces.
+//
 func nilLiteral(typ types.Type) *Literal {
 	return newLiteral(types.NilType{}, typ)
 }

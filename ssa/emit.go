@@ -232,11 +232,20 @@ func emitTailCall(f *Function, call *Call) {
 	for _, arg := range f.Params[1:] {
 		call.Args = append(call.Args, arg)
 	}
-	call.Type_ = &types.Result{Values: f.Signature.Results}
+	nr := len(f.Signature.Results)
+	if nr == 1 {
+		call.Type_ = f.Signature.Results[0].Type
+	} else {
+		call.Type_ = &types.Result{Values: f.Signature.Results}
+	}
 	tuple := f.emit(call)
 	var ret Ret
-	switch {
-	case len(f.Signature.Results) > 1:
+	switch nr {
+	case 0:
+		// no-op
+	case 1:
+		ret.Results = []Value{tuple}
+	default:
 		for i, o := range call.Type().(*types.Result).Values {
 			v := emitExtract(f, tuple, i, o.Type)
 			// TODO(adonovan): in principle, this is required:
@@ -245,10 +254,6 @@ func emitTailCall(f *Function, call *Call) {
 			// the types exactly match.
 			ret.Results = append(ret.Results, v)
 		}
-	case len(f.Signature.Results) == 1:
-		ret.Results = []Value{tuple}
-	default:
-		// no-op
 	}
 	f.emit(&ret)
 	f.currentBlock = nil

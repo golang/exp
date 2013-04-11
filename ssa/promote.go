@@ -271,7 +271,7 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 		Signature: &sig,
 		Prog:      prog,
 	}
-	fn.start(nil)
+	fn.startBody()
 	fn.addSpilledParam(sig.Recv)
 	createParams(fn)
 
@@ -315,7 +315,7 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 		c.Method = 0
 	}
 	emitTailCall(fn, &c)
-	fn.finish()
+	fn.finishBody()
 	return fn
 }
 
@@ -374,14 +374,14 @@ func makeImethodThunk(prog *Program, typ types.Type, id Id) *Function {
 		Prog:      prog,
 	}
 	// TODO(adonovan): set fn.Pos to location of interface method ast.Field.
-	fn.start(nil)
+	fn.startBody()
 	fn.addParam("recv", typ)
 	createParams(fn)
 	var c Call
 	c.Method = index
 	c.Recv = fn.Params[0]
 	emitTailCall(fn, &c)
-	fn.finish()
+	fn.finishBody()
 	return fn
 }
 

@@ -190,21 +190,26 @@ func (f *Function) addSpilledParam(obj types.Object) {
 	f.emit(&Store{Addr: spill, Val: param})
 }
 
-// start initializes the function prior to generating SSA code for its body.
+// startBody initializes the function prior to generating SSA code for its body.
 // Precondition: f.Type() already set.
 //
-// If f.syntax != nil, f is a Go source function and idents must be a
-// mapping from syntactic identifiers to their canonical type objects;
-// Otherwise, idents is ignored and the usual set-up for Go source
-// functions is skipped.
-//
-func (f *Function) start(idents map[*ast.Ident]types.Object) {
+func (f *Function) startBody() {
 	f.currentBlock = f.newBasicBlock("entry")
 	f.objects = make(map[types.Object]Value) // needed for some synthetics, e.g. init
-	if f.syntax == nil {
-		return // synthetic function; no syntax tree
-	}
+}
 
+// createSyntacticParams populates f.Params and generates code (spills
+// and named result locals) for all the parameters declared in the
+// syntax.  In addition it populates the f.objects mapping.
+//
+// idents must be a mapping from syntactic identifiers to their
+// canonical type objects.
+//
+// Preconditions:
+// f.syntax != nil, i.e. this is a Go source function.
+// f.startBody() was called.
+//
+func (f *Function) createSyntacticParams(idents map[*ast.Ident]types.Object) {
 	// Receiver (at most one inner iteration).
 	if f.syntax.recvField != nil {
 		for _, field := range f.syntax.recvField.List {
@@ -284,8 +289,8 @@ func buildReferrers(f *Function) {
 	}
 }
 
-// finish() finalizes the function after SSA code generation of its body.
-func (f *Function) finish() {
+// finishBody() finalizes the function after SSA code generation of its body.
+func (f *Function) finishBody() {
 	f.objects = nil
 	f.namedResults = nil
 	f.currentBlock = nil
@@ -562,7 +567,7 @@ func (f *Function) DumpTo(w io.Writer) {
 				l -= n
 				// Right-align the type.
 				if t := v.Type(); t != nil {
-					fmt.Fprintf(w, "%*s", l-9, t)
+					fmt.Fprintf(w, " %*s", l-10, t)
 				}
 			case nil:
 				// Be robust against bad transforms.

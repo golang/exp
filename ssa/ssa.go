@@ -37,12 +37,11 @@ type Program struct {
 // type-specific accessor methods Func, Type, Var and Const.
 //
 type Package struct {
-	Prog      *Program          // the owning program
-	Types     *types.Package    // the type checker's package object for this package.
-	Pos       token.Pos         // position of an arbitrary file in the package
-	Members   map[string]Member // all exported and unexported members of the package
-	AnonFuncs []*Function       // all anonymous functions in this package
-	Init      *Function         // the package's (concatenated) init function
+	Prog    *Program          // the owning program
+	Types   *types.Package    // the type checker's package object for this package.
+	Pos     token.Pos         // position of an arbitrary file in the package
+	Members map[string]Member // all exported and unexported members of the package
+	Init    *Function         // the package's (concatenated) init function
 
 	// The following fields are set transiently during building,
 	// then cleared.
@@ -84,6 +83,8 @@ type Id struct {
 
 // A MethodSet contains all the methods for a particular type.
 // The method sets for T and *T are distinct entities.
+// The methods for a non-pointer type T all have receiver type T, but
+// the methods for pointer type *T may have receiver type *T or T.
 //
 type MethodSet map[Id]*Function
 
@@ -121,10 +122,6 @@ type Value interface {
 	// Type returns the type of this value.  Many instructions
 	// (e.g. IndexAddr) change the behaviour depending on the
 	// types of their operands.
-	//
-	// Documented type invariants below (e.g. "Alloc.Type()
-	// returns a *types.Pointer") refer to the underlying type in
-	// the case of NamedTypes.
 	Type() types.Type
 
 	// Referrers returns the list of instructions that have this
@@ -228,12 +225,12 @@ type Function struct {
 	Name_     string
 	Signature *types.Signature
 
-	Pos       token.Pos // location of the definition
-	Enclosing *Function // enclosing function if anon; nil if global
-	Pkg       *Package  // enclosing package for Go source functions; otherwise nil
-	Prog      *Program  // enclosing program
-	Params    []*Parameter
-	FreeVars  []*Capture // free variables whose values must be supplied by closure
+	Pos       token.Pos    // location of the definition
+	Enclosing *Function    // enclosing function if anon; nil if global
+	Pkg       *Package     // enclosing package for Go source functions; otherwise nil
+	Prog      *Program     // enclosing program
+	Params    []*Parameter // function parameters; for methods, includes receiver
+	FreeVars  []*Capture   // free variables whose values must be supplied by closure
 	Locals    []*Alloc
 	Blocks    []*BasicBlock // basic blocks of the function; nil => external
 
@@ -487,6 +484,8 @@ type Conv struct {
 // ChangeInterface constructs a value of one interface type from a
 // value of another interface type known to be assignable to it.
 //
+// TODO(adonovan): state whether this can fail dynamically.
+//
 // Example printed form:
 // 	t1 = change interface interface{} <- I (t0)
 //
@@ -516,7 +515,7 @@ type MakeInterface struct {
 // By construction, all captured variables are addresses of variables
 // allocated with 'new', i.e. Alloc(Heap=true).
 //
-// Type() returns a *types.Signature.
+// Type() returns a (possibly named) *types.Signature.
 //
 // Example printed form:
 // 	t0 = make closure anon@1.2 [x y z]
@@ -530,7 +529,7 @@ type MakeClosure struct {
 // The MakeMap instruction creates a new hash-table-based map object
 // and yields a value of kind map.
 //
-// Type() returns a *types.Map.
+// Type() returns a (possibly named) *types.Map.
 //
 // Example printed form:
 // 	t1 = make map[string]int t0
@@ -543,7 +542,7 @@ type MakeMap struct {
 // The MakeChan instruction creates a new channel object and yields a
 // value of kind chan.
 //
-// Type() returns a *types.Chan.
+// Type() returns a (possibly named) *types.Chan.
 //
 // Example printed form:
 // 	t0 = make chan int 0
@@ -561,7 +560,7 @@ type MakeChan struct {
 // (Alloc(types.Array) followed by Slice will not suffice because
 // Alloc can only create arrays of statically known length.)
 //
-// Type() returns a *types.Slice.
+// Type() returns a (possibly named) *types.Slice.
 //
 // Example printed form:
 // 	t1 = make slice []string 1:int t0
@@ -577,6 +576,7 @@ type MakeSlice struct {
 //
 // Type() returns string if the type of X was string, otherwise a
 // *types.Slice with the same element type as X.
+// TODO(adonovan): check that named string types are preserved.
 //
 // Example printed form:
 // 	t1 = slice t0[1:]
@@ -592,7 +592,7 @@ type Slice struct {
 // The field is identified by its index within the field list of the
 // struct type of X.
 //
-// Type() returns a *types.Pointer.
+// Type() returns a (possibly named) *types.Pointer.
 //
 // Example printed form:
 // 	t1 = &t0.name [#1]
@@ -624,7 +624,7 @@ type Field struct {
 // The elements of maps and strings are not addressable; use Lookup or
 // MapUpdate instead.
 //
-// Type() returns a *types.Pointer.
+// Type() returns a (possibly named) *types.Pointer.
 //
 // Example printed form:
 // 	t2 = &t0[t1]
@@ -717,7 +717,7 @@ type Select struct {
 //
 // Elements are accessed via Next.
 //
-// Type() returns a *types.Result (tuple type).
+// Type() returns a (possibly named) *types.Result (tuple type).
 //
 // Example printed form:
 // 	t0 = range "hello":string
@@ -727,24 +727,28 @@ type Range struct {
 	X Value // string or map
 }
 
-// Next reads and advances the iterator Iter and returns a 3-tuple
-// value (ok, k, v).  If the iterator is not exhausted, ok is true and
-// k and v are the next elements of the domain and range,
-// respectively.  Otherwise ok is false and k and v are undefined.
-//
-// For channel iterators, k is the received value and v is always
-// undefined.
+// Next reads and advances the (map or string) iterator Iter and
+// returns a 3-tuple value (ok, k, v).  If the iterator is not
+// exhausted, ok is true and k and v are the next elements of the
+// domain and range, respectively.  Otherwise ok is false and k and v
+// are undefined.
 //
 // Components of the tuple are accessed using Extract.
 //
-// Type() returns a *types.Result (tuple type).
+// The IsString field distinguishes iterators over strings from those
+// over maps, as the Type() alone is insufficient: consider
+// map[int]rune.
+//
+// Type() returns a *types.Result (tuple type) for the triple
+// (ok, k, v).  The types of k and/or v may be types.Invalid.
 //
 // Example printed form:
 // 	t1 = next t0
 //
 type Next struct {
 	Register
-	Iter Value
+	Iter     Value
+	IsString bool // true => string iterator; false => map iterator.
 }
 
 // TypeAssert tests whether interface value X has type
@@ -969,8 +973,8 @@ type anInstruction struct {
 // Each CallCommon exists in one of two modes, function call and
 // interface method invocation, or "call" and "invoke" for short.
 //
-// 1. "call" mode: when Recv is nil, a CallCommon represents an
-// ordinary function call of the value in Func.
+// 1. "call" mode: when Recv is nil (!IsInvoke), a CallCommon
+// represents an ordinary function call of the value in Func.
 //
 // In the common case in which Func is a *Function, this indicates a
 // statically dispatched call to a package-level function, an
@@ -989,15 +993,19 @@ type anInstruction struct {
 // 	go t3()
 //	defer t5(...t6)
 //
-// 2. "invoke" mode: when Recv is non-nil, a CallCommon represents a
-// dynamically dispatched call to an interface method.  In this
-// mode, Recv is the interface value and Method is the index of the
-// method within the interface type of the receiver.
+// 2. "invoke" mode: when Recv is non-nil (IsInvoke), a CallCommon
+// represents a dynamically dispatched call to an interface method.
+// In this mode, Recv is the interface value and Method is the index
+// of the method within the interface type of the receiver.
 //
 // Recv is implicitly supplied to the concrete method implementation
 // as the receiver parameter; in other words, Args[0] holds not the
 // receiver but the first true argument.  Func is not used in this
 // mode.
+//
+// If the called method's receiver has non-pointer type T, but the
+// receiver supplied by the interface value has type *T, an implicit
+// load (copy) operation is performed.
 //
 // Example printed form:
 // 	t1 = invoke t0.String()
@@ -1012,11 +1020,23 @@ type anInstruction struct {
 //
 type CallCommon struct {
 	Recv        Value     // receiver, iff interface method invocation
-	Method      int       // index of interface method within Recv.Type().(*types.Interface).Methods
+	Method      int       // index of interface method; call MethodId() for its Id
 	Func        Value     // target of call, iff function call
 	Args        []Value   // actual parameters, including receiver in invoke mode
 	HasEllipsis bool      // true iff last Args is a slice of '...' args (needed?)
 	Pos         token.Pos // position of call expression
+}
+
+// IsInvoke returns true if this call has "invoke" (not "call") mode.
+func (c *CallCommon) IsInvoke() bool {
+	return c.Recv != nil
+}
+
+// MethodId returns the Id for the method called by c, which must
+// have "invoke" mode.
+func (c *CallCommon) MethodId() Id {
+	meth := underlyingType(c.Recv.Type()).(*types.Interface).Methods[c.Method]
+	return IdFromQualifiedName(meth.QualifiedName)
 }
 
 func (v *Builtin) Type() types.Type        { return v.Object.GetType() }

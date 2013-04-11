@@ -766,7 +766,6 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 				body:         e.Body,
 			},
 		}
-		fn.Pkg.AnonFuncs = append(fn.Pkg.AnonFuncs, fn2)
 		b.buildFunction(fn2)
 		if fn2.FreeVars == nil {
 			return fn2
@@ -1217,23 +1216,30 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 
 	// Common code for varargs.
 	if vt != nil { // case 2
-		at := &types.Array{
-			Elt: vt,
-			Len: int64(len(varargs)),
-		}
-		a := emitNew(fn, at)
-		for i, arg := range varargs {
-			iaddr := &IndexAddr{
-				X:     a,
-				Index: intLiteral(int64(i)),
+		st := &types.Slice{Elt: vt}
+		var vaslice Value
+		if len(varargs) == 0 {
+			vaslice = nilLiteral(st)
+		} else {
+			at := &types.Array{
+				Elt: vt,
+				Len: int64(len(varargs)),
 			}
-			iaddr.setType(pointer(vt))
-			fn.emit(iaddr)
-			emitStore(fn, iaddr, b.expr(fn, arg))
+			a := emitNew(fn, at)
+			for i, arg := range varargs {
+				iaddr := &IndexAddr{
+					X:     a,
+					Index: intLiteral(int64(i)),
+				}
+				iaddr.setType(pointer(vt))
+				fn.emit(iaddr)
+				emitStore(fn, iaddr, b.expr(fn, arg))
+			}
+			s := &Slice{X: a}
+			s.setType(st)
+			vaslice = fn.emit(s)
 		}
-		s := &Slice{X: a}
-		s.setType(&types.Slice{Elt: vt})
-		c.Args = append(c.Args, fn.emit(s))
+		c.Args = append(c.Args, vaslice)
 	}
 }
 
@@ -1997,7 +2003,7 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 	incr := &BinOp{
 		Op: token.ADD,
 		X:  emitLoad(fn, index),
-		Y:  intLiteral(1),
+		Y:  vOne,
 	}
 	incr.setType(tInt)
 	emitStore(fn, index, fn.emit(incr))
@@ -2061,6 +2067,13 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Valu
 	// done:                                   (target of break)
 	//
 
+	if tk == nil {
+		tk = tInvalid
+	}
+	if tv == nil {
+		tv = tInvalid
+	}
+
 	rng := &Range{X: x}
 	rng.setType(tRangeIter)
 	it := fn.emit(rng)
@@ -2069,7 +2082,12 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Valu
 	emitJump(fn, loop)
 	fn.currentBlock = loop
 
-	okv := &Next{Iter: it}
+	_, isString := underlyingType(x.Type()).(*types.Basic)
+
+	okv := &Next{
+		Iter:     it,
+		IsString: isString,
+	}
 	okv.setType(&types.Result{Values: []*types.Var{
 		varOk,
 		{Name: "k", Type: tk},
@@ -2082,10 +2100,10 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Valu
 	emitIf(fn, emitExtract(fn, okv, 0, tBool), body, done)
 	fn.currentBlock = body
 
-	if tk != nil {
+	if tk != tInvalid {
 		k = emitExtract(fn, okv, 1, tk)
 	}
-	if tv != nil {
+	if tv != tInvalid {
 		v = emitExtract(fn, okv, 2, tv)
 	}
 	return
@@ -2093,8 +2111,8 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Valu
 
 // rangeChan emits to fn the header for a loop that receives from
 // channel x until it fails.
-// tk is the channel's element type, or nil if the k result is not
-// wanted
+// tk is the channel's element type, or nil if the k result is
+// not wanted
 //
 func (b *Builder) rangeChan(fn *Function, x Value, tk types.Type) (k Value, loop, done *BasicBlock) {
 	//
@@ -2417,16 +2435,33 @@ func (b *Builder) buildFunction(fn *Function) {
 		return // building already started
 	}
 	if fn.syntax == nil {
-		return // not a Go source function
+		return // not a Go source function.  (Synthetic, or from object file.)
 	}
 	if fn.syntax.body == nil {
-		return // Go source function with no body (external)
+		// External function.
+		if fn.Params == nil {
+			// This condition ensures we add a non-empty
+			// params list once only, but we may attempt
+			// the degenerate empty case repeatedly.
+			// TODO(adonovan): opt: don't do that.
+
+			// We set Function.Params even though there is no body
+			// code to reference them.  This simplifies clients.
+			if recv := fn.Signature.Recv; recv != nil {
+				fn.addParam(recv.Name, recv.Type)
+			}
+			for _, param := range fn.Signature.Params {
+				fn.addParam(param.Name, param.Type)
+			}
+		}
+		return
 	}
 	if fn.Prog.mode&LogSource != 0 {
 		defer logStack("build function %s @ %s",
 			fn.FullName(), fn.Prog.Files.Position(fn.Pos))()
 	}
-	fn.start(b.idents)
+	fn.startBody()
+	fn.createSyntacticParams(b.idents)
 	b.stmt(fn, fn.syntax.body)
 	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb.Preds != nil) {
 		// Run function calls deferred in this function when
@@ -2434,7 +2469,7 @@ func (b *Builder) buildFunction(fn *Function) {
 		fn.emit(new(RunDefers))
 		fn.emit(new(Ret))
 	}
-	fn.finish()
+	fn.finishBody()
 }
 
 // memberFromObject populates package pkg with a member for the
@@ -2759,7 +2794,7 @@ func (b *Builder) BuildPackage(p *Package) {
 		defer logStack("build package %s", p.Types.Path)()
 	}
 	init := p.Init
-	init.start(b.idents)
+	init.startBody()
 
 	// Make init() skip if package is already initialized.
 	initguard := p.Var("init·guard")
@@ -2818,5 +2853,5 @@ func (b *Builder) BuildPackage(p *Package) {
 	init.currentBlock = done
 	init.emit(new(RunDefers))
 	init.emit(new(Ret))
-	init.finish()
+	init.finishBody()
 }
