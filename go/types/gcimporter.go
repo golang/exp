@@ -14,12 +14,13 @@ import (
 	"go/build"
 	"go/token"
 	"io"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/scanner"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 var pkgExts = [...]string{".a", ".5", ".6", ".8"}
@@ -674,16 +675,16 @@ func (p *gcParser) parseImportDecl() {
 
 // int_lit = [ "+" | "-" ] { "0" ... "9" } .
 //
-func (p *gcParser) parseInt() (neg bool, val string) {
+func (p *gcParser) parseInt() string {
+	s := ""
 	switch p.tok {
 	case '-':
-		neg = true
-		fallthrough
+		s = "-"
+		p.next()
 	case '+':
 		p.next()
 	}
-	val = p.expect(scanner.Int)
-	return
+	return s + p.expect(scanner.Int)
 }
 
 // number = int_lit [ "p" int_lit ] .
@@ -692,39 +693,33 @@ func (p *gcParser) parseNumber() (x operand) {
 	x.mode = constant
 
 	// mantissa
-	neg, val := p.parseInt()
-	mant, ok := new(big.Int).SetString(val, 0)
-	assert(ok)
-	if neg {
-		mant.Neg(mant)
-	}
+	mant := constants.MakeFromLiteral(p.parseInt(), token.INT)
+	assert(mant != nil)
 
 	if p.lit == "p" {
 		// exponent (base 2)
 		p.next()
-		neg, val = p.parseInt()
-		exp64, err := strconv.ParseUint(val, 10, 0)
+		exp, err := strconv.ParseInt(p.parseInt(), 10, 0)
 		if err != nil {
 			p.error(err)
 		}
-		exp := uint(exp64)
-		if neg {
-			denom := big.NewInt(1)
-			denom.Lsh(denom, exp)
+		if exp < 0 {
+			denom := constants.MakeInt64(1)
+			denom = constants.Shift(denom, token.SHL, uint(-exp))
 			x.typ = Typ[UntypedFloat]
-			x.val = normalizeRatConst(new(big.Rat).SetFrac(mant, denom))
+			x.val = constants.BinaryOp(mant, token.QUO, denom)
 			return
 		}
 		if exp > 0 {
-			mant.Lsh(mant, exp)
+			mant = constants.Shift(mant, token.SHL, uint(exp))
 		}
 		x.typ = Typ[UntypedFloat]
-		x.val = normalizeIntConst(mant)
+		x.val = mant
 		return
 	}
 
 	x.typ = Typ[UntypedInt]
-	x.val = normalizeIntConst(mant)
+	x.val = mant
 	return
 }
 
@@ -751,7 +746,7 @@ func (p *gcParser) parseConstDecl() {
 			p.error("expected true or false")
 		}
 		x.typ = Typ[UntypedBool]
-		x.val = p.lit == "true"
+		x.val = constants.MakeBool(p.lit == "true")
 		p.next()
 
 	case '-', scanner.Int:
@@ -777,7 +772,7 @@ func (p *gcParser) parseConstDecl() {
 		x.typ = Typ[UntypedComplex]
 		// TODO(gri) fix this
 		_, _ = re, im
-		x.val = zeroConst
+		x.val = constants.MakeInt64(0)
 
 	case scanner.Char:
 		// rune_lit

@@ -20,7 +20,7 @@ package types
 // BUG(gri): Some built-ins don't check parameters fully, yet (e.g. append).
 // BUG(gri): Use of labels is not checked.
 // BUG(gri): Unused variables and imports are not reported.
-// BUG(gri): Unterface vs non-interface comparisons are not correctly implemented.
+// BUG(gri): Interface vs non-interface comparisons are not correctly implemented.
 // BUG(gri): Switch statements don't check correct use of 'fallthrough'.
 // BUG(gri): Switch statements don't check duplicate cases for all types for which it is required.
 // BUG(gri): Some built-ins may not be callable if in statement-context.
@@ -33,13 +33,13 @@ package types
 // API(gri): Provide scope information for all objects.
 // API(gri): Provide position information for all objects.
 // API(gri): The semantics of QualifiedIdent needs to be revisited.
-// API(gri): Context.Expr needs to distinguish between constants that have unknown value and nil.
-// API(gri): Constants need to be passed via a specific Const type rather than interface{}.
 // API(gri): The GcImporter should probably be in its own package - it is only one of possible importers.
 
 import (
 	"go/ast"
 	"go/token"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 // A Context specifies the supporting context for type checking.
@@ -68,19 +68,8 @@ type Context struct {
 	// If x is a literal value (constant, composite literal), typ is always
 	// the dynamic type of x (never an interface type). Otherwise, typ is x's
 	// static type (possibly an interface type).
-	//
-	// Constants are represented as follows:
-	//
-	//	bool     ->  bool
-	//	numeric  ->  int64, *big.Int, *big.Rat, Complex
-	//	string   ->  string
-	//	nil      ->  NilType
-	//
-	// Constant values are normalized, that is, they are represented
-	// using the "smallest" possible type that can represent the value.
-	// For instance, 1.0 is represented as an int64 because it can be
-	// represented accurately as an int64.
-	Expr func(x ast.Expr, typ Type, val interface{})
+	// TODO(gri): Should this hold for all constant expressions?
+	Expr func(x ast.Expr, typ Type, val constants.Value)
 
 	// If Import != nil, it is called for each imported package.
 	// Otherwise, GcImporter is called.

@@ -9,6 +9,8 @@ package types
 import (
 	"go/ast"
 	"strings"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 var (
@@ -55,10 +57,10 @@ var aliases = [...]*Basic{
 }
 
 var predeclaredConstants = [...]*Const{
-	{Name: "true", Type: Typ[UntypedBool], Val: true},
-	{Name: "false", Type: Typ[UntypedBool], Val: false},
-	{Name: "iota", Type: Typ[UntypedInt], Val: zeroConst},
-	{Name: "nil", Type: Typ[UntypedNil], Val: nilConst},
+	{Name: "true", Type: Typ[UntypedBool], Val: constants.MakeBool(true)},
+	{Name: "false", Type: Typ[UntypedBool], Val: constants.MakeBool(false)},
+	{Name: "iota", Type: Typ[UntypedInt], Val: constants.MakeInt64(0)},
+	{Name: "nil", Type: Typ[UntypedNil], Val: constants.MakeNil()},
 }
 
 var predeclaredFunctions = [...]*builtin{

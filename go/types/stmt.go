@@ -9,6 +9,8 @@ package types
 import (
 	"go/ast"
 	"go/token"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 // assigment reports whether x can be assigned to a variable of type 'to',
@@ -145,7 +147,7 @@ func (check *checker) assign1to1(lhs, rhs ast.Expr, x *operand, decl bool, iota 
 
 	// for constants, set their value
 	if obj, _ := obj.(*Const); obj != nil {
-		obj.Val = nil // failure case: we don't know the constant value
+		obj.Val = constants.MakeUnknown() // failure case: we don't know the constant value
 		if x.mode == constant {
 			if isConstType(x.typ) {
 				obj.Val = x.val

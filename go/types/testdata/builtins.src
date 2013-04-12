@@ -173,7 +173,7 @@ func _len() {
 	var t string
 	var hash map[interface{}][]*[10]int
 	const n = len /* ERROR "not constant" */ (hash[recover()][len(t)])
-	assert /* ERROR "failed" */ (n == 10)
+	assert(n == 10) // ok because n has unknown value and no error is reported
 	var ch <-chan int
 	const nn = len /* ERROR "not constant" */ (hash[<-ch][len(t)])
 

@@ -8,6 +8,8 @@ package types
 
 import (
 	"go/ast"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 // conversion typechecks the type conversion conv to type typ. iota is the current
@@ -37,14 +39,14 @@ func (check *checker) conversion(x *operand, conv *ast.CallExpr, typ Type, iota 
 		if typ.Kind == String {
 			switch {
 			case x.isInteger():
-				codepoint, ok := x.val.(int64)
-				if !ok {
-					// absolute value too large (or unknown) for conversion;
-					// same as converting any other out-of-range value - let
-					// string(codepoint) do the work
-					codepoint = -1
+				codepoint := int64(-1)
+				if x.val.Kind() == constants.Int64 {
+					codepoint = constants.Int64Val(x.val)
 				}
-				x.val = string(codepoint)
+				// If codepoint < 0 the absolute value is too large (or unknown) for
+				// conversion. This is the same as converting any other out-of-range
+				// value - let string(codepoint) do the work.
+				x.val = constants.MakeString(string(codepoint))
 			case isString(x.typ):
 				// nothing to do
 			default:

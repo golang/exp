@@ -7,6 +7,8 @@ package types
 import (
 	"go/ast"
 	"go/token"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 // An Object describes a named language entity such as a package,
@@ -38,7 +40,7 @@ type Const struct {
 	Pkg  *Package
 	Name string
 	Type Type
-	Val  interface{} // nil means unknown constant value due to type error
+	Val  constants.Value
 
 	visited bool // for initialization cycle detection
 	spec    *ast.ValueSpec
@@ -156,7 +158,7 @@ func (*Func) anObject()     {}
 // For canonicalization, see check.lookup.
 //
 // TODO(gri) Once we do identifier resolution completely in
-//           in the typechecker, this functionality can go.
+//           the typechecker, this functionality can go.
 //
 func newObj(pkg *Package, astObj *ast.Object) Object {
 	assert(pkg != nil)
@@ -168,7 +170,8 @@ func newObj(pkg *Package, astObj *ast.Object) Object {
 	case ast.Pkg:
 		unreachable()
 	case ast.Con:
-		return &Const{Pkg: pkg, Name: name, Type: typ, Val: astObj.Data, spec: astObj.Decl.(*ast.ValueSpec)}
+		iota := astObj.Data.(int)
+		return &Const{Pkg: pkg, Name: name, Type: typ, Val: constants.MakeInt64(int64(iota)), spec: astObj.Decl.(*ast.ValueSpec)}
 	case ast.Typ:
 		return &TypeName{Pkg: pkg, Name: name, Type: typ, spec: astObj.Decl.(*ast.TypeSpec)}
 	case ast.Var:

@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 // An operandMode specifies the (addressing) mode of an operand.
@@ -44,7 +46,7 @@ type operand struct {
 	mode operandMode
 	expr ast.Expr
 	typ  Type
-	val  interface{}
+	val  constants.Value
 }
 
 // pos returns the position of the expression corresponding to x.
@@ -86,42 +88,35 @@ func (x *operand) String() string {
 
 // setConst sets x to the untyped constant for literal lit.
 func (x *operand) setConst(tok token.Token, lit string) {
-	x.mode = invalid
+	val := constants.MakeFromLiteral(lit, tok)
+	if val == nil {
+		// TODO(gri) Should we make it an unknown constant instead?
+		x.mode = invalid
+		return
+	}
 
 	var kind BasicKind
-	var val interface{}
 	switch tok {
 	case token.INT:
 		kind = UntypedInt
-		val = makeIntConst(lit)
-
 	case token.FLOAT:
 		kind = UntypedFloat
-		val = makeFloatConst(lit)
-
 	case token.IMAG:
 		kind = UntypedComplex
-		val = makeComplexConst(lit)
-
 	case token.CHAR:
 		kind = UntypedRune
-		val = makeRuneConst(lit)
-
 	case token.STRING:
 		kind = UntypedString
-		val = makeStringConst(lit)
 	}
 
-	if val != nil {
-		x.mode = constant
-		x.typ = Typ[kind]
-		x.val = val
-	}
+	x.mode = constant
+	x.typ = Typ[kind]
+	x.val = val
 }
 
 // isNil reports whether x is the predeclared nil constant.
 func (x *operand) isNil() bool {
-	return x.mode == constant && x.val == nilConst
+	return x.mode == constant && x.val.Kind() == constants.Nil
 }
 
 // TODO(gri) The functions operand.isAssignable, checker.convertUntyped,

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+
+	constants "code.google.com/p/go.exp/go/types/constant"
 )
 
 // debugging support
@@ -20,10 +22,9 @@ const (
 
 // exprInfo stores type and constant value for an untyped expression.
 type exprInfo struct {
-	isConst bool // expression has a, possibly unknown, constant value
-	isLhs   bool // expression is lhs operand of a shift with delayed type check
-	typ     *Basic
-	val     interface{} // constant value (may be nil if unknown); valid if isConst
+	isLhs bool // expression is lhs operand of a shift with delayed type check
+	typ   *Basic
+	val   constants.Value // constant value; or nil (if not a constant)
 }
 
 // A checker is an instance of the type checker.
@@ -219,8 +220,8 @@ func (check *checker) object(obj Object, cycleOk bool) {
 		}
 		obj.visited = true
 		spec := obj.spec
-		iota := obj.Val.(int)
-		obj.Val = nil // set to a valid (but unknown) constant value
+		iota := int(constants.Int64Val(obj.Val))
+		obj.Val = constants.MakeUnknown()
 		// determine spec for type and initialization expressions
 		init := spec
 		if len(init.Values) == 0 {
@@ -501,11 +502,7 @@ func check(ctxt *Context, fset *token.FileSet, files []*ast.File) (pkg *Package,
 	// map size and more immediate feedback.
 	if ctxt.Expr != nil {
 		for x, info := range check.untyped {
-			var val interface{}
-			if info.isConst {
-				val = info.val
-			}
-			ctxt.Expr(x, info.typ, val)
+			ctxt.Expr(x, info.typ, info.val)
 		}
 	}
 
