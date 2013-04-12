@@ -235,9 +235,23 @@ func Sign(x Value) int {
 	panic(fmt.Sprintf("invalid Sign(%s)", x))
 }
 
-// Real and Imag return the real and imaginary parts of a complex value.
-func Real(x Value) Value { return normFloat(x.(complexVal).re) }
-func Imag(x Value) Value { return normFloat(x.(complexVal).im) }
+// Real returns the real part of x, which must be a numeric value.
+// If x is unknown, the result is unknown.
+func Real(x Value) Value {
+	if z, ok := x.(complexVal); ok {
+		return normFloat(z.re)
+	}
+	return x
+}
+
+// Imag returns the imaginary part of x, which must be a numeric value.
+// If x is unknown, the result is 0.
+func Imag(x Value) Value {
+	if z, ok := x.(complexVal); ok {
+		return normFloat(z.im)
+	}
+	return int64Val(0)
+}
 
 // ----------------------------------------------------------------------------
 // Operations
@@ -314,8 +328,8 @@ var (
 )
 
 // match returns the matching representation (same type) with the
-// smallest complexity for two constant values x and y. They must
-// be of the same "class" (unknown, nil, bool, string, numeric).
+// smallest complexity for two values x and y. If one of them is
+// numeric, both of them must be numeric.
 //
 func match(x, y Value) (_, _ Value) {
 	if x.Kind() > y.Kind() {
