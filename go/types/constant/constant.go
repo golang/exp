@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package constant implements mathematically precise constants
+// Package constant implements mathematically precise values
 // and operations for all Go basic types.
 //
 package constant
@@ -14,48 +14,43 @@ import (
 	"strconv"
 )
 
-// The constant kind is expressed as a value of type Kind.
+// Kind specifies the kind of value represented by a Value.
 type Kind int
 
-// Implementation note: Kind values must be enumerated in
-// order of increasing "complexity" (used by match below).
+// Implementation note: Kinds must be enumerated in
+// order of increasing "complexity" (used by match).
 
 const (
-	// constants of unknown value
+	// unknown values
 	Unknown Kind = iota
 
-	// non-numeric constants
+	// non-numeric values
 	Nil
 	Bool
 	String
 
-	// numeric constants
-	Int64 // integer fits into 64 bits
+	// numeric values
+	Int64 // integers that fit into 64 bits
 	Int
 	Float
 	Complex
 )
 
-// A Value represents a constant value.
-// The value of a constant of Unknown kind is unknown;
-// all operations involving unknown constants succeed
-// in order to avoid spurious errors.
-//
+// A Value represents a mathematically precise value of a given Kind.
 type Value interface {
-	// Kind returns the constant kind. A value's kind
-	// is always the smallest kind in which the value
-	// can be represented accurately.
+	// Kind returns the value kind; it is always the smallest
+	// kind in which the value can be represented exactly.
 	Kind() Kind
 
-	// String returns a human-readable form of the constant value.
+	// String returns a human-readable form of the value.
 	String() string
 
 	// Prevent external implementations.
 	implementsValue()
 }
 
-// TODO(gri): Provide operations to truncate numeric values
-//            to specific machine sizes.
+// TODO(gri) Handle unknown values more consistently. Some operations
+//           accept unknowns, some don't.
 
 // ----------------------------------------------------------------------------
 // Implementations
@@ -128,30 +123,32 @@ func normComplex(re, im *big.Rat) Value {
 // ----------------------------------------------------------------------------
 // Factories
 
-func MakeUnknown() Value        { return unknownVal{} }
-func MakeNil() Value            { return nilVal{} }
-func MakeBool(b bool) Value     { return boolVal(b) }
-func MakeString(s string) Value { return stringVal(s) }
-func MakeInt64(x int64) Value   { return int64Val(x) }
+// MakeUnknown returns the Unknown value.
+func MakeUnknown() Value { return unknownVal{} }
 
-// MakeImag returns the imaginary value x*i;
-// x must be a non-complex numeric value.
-// If x is unknown, the result is unknown.
-func MakeImag(x Value) Value {
-	var im *big.Rat
-	switch x := x.(type) {
-	case unknownVal:
-		return x
-	case int64Val:
-		im = big.NewRat(int64(x), 1)
-	case intVal:
-		im = new(big.Rat).SetFrac(x.val, int1)
-	case floatVal:
-		im = x.val
-	default:
-		panic(fmt.Sprintf("invalid MakeImag(%s)", x))
+// MakeNil returns the Nil value.
+func MakeNil() Value { return nilVal{} }
+
+// MakeBool returns the Bool value for x.
+func MakeBool(b bool) Value { return boolVal(b) }
+
+// MakeString returns the String value for x.
+func MakeString(s string) Value { return stringVal(s) }
+
+// MakeInt64 returns the Int64 value for x.
+func MakeInt64(x int64) Value { return int64Val(x) }
+
+// MakeInt returns the integer value for x.
+func MakeInt(x uint64) Value { return normInt(new(big.Int).SetUint64(x)) }
+
+// MakeFloat returns the numeric value for x.
+// If x is not finite, the result is unknown.
+func MakeFloat(x float64) Value {
+	f := new(big.Rat).SetFloat64(x)
+	if f != nil {
+		return normFloat(f)
 	}
-	return normComplex(rat0, im)
+	return unknownVal{}
 }
 
 // MakeFromLiteral returns the corresponding literal value.
@@ -191,32 +188,67 @@ func MakeFromLiteral(lit string, tok token.Token) Value {
 		}
 	}
 
+	// TODO(gri) should we instead a) return unknown, or b) an error?
 	return nil
 }
 
 // ----------------------------------------------------------------------------
 // Accessors
 
-// XVal returns the argument's corresponding Go value.
+// BoolVal returns the Go boolean value of x, which must be a Bool.
+func BoolVal(x Value) bool { return bool(x.(boolVal)) }
 
-func BoolVal(x Value) bool     { return bool(x.(boolVal)) }
+// StringVal returns the Go string value of x, which must be a String.
 func StringVal(x Value) string { return string(x.(stringVal)) }
-func Int64Val(x Value) int64   { return int64(x.(int64Val)) }
+
+// Int64Val returns the Go int64 value of x, which must be an Int64.
+func Int64Val(x Value) int64 { return int64(x.(int64Val)) }
+
+// IntVal returns the Go uint64 value of x and whether the result is exact;
+// x must be an integer. If the result is not exact, its value is undefined.
+func IntVal(x Value) (uint64, bool) {
+	switch x := x.(type) {
+	case int64Val:
+		return uint64(x), x >= 0
+	case intVal:
+		if x.val.Sign() >= 0 && x.val.BitLen() <= 64 {
+			return x.val.Uint64(), true
+		}
+		return 0, false
+	}
+	panic(fmt.Sprintf("invalid IntVal(%v)", x))
+}
+
+// Float64Val returns the nearest Go float64 value of x and whether the result is exact;
+// x must be numeric but not complex.
+func Float64Val(x Value) (float64, bool) {
+	switch x := x.(type) {
+	case int64Val:
+		f := float64(int64(x))
+		return f, int64Val(f) == x
+	case intVal:
+		return new(big.Rat).SetFrac(x.val, int1).Float64()
+	case floatVal:
+		return x.val.Float64()
+	}
+	panic(fmt.Sprintf("invalid Float64Val(%v)", x))
+}
 
 // IntBitLen() returns the number of bits required to represent
-// the (unsigned) value x in binary representation. x must be Int.
+// the (unsigned) value x in binary representation; x must be an Int.
 func IntBitLen(x Value) int { return x.(intVal).val.BitLen() }
 
 // Sign returns -1, 0, or 1 depending on whether
 // x < 0, x == 0, or x > 0. For complex values z,
 // the sign is 0 if z == 0, otherwise it is != 0.
-// For unknown values, the sign is always 0. For
+// For unknown values, the sign is always 1 (this
+// helps avoiding "division by zero errors"). For
 // all other values, Sign panics.
 //
 func Sign(x Value) int {
 	switch x := x.(type) {
 	case unknownVal:
-		return 0
+		return 1
 	case int64Val:
 		switch {
 		case x < 0:
@@ -232,7 +264,30 @@ func Sign(x Value) int {
 	case complexVal:
 		return x.re.Sign() | x.im.Sign()
 	}
-	panic(fmt.Sprintf("invalid Sign(%s)", x))
+	panic(fmt.Sprintf("invalid Sign(%v)", x))
+}
+
+// ----------------------------------------------------------------------------
+// Support for assembling/disassembling complex numbers
+
+// MakeImag returns the numeric value x*i (possibly 0);
+// x must be numeric but not complex.
+// If x is unknown, the result is unknown.
+func MakeImag(x Value) Value {
+	var im *big.Rat
+	switch x := x.(type) {
+	case unknownVal:
+		return x
+	case int64Val:
+		im = big.NewRat(int64(x), 1)
+	case intVal:
+		im = new(big.Rat).SetFrac(x.val, int1)
+	case floatVal:
+		im = x.val
+	default:
+		panic(fmt.Sprintf("invalid MakeImag(%v)", x))
+	}
+	return normComplex(rat0, im)
 }
 
 // Real returns the real part of x, which must be a numeric value.
@@ -319,7 +374,7 @@ func UnaryOp(op token.Token, y Value, size int) Value {
 	}
 
 Error:
-	panic(fmt.Sprintf("invalid unary operation %s%s", op, y))
+	panic(fmt.Sprintf("invalid unary operation %s%v", op, y))
 }
 
 var (
@@ -532,7 +587,7 @@ func BinaryOp(x Value, op token.Token, y Value) Value {
 	}
 
 Error:
-	panic(fmt.Sprintf("invalid binary operation %s %s %s", x, op, y))
+	panic(fmt.Sprintf("invalid binary operation %v %s %v", x, op, y))
 }
 
 // Shift returns the result of the shift expression x op s
@@ -569,7 +624,7 @@ func Shift(x Value, op token.Token, s uint) Value {
 		}
 	}
 
-	panic(fmt.Sprintf("invalid shift %s %s %d", x, op, s))
+	panic(fmt.Sprintf("invalid shift %v %s %d", x, op, s))
 }
 
 func cmpZero(x int, op token.Token) bool {
@@ -661,5 +716,5 @@ func Compare(x Value, op token.Token, y Value) bool {
 		}
 	}
 
-	panic(fmt.Sprintf("invalid comparison %s %s %s", x, op, y))
+	panic(fmt.Sprintf("invalid comparison %v %s %v", x, op, y))
 }
