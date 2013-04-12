@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"sync"
 
+	"code.google.com/p/go.exp/go/exact"
 	"code.google.com/p/go.exp/go/types"
 )
 
@@ -314,7 +315,7 @@ type Parameter struct {
 //
 type Literal struct {
 	Type_ types.Type
-	Value interface{}
+	Value exact.Value
 }
 
 // A Global is a named Value holding the address of a package-level

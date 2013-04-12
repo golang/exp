@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unsafe"
 
+	"code.google.com/p/go.exp/go/exact"
 	"code.google.com/p/go.exp/go/types"
 	"code.google.com/p/go.exp/ssa"
 )
@@ -32,7 +33,7 @@ func literalValue(l *ssa.Literal) value {
 	case *types.Basic:
 		switch t.Kind {
 		case types.Bool, types.UntypedBool:
-			return l.Value.(bool)
+			return exact.BoolVal(l.Value)
 		case types.Int, types.UntypedInt:
 			// Assume sizeof(int) is same on host and target.
 			return int(l.Int64())
@@ -67,8 +68,8 @@ func literalValue(l *ssa.Literal) value {
 		case types.Complex128, types.UntypedComplex:
 			return l.Complex128()
 		case types.String, types.UntypedString:
-			if v, ok := l.Value.(string); ok {
-				return v
+			if l.Value.Kind() == exact.String {
+				return exact.StringVal(l.Value)
 			}
 			return string(rune(l.Int64()))
 		case types.UnsafePointer:
@@ -83,13 +84,13 @@ func literalValue(l *ssa.Literal) value {
 			switch et.Kind {
 			case types.Byte: // string -> []byte
 				var v []value
-				for _, b := range []byte(l.Value.(string)) {
+				for _, b := range []byte(exact.StringVal(l.Value)) {
 					v = append(v, b)
 				}
 				return v
 			case types.Rune: // string -> []rune
 				var v []value
-				for _, r := range []rune(l.Value.(string)) {
+				for _, r := range []rune(exact.StringVal(l.Value)) {
 					v = append(v, r)
 				}
 				return v

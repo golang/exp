@@ -33,6 +33,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"code.google.com/p/go.exp/go/exact"
 	"code.google.com/p/go.exp/go/types"
 )
 
@@ -62,8 +63,8 @@ var (
 	// SSA Value constants.
 	vZero  = intLiteral(0)
 	vOne   = intLiteral(1)
-	vTrue  = newLiteral(true, tBool)
-	vFalse = newLiteral(false, tBool)
+	vTrue  = newLiteral(exact.MakeBool(true), tBool)
+	vFalse = newLiteral(exact.MakeBool(false), tBool)
 )
 
 // A Builder creates the SSA representation of a single program.
@@ -152,7 +153,7 @@ func NewBuilder(mode BuilderMode, loader SourceLoader, errh func(error)) *Builde
 	// package so we can discard them once that package is built.
 	b.typechecker = types.Context{
 		Error: errh,
-		Expr: func(x ast.Expr, typ types.Type, val interface{}) {
+		Expr: func(x ast.Expr, typ types.Type, val exact.Value) {
 			b.types[x] = typ
 			if val != nil {
 				b.constants[x] = newLiteral(val, typ)
@@ -317,7 +318,7 @@ func (b *Builder) cond(fn *Function, e ast.Expr, t, f *BasicBlock) {
 	switch cond := b.expr(fn, e).(type) {
 	case *Literal:
 		// Dispatch constant conditions statically.
-		if cond.Value.(bool) {
+		if exact.BoolVal(cond.Value) {
 			emitJump(fn, t)
 		} else {
 			emitJump(fn, f)
