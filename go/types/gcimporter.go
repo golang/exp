@@ -20,7 +20,7 @@ import (
 	"strings"
 	"text/scanner"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 var pkgExts = [...]string{".a", ".5", ".6", ".8"}
@@ -693,7 +693,7 @@ func (p *gcParser) parseNumber() (x operand) {
 	x.mode = constant
 
 	// mantissa
-	mant := constants.MakeFromLiteral(p.parseInt(), token.INT)
+	mant := exact.MakeFromLiteral(p.parseInt(), token.INT)
 	assert(mant != nil)
 
 	if p.lit == "p" {
@@ -704,14 +704,14 @@ func (p *gcParser) parseNumber() (x operand) {
 			p.error(err)
 		}
 		if exp < 0 {
-			denom := constants.MakeInt64(1)
-			denom = constants.Shift(denom, token.SHL, uint(-exp))
+			denom := exact.MakeInt64(1)
+			denom = exact.Shift(denom, token.SHL, uint(-exp))
 			x.typ = Typ[UntypedFloat]
-			x.val = constants.BinaryOp(mant, token.QUO, denom)
+			x.val = exact.BinaryOp(mant, token.QUO, denom)
 			return
 		}
 		if exp > 0 {
-			mant = constants.Shift(mant, token.SHL, uint(exp))
+			mant = exact.Shift(mant, token.SHL, uint(exp))
 		}
 		x.typ = Typ[UntypedFloat]
 		x.val = mant
@@ -746,7 +746,7 @@ func (p *gcParser) parseConstDecl() {
 			p.error("expected true or false")
 		}
 		x.typ = Typ[UntypedBool]
-		x.val = constants.MakeBool(p.lit == "true")
+		x.val = exact.MakeBool(p.lit == "true")
 		p.next()
 
 	case '-', scanner.Int:
@@ -772,7 +772,7 @@ func (p *gcParser) parseConstDecl() {
 		x.typ = Typ[UntypedComplex]
 		// TODO(gri) fix this
 		_, _ = re, im
-		x.val = constants.MakeInt64(0)
+		x.val = exact.MakeInt64(0)
 
 	case scanner.Char:
 		// rune_lit

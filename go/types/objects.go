@@ -8,7 +8,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // An Object describes a named language entity such as a package,
@@ -40,7 +40,7 @@ type Const struct {
 	Pkg  *Package
 	Name string
 	Type Type
-	Val  constants.Value
+	Val  exact.Value
 
 	visited bool // for initialization cycle detection
 	spec    *ast.ValueSpec
@@ -171,7 +171,7 @@ func newObj(pkg *Package, astObj *ast.Object) Object {
 		unreachable()
 	case ast.Con:
 		iota := astObj.Data.(int)
-		return &Const{Pkg: pkg, Name: name, Type: typ, Val: constants.MakeInt64(int64(iota)), spec: astObj.Decl.(*ast.ValueSpec)}
+		return &Const{Pkg: pkg, Name: name, Type: typ, Val: exact.MakeInt64(int64(iota)), spec: astObj.Decl.(*ast.ValueSpec)}
 	case ast.Typ:
 		return &TypeName{Pkg: pkg, Name: name, Type: typ, spec: astObj.Decl.(*ast.TypeSpec)}
 	case ast.Var:

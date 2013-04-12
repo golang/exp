@@ -9,7 +9,7 @@ package types
 import (
 	"go/ast"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // conversion typechecks the type conversion conv to type typ. iota is the current
@@ -40,13 +40,13 @@ func (check *checker) conversion(x *operand, conv *ast.CallExpr, typ Type, iota 
 			switch {
 			case x.isInteger():
 				codepoint := int64(-1)
-				if x.val.Kind() == constants.Int64 {
-					codepoint = constants.Int64Val(x.val)
+				if x.val.Kind() == exact.Int64 {
+					codepoint = exact.Int64Val(x.val)
 				}
 				// If codepoint < 0 the absolute value is too large (or unknown) for
 				// conversion. This is the same as converting any other out-of-range
 				// value - let string(codepoint) do the work.
-				x.val = constants.MakeString(string(codepoint))
+				x.val = exact.MakeString(string(codepoint))
 			case isString(x.typ):
 				// nothing to do
 			default:

@@ -10,7 +10,7 @@ import (
 	"go/ast"
 	"strings"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 var (
@@ -57,10 +57,10 @@ var aliases = [...]*Basic{
 }
 
 var predeclaredConstants = [...]*Const{
-	{Name: "true", Type: Typ[UntypedBool], Val: constants.MakeBool(true)},
-	{Name: "false", Type: Typ[UntypedBool], Val: constants.MakeBool(false)},
-	{Name: "iota", Type: Typ[UntypedInt], Val: constants.MakeInt64(0)},
-	{Name: "nil", Type: Typ[UntypedNil], Val: constants.MakeNil()},
+	{Name: "true", Type: Typ[UntypedBool], Val: exact.MakeBool(true)},
+	{Name: "false", Type: Typ[UntypedBool], Val: exact.MakeBool(false)},
+	{Name: "iota", Type: Typ[UntypedInt], Val: exact.MakeInt64(0)},
+	{Name: "nil", Type: Typ[UntypedNil], Val: exact.MakeNil()},
 }
 
 var predeclaredFunctions = [...]*builtin{

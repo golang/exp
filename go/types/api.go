@@ -39,7 +39,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // A Context specifies the supporting context for type checking.
@@ -69,7 +69,7 @@ type Context struct {
 	// the dynamic type of x (never an interface type). Otherwise, typ is x's
 	// static type (possibly an interface type).
 	// TODO(gri): Should this hold for all constant expressions?
-	Expr func(x ast.Expr, typ Type, val constants.Value)
+	Expr func(x ast.Expr, typ Type, val exact.Value)
 
 	// If Import != nil, it is called for each imported package.
 	// Otherwise, GcImporter is called.

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package constant implements mathematically precise values
+// Package exact implements mathematically exact values
 // and operations for all Go basic types.
 //
-package constant
+package exact
 
 import (
 	"fmt"

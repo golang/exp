@@ -10,7 +10,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // TODO(gri): Several built-ins are missing assignment checks. As a result,
@@ -76,13 +76,13 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 
 	case _Cap, _Len:
 		mode := invalid
-		var val constants.Value
+		var val exact.Value
 		switch typ := implicitArrayDeref(underlying(x.typ)).(type) {
 		case *Basic:
 			if isString(typ) && id == _Len {
 				if x.mode == constant {
 					mode = constant
-					val = constants.MakeInt64(int64(len(constants.StringVal(x.val))))
+					val = exact.MakeInt64(int64(len(exact.StringVal(x.val))))
 				} else {
 					mode = value
 				}
@@ -96,7 +96,7 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 			// function calls; in this case s is not evaluated."
 			if !check.containsCallsOrReceives(arg0) {
 				mode = constant
-				val = constants.MakeInt64(typ.Len)
+				val = exact.MakeInt64(typ.Len)
 			}
 
 		case *Slice, *Chan:
@@ -158,7 +158,7 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 
 		typ := underlying(x.typ).(*Basic)
 		if x.mode == constant && y.mode == constant {
-			x.val = constants.BinaryOp(x.val, token.ADD, constants.MakeImag(y.val))
+			x.val = exact.BinaryOp(x.val, token.ADD, exact.MakeImag(y.val))
 		} else {
 			x.mode = value
 		}
@@ -250,9 +250,9 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 		}
 		if x.mode == constant {
 			if id == _Real {
-				x.val = constants.Real(x.val)
+				x.val = exact.Real(x.val)
 			} else {
-				x.val = constants.Imag(x.val)
+				x.val = exact.Imag(x.val)
 			}
 		} else {
 			x.mode = value
@@ -328,7 +328,7 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 
 	case _Alignof:
 		x.mode = constant
-		x.val = constants.MakeInt64(check.ctxt.alignof(x.typ))
+		x.val = exact.MakeInt64(check.ctxt.alignof(x.typ))
 		x.typ = Typ[Uintptr]
 
 	case _Offsetof:
@@ -353,12 +353,12 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 			goto Error
 		}
 		x.mode = constant
-		x.val = constants.MakeInt64(offs)
+		x.val = exact.MakeInt64(offs)
 		x.typ = Typ[Uintptr]
 
 	case _Sizeof:
 		x.mode = constant
-		x.val = constants.MakeInt64(check.ctxt.sizeof(x.typ))
+		x.val = exact.MakeInt64(check.ctxt.sizeof(x.typ))
 		x.typ = Typ[Uintptr]
 
 	case _Assert:
@@ -369,11 +369,11 @@ func (check *checker) builtin(x *operand, call *ast.CallExpr, bin *builtin, iota
 			check.invalidArg(x.pos(), "%s is not a boolean constant", x)
 			goto Error
 		}
-		if x.val.Kind() != constants.Bool {
+		if x.val.Kind() != exact.Bool {
 			check.errorf(x.pos(), "internal error: value of %s should be a boolean constant", x)
 			goto Error
 		}
-		if !constants.BoolVal(x.val) {
+		if !exact.BoolVal(x.val) {
 			check.errorf(call.Pos(), "%s failed", call)
 			// compile-time assertion failure - safe to continue
 		}

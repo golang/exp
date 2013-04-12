@@ -11,7 +11,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // debugging support
@@ -24,7 +24,7 @@ const (
 type exprInfo struct {
 	isLhs bool // expression is lhs operand of a shift with delayed type check
 	typ   *Basic
-	val   constants.Value // constant value; or nil (if not a constant)
+	val   exact.Value // constant value; or nil (if not a constant)
 }
 
 // A checker is an instance of the type checker.
@@ -220,8 +220,8 @@ func (check *checker) object(obj Object, cycleOk bool) {
 		}
 		obj.visited = true
 		spec := obj.spec
-		iota := int(constants.Int64Val(obj.Val))
-		obj.Val = constants.MakeUnknown()
+		iota := int(exact.Int64Val(obj.Val))
+		obj.Val = exact.MakeUnknown()
 		// determine spec for type and initialization expressions
 		init := spec
 		if len(init.Values) == 0 {

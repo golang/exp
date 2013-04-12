@@ -11,7 +11,7 @@ import (
 	"go/token"
 	"strconv"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // TODO(gri) Internal cleanups
@@ -273,7 +273,7 @@ func (check *checker) unary(x *operand, op token.Token) {
 		if isUnsigned(typ) {
 			size = int(check.ctxt.sizeof(typ))
 		}
-		x.val = constants.UnaryOp(op, x.val, size)
+		x.val = exact.UnaryOp(op, x.val, size)
 		// Typed constants must be representable in
 		// their type after each constant operation.
 		check.isRepresentable(x, typ)
@@ -301,16 +301,16 @@ func isComparison(op token.Token) bool {
 	return false
 }
 
-func isRepresentableConst(x constants.Value, ctxt *Context, as BasicKind) bool {
+func isRepresentableConst(x exact.Value, ctxt *Context, as BasicKind) bool {
 	switch x.Kind() {
-	case constants.Unknown:
+	case exact.Unknown:
 		return true
 
-	case constants.Bool:
+	case exact.Bool:
 		return as == Bool || as == UntypedBool
 
-	case constants.Int64:
-		x := constants.Int64Val(x)
+	case exact.Int64:
+		x := exact.Int64Val(x)
 		switch as {
 		case Int:
 			var s = uint(ctxt.sizeof(Typ[as])) * 8
@@ -352,14 +352,14 @@ func isRepresentableConst(x constants.Value, ctxt *Context, as BasicKind) bool {
 			return true
 		}
 
-	case constants.Int:
-		n := constants.IntBitLen(x)
+	case exact.Int:
+		n := exact.IntBitLen(x)
 		switch as {
 		case Uint, Uintptr:
 			var s = uint(ctxt.sizeof(Typ[as])) * 8
-			return constants.Sign(x) >= 0 && n <= int(s)
+			return exact.Sign(x) >= 0 && n <= int(s)
 		case Uint64:
-			return constants.Sign(x) >= 0 && n <= 64
+			return exact.Sign(x) >= 0 && n <= 64
 		case Float32:
 			return true // TODO(gri) fix this
 		case Float64:
@@ -372,7 +372,7 @@ func isRepresentableConst(x constants.Value, ctxt *Context, as BasicKind) bool {
 			return true
 		}
 
-	case constants.Float:
+	case exact.Float:
 		switch as {
 		case Float32:
 			return true // TODO(gri) fix this
@@ -386,7 +386,7 @@ func isRepresentableConst(x constants.Value, ctxt *Context, as BasicKind) bool {
 			return true
 		}
 
-	case constants.Complex:
+	case exact.Complex:
 		switch as {
 		case Complex64:
 			return true // TODO(gri) fix this
@@ -396,10 +396,10 @@ func isRepresentableConst(x constants.Value, ctxt *Context, as BasicKind) bool {
 			return true
 		}
 
-	case constants.String:
+	case exact.String:
 		return as == String || as == UntypedString
 
-	case constants.Nil:
+	case exact.Nil:
 		return as == UntypedNil || as == UnsafePointer
 
 	default:
@@ -639,7 +639,7 @@ func (check *checker) comparison(x, y *operand, op token.Token) {
 	}
 
 	if x.mode == constant && y.mode == constant {
-		x.val = constants.MakeBool(constants.Compare(x.val, op, y.val))
+		x.val = exact.MakeBool(exact.Compare(x.val, op, y.val))
 		// The operands are never materialized; no need to update
 		// their types.
 	} else {
@@ -694,8 +694,8 @@ func (check *checker) shift(x, y *operand, op token.Token) {
 			// rhs must be within reasonable bounds
 			const stupidShift = 1024
 			s := int64(-1)
-			if y.val.Kind() == constants.Int64 {
-				s = constants.Int64Val(y.val)
+			if y.val.Kind() == exact.Int64 {
+				s = exact.Int64Val(y.val)
 			}
 			if s < 0 || s >= stupidShift {
 				check.invalidOp(y.pos(), "%s: stupid shift", y)
@@ -703,7 +703,7 @@ func (check *checker) shift(x, y *operand, op token.Token) {
 				return
 			}
 			// everything's ok
-			x.val = constants.Shift(x.val, op, uint(s))
+			x.val = exact.Shift(x.val, op, uint(s))
 			return
 		}
 
@@ -808,7 +808,7 @@ func (check *checker) binary(x *operand, lhs, rhs ast.Expr, op token.Token, iota
 		return
 	}
 
-	if (op == token.QUO || op == token.REM) && y.mode == constant && constants.Sign(y.val) == 0 {
+	if (op == token.QUO || op == token.REM) && y.mode == constant && exact.Sign(y.val) == 0 {
 		check.invalidOp(y.pos(), "division by zero")
 		x.mode = invalid
 		return
@@ -820,7 +820,7 @@ func (check *checker) binary(x *operand, lhs, rhs ast.Expr, op token.Token, iota
 		if op == token.QUO && isInteger(typ) {
 			op = token.QUO_ASSIGN
 		}
-		x.val = constants.BinaryOp(x.val, op, y.val)
+		x.val = exact.BinaryOp(x.val, op, y.val)
 		// Typed constants must be representable in
 		// their type after each constant operation.
 		check.isRepresentable(x, typ)
@@ -852,7 +852,7 @@ func (check *checker) index(arg ast.Expr, length int64, iota int) (i int64, ok b
 
 	// a constant index/size i must be 0 <= i < length
 	if x.mode == constant {
-		i = constants.Int64Val(x.val)
+		i = exact.Int64Val(x.val)
 		if i < 0 {
 			check.invalidArg(x.pos(), "%s must not be negative", &x)
 			return
@@ -983,7 +983,7 @@ var emptyResult Result
 func (check *checker) callExpr(x *operand) {
 	// convert x into a user-friendly set of values
 	var typ Type
-	var val constants.Value
+	var val exact.Value
 	switch x.mode {
 	case invalid:
 		return // nothing to do
@@ -1060,7 +1060,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 					check.invalidAST(e.Pos(), "cannot use iota outside constant declaration")
 					goto Error
 				}
-				x.val = constants.MakeInt64(int64(iota))
+				x.val = exact.MakeInt64(int64(iota))
 			} else {
 				x.val = obj.Val // may be nil if we don't know the constant value
 			}
@@ -1340,7 +1340,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			if isString(typ) {
 				valid = true
 				if x.mode == constant {
-					length = int64(len(constants.StringVal(x.val)))
+					length = int64(len(exact.StringVal(x.val)))
 				}
 				// an indexed string always yields a byte value
 				// (not a constant) even if the string and the
@@ -1411,7 +1411,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			if isString(typ) {
 				valid = true
 				if x.mode == constant {
-					length = int64(len(constants.StringVal(x.val))) + 1 // +1 for slice
+					length = int64(len(exact.StringVal(x.val))) + 1 // +1 for slice
 				}
 				// a sliced string always yields a string value
 				// of the same type as the original string (not
@@ -1649,8 +1649,8 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				goto Error
 			}
 			n := int64(-1)
-			if x.val.Kind() == constants.Int64 {
-				n = constants.Int64Val(x.val)
+			if x.val.Kind() == exact.Int64 {
+				n = exact.Int64Val(x.val)
 			}
 			if n < 0 {
 				check.errorf(x.pos(), "invalid array length %s", x)

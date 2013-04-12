@@ -12,7 +12,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	constants "code.google.com/p/go.exp/go/types/constant"
+	"code.google.com/p/go.exp/go/exact"
 )
 
 // An operandMode specifies the (addressing) mode of an operand.
@@ -46,7 +46,7 @@ type operand struct {
 	mode operandMode
 	expr ast.Expr
 	typ  Type
-	val  constants.Value
+	val  exact.Value
 }
 
 // pos returns the position of the expression corresponding to x.
@@ -88,7 +88,7 @@ func (x *operand) String() string {
 
 // setConst sets x to the untyped constant for literal lit.
 func (x *operand) setConst(tok token.Token, lit string) {
-	val := constants.MakeFromLiteral(lit, tok)
+	val := exact.MakeFromLiteral(lit, tok)
 	if val == nil {
 		// TODO(gri) Should we make it an unknown constant instead?
 		x.mode = invalid
@@ -116,7 +116,7 @@ func (x *operand) setConst(tok token.Token, lit string) {
 
 // isNil reports whether x is the predeclared nil constant.
 func (x *operand) isNil() bool {
-	return x.mode == constant && x.val.Kind() == constants.Nil
+	return x.mode == constant && x.val.Kind() == exact.Nil
 }
 
 // TODO(gri) The functions operand.isAssignable, checker.convertUntyped,
