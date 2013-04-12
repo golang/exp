@@ -82,7 +82,7 @@ func (complexVal) Kind() Kind { return Complex }
 
 func (unknownVal) String() string   { return "unknown" }
 func (nilVal) String() string       { return "nil" }
-func (x boolVal) String() string    { return fmt.Sprintf("%v", x) }
+func (x boolVal) String() string    { return fmt.Sprintf("%v", bool(x)) }
 func (x stringVal) String() string  { return strconv.Quote(string(x)) }
 func (x int64Val) String() string   { return strconv.FormatInt(int64(x), 10) }
 func (x intVal) String() string     { return x.val.String() }
