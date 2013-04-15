@@ -92,14 +92,8 @@ func (l *Literal) IsNil() bool {
 //
 func (l *Literal) Int64() int64 {
 	switch x := l.Value; x.Kind() {
-	case exact.Int64:
-		return exact.Int64Val(x)
 	case exact.Int:
-		if u, ok := exact.IntVal(x); ok {
-			i := int64(u)
-			if exact.Sign(x) < 0 {
-				i = -i
-			}
+		if i, ok := exact.Int64Val(x); ok {
 			return i
 		}
 		return 0
@@ -114,11 +108,17 @@ func (l *Literal) Int64() int64 {
 // an unsigned 64-bit integer.
 //
 func (l *Literal) Uint64() uint64 {
-	if exact.Sign(l.Value) < 0 {
+	switch x := l.Value; x.Kind() {
+	case exact.Int:
+		if u, ok := exact.Uint64Val(x); ok {
+			return u
+		}
 		return 0
+	case exact.Float:
+		f, _ := exact.Float64Val(x)
+		return uint64(f)
 	}
-	x, _ := exact.IntVal(l.Value)
-	return x
+	panic(fmt.Sprintf("unexpected literal value: %T", l.Value))
 }
 
 // Float64 returns the numeric value of this literal truncated to fit

@@ -22,6 +22,11 @@ var tests = []string{
 	// etc.
 
 	// binary operations
+	`"" + "" = ""`,
+	`"foo" + "" = "foo"`,
+	`"" + "bar" = "bar"`,
+	`"foo" + "bar" = "foobar"`,
+
 	`0 + 0 = 0`,
 	`0 + 0.1 = 0.1`,
 	`0 + 0.1i = 0.1i`,
@@ -52,9 +57,25 @@ var tests = []string{
 	// etc.
 
 	// comparisons
-	`0 == 0 = true`,
-	`0 != 0 = false`,
+	`false == false = true`,
+	`false == true = false`,
+	`true == false = false`,
+	`true == true = true`,
+
+	`false != false = false`,
+	`false != true = true`,
+	`true != false = true`,
+	`true != true = false`,
+
+	`"foo" == "bar" = false`,
 	`"foo" != "bar" = true`,
+	`"foo" < "bar" = false`,
+	`"foo" <= "bar" = false`,
+	`"foo" > "bar" = true`,
+	`"foo" >= "bar" = true`,
+
+	`0 != 0 = false`,
+
 	// etc.
 }
 
@@ -89,6 +110,10 @@ func val(lit string) Value {
 	}
 
 	switch lit {
+	case "?":
+		return MakeUnknown()
+	case "nil":
+		return MakeNil()
 	case "true":
 		return MakeBool(true)
 	case "false":
@@ -153,7 +178,8 @@ func doOp(x Value, op token.Token, y Value) (z Value) {
 	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
 		return MakeBool(Compare(x, op, y))
 	case token.SHL, token.SHR:
-		return Shift(x, op, uint(Int64Val(y)))
+		s, _ := Int64Val(y)
+		return Shift(x, op, uint(s))
 	default:
 		return BinaryOp(x, op, y)
 	}

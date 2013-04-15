@@ -220,14 +220,15 @@ func (check *checker) object(obj Object, cycleOk bool) {
 		}
 		obj.visited = true
 		spec := obj.spec
-		iota := int(exact.Int64Val(obj.Val))
+		iota, ok := exact.Int64Val(obj.Val)
+		assert(ok)
 		obj.Val = exact.MakeUnknown()
 		// determine spec for type and initialization expressions
 		init := spec
 		if len(init.Values) == 0 {
 			init = check.initspecs[spec]
 		}
-		check.valueSpec(spec.Pos(), obj, spec.Names, init, iota)
+		check.valueSpec(spec.Pos(), obj, spec.Names, init, int(iota))
 
 	case *Var:
 		if obj.Type != nil {

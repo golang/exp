@@ -309,51 +309,53 @@ func isRepresentableConst(x exact.Value, ctxt *Context, as BasicKind) bool {
 	case exact.Bool:
 		return as == Bool || as == UntypedBool
 
-	case exact.Int64:
-		x := exact.Int64Val(x)
-		switch as {
-		case Int:
-			var s = uint(ctxt.sizeof(Typ[as])) * 8
-			return int64(-1)<<(s-1) <= x && x <= int64(1)<<(s-1)-1
-		case Int8:
-			const s = 8
-			return -1<<(s-1) <= x && x <= 1<<(s-1)-1
-		case Int16:
-			const s = 16
-			return -1<<(s-1) <= x && x <= 1<<(s-1)-1
-		case Int32:
-			const s = 32
-			return -1<<(s-1) <= x && x <= 1<<(s-1)-1
-		case Int64:
-			return true
-		case Uint, Uintptr:
-			var s = uint(ctxt.sizeof(Typ[as])) * 8
-			return 0 <= x && x <= int64(1)<<(s-1)-1
-		case Uint8:
-			const s = 8
-			return 0 <= x && x <= 1<<s-1
-		case Uint16:
-			const s = 16
-			return 0 <= x && x <= 1<<s-1
-		case Uint32:
-			const s = 32
-			return 0 <= x && x <= 1<<s-1
-		case Uint64:
-			return 0 <= x
-		case Float32:
-			return true // TODO(gri) fix this
-		case Float64:
-			return true // TODO(gri) fix this
-		case Complex64:
-			return true // TODO(gri) fix this
-		case Complex128:
-			return true // TODO(gri) fix this
-		case UntypedInt, UntypedFloat, UntypedComplex:
-			return true
+	case exact.Int:
+		if x, ok := exact.Int64Val(x); ok {
+			switch as {
+			case Int:
+				var s = uint(ctxt.sizeof(Typ[as])) * 8
+				return int64(-1)<<(s-1) <= x && x <= int64(1)<<(s-1)-1
+			case Int8:
+				const s = 8
+				return -1<<(s-1) <= x && x <= 1<<(s-1)-1
+			case Int16:
+				const s = 16
+				return -1<<(s-1) <= x && x <= 1<<(s-1)-1
+			case Int32:
+				const s = 32
+				return -1<<(s-1) <= x && x <= 1<<(s-1)-1
+			case Int64:
+				return true
+			case Uint, Uintptr:
+				if s := uint(ctxt.sizeof(Typ[as])) * 8; s < 64 {
+					return 0 <= x && x <= int64(1)<<s-1
+				}
+				return 0 <= x
+			case Uint8:
+				const s = 8
+				return 0 <= x && x <= 1<<s-1
+			case Uint16:
+				const s = 16
+				return 0 <= x && x <= 1<<s-1
+			case Uint32:
+				const s = 32
+				return 0 <= x && x <= 1<<s-1
+			case Uint64:
+				return 0 <= x
+			case Float32:
+				return true // TODO(gri) fix this
+			case Float64:
+				return true // TODO(gri) fix this
+			case Complex64:
+				return true // TODO(gri) fix this
+			case Complex128:
+				return true // TODO(gri) fix this
+			case UntypedInt, UntypedFloat, UntypedComplex:
+				return true
+			}
 		}
 
-	case exact.Int:
-		n := exact.IntBitLen(x)
+		n := exact.BitLen(x)
 		switch as {
 		case Uint, Uintptr:
 			var s = uint(ctxt.sizeof(Typ[as])) * 8
@@ -693,11 +695,8 @@ func (check *checker) shift(x, y *operand, op token.Token) {
 			}
 			// rhs must be within reasonable bounds
 			const stupidShift = 1024
-			s := int64(-1)
-			if y.val.Kind() == exact.Int64 {
-				s = exact.Int64Val(y.val)
-			}
-			if s < 0 || s >= stupidShift {
+			s, ok := exact.Uint64Val(y.val)
+			if !ok || s >= stupidShift {
 				check.invalidOp(y.pos(), "%s: stupid shift", y)
 				x.mode = invalid
 				return
@@ -852,14 +851,14 @@ func (check *checker) index(arg ast.Expr, length int64, iota int) (i int64, ok b
 
 	// a constant index/size i must be 0 <= i < length
 	if x.mode == constant {
-		i = exact.Int64Val(x.val)
-		if i < 0 {
+		if exact.Sign(x.val) < 0 {
 			check.invalidArg(x.pos(), "%s must not be negative", &x)
 			return
 		}
-		if length >= 0 && i >= length {
-			check.errorf(x.pos(), "index %s is out of bounds (>= %d)", &x, length)
-			return
+		i, ok = exact.Int64Val(x.val)
+		if !ok || length >= 0 && i >= length {
+			check.errorf(x.pos(), "index %s is out of bounds", &x)
+			return i, false
 		}
 		// 0 <= i [ && i < length ]
 		return i, true
@@ -1648,11 +1647,12 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				}
 				goto Error
 			}
-			n := int64(-1)
-			if x.val.Kind() == exact.Int64 {
-				n = exact.Int64Val(x.val)
+			if !x.isInteger() {
+				check.errorf(x.pos(), "array length %s must be integer", x)
+				goto Error
 			}
-			if n < 0 {
+			n, ok := exact.Int64Val(x.val)
+			if !ok || n < 0 {
 				check.errorf(x.pos(), "invalid array length %s", x)
 				goto Error
 			}

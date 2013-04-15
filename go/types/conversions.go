@@ -40,8 +40,8 @@ func (check *checker) conversion(x *operand, conv *ast.CallExpr, typ Type, iota 
 			switch {
 			case x.isInteger():
 				codepoint := int64(-1)
-				if x.val.Kind() == exact.Int64 {
-					codepoint = exact.Int64Val(x.val)
+				if i, ok := exact.Int64Val(x.val); ok {
+					codepoint = i
 				}
 				// If codepoint < 0 the absolute value is too large (or unknown) for
 				// conversion. This is the same as converting any other out-of-range

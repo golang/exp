@@ -30,7 +30,6 @@ const (
 	String
 
 	// numeric values
-	Int64 // integers that fit into 64 bits
 	Int
 	Float
 	Complex
@@ -70,7 +69,7 @@ func (unknownVal) Kind() Kind { return Unknown }
 func (nilVal) Kind() Kind     { return Nil }
 func (boolVal) Kind() Kind    { return Bool }
 func (stringVal) Kind() Kind  { return String }
-func (int64Val) Kind() Kind   { return Int64 }
+func (int64Val) Kind() Kind   { return Int }
 func (intVal) Kind() Kind     { return Int }
 func (floatVal) Kind() Kind   { return Float }
 func (complexVal) Kind() Kind { return Complex }
@@ -135,15 +134,15 @@ func MakeBool(b bool) Value { return boolVal(b) }
 // MakeString returns the String value for x.
 func MakeString(s string) Value { return stringVal(s) }
 
-// MakeInt64 returns the Int64 value for x.
+// MakeInt64 returns the Int value for x.
 func MakeInt64(x int64) Value { return int64Val(x) }
 
-// MakeInt returns the integer value for x.
-func MakeInt(x uint64) Value { return normInt(new(big.Int).SetUint64(x)) }
+// MakeUint64 returns the Int value for x.
+func MakeUint64(x uint64) Value { return normInt(new(big.Int).SetUint64(x)) }
 
-// MakeFloat returns the numeric value for x.
+// MakeFloat64 returns the numeric value for x.
 // If x is not finite, the result is unknown.
-func MakeFloat(x float64) Value {
+func MakeFloat64(x float64) Value {
 	f := new(big.Rat).SetFloat64(x)
 	if f != nil {
 		return normFloat(f)
@@ -201,26 +200,32 @@ func BoolVal(x Value) bool { return bool(x.(boolVal)) }
 // StringVal returns the Go string value of x, which must be a String.
 func StringVal(x Value) string { return string(x.(stringVal)) }
 
-// Int64Val returns the Go int64 value of x, which must be an Int64.
-func Int64Val(x Value) int64 { return int64(x.(int64Val)) }
+// Int64Val returns the Go int64 value of x and whether the result is exact;
+// x must be an Int. If the result is not exact, its value is undefined.
+func Int64Val(x Value) (int64, bool) {
+	switch x := x.(type) {
+	case int64Val:
+		return int64(x), true
+	case intVal:
+		return x.val.Int64(), x.val.BitLen() <= 63
+	}
+	panic(fmt.Sprintf("invalid Int64Val(%v)", x))
+}
 
-// IntVal returns the Go uint64 value of x and whether the result is exact;
-// x must be an integer. If the result is not exact, its value is undefined.
-func IntVal(x Value) (uint64, bool) {
+// Uint64Val returns the Go uint64 value of x and whether the result is exact;
+// x must be an Int. If the result is not exact, its value is undefined.
+func Uint64Val(x Value) (uint64, bool) {
 	switch x := x.(type) {
 	case int64Val:
 		return uint64(x), x >= 0
 	case intVal:
-		if x.val.Sign() >= 0 && x.val.BitLen() <= 64 {
-			return x.val.Uint64(), true
-		}
-		return 0, false
+		return x.val.Uint64(), x.val.Sign() >= 0 && x.val.BitLen() <= 64
 	}
-	panic(fmt.Sprintf("invalid IntVal(%v)", x))
+	panic(fmt.Sprintf("invalid Uint64Val(%v)", x))
 }
 
 // Float64Val returns the nearest Go float64 value of x and whether the result is exact;
-// x must be numeric but not complex.
+// x must be numeric but not Complex.
 func Float64Val(x Value) (float64, bool) {
 	switch x := x.(type) {
 	case int64Val:
@@ -234,9 +239,17 @@ func Float64Val(x Value) (float64, bool) {
 	panic(fmt.Sprintf("invalid Float64Val(%v)", x))
 }
 
-// IntBitLen() returns the number of bits required to represent
-// the (unsigned) value x in binary representation; x must be an Int.
-func IntBitLen(x Value) int { return x.(intVal).val.BitLen() }
+// BitLen() returns the number of bits required to represent
+// the absolute value x in binary representation; x must be an Int.
+func BitLen(x Value) int {
+	switch x := x.(type) {
+	case int64Val:
+		return new(big.Int).SetInt64(int64(x)).BitLen()
+	case intVal:
+		return x.val.BitLen()
+	}
+	panic(fmt.Sprintf("invalid BitLen(%v)", x))
+}
 
 // Sign returns -1, 0, or 1 depending on whether
 // x < 0, x == 0, or x > 0. For complex values z,
@@ -271,7 +284,7 @@ func Sign(x Value) int {
 // Support for assembling/disassembling complex numbers
 
 // MakeImag returns the numeric value x*i (possibly 0);
-// x must be numeric but not complex.
+// x must be numeric but not Complex.
 // If x is unknown, the result is unknown.
 func MakeImag(x Value) Value {
 	var im *big.Rat
@@ -382,16 +395,31 @@ var (
 	rat0 = big.NewRat(0, 1)
 )
 
+func ord(x Value) int {
+	switch x.(type) {
+	default:
+		return 0
+	case int64Val:
+		return 1
+	case intVal:
+		return 2
+	case floatVal:
+		return 3
+	case complexVal:
+		return 4
+	}
+}
+
 // match returns the matching representation (same type) with the
 // smallest complexity for two values x and y. If one of them is
 // numeric, both of them must be numeric.
 //
 func match(x, y Value) (_, _ Value) {
-	if x.Kind() > y.Kind() {
+	if ord(x) > ord(y) {
 		y, x = match(y, x)
 		return x, y
 	}
-	// x.Kind() <= y.Kind()
+	// ord(x) <= ord(y)
 
 	switch x := x.(type) {
 	case unknownVal, nilVal, boolVal, stringVal, complexVal:
@@ -592,7 +620,7 @@ Error:
 
 // Shift returns the result of the shift expression x op s
 // with op == token.SHL or token.SHR (<< or >>). x must be
-// an integer.
+// an Int.
 //
 func Shift(x Value, op token.Token, s uint) Value {
 	switch x := x.(type) {
