@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// The locale package provides a type to represent BCP47 compliant locale identifiers.
+// The locale package provides a type to represent BCP 47 locale identifiers.
 // It supports various canonicalizations defined in CLDR.
 package locale
 
 var (
+	// Und represents the undefined langauge. It is also the root locale.
+	Und   = und
 	En    = en    // Default Locale for English.
 	En_US = en_US // Default locale for American English.
 	De    = de    // Default locale for German.
@@ -19,34 +21,29 @@ var (
 )
 
 var (
-	de    = ID{"de"}
-	en    = ID{"en"}
+	de    = ID{lang: getLangID([]byte("de"))}
+	en    = ID{lang: getLangID([]byte("en"))}
 	en_US = en
+	und   = ID{lang: unknownLang, region: unknownRegion, script: unknownScript}
 )
 
-// ID represents a BCP47 compliant locale identifier. It can be used to
+// ID represents a BCP 47 locale identifier. It can be used to
 // select an instance for a specific locale. All Locale values are guaranteed
 // to be well-formed.
 type ID struct {
-	id string
+	// In most cases, just lang, region and script will be needed.  In such cases
+	// str may be nil.
+	lang     langID
+	region   regionID
+	script   scriptID
+	pVariant byte   // offset in str
+	pExt     uint16 // offset of first extension
+	str      *string
 }
 
-// ParseBCP47 parses the given BCP47 string and returns a valid, canonical ID.
-// If parsing failed it returns an error and the ID returned will be "und".
-// If parsing succeeded but an unknown option was found, it
-// returns the valid Locale and an error.
-// It accepts identifiers in the BCP 47 format, extensions to this standard
-// defined in
-// http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers
-// and old-style identifiers.
-func Parse(id string) (ID, error) {
-	// TODO: implement
-	return ID{"und"}, nil
-}
-
-// Make calls ParseBCP47 and Canonicalize and returns the resulting ID.
-// Any errors are ignored. In most cases, locale IDs should be created
-// in
+// Make calls Parse and Canonicalize and returns the resulting ID.
+// Any errors are ignored and a sensible default is returned.
+// In most cases, locale IDs should be created using this method.
 func Make(id string) ID {
 	loc, _ := Parse(id)
 	return loc.Canonicalize()
@@ -54,21 +51,21 @@ func Make(id string) ID {
 
 // Canonicalize replaces the identifier with its canonical equivalent.
 func (loc ID) Canonicalize() ID {
-	return ID{"und"}
+	return und
 }
 
 // Parent returns the direct parent for this locale, which is the locale
 // from which this locale inherits any undefined values.
 func (loc ID) Parent() ID {
 	// TODO: implement
-	return ID{"und"}
+	return und
 }
 
 // Written strips qualifiers from the identifier until the resulting identfier
 // inherits from root.
 func (loc ID) Written() ID {
 	// TODO: implement
-	return ID{"und"}
+	return und
 }
 
 // Confidence indicates the level of certainty for a given return value.
@@ -84,6 +81,21 @@ const (
 	High                    // value inferred from a parent and is generally assumed to be the correct match
 	Exact                   // exact match or explicitly specified value
 )
+
+// String returns the canonical string representation of the locale.
+func (loc ID) String() string {
+	if loc.str == nil {
+		s := loc.lang.String()
+		if loc.script != unknownScript {
+			s += "-" + loc.script.String()
+		}
+		if loc.region != unknownRegion {
+			s += "-" + loc.region.String()
+		}
+		loc.str = &s
+	}
+	return *loc.str
+}
 
 // Language returns the language for the locale.
 func (loc ID) Language() Language {
@@ -131,46 +143,6 @@ func (loc ID) Scope() Set {
 	return nil
 }
 
-// A Part identifies a part of the locale identifier string.
-type Part int
-
-const (
-	TagPart Part = iota // The identifier excluding extensions.
-	LanguagePart
-	ScriptPart
-	RegionPart
-	VariantPart
-	KeyValuePart   // Key-value pairs of the 'u' section.
-	AttributesPart // Attributes of the 'u' section.
-)
-
-// Extension returns the Part identifier for extension e, which must be 0-9 or a-z.
-func Extension(e byte) Part {
-	// TODO: implement
-	return Part(e)
-}
-
-// Part returns the part of the locale identifer indicated by t.
-// The one-letter section identifier, if applicable, is not included.
-// Components are separated by a '-'.
-func (loc ID) Part(t Part) string {
-	// TODO: implement
-	return ""
-}
-
-// Parts returns all parts of the locale identifier in a map.
-func (loc ID) Parts() map[Part]string {
-	// TODO: implement
-	return nil
-}
-
-// Compose returns an ID composed from the given parts or an error
-// if any of the strings for the parts are ill-formed.
-func Compose(parts map[Part]string) (ID, error) {
-	// TODO: implement
-	return ID{}, nil
-}
-
 // TypeForKey returns the type associated with the given key, where key
 // is one of the allowed values defined for the Unicode locale extension ('u') in
 // http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
@@ -191,7 +163,7 @@ func KeyValueString(m map[string]string) (string, error) {
 // by default from its parent.
 func (loc ID) SimplifyOptions() ID {
 	// TODO: implement
-	return ID{"und"}
+	return ID{}
 }
 
 // Language is an ISO 639 language identifier.

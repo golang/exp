@@ -15,19 +15,42 @@ func get(idx string, id, n int) string {
 	return idx[id<<2:][:n]
 }
 
+// cmp returns an integer comparing a and b lexicographically.
+func cmp(a string, b []byte) int {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	for i, c := range b[:n] {
+		switch {
+		case a[i] > c:
+			return 1
+		case a[i] < c:
+			return -1
+		}
+	}
+	switch {
+	case len(a) < len(b):
+		return -1
+	case len(a) > len(b):
+		return 1
+	}
+	return 0
+}
+
 // search searchs for the insertion point of key in smap, which is a
 // string with consecutive 4-byte entries. Only the first len(key)
 // bytes from the start of the 4-byte entries will be considered.
-func search(smap, key string) int {
+func search(smap string, key []byte) int {
 	n := len(key)
 	return sort.Search(len(smap)>>2, func(i int) bool {
-		return get(smap, i, n) >= key
+		return cmp(get(smap, i, n), key) != -1
 	}) << 2
 }
 
-func index(smap, key string) int {
+func index(smap string, key []byte) int {
 	i := search(smap, key)
-	if smap[i:i+len(key)] != key {
+	if cmp(smap[i:i+len(key)], key) != 0 {
 		return -1
 	}
 	return i
@@ -40,49 +63,38 @@ func searchUint(imap []uint16, key uint16) int {
 }
 
 // fixCase reformats s to the same pattern of cases as pat.
-// If string s is malformed, pat is returned.
-func fixCase(pat, s string) string {
-	if len(pat) != len(s) {
-		return pat
+// If returns false if string s is malformed.
+func fixCase(pat string, b []byte) bool {
+	if len(pat) != len(b) {
+		return false
 	}
-	var b []byte
-	for i, r := range pat {
-		c := s[i]
+	for i, c := range b {
+		r := pat[i]
 		if r <= 'Z' {
-			if s[i] >= 'a' {
+			if c >= 'a' {
 				c -= 'z' - 'Z'
 			}
 			if c > 'Z' || c < 'A' {
-				return pat
+				return false
 			}
 		} else {
-			if s[i] <= 'Z' {
+			if c <= 'Z' {
 				c += 'z' - 'Z'
 			}
 			if c > 'z' || c < 'a' {
-				return pat
+				return false
 			}
-		}
-		if b == nil {
-			if s[i] == c {
-				continue
-			}
-			b = make([]byte, len(pat))
-			copy(b, s[:i])
 		}
 		b[i] = c
 	}
-	if b == nil {
-		return s
-	}
-	return string(b)
+	return true
 }
 
 type langID uint16
 
 // getLangID returns the langID of s if s is a canonical ID
 // or langUnknown if s is not a canonical langID.
-func getLangID(s string) langID {
+func getLangID(s []byte) langID {
 	if len(s) == 2 {
 		return getLangISO2(s)
 	}
@@ -92,37 +104,42 @@ func getLangID(s string) langID {
 func getMappedID(index int) langID {
 	m := mappedLang[index:]
 	if m[3] >= 'a' {
-		return getLangISO2(m[:1] + m[3:4])
+		b := [2]byte{}
+		b[0], b[1] = m[0], m[3]
+		return getLangISO2(b[:])
 	}
 	i := mappedLangID[m[3]]
 	if i < 0 {
 		i = -(i + 1)
+		b := [2]byte{}
+		copy(b[:], altTag[i:][:2])
 		// TODO: this code can be a locale.
-		return getLangISO2(altTag[i:][:2])
+		return getLangISO2(b[:])
 	}
 	return langID(i)
 }
 
 // normLang returns the langID of s, canonicalizing the language
-// according to BCP47 and CLDR rules.
-func normLang(s string) langID {
-	s = getLangID(s).String()
+// according to BCP 47 and CLDR rules.
+func normLang(s []byte) langID {
 	if len(s) < 2 || len(s) > 3 {
 		return unknownLang
 	}
-	if i := index(mappedLang, s); i != -1 {
-		if len(s) == 3 || mappedLang[i+2] == ' ' {
+	lang := getLangID(s)
+	buf := [4]byte{}
+	b := buf[:copy(buf[:], lang.String())]
+	if i := index(mappedLang, b); i != -1 {
+		if len(b) == 3 || mappedLang[i+2] == ' ' {
 			return getMappedID(i)
 		}
 	}
-	return getLangID(s)
+	return lang
 }
 
 // getLangISO2 returns the langID for the given 2-letter ISO language code
 // or unknownLang if this does not exist.
-func getLangISO2(s string) langID {
-	if len(s) == 2 {
-		s = fixCase("zz", s)
+func getLangISO2(s []byte) langID {
+	if len(s) == 2 && fixCase("zz", s) {
 		if i := index(lang, s); i != -1 && lang[i+3] != 0 {
 			return langID(i >> 2)
 		}
@@ -135,27 +152,28 @@ func getLangISO2(s string) langID {
 
 // getLangISO3 returns the langID for the given 3-letter ISO language code
 // or unknownLang if this does not exist.
-func getLangISO3(s string) langID {
-	s = fixCase("und", s)
-	// first try to match canonical 3-letter entries
-	for i := search(lang, s[:2]); lang[i:i+2] == s[:2]; i += 4 {
-		if lang[i+3] == 0 && lang[i+2] == s[2] {
-			return langID(i >> 2)
+func getLangISO3(s []byte) langID {
+	if fixCase("und", s) {
+		// first try to match canonical 3-letter entries
+		for i := search(lang, s[:2]); cmp(lang[i:i+2], s[:2]) == 0; i += 4 {
+			if lang[i+3] == 0 && lang[i+2] == s[2] {
+				return langID(i >> 2)
+			}
 		}
-	}
-	if i := index(mappedLang, s); i != -1 {
-		return getMappedID(i)
-	}
-	// Check for non-canonical uses of ISO3.
-	for i := search(lang, s[:1]); lang[i] == s[0]; i += 4 {
-		if lang[i+2:][:2] == s[1:3] {
-			return langID(i >> 2)
+		if i := index(mappedLang, s); i != -1 {
+			return getMappedID(i)
+		}
+		// Check for non-canonical uses of ISO3.
+		for i := search(lang, s[:1]); lang[i] == s[0]; i += 4 {
+			if cmp(lang[i+2:][:2], s[1:3]) == 0 {
+				return langID(i >> 2)
+			}
 		}
 	}
 	return unknownLang
 }
 
-// String returns the BCP47 representation of the langID.
+// String returns the BCP 47 representation of the langID.
 func (id langID) String() string {
 	l := lang[id<<2:]
 	if l[3] == 0 {
@@ -173,7 +191,7 @@ func (id langID) iso3() string {
 		return get(mappedLang, int(l[3]), 3)
 	}
 	// This allocation will only happen for 3-letter ISO codes
-	// that are non-canonical BCP47 language identifiers.
+	// that are non-canonical BCP 47 language identifiers.
 	return l[0:1] + l[2:4]
 }
 
@@ -181,12 +199,12 @@ type regionID uint16
 
 // getRegionID returns the region id for s if s is a valid 2-letter region code
 // or unknownRegion.
-func getRegionID(s string) regionID {
+func getRegionID(s []byte) regionID {
 	if len(s) == 3 {
-		if s[0] >= 'A' {
+		if isAlpha(s[0]) {
 			return getRegionISO3(s)
 		}
-		if i, err := strconv.ParseUint(s, 10, 10); err == nil {
+		if i, err := strconv.ParseUint(string(s), 10, 10); err == nil {
 			return getRegionM49(int(i))
 		}
 	}
@@ -195,25 +213,28 @@ func getRegionID(s string) regionID {
 
 // getRegionISO2 returns the regionID for the given 2-letter ISO country code
 // or unknownRegion if this does not exist.
-func getRegionISO2(s string) regionID {
-	if i := index(regionISO, fixCase("ZZ", s)); i != -1 {
-		return regionID(i>>2) + isoRegionOffset
+func getRegionISO2(s []byte) regionID {
+	if fixCase("ZZ", s) {
+		if i := index(regionISO, s); i != -1 {
+			return regionID(i>>2) + isoRegionOffset
+		}
 	}
 	return unknownRegion
 }
 
 // getRegionISO3 returns the regionID for the given 3-letter ISO country code
 // or unknownRegion if this does not exist.
-func getRegionISO3(s string) regionID {
-	s = fixCase("ZZZ", s)
-	for i := search(regionISO, s[:1]); regionISO[i] == s[0]; i += 4 {
-		if regionISO[i+2:][:2] == s[1:3] {
-			return regionID(i>>2) + isoRegionOffset
+func getRegionISO3(s []byte) regionID {
+	if fixCase("ZZZ", s) {
+		for i := search(regionISO, s[:1]); regionISO[i] == s[0]; i += 4 {
+			if cmp(regionISO[i+2:][:2], s[1:3]) == 0 {
+				return regionID(i>>2) + isoRegionOffset
+			}
 		}
-	}
-	for i := 0; i < len(altRegionISO3); i += 3 {
-		if altRegionISO3[i:i+3] == s {
-			return regionID(altRegionIDs[i/3])
+		for i := 0; i < len(altRegionISO3); i += 3 {
+			if cmp(altRegionISO3[i:i+3], s) == 0 {
+				return regionID(altRegionIDs[i/3])
+			}
 		}
 	}
 	return unknownRegion
@@ -234,7 +255,7 @@ func getRegionM49(n int) regionID {
 	return unknownRegion
 }
 
-// String returns the BCP47 representation for the region.
+// String returns the BCP 47 representation for the region.
 func (r regionID) String() string {
 	if r < isoRegionOffset {
 		return fmt.Sprintf("%03d", r.m49())
@@ -268,9 +289,11 @@ type scriptID uint8
 
 // getScriptID returns the script id for string s. It assumes that s
 // is of the format [A-Z][a-z]{3}.
-func getScriptID(idx, s string) scriptID {
-	if i := index(idx, fixCase("Zzzz", s)); i != -1 {
-		return scriptID(i >> 2)
+func getScriptID(idx string, s []byte) scriptID {
+	if fixCase("Zzzz", s) {
+		if i := index(idx, s); i != -1 {
+			return scriptID(i >> 2)
+		}
 	}
 	return unknownScript
 }
@@ -281,9 +304,11 @@ func (s scriptID) String() string {
 
 type currencyID uint16
 
-func getCurrencyID(idx, s string) currencyID {
-	if i := index(idx, fixCase("XXX", s)); i != -1 {
-		return currencyID(i >> 2)
+func getCurrencyID(idx string, s []byte) currencyID {
+	if fixCase("XXX", s) {
+		if i := index(idx, s); i != -1 {
+			return currencyID(i >> 2)
+		}
 	}
 	return unknownCurrency
 }
