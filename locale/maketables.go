@@ -18,6 +18,7 @@ import (
 	"hash/fnv"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path"
@@ -31,6 +32,9 @@ var (
 	url = flag.String("cldr",
 		"http://www.unicode.org/Public/cldr/22/core.zip",
 		"URL of CLDR archive.")
+	iana = flag.String("iana",
+		"http://www.iana.org/assignments/language-subtag-registry",
+		"URL of IANA language subtag registry.")
 	test = flag.Bool("test", false,
 		"test existing tables; can be used to compare web data with package data.")
 	localFiles = flag.Bool("local", false,
@@ -39,28 +43,29 @@ var (
 
 var comment = []string{
 	`
-lang holds an alphabetically sorted list of bcp47 language identifiers.
+lang holds an alphabetically sorted list of BCP 47 language identifiers.
 All entries are 4 bytes. The index of the identifier (divided by 4) is the language ID.
 For 2-byte language identifiers, the two successive bytes have the following meaning:
     - if the first letter of the 2- and 3-letter ISO codes are the same:
       the second and third letter of the 3-letter ISO code.
-    - otherwise: a 0 and a by 2 bits right-shifted index into mappedLang.
+    - otherwise: a 0 and a by 2 bits right-shifted index into altLangISO3.
 For 3-byte language identifiers the 4th byte is 0.`,
 	`
-mappedLang holds an alphabetically sorted list of non-canonical language
-identifiers (by definition of BCP47 or CLDR) with a mapping to their cannonical
-equivalents. Each entry is 4 bytes.  The first 3 bytes are the language code.
-(May be a 2-letter code followed by a space.) The 4th byte is one of the following values:
-    - [a-z]:   The canonical code is the first letter of the non-canonical code plus
-               this character. The majority of mappings can be expressed this way.
-    - [0-'a']: Index into mappedLangID, an array of language ids.`,
+langNoIndex is a bit vector of all 3-letter language codes that are not used as an index
+in lookup tables. The language ids for these language codes are derived directly
+from the letters and are not consecutive.`,
 	`
-mappedLangID holds a list of language IDs, which correspond to the 4-byte index
-into lang. A negative index indicates a mapping to a tag.`,
+altLangISO3 holds an alphabetically sorted list of 3-letter language code alternatives
+to 2-letter language codes that cannot be derived using the method described above.
+Each 3-letter code is followed by its 1-byte langID.`,
 	`
 tagAlias holds a mapping from legacy and grandfathered tags to their locale ID.`,
 	`
-scripts is an alphabetically sorted list of ISO 15924 codes. The index
+langOldMap maps deprecated langIDs to their suggested replacements.`,
+	`
+langMacroMap maps languages to their macro language replacement, if applicable.`,
+	`
+script is an alphabetically sorted list of ISO 15924 codes. The index
 of the script in the string, divided by 4, is the internal script ID.`,
 	`
 isoRegionOffset needs to be added to the index of regionISO to obtain the regionID
@@ -86,6 +91,9 @@ currency holds an alphabetically sorted list of canonical 3-letter currency iden
 Each identifier is followed by a byte of which the 6 most significant bits
 indicated the rounding and the least 2 significant bits indicate the
 number of decimal positions.`,
+	`
+suppressScript is an index from langID to the dominant script for that language,
+if it exists.  If a script is given, it should be suppressed from the language tag.`,
 }
 
 // TODO: consider changing some of these strutures to tries. This can reduce
@@ -171,6 +179,20 @@ func (ss *stringSet) compact() {
 	ss.sorted = ss.frozen
 }
 
+type funcSorter struct {
+	fn func(a, b string) bool
+	sort.StringSlice
+}
+
+func (s funcSorter) Less(i, j int) bool {
+	return s.fn(s.StringSlice[i], s.StringSlice[j])
+}
+
+func (ss *stringSet) sortFunc(f func(a, b string) bool) {
+	ss.compact()
+	sort.Sort(funcSorter{f, sort.StringSlice(ss.s)})
+}
+
 func (ss *stringSet) remove(s string) {
 	ss.assertChangeable()
 	if i, ok := ss.find(s); ok {
@@ -188,7 +210,6 @@ func (ss *stringSet) index(s string) int {
 	ss.setType(Indexed)
 	i, ok := ss.find(s)
 	if !ok {
-		log.Println(ss.s)
 		if i < len(ss.s) {
 			log.Panicf("find: item %q is not in list. Closest match is %q.", s, ss.s[i])
 		}
@@ -229,6 +250,23 @@ func (ss *stringSet) join() string {
 	return strings.Join(ss.s, "")
 }
 
+// ianaEntry holds information for an entry in the IANA Language Subtag Repository.
+// All types use the same entry.
+// See http://tools.ietf.org/html/bcp47#section-5.1 for a description of the various
+// fields.
+type ianaEntry struct {
+	typ            string
+	tag            string
+	description    []string
+	scope          string
+	added          string
+	preferred      string
+	deprecated     string
+	suppressScript string
+	macro          string
+	prefix         []string
+}
+
 type builder struct {
 	w      io.Writer   // multi writer
 	out    io.Writer   // set to Stdout
@@ -238,14 +276,18 @@ type builder struct {
 	supp   *cldr.SupplementalData
 
 	// indices
-	locale   stringSet // common locales
-	lang     stringSet // canonical language ids (2 or 3 letter ISO codes)
-	script   stringSet // 4-letter ISO codes
-	region   stringSet // 2-letter ISO or 3-digit UN M49 codes
-	currency stringSet // 3-letter ISO currency codes
+	locale      stringSet // common locales
+	lang        stringSet // canonical language ids (2 or 3 letter ISO codes) with data
+	langNoIndex stringSet // 3-letter ISO codes with no associated data
+	script      stringSet // 4-letter ISO codes
+	region      stringSet // 2-letter ISO or 3-digit UN M49 codes
+	currency    stringSet // 3-letter ISO currency codes
+
+	// langInfo
+	registry map[string]*ianaEntry
 }
 
-func newBuilder(url *string) *builder {
+func openReader(url *string) io.ReadCloser {
 	if *localFiles {
 		pwd, _ := os.Getwd()
 		*url = "file://" + path.Join(pwd, path.Base(*url))
@@ -255,13 +297,18 @@ func newBuilder(url *string) *builder {
 	c := &http.Client{Transport: t}
 	resp, err := c.Get(*url)
 	failOnError(err)
-	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		log.Fatalf(`bad GET status for "%s": %s`, *url, resp.Status)
 	}
+	return resp.Body
+}
+
+func newBuilder() *builder {
+	r := openReader(url)
+	defer r.Close()
 	d := &cldr.Decoder{}
 	d.SetDirFilter("supplemental")
-	data, err := d.DecodeZip(resp.Body)
+	data, err := d.DecodeZip(r)
 	failOnError(err)
 	b := builder{
 		out:    os.Stdout,
@@ -270,7 +317,69 @@ func newBuilder(url *string) *builder {
 		hash32: fnv.New32(),
 	}
 	b.w = io.MultiWriter(b.out, b.hash32)
+	b.parseRegistry()
 	return &b
+}
+
+func (b *builder) parseRegistry() {
+	r := openReader(iana)
+	defer r.Close()
+	b.registry = make(map[string]*ianaEntry)
+
+	scan := bufio.NewScanner(r)
+	scan.Split(bufio.ScanWords)
+	var record *ianaEntry
+	for more := scan.Scan(); more; {
+		key := scan.Text()
+		more = scan.Scan()
+		value := scan.Text()
+		switch key {
+		case "Type:":
+			//log.Printf("%#v", record)
+			record = &ianaEntry{typ: value}
+		case "Subtag:", "Tag:":
+			record.tag = value
+			if info, ok := b.registry[value]; ok {
+				if info.typ != "language" || record.typ != "extlang" {
+					log.Fatalf("parseRegistry: tag %q already exists", value)
+				}
+			} else {
+				b.registry[value] = record
+			}
+		case "Suppress-Script:":
+			record.suppressScript = value
+		case "Added:":
+			record.added = value
+		case "Deprecated:":
+			record.deprecated = value
+		case "Macrolanguage:":
+			record.macro = value
+		case "Preferred-Value:":
+			record.preferred = value
+		case "Prefix:":
+			record.prefix = append(record.prefix, value)
+		case "Scope:":
+			record.scope = value
+		case "Description:":
+			buf := []byte(value)
+			for more = scan.Scan(); more; more = scan.Scan() {
+				b := scan.Bytes()
+				if b[0] == '%' || b[len(b)-1] == ':' {
+					break
+				}
+				buf = append(buf, ' ')
+				buf = append(buf, b...)
+			}
+			record.description = append(record.description, string(buf))
+			continue
+		default:
+			continue
+		}
+		more = scan.Scan()
+	}
+	if scan.Err() != nil {
+		log.Panic(scan.Err())
+	}
 }
 
 var commentIndex = make(map[string]string)
@@ -317,10 +426,14 @@ func (b *builder) writeSlice(name string, ss interface{}) {
 	b.addArraySize(v.Len()*int(t.Size()), v.Len())
 	fmt.Fprintf(b.w, `var %s = [%d]%s{`, name, v.Len(), t)
 	for i := 0; i < v.Len(); i++ {
-		if i%12 == 0 {
-			fmt.Fprintf(b.w, "\n\t")
+		if t.Kind() == reflect.Struct {
+			fmt.Fprintf(b.w, "\n\t%#v, ", v.Index(i).Interface())
+		} else {
+			if i%12 == 0 {
+				fmt.Fprintf(b.w, "\n\t")
+			}
+			fmt.Fprintf(b.w, "%d, ", v.Index(i).Interface())
 		}
-		fmt.Fprintf(b.w, "%+v, ", v.Index(i).Interface())
 	}
 	b.p("\n}")
 }
@@ -375,6 +488,26 @@ func (b *builder) writeString(name, s string) {
 	}
 }
 
+const base = 'z' - 'a' + 1
+
+func strToInt(s string) uint {
+	v := uint(0)
+	for i := 0; i < len(s); i++ {
+		v *= base
+		v += uint(s[i] - 'a')
+	}
+	return v
+}
+
+func (b *builder) writeBitVector(name string, ss []string) {
+	vec := make([]uint8, int(math.Ceil(math.Pow(base, float64(len(ss[0])))/8)))
+	for _, s := range ss {
+		v := strToInt(s)
+		vec[v/8] |= 1 << (v % 8)
+	}
+	b.writeSlice(name, vec)
+}
+
 // TODO: convert this type into a list or two-stage trie.
 func (b *builder) writeMapFunc(name string, m map[string]string, f func(string) uint16) {
 	b.comment(name)
@@ -406,36 +539,48 @@ func (ss *stringSet) parseKeyed(slice interface{}, key, value string) {
 	}
 }
 
+func (b *builder) langIndex(s string) uint16 {
+	if i, ok := b.lang.find(s); ok {
+		return uint16(i)
+	}
+	return uint16(strToInt(s)) + uint16(len(b.lang.s))
+}
+
+// inc advances the string to its lexicographical successor.
+func inc(s string) string {
+	i := len(s) - 1
+	for ; s[i]+1 > 'z'; i-- {
+	}
+	return fmt.Sprintf("%s%s%s", s[:i], string(s[i]+1), s[i+1:])
+}
+
 func (b *builder) parseIndices() {
 	meta := b.supp.Metadata
 
-	// canonical language codes
-	b.lang.parseKeyed(meta.Validity.Variable, "Id", "$language")
-	for _, a := range meta.Alias.LanguageAlias {
-		if r := a.Replacement; len(r) >= 2 && len(r) <= 3 {
-			b.lang.add(r)
+	for k, v := range b.registry {
+		var ss *stringSet
+		switch v.typ {
+		case "language":
+			if len(k) == 2 || v.suppressScript != "" || v.scope == "special" {
+				b.lang.add(k)
+				continue
+			} else {
+				ss = &b.langNoIndex
+			}
+		case "region":
+			ss = &b.region
+		case "script":
+			ss = &b.script
+		default:
+			continue
 		}
-		if a.Reason == "macrolanguage" {
-			b.lang.add(a.Type)
+		if s := strings.SplitN(k, "..", 2); len(s) > 1 {
+			for a := s[0]; a <= s[1]; a = inc(a) {
+				ss.add(a)
+			}
+		} else {
+			ss.add(k)
 		}
-		remove := a.Reason == "overlong" || a.Reason == "deprecated"
-		if remove {
-			b.lang.remove(a.Type)
-		}
-	}
-	b.lang.remove("root")
-
-	// script codes
-	b.script.parseKeyed(meta.Validity.Variable, "Id", "$script")
-
-	// canonical regions codes
-	for _, g := range b.supp.TerritoryContainment.Group {
-		if len(g.Type) == 3 { // UN M49 code
-			b.region.add(g.Type)
-		}
-	}
-	for _, tc := range b.supp.CodeMappings.TerritoryCodes {
-		b.region.add(tc.Type)
 	}
 
 	// currency codes
@@ -453,12 +598,13 @@ func (b *builder) writeLanguage() {
 
 	// Get language codes that need to be mapped (overlong 3-letter codes, deprecated
 	// 2-letter codes and grandfathered tags.
-	mappedLang := stringSet{}
+	langOldMap := stringSet{}
 
-	// langSpecial maps from non-canonical to canonical ISO language codes.
-	// TODO: Map to Locale id, instead of language.  This allows sh and bhs to be
-	// mapped to sr_Latn.
-	langSpecial := stringSet{}
+	// Mappings for macro languages
+	langMacroMap := stringSet{}
+
+	// altLangISO3 get the alternative ISO3 names that need to be mapped.
+	altLangISO3 := stringSet{}
 
 	// legacyTag maps from tag to language code.
 	legacyTag := make(map[string]string)
@@ -468,21 +614,49 @@ func (b *builder) writeLanguage() {
 		if a.Replacement == "" {
 			a.Replacement = "und"
 		}
-		if len(a.Type) <= 3 {
-			code := fmt.Sprintf("%-3s", a.Type)
-			if len(a.Replacement) != 2 || a.Type[0] != a.Replacement[0] {
-				langSpecial.add(a.Replacement)
-				mappedLang.updateLater(code, a.Replacement)
-				mappedLang.add(code)
-			} else if a.Reason != "overlong" || len(a.Type) != 3 {
-				code += a.Replacement[1:]
-				mappedLang.add(code)
-			}
-			if a.Reason == "overlong" && len(a.Type) == 3 && len(a.Replacement) == 2 {
+		// TODO: support mapping to tags
+		repl := strings.SplitN(a.Replacement, "_", 2)[0]
+		if a.Reason == "overlong" {
+			if len(a.Replacement) == 2 && len(a.Type) == 3 {
 				lang.updateLater(a.Replacement, a.Type)
 			}
+		} else if len(a.Type) <= 3 {
+			if a.Reason != "deprecated" {
+				langMacroMap.add(a.Type)
+				langMacroMap.updateLater(a.Type, repl)
+			}
 		} else {
-			legacyTag[strings.Replace(a.Type, "_", "-", -1)] = a.Replacement
+			legacyTag[strings.Replace(a.Type, "_", "-", -1)] = repl
+		}
+	}
+	for k, v := range b.registry {
+		// Also add deprecated values for 3-letter ISO codes, which CLDR omits.
+		if v.typ == "language" && v.deprecated != "" && v.preferred != "" {
+			langOldMap.add(k)
+			langOldMap.updateLater(k, v.preferred)
+		}
+	}
+	// Fix CLDR mappings.
+	lang.updateLater("tl", "tgl")
+	lang.updateLater("sh", "hbs")
+	lang.updateLater("mo", "mol")
+	lang.updateLater("no", "nor")
+	lang.updateLater("tw", "twi")
+	lang.updateLater("nb", "nob")
+	lang.updateLater("ak", "aka")
+
+	// Ensure that each 2-letter code is matched with a 3-letter code.
+	for _, v := range lang.s {
+		s, ok := lang.update[v]
+		if !ok {
+			if s, ok = lang.update[langOldMap.update[v]]; !ok {
+				continue
+			}
+			lang.update[v] = s
+		}
+		if v[0] != s[0] {
+			altLangISO3.add(s)
+			altLangISO3.updateLater(s, v)
 		}
 	}
 
@@ -492,19 +666,12 @@ func (b *builder) writeLanguage() {
 		// We can avoid these manual entries by using the IANI registry directly.
 		// Seems easier to update the list manually, as changes are rare.
 		// The panic in this loop will trigger if we miss an entry.
-		lang.update["no"] = "nor"
-		lang.update["sh"] = "scr"
-		lang.update["tl"] = "tgl"
-		lang.update["tw"] = "twi"
-		// Fix CLDR ambiguities.
-		lang.update["nb"] = "nob"
-		lang.update["ak"] = "aka"
 		add := ""
 		if s, ok := lang.update[v]; ok {
 			if s[0] == v[0] {
 				add = s[1:]
 			} else {
-				add = string([]byte{0, byte(mappedLang.index(s))})
+				add = string([]byte{0, byte(altLangISO3.index(s))})
 			}
 		} else if len(v) == 3 {
 			add = "\x00"
@@ -515,36 +682,51 @@ func (b *builder) writeLanguage() {
 	}
 	b.writeString("lang", lang.join())
 
-	// Generate tables for non-canonicalized tags.
-	mappedLang.freeze()
-	mappedLangID := []int16{}
-	altTag := ""
-	for _, v := range langSpecial.slice() {
-		i := 0
-		if len(v) <= 3 {
-			i = b.lang.index(v)
-		} else {
-			i = -1 - len(altTag)
-			altTag += v
-		}
-		mappedLangID = append(mappedLangID, int16(i))
-	}
+	b.writeConst("langNoIndexOffset", len(b.lang.s))
 
-	for k, v := range mappedLang.update {
-		i := mappedLang.index(k)
-		mappedLang.s[i] += string(langSpecial.index(v))
+	// space of all valid 3-letter language identifiers.
+	b.writeBitVector("langNoIndex", b.langNoIndex.slice())
+
+	for i, s := range altLangISO3.slice() {
+		idx := b.lang.index(altLangISO3.update[s])
+		altLangISO3.s[i] += string([]byte{byte(idx)})
 	}
-	b.writeString("mappedLang", mappedLang.join())
-	b.writeSlice("mappedLangID", mappedLangID)
-	b.writeString("altTag", altTag)
+	b.writeString("altLangISO3", altLangISO3.join())
+
+	makeMap := func(name string, ss *stringSet) {
+		ss.sortFunc(func(i, j string) bool {
+			return b.langIndex(i) < b.langIndex(j)
+		})
+		m := []struct{ from, to uint16 }{}
+		for _, s := range ss.s {
+			m = append(m, struct{ from, to uint16 }{
+				b.langIndex(s),
+				b.langIndex(ss.update[s]),
+			})
+		}
+		b.writeSlice(name, m)
+	}
+	makeMap("langOldMap", &langOldMap)
+	makeMap("langMacroMap", &langMacroMap)
+
 	b.writeMapFunc("tagAlias", legacyTag, func(s string) uint16 {
-		return uint16(b.lang.index(s))
+		return uint16(b.langIndex(s))
 	})
 }
 
 func (b *builder) writeScript() {
-	b.writeConst("unknownScript", b.script.index("Zzzz"))
+	unknown := uint8(b.script.index("Zzzz"))
+	b.writeConst("unknownScript", unknown)
 	b.writeString("script", b.script.join())
+
+	supp := make([]uint8, len(b.lang.slice()))
+	for i, v := range b.lang.slice() {
+		supp[i] = unknown
+		if sc := b.registry[v].suppressScript; sc != "" {
+			supp[i] = uint8(b.script.index(sc))
+		}
+	}
+	b.writeSlice("suppressScript", supp)
 }
 
 func parseM49(s string) uint16 {
@@ -570,10 +752,8 @@ func (b *builder) writeRegion() {
 	regionISO := b.region.clone()
 	regionISO.s = regionISO.s[isoOffset:]
 	regionISO.sorted = false
-	for i, tc := range b.supp.CodeMappings.TerritoryCodes {
-		if tc.Type != regionISO.s[i] {
-			log.Panicf("writeRegion: found %q; want %q", regionISO.s[i], tc.Type)
-		}
+	for _, tc := range b.supp.CodeMappings.TerritoryCodes {
+		i := regionISO.index(tc.Type)
 		if len(tc.Alpha3) == 3 {
 			if tc.Alpha3[0] == tc.Type[0] {
 				regionISO.s[i] += tc.Alpha3[1:]
@@ -582,13 +762,16 @@ func (b *builder) writeRegion() {
 				altRegionISO3 += tc.Alpha3
 				altRegionIDs = append(altRegionIDs, uint16(isoOffset+i))
 			}
-		} else {
-			regionISO.s[i] += "  "
 		}
 		if d := m49map[isoOffset+i]; d != 0 {
 			log.Panicf("%s found as a duplicate UN.M49 code of %03d", tc.Numeric, d)
 		}
 		m49map[isoOffset+i] = parseM49(tc.Numeric)
+	}
+	for i, s := range regionISO.s {
+		if len(s) != 4 {
+			regionISO.s[i] = s + "  "
+		}
 	}
 	b.writeString("regionISO", regionISO.join())
 	b.writeString("altRegionISO3", altRegionISO3)
@@ -638,7 +821,7 @@ func (b *builder) writeCurrencies() {
 }
 
 var header = `// Generated by running
-//		maketables -url=%s
+//		maketables -url=%s -iana=%s
 // DO NOT EDIT
 
 package locale
@@ -646,8 +829,8 @@ package locale
 
 func main() {
 	flag.Parse()
-	b := newBuilder(url)
-	fmt.Fprintf(b.out, header, *url)
+	b := newBuilder()
+	fmt.Fprintf(b.out, header, *url, *iana)
 
 	b.parseIndices()
 	b.writeLanguage()

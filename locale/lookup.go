@@ -101,39 +101,15 @@ func getLangID(s []byte) langID {
 	return getLangISO3(s)
 }
 
-func getMappedID(index int) langID {
-	m := mappedLang[index:]
-	if m[3] >= 'a' {
-		b := [2]byte{}
-		b[0], b[1] = m[0], m[3]
-		return getLangISO2(b[:])
+// mapLang returns the mapped langID of id according to mapping m.
+func normLang(m []struct{ from, to uint16 }, id langID) langID {
+	k := sort.Search(len(m), func(i int) bool {
+		return m[i].from >= uint16(id)
+	})
+	if m[k].from == uint16(id) {
+		return langID(m[k].to)
 	}
-	i := mappedLangID[m[3]]
-	if i < 0 {
-		i = -(i + 1)
-		b := [2]byte{}
-		copy(b[:], altTag[i:][:2])
-		// TODO: this code can be a locale.
-		return getLangISO2(b[:])
-	}
-	return langID(i)
-}
-
-// normLang returns the langID of s, canonicalizing the language
-// according to BCP 47 and CLDR rules.
-func normLang(s []byte) langID {
-	if len(s) < 2 || len(s) > 3 {
-		return unknownLang
-	}
-	lang := getLangID(s)
-	buf := [4]byte{}
-	b := buf[:copy(buf[:], lang.String())]
-	if i := index(mappedLang, b); i != -1 {
-		if len(b) == 3 || mappedLang[i+2] == ' ' {
-			return getMappedID(i)
-		}
-	}
-	return lang
+	return id
 }
 
 // getLangISO2 returns the langID for the given 2-letter ISO language code
@@ -143,11 +119,28 @@ func getLangISO2(s []byte) langID {
 		if i := index(lang, s); i != -1 && lang[i+3] != 0 {
 			return langID(i >> 2)
 		}
-		if i := index(mappedLang, s); i != -1 && mappedLang[i+2] == ' ' {
-			return getMappedID(i)
-		}
 	}
 	return unknownLang
+}
+
+const base = 'z' - 'a' + 1
+
+func strToInt(s []byte) uint {
+	v := uint(0)
+	for i := 0; i < len(s); i++ {
+		v *= base
+		v += uint(s[i] - 'a')
+	}
+	return v
+}
+
+// converts the given integer to the original ASCII string passed to strToInt.
+// len(s) must match the number of characters obtained.
+func intToStr(v uint, s []byte) {
+	for i := len(s) - 1; i >= 0; i-- {
+		s[i] = byte(v%base) + 'a'
+		v /= base
+	}
 }
 
 // getLangISO3 returns the langID for the given 3-letter ISO language code
@@ -160,8 +153,12 @@ func getLangISO3(s []byte) langID {
 				return langID(i >> 2)
 			}
 		}
-		if i := index(mappedLang, s); i != -1 {
-			return getMappedID(i)
+		if i := index(altLangISO3, s); i != -1 {
+			return langID(altLangISO3[i+3])
+		}
+		n := strToInt(s)
+		if langNoIndex[n/8]&(1<<(n%8)) != 0 {
+			return langID(n) + langNoIndexOffset
 		}
 		// Check for non-canonical uses of ISO3.
 		for i := search(lang, s[:1]); lang[i] == s[0]; i += 4 {
@@ -173,8 +170,28 @@ func getLangISO3(s []byte) langID {
 	return unknownLang
 }
 
+// stringToBuf writes the string to b and returns the number of bytes
+// written.  cap(b) must be >= 3.
+func (id langID) stringToBuf(b []byte) int {
+	if id >= langNoIndexOffset {
+		intToStr(uint(id)-langNoIndexOffset, b[:3])
+		return 3
+	}
+	l := lang[id<<2:]
+	if l[3] == 0 {
+		return copy(b, l[:3])
+	}
+	return copy(b, l[:2])
+}
+
 // String returns the BCP 47 representation of the langID.
 func (id langID) String() string {
+	if id >= langNoIndexOffset {
+		id -= langNoIndexOffset
+		buf := [3]byte{}
+		intToStr(uint(id), buf[:])
+		return string(buf[:])
+	}
 	l := lang[id<<2:]
 	if l[3] == 0 {
 		return l[:3]
@@ -183,12 +200,15 @@ func (id langID) String() string {
 }
 
 // ISO3 returns the ISO 639-3 language code.
-func (id langID) iso3() string {
+func (id langID) ISO3() string {
+	if id >= langNoIndexOffset {
+		return id.String()
+	}
 	l := lang[id<<2:]
 	if l[3] == 0 {
 		return l[:3]
 	} else if l[2] == 0 {
-		return get(mappedLang, int(l[3]), 3)
+		return get(altLangISO3, int(l[3]), 3)
 	}
 	// This allocation will only happen for 3-letter ISO codes
 	// that are non-canonical BCP 47 language identifiers.
@@ -298,6 +318,7 @@ func getScriptID(idx string, s []byte) scriptID {
 	return unknownScript
 }
 
+// String returns the script code in title case.
 func (s scriptID) String() string {
 	return get(script, int(s), 4)
 }
@@ -311,6 +332,11 @@ func getCurrencyID(idx string, s []byte) currencyID {
 		}
 	}
 	return unknownCurrency
+}
+
+// String returns the upper case representation of the currency.
+func (c currencyID) String() string {
+	return get(currency, int(c), 3)
 }
 
 func round(index string, c currencyID) int {

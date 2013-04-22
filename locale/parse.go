@@ -230,11 +230,14 @@ func parse(scan *scanner, s string) (loc ID, err error) {
 // It returns an ID and the end position in the input that was parsed.
 func parseTag(scan *scanner) (ID, int) {
 	loc := und
+	// TODO: set an error if an unknown lang, script or region is encountered.
 	loc.lang = getLangID(scan.token)
 	scan.replace(loc.lang.String())
 	langStart := scan.start
 	end := scan.scan()
 	for len(scan.token) == 3 && isAlpha(scan.token[0]) {
+		// From http://tools.ietf.org/html/bcp47, <lang>-<extlang> tags are equivalent
+		// to a tag of the form <extlang>.
 		if lang := getLangID(scan.token); lang != unknownLang {
 			loc.lang = lang
 			copy(scan.b[langStart:], lang.String())

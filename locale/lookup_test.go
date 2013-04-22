@@ -93,8 +93,8 @@ func TestLangID(t *testing.T) {
 		{id: "jrb", bcp47: "jrb", iso3: "jrb"},
 		{id: "es", bcp47: "es", iso3: "spa"},
 		{id: "spa", bcp47: "es", iso3: "spa"},
-		{id: "ji", bcp47: "yi", iso3: "yid"},
-		{id: "jw", bcp47: "jv", iso3: "jav"},
+		{id: "ji", bcp47: "ji", iso3: "yid-", norm: "yi"},
+		{id: "jw", bcp47: "jw", iso3: "jav-", norm: "jv"},
 		{id: "ar", bcp47: "ar", iso3: "ara"},
 		{id: "arb", bcp47: "arb", iso3: "arb", norm: "ar"},
 		{id: "ar", bcp47: "ar", iso3: "ara"},
@@ -104,8 +104,8 @@ func TestLangID(t *testing.T) {
 		{id: "gsw", bcp47: "gsw", iso3: "gsw"},
 		{id: "gSW", bcp47: "gsw", iso3: "gsw"},
 		{id: "und", bcp47: "und", iso3: "und"},
-		{id: "sh", bcp47: "sh", iso3: "scr", norm: "sr"},
-		{id: "scr", bcp47: "sh", iso3: "scr", norm: "sr"},
+		{id: "sh", bcp47: "sh", iso3: "hbs", norm: "sr"},
+		{id: "hbs", bcp47: "sh", iso3: "hbs", norm: "sr"},
 		{id: "no", bcp47: "no", iso3: "nor", norm: "nb"},
 		{id: "nor", bcp47: "no", iso3: "nor", norm: "nb"},
 		{id: "cmn", bcp47: "cmn", iso3: "cmn", norm: "zh"},
@@ -115,24 +115,28 @@ func TestLangID(t *testing.T) {
 		if id := getLangISO2(b(tt.bcp47)); len(tt.bcp47) == 2 && want != id {
 			t.Errorf("%d:getISO2(%s): found %v; want %v", i, tt.bcp47, id, want)
 		}
-		if id := getLangISO3(b(tt.iso3)); want != id {
-			t.Errorf("%d:getISO3(%s): found %v; want %v", i, tt.iso3, id, want)
-		}
-		if id := getLangID(b(tt.iso3)); want != id {
-			t.Errorf("%d:getID3(%s): found %v; want %v", i, tt.iso3, id, want)
+		if len(tt.iso3) == 3 {
+			if id := getLangISO3(b(tt.iso3)); want != id {
+				t.Errorf("%d:getISO3(%s): found %q; want %q", i, tt.iso3, id, want)
+			}
+			if id := getLangID(b(tt.iso3)); want != id {
+				t.Errorf("%d:getID3(%s): found %v; want %v", i, tt.iso3, id, want)
+			}
 		}
 		norm := want
 		if tt.norm != "" {
 			norm = getLangID(b(tt.norm))
 		}
-		if id := normLang(b(tt.id)); id != norm {
+		id := normLang(langOldMap[:], want)
+		id = normLang(langMacroMap[:], id)
+		if id != norm {
 			t.Errorf("%d:norm(%s): found %v; want %v", i, tt.id, id, norm)
 		}
 		if id := want.String(); tt.bcp47 != id {
 			t.Errorf("%d:String(): found %s; want %s", i, id, tt.bcp47)
 		}
-		if id := want.iso3(); tt.iso3 != id {
-			t.Errorf("%d:iso3(): found %s; want %s", i, id, tt.iso3)
+		if id := want.ISO3(); tt.iso3[:3] != id {
+			t.Errorf("%d:iso3(): found %s; want %s", i, id, tt.iso3[:3])
 		}
 	}
 }

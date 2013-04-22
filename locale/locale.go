@@ -6,6 +6,8 @@
 // It supports various canonicalizations defined in CLDR.
 package locale
 
+import "strings"
+
 var (
 	// Und represents the undefined langauge. It is also the root locale.
 	Und   = und
@@ -46,12 +48,74 @@ type ID struct {
 // In most cases, locale IDs should be created using this method.
 func Make(id string) ID {
 	loc, _ := Parse(id)
-	return loc.Canonicalize()
+	return loc.Canonicalize(All)
 }
 
+// IsRoot returns true if loc is equal to locale "und".
+func (loc ID) IsRoot() bool {
+	if loc.str != nil {
+		n := len(*loc.str)
+		if n > 0 && loc.pExt > 0 && int(loc.pExt) < n {
+			return false
+		}
+		if uint16(loc.pVariant) != loc.pExt || strings.HasPrefix(*loc.str, "x-") {
+			return false
+		}
+		loc.str = nil
+	}
+	return loc == und
+}
+
+// CanonType is can be used to enable or disable various types of canonicalization.
+type CanonType int
+
+const (
+	// Replace deprecated values with their preferred ones.
+	Deprecated CanonType = 1 << iota
+	// Remove redundant scripts.
+	SuppressScript
+	// Map the dominant language of macro language group to the macro language identifier.
+	// For example cmn -> zh.
+	Macro
+	// All canonicalizations prescribed by BCP 47.
+	BCP47 = Deprecated | SuppressScript
+	All   = BCP47 | Macro
+
+	// TODO: LikelyScript, LikelyRegion: supress similar to ICU.
+)
+
 // Canonicalize replaces the identifier with its canonical equivalent.
-func (loc ID) Canonicalize() ID {
-	return und
+func (loc ID) Canonicalize(t CanonType) ID {
+	changed := false
+	if t&SuppressScript != 0 {
+		if loc.lang < langNoIndexOffset && uint8(loc.script) == suppressScript[loc.lang] {
+			loc.script = unknownScript
+			changed = true
+		}
+	}
+	if t&Deprecated != 0 {
+		l := normLang(langOldMap[:], loc.lang)
+		if l != loc.lang {
+			changed = true
+		}
+		loc.lang = l
+	}
+	if t&Macro != 0 {
+		l := normLang(langMacroMap[:], loc.lang)
+		if l != loc.lang {
+			changed = true
+		}
+		loc.lang = l
+	}
+	if changed && loc.str != nil {
+		ext := ""
+		if loc.pExt > 0 {
+			ext = (*loc.str)[loc.pExt+1:]
+		}
+		s := loc.makeString(loc.Part(VariantPart), ext)
+		loc.str = &s
+	}
+	return loc
 }
 
 // Parent returns the direct parent for this locale, which is the locale
@@ -82,17 +146,36 @@ const (
 	Exact                   // exact match or explicitly specified value
 )
 
+func (loc *ID) makeString(vars, ext string) string {
+	buf := [128]byte{}
+	n := loc.lang.stringToBuf(buf[:])
+	if loc.script != unknownScript {
+		n += copy(buf[n:], "-")
+		n += copy(buf[n:], loc.script.String())
+	}
+	if loc.region != unknownRegion {
+		n += copy(buf[n:], "-")
+		n += copy(buf[n:], loc.region.String())
+	}
+	b := buf[:n]
+	if vars != "" {
+		b = append(b, '-')
+		loc.pVariant = byte(len(b))
+		b = append(b, vars...)
+		loc.pExt = uint16(len(b))
+	}
+	if ext != "" {
+		loc.pExt = uint16(len(b))
+		b = append(b, '-')
+		b = append(b, ext...)
+	}
+	return string(b)
+}
+
 // String returns the canonical string representation of the locale.
 func (loc ID) String() string {
 	if loc.str == nil {
-		s := loc.lang.String()
-		if loc.script != unknownScript {
-			s += "-" + loc.script.String()
-		}
-		if loc.region != unknownRegion {
-			s += "-" + loc.region.String()
-		}
-		loc.str = &s
+		return loc.makeString("", "")
 	}
 	return *loc.str
 }
@@ -168,20 +251,7 @@ func (loc ID) SimplifyOptions() ID {
 
 // Language is an ISO 639 language identifier.
 type Language struct {
-	// TODO: implement
-	lang int
-}
-
-// String returns the shortest possible ISO country code.
-func (l Language) String() string {
-	// TODO: implement
-	return ""
-}
-
-// ISO3 returns the ISO 639-3 language code.
-func (l Language) ISO3() string {
-	// TODO: implement
-	return ""
+	langID
 }
 
 // Scope returns a Set of all pre-defined sublocales for this language.
@@ -193,14 +263,7 @@ func (l Language) Scope() Set {
 // Script is a 4-letter ISO 15924 code for representing scripts.
 // It is idiomatically represented in title case.
 type Script struct {
-	// TODO: implement
-	script int
-}
-
-// String returns the script code in title case.
-func (s Script) String() string {
-	// TODO: implement
-	return ""
+	scriptID
 }
 
 // Scope returns a Set of all pre-defined sublocales applicable to the script.
@@ -211,14 +274,7 @@ func (s Script) Scope() Set {
 
 // Region is an ISO 3166-1 or UN M.49 code for representing countries and regions.
 type Region struct {
-	// TODO: implement
-	region int
-}
-
-// String returns the canonical representation of the region.
-func (r Region) String() string {
-	// TODO: implement
-	return ""
+	regionID
 }
 
 // IsCountry returns whether this region is a country.
@@ -247,20 +303,7 @@ func (v Variant) String() string {
 
 // Currency is an ISO 4217 currency designator.
 type Currency struct {
-	// TODO: implement
-	currency int
-}
-
-// String returns the lower-cased representation of the currency.
-func (c Currency) String() string {
-	// TODO: implement
-	return ""
-}
-
-// Num returns the 3-digit numerical representation of the currency.
-func (c Currency) Num() int {
-	// TODO: implement
-	return 0
+	currencyID
 }
 
 // Set provides information about a set of locales.

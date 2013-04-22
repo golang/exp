@@ -9,6 +9,27 @@ import (
 	"fmt"
 )
 
+func ExampleID_Canonicalize() {
+	p := func(id string) {
+		loc, _ := locale.Parse(id)
+		fmt.Printf("BCP47(%s) -> %s\n", id, loc.Canonicalize(locale.BCP47))
+		fmt.Printf("Macro(%s) -> %s\n", id, loc.Canonicalize(locale.Macro))
+	}
+	p("en-Latn")
+	p("zh-cmn")
+	p("bjd")
+	p("iw-Latn-fonipa-u-cu-usd")
+	// Output:
+	// BCP47(en-Latn) -> en
+	// Macro(en-Latn) -> en-Latn
+	// BCP47(zh-cmn) -> cmn
+	// Macro(zh-cmn) -> zh
+	// BCP47(bjd) -> drl
+	// Macro(bjd) -> bjd
+	// BCP47(iw-Latn-fonipa-u-cu-usd) -> he-Latn-fonipa-u-cu-usd
+	// Macro(iw-Latn-fonipa-u-cu-usd) -> iw-Latn-fonipa-u-cu-usd
+}
+
 func ExampleID_Parent() {
 	loc := locale.Make("sl-Latn-IT-nedis")
 	fmt.Println(loc.Parent())
