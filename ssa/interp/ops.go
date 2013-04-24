@@ -897,7 +897,7 @@ func callBuiltin(caller *frame, callpos token.Pos, fn *ssa.Builtin, args []value
 		}
 		return nil
 
-	case "print", "println": // print(interface{}, ...interface{})
+	case "print", "println": // print(anytype, ...interface{})
 		ln := fn.Name() == "println"
 		fmt.Print(toString(args[0]))
 		if len(args) == 2 {
@@ -1021,8 +1021,9 @@ func rangeIter(x value, t types.Type) iter {
 		// up an iteration interface using the
 		// reflect.(Value).MapKeys machinery.
 		it := make(mapIter)
+		x2 := x // TODO(gri): workaround for go/types bug in typeswitch+funclit.
 		go func() {
-			for k, v := range x {
+			for k, v := range x2 {
 				it <- [2]value{k, v}
 			}
 			close(it)
@@ -1034,8 +1035,9 @@ func rangeIter(x value, t types.Type) iter {
 		// up an iteration interface using the
 		// reflect.(Value).MapKeys machinery.
 		it := make(mapIter)
+		x2 := x // TODO(gri): workaround for go/types bug in typeswitch+funclit.
 		go func() {
-			for _, e := range x.table {
+			for _, e := range x2.table {
 				for e != nil {
 					it <- [2]value{e.key, e.value}
 					e = e.next
@@ -1096,6 +1098,7 @@ func conv(t_dst, t_src types.Type, x value) value {
 
 	// Same underlying types?
 	// TODO(adonovan): consider a dedicated ssa.ChangeType instruction.
+	// TODO(adonovan): fix: what about channels of different direction?
 	if types.IsIdentical(ut_dst, ut_src) {
 		return x
 	}

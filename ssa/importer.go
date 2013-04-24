@@ -5,12 +5,14 @@ package ssa
 // "main" package.
 
 import (
+	"errors"
 	"go/ast"
 	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"code.google.com/p/go.exp/go/types"
 )
@@ -45,12 +47,13 @@ func (b *Builder) doImport(imports map[string]*types.Package, path string) (typk
 		return // negative cache hit
 	}
 	var files []*ast.File
-	if b.mode&UseGCImporter != 0 {
+	var info *TypeInfo
+	if b.Context.Mode&UseGCImporter != 0 {
 		typkg, err = types.GcImport(imports, path)
 	} else {
-		files, err = b.loader(b.Prog.Files, path)
+		files, err = b.Context.Loader(b.Prog.Files, path)
 		if err == nil {
-			typkg, err = b.typechecker.Check(b.Prog.Files, files)
+			typkg, info, err = b.typecheck(files)
 		}
 	}
 	if err != nil {
@@ -60,8 +63,8 @@ func (b *Builder) doImport(imports map[string]*types.Package, path string) (typk
 	}
 
 	// Cache success
-	imports[path] = typkg                                           // cache for just this package.
-	b.Prog.Packages[path] = b.createPackageImpl(typkg, path, files) // cache across all packages
+	imports[path] = typkg                                                 // cache for just this package.
+	b.Prog.Packages[path] = b.createPackageImpl(typkg, path, files, info) // cache across all packages
 
 	return typkg, nil
 }
@@ -71,6 +74,7 @@ func (b *Builder) doImport(imports map[string]*types.Package, path string) (typk
 // directory beneath $GOROOT/src/pkg.
 //
 // TODO(adonovan): get rsc and adg (go/build owners) to review this.
+// TODO(adonovan): permit clients to specify a non-default go/build.Context.
 //
 func GorootLoader(fset *token.FileSet, path string) (files []*ast.File, err error) {
 	// TODO(adonovan): fix: Do we need cwd? Shouldn't ImportDir(path) / $GOROOT suffice?
@@ -106,6 +110,46 @@ func ParseFiles(fset *token.FileSet, dir string, files ...string) (parsed []*ast
 			return // parsing failed
 		}
 		parsed = append(parsed, f)
+	}
+	return
+}
+
+// CreatePackageFromArgs builds an initial Package from a list of
+// command-line arguments.
+// If args is a list of *.go files, they are parsed and type-checked.
+// If args is a Go package import path, that package is imported.
+// rest is the suffix of args that were not consumed.
+//
+// This utility is provided to facilitate construction of command-line
+// tools with a consistent user interface.
+//
+func CreatePackageFromArgs(builder *Builder, args []string) (pkg *Package, rest []string, err error) {
+	var pkgname string
+	var files []*ast.File
+
+	switch {
+	case len(args) == 0:
+		err = errors.New("No *.go source files nor package name was specified.")
+
+	case strings.HasSuffix(args[0], ".go"):
+		// % tool a.go b.go ...
+		// Leading consecutive *.go arguments constitute main package.
+		pkgname = "main"
+		i := 1
+		for ; i < len(args) && strings.HasSuffix(args[i], ".go"); i++ {
+		}
+		files, err = ParseFiles(builder.Prog.Files, ".", args[:i]...)
+		rest = args[i:]
+
+	default:
+		// % tool my/package ...
+		// First argument is import path of main package.
+		pkgname = args[0]
+		rest = args[1:]
+		files, err = builder.Context.Loader(builder.Prog.Files, pkgname)
+	}
+	if err == nil {
+		pkg, err = builder.CreatePackage(pkgname, files)
 	}
 	return
 }

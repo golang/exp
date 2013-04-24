@@ -139,7 +139,7 @@ func run(t *testing.T, dir, input string) bool {
 		inputs = append(inputs, dir+i)
 	}
 
-	b := ssa.NewBuilder(ssa.SanityCheckFunctions, ssa.GorootLoader, nil)
+	b := ssa.NewBuilder(&ssa.Context{Mode: ssa.SanityCheckFunctions, Loader: ssa.GorootLoader})
 	files, err := ssa.ParseFiles(b.Prog.Files, ".", inputs...)
 	if err != nil {
 		t.Errorf("ssa.ParseFiles(%s) failed: %s", inputs, err.Error())

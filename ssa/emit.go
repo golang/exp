@@ -9,12 +9,13 @@ import (
 )
 
 // emitNew emits to f a new (heap Alloc) instruction allocating an
-// object of type typ.
+// object of type typ.  pos is the optional source location.
 //
-func emitNew(f *Function, typ types.Type) Value {
+func emitNew(f *Function, typ types.Type, pos token.Pos) Value {
 	return f.emit(&Alloc{
 		Type_: pointer(typ),
 		Heap:  true,
+		Pos:   pos,
 	})
 }
 
@@ -230,7 +231,7 @@ func emitExtract(f *Function, tuple Value, index int, typ types.Type) Value {
 //
 func emitTailCall(f *Function, call *Call) {
 	for _, arg := range f.Params[1:] {
-		call.Args = append(call.Args, arg)
+		call.Call.Args = append(call.Call.Args, arg)
 	}
 	nr := len(f.Signature.Results)
 	if nr == 1 {

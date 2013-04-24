@@ -17,10 +17,6 @@ import (
 // Each Builder creates and populates a single Program during its
 // lifetime.
 //
-// TODO(adonovan): synthetic methods for promoted methods and for
-// standalone interface methods do not belong to any package.  Make
-// them enumerable here so clients can (e.g.) generate code for them.
-//
 type Program struct {
 	Files    *token.FileSet            // position information for the files of this Program
 	Packages map[string]*Package       // all loaded Packages, keyed by import path
@@ -44,20 +40,25 @@ type Package struct {
 	Members map[string]Member // all exported and unexported members of the package
 	Init    *Function         // the package's (concatenated) init function
 
+	// These fields are available between package creation and SSA
+	// building, but are then cleared unless Client.RetainAST(pkg).
+	Files    []*ast.File // abstract syntax for the package's files
+	TypeInfo             // type-checker intermediate results
+
 	// The following fields are set transiently during building,
 	// then cleared.
 	started  int32                   // atomically tested and set at start of build phase
-	files    []*ast.File             // the abstract syntax trees for the files of the package
 	nTo1Vars map[*ast.ValueSpec]bool // set of n:1 ValueSpecs already built
 }
 
-// A Member is a member of a Go package, implemented by *Literal,
+// A Member is a member of a Go package, implemented by *Constant,
 // *Global, *Function, or *Type; they are created by package-level
 // const, var, func and type declarations respectively.
 //
 type Member interface {
 	Name() string      // the declared name of the package member
 	String() string    // human-readable information about the value
+	Posn() token.Pos   // position of member's declaration, if known
 	Type() types.Type  // the type of the package member
 	ImplementsMember() // dummy method to indicate the "implements" relation.
 }
@@ -96,6 +97,15 @@ type Type struct {
 	NamedType  *types.NamedType
 	Methods    MethodSet // concrete method set of N
 	PtrMethods MethodSet // concrete method set of (*N)
+}
+
+// A Constant is a Member of Package representing a package-level
+// constant value.
+//
+type Constant struct {
+	Name_ string
+	Value *Literal
+	Pos   token.Pos
 }
 
 // An SSA value that can be referenced by an instruction.
@@ -325,6 +335,7 @@ type Global struct {
 	Name_ string
 	Type_ types.Type
 	Pkg   *Package
+	Pos   token.Pos
 
 	// The following fields are set transiently during building,
 	// then cleared.
@@ -375,6 +386,7 @@ type Alloc struct {
 	Name_     string
 	Type_     types.Type
 	Heap      bool
+	Pos       token.Pos
 	referrers []Instruction
 	index     int // dense numbering; for lifting
 }
@@ -407,7 +419,7 @@ type Phi struct {
 //
 type Call struct {
 	Register
-	CallCommon
+	Call CallCommon
 }
 
 // BinOp yields the result of binary operation X Op Y.
@@ -538,6 +550,7 @@ type MakeClosure struct {
 type MakeMap struct {
 	Register
 	Reserve Value // initial space reservation; nil => default
+	Pos     token.Pos
 }
 
 // The MakeChan instruction creates a new channel object and yields a
@@ -551,6 +564,7 @@ type MakeMap struct {
 type MakeChan struct {
 	Register
 	Size Value // int; size of buffer; zero => synchronous.
+	Pos  token.Pos
 }
 
 // MakeSlice yields a slice of length Len backed by a newly allocated
@@ -570,6 +584,7 @@ type MakeSlice struct {
 	Register
 	Len Value
 	Cap Value
+	Pos token.Pos
 }
 
 // Slice yields a slice of an existing string, slice or *array X
@@ -637,9 +652,6 @@ type IndexAddr struct {
 }
 
 // Index yields element Index of array X.
-//
-// TODO(adonovan): permit X to have type slice.
-// Currently this requires IndexAddr followed by Load.
 //
 // Example printed form:
 // 	t2 = t0[t1]
@@ -887,7 +899,7 @@ type Panic struct {
 //
 type Go struct {
 	anInstruction
-	CallCommon
+	Call CallCommon
 }
 
 // Defer pushes the specified call onto a stack of functions
@@ -902,7 +914,7 @@ type Go struct {
 //
 type Defer struct {
 	anInstruction
-	CallCommon
+	Call CallCommon
 }
 
 // Send sends X on channel Chan.
@@ -939,7 +951,7 @@ type MapUpdate struct {
 	Value Value
 }
 
-// Embeddable mix-ins used for common parts of other structs. --------------------
+// Embeddable mix-ins and helpers for common parts of other structs. -----------
 
 // Register is a mix-in embedded by all SSA values that are also
 // instructions, i.e. virtual registers, and provides implementations
@@ -968,7 +980,7 @@ type anInstruction struct {
 	Block_ *BasicBlock // the basic block of this instruction
 }
 
-// CallCommon is a mix-in embedded by Go, Defer and Call to hold the
+// CallCommon is contained by Go, Defer and Call to hold the
 // common parts of a function or method call.
 //
 // Each CallCommon exists in one of two modes, function call and
@@ -983,7 +995,7 @@ type anInstruction struct {
 // dispatched, but less common, Func may be a *MakeClosure, indicating
 // an immediately applied function literal with free variables.  Any
 // other Value of Func indicates a dynamically dispatched function
-// call.
+// call.  The StaticCallee method returns the callee in these cases.
 //
 // Args contains the arguments to the call.  If Func is a method,
 // Args[0] contains the receiver parameter.  Recv and Method are not
@@ -1033,11 +1045,40 @@ func (c *CallCommon) IsInvoke() bool {
 	return c.Recv != nil
 }
 
+// StaticCallee returns the called function if this is a trivially
+// static "call"-mode call.
+func (c *CallCommon) StaticCallee() *Function {
+	switch fn := c.Func.(type) {
+	case *Function:
+		return fn
+	case *MakeClosure:
+		return fn.Fn.(*Function)
+	}
+	return nil
+}
+
 // MethodId returns the Id for the method called by c, which must
 // have "invoke" mode.
 func (c *CallCommon) MethodId() Id {
 	meth := underlyingType(c.Recv.Type()).(*types.Interface).Methods[c.Method]
 	return IdFromQualifiedName(meth.QualifiedName)
+}
+
+// Description returns a description of the mode of this call suitable
+// for a user interface, e.g. "static method call".
+func (c *CallCommon) Description() string {
+	switch fn := c.Func.(type) {
+	case nil:
+		return "dynamic method call" // ("invoke" mode)
+	case *MakeClosure:
+		return "static function closure call"
+	case *Function:
+		if fn.Signature.Recv != nil {
+			return "static method call"
+		}
+		return "static function call"
+	}
+	return "dynamic function call"
 }
 
 func (v *Builtin) Type() types.Type        { return v.Object.GetType() }
@@ -1050,10 +1091,12 @@ func (v *Capture) Referrers() *[]Instruction { return &v.referrers }
 
 func (v *Global) Type() types.Type        { return v.Type_ }
 func (v *Global) Name() string            { return v.Name_ }
+func (v *Global) Posn() token.Pos         { return v.Pos }
 func (*Global) Referrers() *[]Instruction { return nil }
 
 func (v *Function) Name() string            { return v.Name_ }
 func (v *Function) Type() types.Type        { return v.Signature }
+func (v *Function) Posn() token.Pos         { return v.Pos }
 func (*Function) Referrers() *[]Instruction { return nil }
 
 func (v *Parameter) Type() types.Type          { return v.Type_ }
@@ -1074,11 +1117,17 @@ func (v *Register) asRegister() *Register     { return v }
 func (v *anInstruction) Block() *BasicBlock         { return v.Block_ }
 func (v *anInstruction) SetBlock(block *BasicBlock) { v.Block_ = block }
 
-func (ms *Type) Type() types.Type { return ms.NamedType }
-func (ms *Type) String() string   { return ms.Name() }
-func (ms *Type) Name() string     { return ms.NamedType.Obj.Name }
+func (t *Type) Name() string     { return t.NamedType.Obj.Name }
+func (t *Type) Posn() token.Pos  { return t.NamedType.Obj.GetPos() }
+func (t *Type) String() string   { return t.Name() }
+func (t *Type) Type() types.Type { return t.NamedType }
 
 func (p *Package) Name() string { return p.Types.Name }
+
+func (c *Constant) Name() string     { return c.Name_ }
+func (c *Constant) Posn() token.Pos  { return c.Pos }
+func (c *Constant) String() string   { return c.Name() }
+func (c *Constant) Type() types.Type { return c.Value.Type() }
 
 // Func returns the package-level function of the specified name,
 // or nil if not found.
@@ -1099,8 +1148,8 @@ func (p *Package) Var(name string) (g *Global) {
 // Const returns the package-level constant of the specified name,
 // or nil if not found.
 //
-func (p *Package) Const(name string) (l *Literal) {
-	l, _ = p.Members[name].(*Literal)
+func (p *Package) Const(name string) (c *Constant) {
+	c, _ = p.Members[name].(*Constant)
 	return
 }
 
@@ -1146,9 +1195,9 @@ func (*Slice) ImplementsValue()           {}
 func (*TypeAssert) ImplementsValue()      {}
 func (*UnOp) ImplementsValue()            {}
 
+func (*Constant) ImplementsMember() {}
 func (*Function) ImplementsMember() {}
 func (*Global) ImplementsMember()   {}
-func (*Literal) ImplementsMember()  {}
 func (*Type) ImplementsMember()     {}
 
 func (*Alloc) ImplementsInstruction()           {}
@@ -1203,6 +1252,18 @@ func (c *CallCommon) Operands(rands []*Value) []*Value {
 		rands = append(rands, &c.Args[i])
 	}
 	return rands
+}
+
+func (s *Go) Operands(rands []*Value) []*Value {
+	return s.Call.Operands(rands)
+}
+
+func (s *Call) Operands(rands []*Value) []*Value {
+	return s.Call.Operands(rands)
+}
+
+func (s *Defer) Operands(rands []*Value) []*Value {
+	return s.Call.Operands(rands)
 }
 
 func (v *ChangeInterface) Operands(rands []*Value) []*Value {

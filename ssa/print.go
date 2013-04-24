@@ -67,8 +67,8 @@ func (v *Builtin) String() string {
 	return fmt.Sprintf("builtin %s : %s", v.Name(), v.Type())
 }
 
-func (r *Function) String() string {
-	return fmt.Sprintf("function %s : %s", r.Name(), r.Type())
+func (v *Function) String() string {
+	return fmt.Sprintf("function %s : %s", v.Name(), v.Type())
 }
 
 // FullName returns g's package-qualified name.
@@ -142,7 +142,7 @@ func (c *CallCommon) String() string {
 }
 
 func (v *Call) String() string {
-	return printCall(&v.CallCommon, "", v)
+	return printCall(&v.Call, "", v)
 }
 
 func (v *BinOp) String() string {
@@ -288,7 +288,7 @@ func (s *If) String() string {
 }
 
 func (s *Go) String() string {
-	return printCall(&s.CallCommon, "go ", s)
+	return printCall(&s.Call, "go ", s)
 }
 
 func (s *Panic) String() string {
@@ -318,7 +318,7 @@ func (s *Send) String() string {
 }
 
 func (s *Defer) String() string {
-	return printCall(&s.CallCommon, "defer ", s)
+	return printCall(&s.Call, "defer ", s)
 }
 
 func (s *Select) String() string {
@@ -370,8 +370,8 @@ func (p *Package) DumpTo(w io.Writer) {
 	sort.Strings(names)
 	for _, name := range names {
 		switch mem := p.Members[name].(type) {
-		case *Literal:
-			fmt.Fprintf(w, "  const %-*s %s\n", maxname, name, mem.Name())
+		case *Constant:
+			fmt.Fprintf(w, "  const %-*s %s = %s\n", maxname, name, mem.Name(), mem.Value.Name())
 
 		case *Function:
 			fmt.Fprintf(w, "  func  %-*s %s\n", maxname, name, mem.Type())
@@ -390,7 +390,7 @@ func (p *Package) DumpTo(w io.Writer) {
 			sort.Sort(keys)
 			for _, id := range keys {
 				method := mem.PtrMethods[id]
-				fmt.Fprintf(w, "    method %s %s %s\n", id, method.Signature)
+				fmt.Fprintf(w, "    method %s %s\n", id, method.Signature)
 			}
 
 		case *Global:

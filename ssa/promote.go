@@ -306,13 +306,13 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 
 	var c Call
 	if cand.concrete != nil {
-		c.Func = cand.concrete
-		fn.Pos = c.Func.(*Function).Pos // TODO(adonovan): fix: wrong.
-		c.Pos = fn.Pos                  // TODO(adonovan): fix: wrong.
-		c.Args = append(c.Args, v)
+		c.Call.Func = cand.concrete
+		fn.Pos = c.Call.Func.(*Function).Pos // TODO(adonovan): fix: wrong.
+		c.Call.Pos = fn.Pos                  // TODO(adonovan): fix: wrong.
+		c.Call.Args = append(c.Call.Args, v)
 	} else {
-		c.Recv = v
-		c.Method = 0
+		c.Call.Recv = v
+		c.Call.Method = 0
 	}
 	emitTailCall(fn, &c)
 	fn.finishBody()
@@ -378,8 +378,8 @@ func makeImethodThunk(prog *Program, typ types.Type, id Id) *Function {
 	fn.addParam("recv", typ)
 	createParams(fn)
 	var c Call
-	c.Method = index
-	c.Recv = fn.Params[0]
+	c.Call.Method = index
+	c.Call.Recv = fn.Params[0]
 	emitTailCall(fn, &c)
 	fn.finishBody()
 	return fn

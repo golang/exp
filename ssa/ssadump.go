@@ -7,17 +7,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"go/ast"
 	"log"
 	"os"
 	"runtime/pprof"
-	"strings"
 
 	"code.google.com/p/go.exp/ssa"
 	"code.google.com/p/go.exp/ssa/interp"
 )
 
-// TODO(adonovan): perhaps these should each be separate flags?
 var buildFlag = flag.String("build", "", `Options controlling the SSA builder.
 The value is a sequence of zero or more of these letters:
 C	perform sanity [C]hecking of the SSA form.
@@ -104,53 +101,19 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	// TODO(adonovan/gri): the cascade of errors is confusing due
-	// to reentrant control flow.  Disable for now and re-think.
-	var errh func(error)
-	// errh = func(err error) { fmt.Println(err.Error()) }
-
-	loader := ssa.GorootLoader
-	b := ssa.NewBuilder(mode, loader, errh)
-
-	var pkgname string
-	var files []*ast.File
-	var err error
-
-	switch {
-	case len(args) == 0:
-		log.Fatal("No *.go source files nor package name was specified.")
-
-	case strings.HasSuffix(args[0], ".go"):
-		// % ssadump a.go b.go ...
-		// Leading consecutive *.go arguments constitute main package.
-		i := 1
-		for ; i < len(args) && strings.HasSuffix(args[i], ".go"); i++ {
-		}
-		files, err = ssa.ParseFiles(b.Prog.Files, ".", args[:i]...)
-		pkgname = "main"
-		args = args[i:]
-
-	default:
-		// % ssadump my/package ...
-		// First argument is import path of main package.
-		pkgname = args[0]
-		args = args[1:]
-		files, err = loader(b.Prog.Files, pkgname)
+	context := &ssa.Context{
+		Mode:   mode,
+		Loader: ssa.GorootLoader,
 	}
+	b := ssa.NewBuilder(context)
+	mainpkg, args, err := ssa.CreatePackageFromArgs(b, args)
 	if err != nil {
-		log.Fatalf(err.Error())
-	}
-
-	// TODO(gri): make it a typechecker error for there to be
-	// duplicate (e.g.) main functions in the same package.
-	mainpkg, err := b.CreatePackage(pkgname, files)
-	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatal(err.Error())
 	}
 	b.BuildAllPackages()
 	b = nil // discard Builder
 
 	if *runFlag {
-		interp.Interpret(mainpkg, interpMode, pkgname, args)
+		interp.Interpret(mainpkg, interpMode, mainpkg.Name(), args)
 	}
 }

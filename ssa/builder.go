@@ -67,6 +67,50 @@ var (
 	vFalse = newLiteral(exact.MakeBool(false), tBool)
 )
 
+// A Context specifies the supporting context for SSA construction.
+//
+// TODO(adonovan): make it so empty => default behaviours?
+// Currently not the case for Loader.
+//
+type Context struct {
+	// Mode is a bitfield of options controlling verbosity,
+	// logging and additional sanity checks.
+	Mode BuilderMode
+
+	// Loader is a SourceLoader function that finds, loads and
+	// parses Go source files for a given import path.  (It is
+	// ignored if the mode bits include UseGCImporter.)
+	// See (e.g.) GoRootLoader.
+	Loader SourceLoader
+
+	// RetainAST is an optional user predicate that determines
+	// whether to retain (true) or discard (false) the AST and its
+	// type information for each package after BuildPackage has
+	// finished.
+	// Implementations must be thread-safe.
+	// If RetainAST is nil, all ASTs and TypeInfos are discarded.
+	RetainAST func(*Package) bool
+
+	// TypeChecker contains options relating to the type checker.
+	// The SSA Builder will override any user-supplied values for
+	// its Expr, Ident and Import fields; other fields will be
+	// passed through to the type checker.
+	TypeChecker types.Context
+}
+
+// BuilderMode is a bitmask of options for diagnostics and checking.
+type BuilderMode uint
+
+const (
+	LogPackages          BuilderMode = 1 << iota // Dump package inventory to stderr
+	LogFunctions                                 // Dump function SSA code to stderr
+	LogSource                                    // Show source locations as SSA builder progresses
+	SanityCheckFunctions                         // Perform sanity checking of function bodies
+	UseGCImporter                                // Ignore SourceLoader; use gc-compiled object code for all imports
+	NaiveForm                                    // Build naïve SSA form: don't replace local loads/stores with registers
+	BuildSerially                                // Build packages serially, not in parallel.
+)
+
 // A Builder creates the SSA representation of a single program.
 // Instances may be created using NewBuilder.
 //
@@ -90,45 +134,18 @@ var (
 // client's analysis may then begin.
 //
 type Builder struct {
-	Prog        *Program                    // the program being built
-	mode        BuilderMode                 // set of mode bits
-	loader      SourceLoader                // the loader for imported source files
-	importErrs  map[string]error            // across-packages import cache of failures
-	packages    map[*types.Package]*Package // SSA packages by types.Package
-	types       map[ast.Expr]types.Type     // inferred types of expressions
-	constants   map[ast.Expr]*Literal       // values of constant expressions
-	idents      map[*ast.Ident]types.Object // canonical type objects of all named entities
-	globals     map[types.Object]Value      // all package-level funcs and vars, and universal built-ins
-	typechecker types.Context               // the typechecker context (stateless)
+	Prog    *Program // the program being built
+	Context *Context // the client context
+
+	importErrs map[string]error            // across-packages import cache of failures
+	packages   map[*types.Package]*Package // SSA packages by types.Package
+	globals    map[types.Object]Value      // all package-level funcs and vars, and universal built-ins
 }
 
-// BuilderMode is a bitmask of options for diagnostics and checking.
-type BuilderMode uint
-
-const (
-	LogPackages          BuilderMode = 1 << iota // Dump package inventory to stderr
-	LogFunctions                                 // Dump function SSA code to stderr
-	LogSource                                    // Show source locations as SSA builder progresses
-	SanityCheckFunctions                         // Perform sanity checking of function bodies
-	UseGCImporter                                // Ignore SourceLoader; use gc-compiled object code for all imports
-	NaiveForm                                    // Build naïve SSA form: don't replace local loads/stores with registers
-	BuildSerially                                // Build packages serially, not in parallel.
-)
-
-// NewBuilder creates and returns a new SSA builder.
+// NewBuilder creates and returns a new SSA builder with options
+// specified by context.
 //
-// mode is a bitfield of options controlling verbosity, logging and
-// additional sanity checks.
-//
-// loader is a SourceLoader function that finds, loads and parses Go
-// source files for a given import path.  (It is ignored if the mode
-// bits include UseGCImporter.)
-//
-// errh is an optional error handler that is called for each error
-// encountered during type checking; if nil, only the first type error
-// will be returned, via the result of CreatePackage.
-//
-func NewBuilder(mode BuilderMode, loader SourceLoader, errh func(error)) *Builder {
+func NewBuilder(context *Context) *Builder {
 	b := &Builder{
 		Prog: &Program{
 			Files:           token.NewFileSet(),
@@ -136,38 +153,16 @@ func NewBuilder(mode BuilderMode, loader SourceLoader, errh func(error)) *Builde
 			Builtins:        make(map[types.Object]*Builtin),
 			methodSets:      make(map[types.Type]MethodSet),
 			concreteMethods: make(map[*types.Method]*Function),
-			mode:            mode,
+			mode:            context.Mode,
 		},
-		mode:       mode,
-		loader:     loader,
-		constants:  make(map[ast.Expr]*Literal),
+		Context:    context,
 		globals:    make(map[types.Object]Value),
-		idents:     make(map[*ast.Ident]types.Object),
 		importErrs: make(map[string]error),
 		packages:   make(map[*types.Package]*Package),
-		types:      make(map[ast.Expr]types.Type),
 	}
 
-	// TODO(adonovan): opt: record the Expr/Ident calls into
-	// constants/idents/types maps associated with the containing
-	// package so we can discard them once that package is built.
-	b.typechecker = types.Context{
-		Error: errh,
-		Expr: func(x ast.Expr, typ types.Type, val exact.Value) {
-			b.types[x] = typ
-			if val != nil {
-				b.constants[x] = newLiteral(val, typ)
-			}
-		},
-		Ident: func(ident *ast.Ident, obj types.Object) {
-			// Invariants:
-			// - obj is non-nil.
-			// - isBlankIdent(ident) <=> obj.GetType()==nil
-			b.idents[ident] = obj
-		},
-		Import: func(imports map[string]*types.Package, path string) (pkg *types.Package, err error) {
-			return b.doImport(imports, path)
-		},
+	b.Context.TypeChecker.Import = func(imports map[string]*types.Package, path string) (pkg *types.Package, err error) {
+		return b.doImport(imports, path)
 	}
 
 	// Create Values for built-in functions.
@@ -180,47 +175,6 @@ func NewBuilder(mode BuilderMode, loader SourceLoader, errh func(error)) *Builde
 		}
 	}
 	return b
-}
-
-// isPackageRef returns the identity of the object if sel is a
-// package-qualified reference to a named const, var, func or type.
-// Otherwise it returns nil.
-//
-// It's unfortunate that this is a method of builder, but even the
-// small amount of name resolution required here is no longer
-// available on the AST.
-//
-func (b *Builder) isPackageRef(sel *ast.SelectorExpr) types.Object {
-	if id, ok := sel.X.(*ast.Ident); ok {
-		if obj := b.obj(id); objKind(obj) == ast.Pkg {
-			return obj.(*types.Package).Scope.Lookup(sel.Sel.Name)
-		}
-	}
-	return nil
-}
-
-// isType returns true iff expression e denotes a type.
-//
-// It's unfortunate that this is a method of builder, but even the
-// small amount of name resolution required here is no longer
-// available on the AST.
-//
-func (b *Builder) isType(e ast.Expr) bool {
-	switch e := e.(type) {
-	case *ast.SelectorExpr: // pkg.Type
-		if obj := b.isPackageRef(e); obj != nil {
-			return objKind(obj) == ast.Typ
-		}
-	case *ast.StarExpr: // *T
-		return b.isType(e.X)
-	case *ast.Ident:
-		return objKind(b.obj(e)) == ast.Typ
-	case *ast.ArrayType, *ast.StructType, *ast.FuncType, *ast.InterfaceType, *ast.MapType, *ast.ChanType:
-		return true
-	case *ast.ParenExpr:
-		return b.isType(e.X)
-	}
-	return false
 }
 
 // lookup returns the package-level *Function or *Global (or universal
@@ -246,38 +200,6 @@ func (b *Builder) lookup(from *Package, obj types.Object) (v Value, ok bool) {
 		}
 	}
 	return
-}
-
-// exprType(e) returns the type of expression e.
-// Callers should not access b.types directly since it may lie if
-// called from within a typeswitch.
-//
-func (b *Builder) exprType(e ast.Expr) types.Type {
-	// For Ident, b.types may be more specific than
-	// b.obj(id.(*ast.Ident)).GetType(),
-	// e.g. in the case of typeswitch.
-	if t, ok := b.types[e]; ok {
-		return t
-	}
-	// The typechecker doesn't notify us of all Idents,
-	// e.g. s.Key and s.Value in a RangeStmt.
-	// So we have this fallback.
-	// TODO(gri): Is this a typechecker bug?  If so, eliminate
-	// this case and panic.
-	if id, ok := e.(*ast.Ident); ok {
-		return b.obj(id).GetType()
-	}
-	panic("no type for expression")
-}
-
-// obj returns the typechecker object denoted by the specified
-// identifier.  Panic ensues if there is none.
-//
-func (b *Builder) obj(id *ast.Ident) types.Object {
-	if obj, ok := b.idents[id]; ok {
-		return obj
-	}
-	panic(fmt.Sprintf("no types.Object for ast.Ident %s @ %p", id.Name, id))
 }
 
 // cond emits to fn code to evaluate boolean condition e and jump
@@ -400,12 +322,12 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 		// has multiple results, so we can avoid some of the
 		// cases for single-valued CallExpr.
 		var c Call
-		b.setCall(fn, e, &c.CallCommon)
-		c.Type_ = b.exprType(e)
+		b.setCall(fn, e, &c.Call)
+		c.Type_ = fn.Pkg.TypeOf(e)
 		return fn.emit(&c)
 
 	case *ast.IndexExpr:
-		mapt := underlyingType(b.exprType(e.X)).(*types.Map)
+		mapt := underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Map)
 		typ = mapt.Elt
 		tuple = fn.emit(&Lookup{
 			X:       b.expr(fn, e.X),
@@ -414,7 +336,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 		})
 
 	case *ast.TypeAssertExpr:
-		typ = b.exprType(e)
+		typ = fn.Pkg.TypeOf(e)
 		tuple = fn.emit(&TypeAssert{
 			X:            b.expr(fn, e.X),
 			AssertedType: typ,
@@ -422,7 +344,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 		})
 
 	case *ast.UnaryExpr: // must be receive <-
-		typ = underlyingType(b.exprType(e.X)).(*types.Chan).Elt
+		typ = underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Chan).Elt
 		tuple = fn.emit(&UnOp{
 			Op:      token.ARROW,
 			X:       b.expr(fn, e.X),
@@ -454,7 +376,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 // the caller should treat this like an ordinary library function
 // call.
 //
-func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.Type) Value {
+func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.Type, pos token.Pos) Value {
 	switch name {
 	case "make":
 		switch underlyingType(typ).(type) {
@@ -467,6 +389,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 			v := &MakeSlice{
 				Len: n,
 				Cap: m,
+				Pos: pos,
 			}
 			v.setType(typ)
 			return fn.emit(v)
@@ -476,7 +399,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 			if len(args) == 2 {
 				res = b.expr(fn, args[1])
 			}
-			v := &MakeMap{Reserve: res}
+			v := &MakeMap{Reserve: res, Pos: pos}
 			v.setType(typ)
 			return fn.emit(v)
 
@@ -485,13 +408,13 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 			if len(args) == 2 {
 				sz = b.expr(fn, args[1])
 			}
-			v := &MakeChan{Size: sz}
+			v := &MakeChan{Size: sz, Pos: pos}
 			v.setType(typ)
 			return fn.emit(v)
 		}
 
 	case "new":
-		return emitNew(fn, indirectType(underlyingType(typ)))
+		return emitNew(fn, indirectType(underlyingType(typ)), pos)
 
 	case "len", "cap":
 		// Special case: len or cap of an array or *array is
@@ -499,7 +422,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 		// We must still evaluate the value, though.  (If it
 		// was side-effect free, the whole call would have
 		// been constant-folded.)
-		t := underlyingType(deref(b.exprType(args[0])))
+		t := underlyingType(deref(fn.Pkg.TypeOf(args[0])))
 		if at, ok := t.(*types.Array); ok {
 			b.expr(fn, args[0]) // for effects only
 			return intLiteral(at.Len)
@@ -521,7 +444,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 //
 func (b *Builder) selector(fn *Function, e *ast.SelectorExpr, wantAddr, escaping bool) Value {
 	id := makeId(e.Sel.Name, fn.Pkg.Types)
-	st := underlyingType(deref(b.exprType(e.X))).(*types.Struct)
+	st := underlyingType(deref(fn.Pkg.TypeOf(e.X))).(*types.Struct)
 	index := -1
 	for i, f := range st.Fields {
 		if IdFromQualifiedName(f.QualifiedName) == id {
@@ -537,7 +460,7 @@ func (b *Builder) selector(fn *Function, e *ast.SelectorExpr, wantAddr, escaping
 			panic("field not found, even with promotion: " + e.Sel.Name)
 		}
 	}
-	fieldType := b.exprType(e)
+	fieldType := fn.Pkg.TypeOf(e)
 	if wantAddr {
 		return b.fieldAddr(fn, e.X, path, index, fieldType, escaping)
 	}
@@ -561,7 +484,7 @@ func (b *Builder) fieldAddr(fn *Function, base ast.Expr, path *anonFieldPath, in
 			x = b.fieldExpr(fn, base, path.tail, path.index, path.field.Type)
 		}
 	} else {
-		switch underlyingType(b.exprType(base)).(type) {
+		switch underlyingType(fn.Pkg.TypeOf(base)).(type) {
 		case *types.Struct:
 			x = b.addr(fn, base, escaping).(address).addr
 		case *types.Pointer:
@@ -636,7 +559,7 @@ func (b *Builder) fieldExpr(fn *Function, base ast.Expr, path *anonFieldPath, in
 func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 	switch e := e.(type) {
 	case *ast.Ident:
-		obj := b.obj(e)
+		obj := fn.Pkg.ObjectOf(e)
 		v, ok := b.lookup(fn.Pkg, obj) // var (address)
 		if !ok {
 			v = fn.lookup(obj, escaping)
@@ -644,12 +567,12 @@ func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 		return address{v}
 
 	case *ast.CompositeLit:
-		t := deref(b.exprType(e))
+		t := deref(fn.Pkg.TypeOf(e))
 		var v Value
 		if escaping {
-			v = emitNew(fn, t)
+			v = emitNew(fn, t, e.Lbrace)
 		} else {
-			v = fn.addLocal(t)
+			v = fn.addLocal(t, e.Lbrace)
 		}
 		b.compLit(fn, v, e, t) // initialize in place
 		return address{v}
@@ -659,7 +582,7 @@ func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 
 	case *ast.SelectorExpr:
 		// p.M where p is a package.
-		if obj := b.isPackageRef(e); obj != nil {
+		if obj := fn.Pkg.isPackageRef(e); obj != nil {
 			if v, ok := b.lookup(fn.Pkg, obj); ok {
 				return address{v}
 			}
@@ -672,7 +595,7 @@ func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 	case *ast.IndexExpr:
 		var x Value
 		var et types.Type
-		switch t := underlyingType(b.exprType(e.X)).(type) {
+		switch t := underlyingType(fn.Pkg.TypeOf(e.X)).(type) {
 		case *types.Array:
 			x = b.addr(fn, e.X, escaping).(address).addr
 			et = pointer(t.Elt)
@@ -744,7 +667,7 @@ func (b *Builder) exprInPlace(fn *Function, loc lvalue, e ast.Expr) {
 // to fn and returning the Value defined by the expression.
 //
 func (b *Builder) expr(fn *Function, e ast.Expr) Value {
-	if lit := b.constants[e]; lit != nil {
+	if lit := fn.Pkg.ValueOf(e); lit != nil {
 		return lit
 	}
 
@@ -756,7 +679,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		posn := b.Prog.Files.Position(e.Type.Func)
 		fn2 := &Function{
 			Name_:     fmt.Sprintf("func@%d.%d", posn.Line, posn.Column),
-			Signature: underlyingType(b.exprType(e.Type)).(*types.Signature),
+			Signature: underlyingType(fn.Pkg.TypeOf(e.Type)).(*types.Signature),
 			Pos:       e.Type.Func,
 			Enclosing: fn,
 			Pkg:       fn.Pkg,
@@ -772,7 +695,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 			return fn2
 		}
 		v := &MakeClosure{Fn: fn2}
-		v.setType(b.exprType(e))
+		v.setType(fn.Pkg.TypeOf(e))
 		for _, fv := range fn2.FreeVars {
 			v.Bindings = append(v.Bindings, fv.Outer)
 		}
@@ -784,29 +707,29 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 	case *ast.TypeAssertExpr: // single-result form only
 		v := &TypeAssert{
 			X:            b.expr(fn, e.X),
-			AssertedType: b.exprType(e),
+			AssertedType: fn.Pkg.TypeOf(e),
 		}
 		v.setType(v.AssertedType)
 		return fn.emit(v)
 
 	case *ast.CallExpr:
-		typ := b.exprType(e)
-		if b.isType(e.Fun) {
+		typ := fn.Pkg.TypeOf(e)
+		if fn.Pkg.IsType(e.Fun) {
 			// Type conversion, e.g. string(x) or big.Int(x)
 			return emitConv(fn, b.expr(fn, e.Args[0]), typ)
 		}
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := e.Fun.(*ast.Ident); ok {
-			obj := b.obj(id)
+			obj := fn.Pkg.ObjectOf(id)
 			if _, ok := fn.Prog.Builtins[obj]; ok {
-				if v := b.builtin(fn, id.Name, e.Args, typ); v != nil {
+				if v := b.builtin(fn, id.Name, e.Args, typ, e.Lparen); v != nil {
 					return v
 				}
 			}
 		}
 		// Regular function call.
 		var v Call
-		b.setCall(fn, e, &v.CallCommon)
+		b.setCall(fn, e, &v.Call)
 		v.setType(typ)
 		return fn.emit(&v)
 
@@ -821,7 +744,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 				Op: e.Op,
 				X:  b.expr(fn, e.X),
 			}
-			v.setType(b.exprType(e))
+			v.setType(fn.Pkg.TypeOf(e))
 			return fn.emit(v)
 		default:
 			panic(e.Op)
@@ -834,7 +757,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		case token.SHL, token.SHR:
 			fallthrough
 		case token.ADD, token.SUB, token.MUL, token.QUO, token.REM, token.AND, token.OR, token.XOR, token.AND_NOT:
-			return emitArith(fn, e.Op, b.expr(fn, e.X), b.expr(fn, e.Y), b.exprType(e))
+			return emitArith(fn, e.Op, b.expr(fn, e.X), b.expr(fn, e.Y), fn.Pkg.TypeOf(e))
 
 		case token.EQL, token.NEQ, token.GTR, token.LSS, token.LEQ, token.GEQ:
 			return emitCompare(fn, e.Op, b.expr(fn, e.X), b.expr(fn, e.Y))
@@ -845,7 +768,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 	case *ast.SliceExpr:
 		var low, high Value
 		var x Value
-		switch underlyingType(b.exprType(e.X)).(type) {
+		switch underlyingType(fn.Pkg.TypeOf(e.X)).(type) {
 		case *types.Array:
 			// Potentially escaping.
 			x = b.addr(fn, e.X, true).(address).addr
@@ -865,11 +788,11 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 			Low:  low,
 			High: high,
 		}
-		v.setType(b.exprType(e))
+		v.setType(fn.Pkg.TypeOf(e))
 		return fn.emit(v)
 
 	case *ast.Ident:
-		obj := b.obj(e)
+		obj := fn.Pkg.ObjectOf(e)
 		// Global or universal?
 		if v, ok := b.lookup(fn.Pkg, obj); ok {
 			if objKind(obj) == ast.Var {
@@ -882,14 +805,14 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 
 	case *ast.SelectorExpr:
 		// p.M where p is a package.
-		if obj := b.isPackageRef(e); obj != nil {
+		if obj := fn.Pkg.isPackageRef(e); obj != nil {
 			return b.expr(fn, e.Sel)
 		}
 
 		// (*T).f or T.f, the method f from the method-set of type T.
-		if b.isType(e.X) {
+		if fn.Pkg.IsType(e.X) {
 			id := makeId(e.Sel.Name, fn.Pkg.Types)
-			typ := b.exprType(e.X)
+			typ := fn.Pkg.TypeOf(e.X)
 			if m := b.Prog.MethodSet(typ)[id]; m != nil {
 				return m
 			}
@@ -902,7 +825,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		return b.selector(fn, e, false, false)
 
 	case *ast.IndexExpr:
-		switch t := underlyingType(b.exprType(e.X)).(type) {
+		switch t := underlyingType(fn.Pkg.TypeOf(e.X)).(type) {
 		case *types.Array:
 			// Non-addressable array (in a register).
 			v := &Index{
@@ -914,7 +837,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 
 		case *types.Map:
 			// Maps are not addressable.
-			mapt := underlyingType(b.exprType(e.X)).(*types.Map)
+			mapt := underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Map)
 			v := &Lookup{
 				X:     b.expr(fn, e.X),
 				Index: emitConv(fn, b.expr(fn, e.Index), mapt.Key),
@@ -971,7 +894,7 @@ func (b *Builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	}
 
 	// Case 1: call of form x.F() where x is a package name.
-	if obj := b.isPackageRef(sel); obj != nil {
+	if obj := fn.Pkg.isPackageRef(sel); obj != nil {
 		// This is a specialization of expr(ast.Ident(obj)).
 		if v, ok := b.lookup(fn.Pkg, obj); ok {
 			if _, ok := v.(*Function); !ok {
@@ -988,13 +911,13 @@ func (b *Builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	// an interface.  Treat like case 0.
 	// TODO(adonovan): opt: inline expr() here, to make the call static
 	// and to avoid generation of a stub for an interface method.
-	if b.isType(sel.X) {
+	if fn.Pkg.IsType(sel.X) {
 		c.Func = b.expr(fn, e.Fun)
 		return
 	}
 
 	// Let X be the type of x.
-	typ := b.exprType(sel.X)
+	typ := fn.Pkg.TypeOf(sel.X)
 
 	// Case 2: x.f(): a statically dispatched call to a method
 	// from the method-set of X or perhaps *X (if x is addressable
@@ -1073,7 +996,7 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 
 	// Determine which suffix (if any) of Args is a varargs slice.
 	var vt types.Type // element type of the variadic slice
-	switch typ := underlyingType(b.exprType(e.Fun)).(type) {
+	switch typ := underlyingType(fn.Pkg.TypeOf(e.Fun)).(type) {
 	case *types.Signature:
 		np := len(typ.Params)
 		if !c.HasEllipsis {
@@ -1087,7 +1010,7 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 			// Consider f(...int) called with g() (int,int)
 			// Incomplete.
 			if len(args) == 1 && (np > 1 || typ.IsVariadic) {
-				if res, ok := b.exprType(args[0]).(*types.Result); ok {
+				if res, ok := fn.Pkg.TypeOf(args[0]).(*types.Result); ok {
 					res = res
 					// case 4: f(g()) where g is a multi.
 					// TODO(adonovan): generate:
@@ -1127,10 +1050,10 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 		// so there's no rush.
 
 		var bptypes []types.Type // formal parameter types of builtins
-		switch builtin := e.Fun.(*ast.Ident).Name; builtin {
+		switch builtin := noparens(e.Fun).(*ast.Ident).Name; builtin {
 		case "append":
 			// Infer arg types from result type:
-			rt := b.exprType(e)
+			rt := fn.Pkg.TypeOf(e)
 			bptypes = append(bptypes, rt)
 			if c.HasEllipsis {
 				// 2-arg '...' call form.  No conversions.
@@ -1147,19 +1070,20 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 		case "copy":
 			// copy([]T, []T) int
 			// Infer arg types from each other.  Sleazy.
-			if st, ok := underlyingType(b.exprType(args[0])).(*types.Slice); ok {
+			if st, ok := underlyingType(fn.Pkg.TypeOf(args[0])).(*types.Slice); ok {
 				bptypes = append(bptypes, st, st)
-			} else if st, ok := underlyingType(b.exprType(args[1])).(*types.Slice); ok {
+			} else if st, ok := underlyingType(fn.Pkg.TypeOf(args[1])).(*types.Slice); ok {
 				bptypes = append(bptypes, st, st)
 			} else {
 				panic("cannot infer types in call to copy()")
 			}
 		case "delete":
 			// delete(map[K]V, K)
-			tkey := underlyingType(b.exprType(args[0])).(*types.Map).Key
+			tkey := underlyingType(fn.Pkg.TypeOf(args[0])).(*types.Map).Key
 			bptypes = append(bptypes, nil)  // map: no conv
 			bptypes = append(bptypes, tkey) // key
 		case "print", "println": // print{,ln}(any, ...any)
+			// Note, arg0 may have any type, not necessarily tEface.
 			vt = tEface // variadic
 			if !c.HasEllipsis {
 				args, varargs = args[:1], args[1:]
@@ -1172,7 +1096,7 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 			// Reverse conversion to "complex" case below.
 			// Typechecker, help us out. :(
 			var argType types.Type
-			switch b.exprType(e).(*types.Basic).Kind {
+			switch fn.Pkg.TypeOf(e).(*types.Basic).Kind {
 			case types.UntypedFloat:
 				argType = types.Typ[types.UntypedComplex]
 			case types.Float64:
@@ -1186,7 +1110,7 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 		case "complex":
 			// Typechecker, help us out. :(
 			var argType types.Type
-			switch b.exprType(e).(*types.Basic).Kind {
+			switch fn.Pkg.TypeOf(e).(*types.Basic).Kind {
 			case types.UntypedComplex:
 				argType = types.Typ[types.UntypedFloat]
 			case types.Complex128:
@@ -1226,7 +1150,7 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 				Elt: vt,
 				Len: int64(len(varargs)),
 			}
-			a := emitNew(fn, at)
+			a := emitNew(fn, at, e.Lparen)
 			for i, arg := range varargs {
 				iaddr := &IndexAddr{
 					X:     a,
@@ -1315,7 +1239,7 @@ func (b *Builder) globalValueSpec(init *Function, spec *ast.ValueSpec, g *Global
 			var lval lvalue = blank{}
 			if g != nil {
 				// Mode A: initialized only a single global, g
-				if isBlankIdent(id) || b.obj(id) != obj {
+				if isBlankIdent(id) || init.Pkg.ObjectOf(id) != obj {
 					continue
 				}
 				g.spec = nil
@@ -1323,7 +1247,7 @@ func (b *Builder) globalValueSpec(init *Function, spec *ast.ValueSpec, g *Global
 			} else {
 				// Mode B: initialize all globals.
 				if !isBlankIdent(id) {
-					g2 := b.globals[b.obj(id)].(*Global)
+					g2 := b.globals[init.Pkg.ObjectOf(id)].(*Global)
 					if g2.spec == nil {
 						continue // already done
 					}
@@ -1331,7 +1255,7 @@ func (b *Builder) globalValueSpec(init *Function, spec *ast.ValueSpec, g *Global
 					lval = address{g2}
 				}
 			}
-			if b.mode&LogSource != 0 {
+			if b.Context.Mode&LogSource != 0 {
 				fmt.Fprintln(os.Stderr, "build global", id.Name)
 			}
 			b.exprInPlace(init, lval, spec.Values[i])
@@ -1350,14 +1274,14 @@ func (b *Builder) globalValueSpec(init *Function, spec *ast.ValueSpec, g *Global
 		// Only the first time for a given SPEC has any effect.
 		if !init.Pkg.nTo1Vars[spec] {
 			init.Pkg.nTo1Vars[spec] = true
-			if b.mode&LogSource != 0 {
+			if b.Context.Mode&LogSource != 0 {
 				defer logStack("build globals %s", spec.Names)()
 			}
 			tuple := b.exprN(init, spec.Values[0])
 			rtypes := tuple.Type().(*types.Result).Values
 			for i, id := range spec.Names {
 				if !isBlankIdent(id) {
-					g := b.globals[b.obj(id)].(*Global)
+					g := b.globals[init.Pkg.ObjectOf(id)].(*Global)
 					g.spec = nil // just an optimization
 					emitStore(init, g,
 						emitExtract(init, tuple, i, rtypes[i].Type))
@@ -1382,7 +1306,7 @@ func (b *Builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 		for i, id := range spec.Names {
 			var lval lvalue = blank{}
 			if !isBlankIdent(id) {
-				lval = address{fn.addNamedLocal(b.obj(id))}
+				lval = address{fn.addNamedLocal(fn.Pkg.ObjectOf(id))}
 			}
 			b.exprInPlace(fn, lval, spec.Values[i])
 		}
@@ -1392,7 +1316,7 @@ func (b *Builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 		// Locals are implicitly zero-initialized.
 		for _, id := range spec.Names {
 			if !isBlankIdent(id) {
-				fn.addNamedLocal(b.obj(id))
+				fn.addNamedLocal(fn.Pkg.ObjectOf(id))
 			}
 		}
 
@@ -1402,7 +1326,7 @@ func (b *Builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 		rtypes := tuple.Type().(*types.Result).Values
 		for i, id := range spec.Names {
 			if !isBlankIdent(id) {
-				lhs := fn.addNamedLocal(b.obj(id))
+				lhs := fn.addNamedLocal(fn.Pkg.ObjectOf(id))
 				emitStore(fn, lhs, emitExtract(fn, tuple, i, rtypes[i].Type))
 			}
 		}
@@ -1423,7 +1347,7 @@ func (b *Builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool) {
 			if isDef {
 				// Local may be "redeclared" in the same
 				// scope, so don't blindly create anew.
-				obj := b.obj(lhs.(*ast.Ident))
+				obj := fn.Pkg.ObjectOf(lhs.(*ast.Ident))
 				if _, ok := fn.objects[obj]; !ok {
 					fn.addNamedLocal(obj)
 				}
@@ -1469,27 +1393,26 @@ func (b *Builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool) {
 //
 func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ types.Type) {
 	// TODO(adonovan): test whether typ ever differs from
-	// b.exprType(e) and if so document why.
+	// fn.Pkg.TypeOf(e) and if so document why.
 
 	switch t := underlyingType(typ).(type) {
 	case *types.Struct:
 		for i, e := range e.Elts {
-			// Subtle: field index i is updated in KeyValue case.
-			var sf *types.Field
+			fieldIndex := i
 			if kv, ok := e.(*ast.KeyValueExpr); ok {
 				fname := kv.Key.(*ast.Ident).Name
-				for i, sf = range t.Fields {
+				for i, sf := range t.Fields {
 					if sf.Name == fname {
+						fieldIndex = i
 						e = kv.Value
 						break
 					}
 				}
-			} else {
-				sf = t.Fields[i]
 			}
+			sf := t.Fields[fieldIndex]
 			faddr := &FieldAddr{
 				X:     addr,
-				Field: i,
+				Field: fieldIndex,
 			}
 			faddr.setType(pointer(sf.Type))
 			fn.emit(faddr)
@@ -1502,7 +1425,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 		switch t := t.(type) {
 		case *types.Slice:
 			at = &types.Array{Elt: t.Elt} // set Len later
-			array = emitNew(fn, at)
+			array = emitNew(fn, at, e.Lbrace)
 		case *types.Array:
 			at = t
 			array = addr
@@ -1539,7 +1462,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 		}
 
 	case *types.Map:
-		m := &MakeMap{Reserve: intLiteral(int64(len(e.Elts)))}
+		m := &MakeMap{Reserve: intLiteral(int64(len(e.Elts))), Pos: e.Lbrace}
 		m.setType(typ)
 		emitStore(fn, addr, fn.emit(m))
 		for _, e := range e.Elts {
@@ -1701,7 +1624,7 @@ func (b *Builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 	case *ast.AssignStmt: // y := x.(type)
 		x = b.expr(fn, noparens(ass.Rhs[0]).(*ast.TypeAssertExpr).X)
 		id = ass.Lhs[0].(*ast.Ident)
-		y = fn.addNamedLocal(b.obj(id))
+		y = fn.addNamedLocal(fn.Pkg.ObjectOf(id))
 		emitStore(fn, y, x)
 	}
 
@@ -1722,7 +1645,7 @@ func (b *Builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 		var ti Value // t_i, ok := typeassert,ok x <T_i>
 		for _, cond := range cc.List {
 			next = fn.newBasicBlock("typeswitch.next")
-			casetype = b.exprType(cond)
+			casetype = fn.Pkg.TypeOf(cond)
 			var condv Value
 			if casetype == tUntypedNil {
 				condv = emitCompare(fn, token.EQL, x, nilLiteral(x.Type()))
@@ -1748,7 +1671,7 @@ func (b *Builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 			// Declare a new shadow local variable of the
 			// same name but a more specific type.
 			// Side effect: reassociates binding for y's object.
-			y2 := fn.addNamedLocal(b.obj(id))
+			y2 := fn.addNamedLocal(fn.Pkg.ObjectOf(id))
 			y2.Name_ += "'" // debugging aid
 			y2.Type_ = pointer(casetype)
 			emitStore(fn, y2, ti)
@@ -1760,7 +1683,7 @@ func (b *Builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 		b.stmtList(fn, cc.Body)
 		fn.targets = fn.targets.tail
 		if id != nil {
-			fn.objects[b.obj(id)] = y // restore previous y binding
+			fn.objects[fn.Pkg.ObjectOf(id)] = y // restore previous y binding
 		}
 		emitJump(fn, done)
 		fn.currentBlock = next
@@ -1877,11 +1800,11 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 		}
 		switch comm := clause.Comm.(type) {
 		case *ast.AssignStmt: // x := <-states[state].Chan
-			xdecl := fn.addNamedLocal(b.obj(comm.Lhs[0].(*ast.Ident)))
+			xdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[0].(*ast.Ident)))
 
 			emitStore(fn, xdecl, emitExtract(fn, pair, 1, indirectType(xdecl.Type())))
 			if len(comm.Lhs) == 2 { // x, ok := ...
-				okdecl := fn.addNamedLocal(b.obj(comm.Lhs[1].(*ast.Ident)))
+				okdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[1].(*ast.Ident)))
 				emitStore(fn, okdecl, emitExtract(fn, pair, 2, indirectType(okdecl.Type())))
 			}
 		}
@@ -1987,14 +1910,14 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 		length = intLiteral(arr.Len)
 	} else {
 		// length = len(x).
-		var call Call
-		call.Func = b.globals[types.Universe.Lookup("len")]
-		call.Args = []Value{x}
-		call.setType(tInt)
-		length = fn.emit(&call)
+		var c Call
+		c.Call.Func = b.globals[types.Universe.Lookup("len")]
+		c.Call.Args = []Value{x}
+		c.setType(tInt)
+		length = fn.emit(&c)
 	}
 
-	index := fn.addLocal(tInt)
+	index := fn.addLocal(tInt, token.NoPos)
 	emitStore(fn, index, intLiteral(-1))
 
 	loop = fn.newBasicBlock("rangeindex.loop")
@@ -2156,10 +2079,10 @@ func (b *Builder) rangeChan(fn *Function, x Value, tk types.Type) (k Value, loop
 func (b *Builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock) {
 	var tk, tv types.Type
 	if !isBlankIdent(s.Key) {
-		tk = b.exprType(s.Key)
+		tk = fn.Pkg.TypeOf(s.Key)
 	}
 	if s.Value != nil && !isBlankIdent(s.Value) {
-		tv = b.exprType(s.Value)
+		tv = fn.Pkg.TypeOf(s.Value)
 	}
 
 	// If iteration variables are defined (:=), this
@@ -2170,10 +2093,10 @@ func (b *Builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock) {
 	// always creates a new one.
 	if s.Tok == token.DEFINE {
 		if tk != nil {
-			fn.addNamedLocal(b.obj(s.Key.(*ast.Ident)))
+			fn.addNamedLocal(fn.Pkg.ObjectOf(s.Key.(*ast.Ident)))
 		}
 		if tv != nil {
-			fn.addNamedLocal(b.obj(s.Value.(*ast.Ident)))
+			fn.addNamedLocal(fn.Pkg.ObjectOf(s.Value.(*ast.Ident)))
 		}
 	}
 
@@ -2260,7 +2183,7 @@ start:
 		fn.emit(&Send{
 			Chan: b.expr(fn, s.Chan),
 			X: emitConv(fn, b.expr(fn, s.Value),
-				underlyingType(b.exprType(s.Chan)).(*types.Chan).Elt),
+				underlyingType(fn.Pkg.TypeOf(s.Chan)).(*types.Chan).Elt),
 		})
 
 	case *ast.IncDecStmt:
@@ -2284,14 +2207,14 @@ start:
 		// The "intrinsics" new/make/len/cap are forbidden here.
 		// panic is treated like an ordinary function call.
 		var v Go
-		b.setCall(fn, s.Call, &v.CallCommon)
+		b.setCall(fn, s.Call, &v.Call)
 		fn.emit(&v)
 
 	case *ast.DeferStmt:
 		// The "intrinsics" new/make/len/cap are forbidden here.
 		// panic is treated like an ordinary function call.
 		var v Defer
-		b.setCall(fn, s.Call, &v.CallCommon)
+		b.setCall(fn, s.Call, &v.Call)
 		fn.emit(&v)
 
 	case *ast.ReturnStmt:
@@ -2462,7 +2385,7 @@ func (b *Builder) buildFunction(fn *Function) {
 			fn.FullName(), fn.Prog.Files.Position(fn.Pos))()
 	}
 	fn.startBody()
-	fn.createSyntacticParams(b.idents)
+	fn.createSyntacticParams(fn.Pkg.idents)
 	b.stmt(fn, fn.syntax.body)
 	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb.Preds != nil) {
 		// Run function calls deferred in this function when
@@ -2487,7 +2410,11 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 		pkg.Members[name] = &Type{NamedType: obj.Type.(*types.NamedType)}
 
 	case *types.Const:
-		pkg.Members[name] = newLiteral(obj.Val, obj.Type)
+		pkg.Members[name] = &Constant{
+			Name_: name,
+			Value: newLiteral(obj.Val, obj.Type),
+			Pos:   obj.GetPos(),
+		}
 
 	case *types.Var:
 		spec, _ := syntax.(*ast.ValueSpec)
@@ -2495,6 +2422,7 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 			Pkg:   pkg,
 			Name_: name,
 			Type_: pointer(obj.Type), // address
+			Pos:   obj.GetPos(),
 			spec:  spec,
 		}
 		b.globals[obj] = g
@@ -2552,7 +2480,7 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 			for _, spec := range decl.Specs {
 				for _, id := range spec.(*ast.ValueSpec).Names {
 					if !isBlankIdent(id) {
-						b.memberFromObject(pkg, b.obj(id), nil)
+						b.memberFromObject(pkg, pkg.ObjectOf(id), nil)
 					}
 				}
 			}
@@ -2561,7 +2489,7 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 			for _, spec := range decl.Specs {
 				for _, id := range spec.(*ast.ValueSpec).Names {
 					if !isBlankIdent(id) {
-						b.memberFromObject(pkg, b.obj(id), spec)
+						b.memberFromObject(pkg, pkg.ObjectOf(id), spec)
 					}
 				}
 			}
@@ -2570,7 +2498,7 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 			for _, spec := range decl.Specs {
 				id := spec.(*ast.TypeSpec).Name
 				if !isBlankIdent(id) {
-					b.memberFromObject(pkg, b.obj(id), nil)
+					b.memberFromObject(pkg, pkg.ObjectOf(id), nil)
 				}
 			}
 		}
@@ -2581,9 +2509,40 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 			return // init blocks aren't functions
 		}
 		if !isBlankIdent(id) {
-			b.memberFromObject(pkg, b.obj(id), decl)
+			b.memberFromObject(pkg, pkg.ObjectOf(id), decl)
 		}
 	}
+}
+
+// typecheck invokes the type-checker on files and returns the
+// type-checker's package so formed, plus the AST type information.
+//
+func (b *Builder) typecheck(files []*ast.File) (*types.Package, *TypeInfo, error) {
+	info := &TypeInfo{
+		types:     make(map[ast.Expr]types.Type),
+		idents:    make(map[*ast.Ident]types.Object),
+		constants: make(map[ast.Expr]*Literal),
+	}
+	tc := b.Context.TypeChecker
+	tc.Expr = func(x ast.Expr, typ types.Type, val exact.Value) {
+		info.types[x] = typ
+		if val != nil {
+			info.constants[x] = newLiteral(val, typ)
+		}
+	}
+	tc.Ident = func(ident *ast.Ident, obj types.Object) {
+		// Invariants:
+		// - obj is non-nil.
+		// - isBlankIdent(ident) <=> obj.GetType()==nil
+		info.idents[ident] = obj
+	}
+	typkg, firstErr := tc.Check(b.Prog.Files, files)
+	tc.Expr = nil
+	tc.Ident = nil
+	if firstErr != nil {
+		return nil, nil, firstErr
+	}
+	return typkg, info, nil
 }
 
 // CreatePackage creates a package from the specified set of files,
@@ -2598,11 +2557,11 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 // source files.
 //
 func (b *Builder) CreatePackage(importPath string, files []*ast.File) (*Package, error) {
-	typkg, firstErr := b.typechecker.Check(b.Prog.Files, files)
-	if firstErr != nil {
-		return nil, firstErr
+	typkg, info, err := b.typecheck(files)
+	if err != nil {
+		return nil, err
 	}
-	return b.createPackageImpl(typkg, importPath, files), nil
+	return b.createPackageImpl(typkg, importPath, files, info), nil
 }
 
 // createPackageImpl constructs an SSA Package from an error-free
@@ -2614,10 +2573,11 @@ func (b *Builder) CreatePackage(importPath string, files []*ast.File) (*Package,
 //
 // If files is non-nil, its declarations will be used to generate code
 // for functions, methods and init blocks in a subsequent call to
-// BuildPackage.  Otherwise, typkg is assumed to have been imported
+// BuildPackage; info must contains the type information for those files.
+// Otherwise, typkg is assumed to have been imported
 // from the gc compiler's object files; no code will be available.
 //
-func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, files []*ast.File) *Package {
+func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, files []*ast.File, info *TypeInfo) *Package {
 	// The typechecker sets types.Package.Path only for GcImported
 	// packages, since it doesn't know import path until after typechecking is done.
 	// Here we ensure it is always set, since we know the correct path.
@@ -2631,8 +2591,12 @@ func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, fil
 		Prog:     b.Prog,
 		Types:    typkg,
 		Members:  make(map[string]Member),
-		files:    files,
+		Files:    files,
 		nTo1Vars: make(map[*ast.ValueSpec]bool),
+	}
+
+	if files != nil {
+		p.TypeInfo = *info
 	}
 
 	b.packages[typkg] = p
@@ -2647,8 +2611,7 @@ func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, fil
 
 		// TODO(gri): make it a typechecker error for there to
 		// be duplicate (e.g.) main functions in the same package.
-		for _, file := range p.files {
-			// ast.Print(b.Prog.Files, file) // debugging
+		for _, file := range p.Files {
 			for _, decl := range file.Decls {
 				b.membersFromDecl(p, decl)
 			}
@@ -2689,7 +2652,7 @@ func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, fil
 	}
 	p.Members[initguard.Name()] = initguard
 
-	if b.mode&LogPackages != 0 {
+	if b.Context.Mode&LogPackages != 0 {
 		p.DumpTo(os.Stderr)
 	}
 
@@ -2714,7 +2677,7 @@ func (b *Builder) buildDecl(pkg *Package, decl ast.Decl) {
 				if isBlankIdent(id) {
 					continue
 				}
-				obj := b.obj(id).(*types.TypeName)
+				obj := pkg.ObjectOf(id).(*types.TypeName)
 				for _, method := range obj.Type.(*types.NamedType).Methods {
 					b.buildFunction(b.Prog.concreteMethods[method])
 				}
@@ -2728,7 +2691,7 @@ func (b *Builder) buildDecl(pkg *Package, decl ast.Decl) {
 
 		} else if decl.Recv == nil && id.Name == "init" {
 			// init() block
-			if b.mode&LogSource != 0 {
+			if b.Context.Mode&LogSource != 0 {
 				fmt.Fprintln(os.Stderr, "build init block @", b.Prog.Files.Position(decl.Pos()))
 			}
 			init := pkg.Init
@@ -2750,7 +2713,7 @@ func (b *Builder) buildDecl(pkg *Package, decl ast.Decl) {
 			init.targets = init.targets.tail
 			init.currentBlock = next
 
-		} else if m, ok := b.globals[b.obj(id)]; ok {
+		} else if m, ok := b.globals[pkg.ObjectOf(id)]; ok {
 			// Package-level function.
 			b.buildFunction(m.(*Function))
 		}
@@ -2767,7 +2730,7 @@ func (b *Builder) buildDecl(pkg *Package, decl ast.Decl) {
 func (b *Builder) BuildAllPackages() {
 	var wg sync.WaitGroup
 	for _, p := range b.Prog.Packages {
-		if b.mode&BuildSerially != 0 {
+		if b.Context.Mode&BuildSerially != 0 {
 			b.BuildPackage(p)
 		} else {
 			wg.Add(1)
@@ -2788,10 +2751,10 @@ func (b *Builder) BuildPackage(p *Package) {
 	if !atomic.CompareAndSwapInt32(&p.started, 0, 1) {
 		return // already started
 	}
-	if p.files == nil {
+	if p.Files == nil {
 		return // nothing to do
 	}
-	if b.mode&LogSource != 0 {
+	if b.Context.Mode&LogSource != 0 {
 		defer logStack("build package %s", p.Types.Path)()
 	}
 	init := p.Init
@@ -2809,7 +2772,7 @@ func (b *Builder) BuildPackage(p *Package) {
 	// entries for other package's import statements, if produced
 	// by GcImport.  Project it down to just the ones for us.
 	imports := make(map[string]*types.Package)
-	for _, file := range p.files {
+	for _, file := range p.Files {
 		for _, imp := range file.Imports {
 			path, _ := strconv.Unquote(imp.Path.Value)
 			if path != "unsafe" {
@@ -2827,8 +2790,8 @@ func (b *Builder) BuildPackage(p *Package) {
 		}
 
 		var v Call
-		v.Func = p2.Init
-		v.Pos = init.Pos
+		v.Call.Func = p2.Init
+		v.Call.Pos = init.Pos
 		v.setType(new(types.Result))
 		init.emit(&v)
 	}
@@ -2841,12 +2804,17 @@ func (b *Builder) BuildPackage(p *Package) {
 	//
 	// We also ensure all functions and methods are built, even if
 	// they are unreachable.
-	for _, file := range p.files {
+	for _, file := range p.Files {
 		for _, decl := range file.Decls {
 			b.buildDecl(p, decl)
 		}
 	}
-	p.files = nil
+
+	// Clear out the typed ASTs unless otherwise requested.
+	if retain := b.Context.RetainAST; retain == nil || !retain(p) {
+		p.Files = nil
+		p.TypeInfo = TypeInfo{} // clear
+	}
 	p.nTo1Vars = nil
 
 	// Finish up.

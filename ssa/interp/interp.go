@@ -157,8 +157,8 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		fr.env[instr] = binop(instr.Op, fr.get(instr.X), fr.get(instr.Y))
 
 	case *ssa.Call:
-		fn, args := prepareCall(fr, &instr.CallCommon)
-		fr.env[instr] = call(fr.i, fr, instr.Pos, fn, args)
+		fn, args := prepareCall(fr, &instr.Call)
+		fr.env[instr] = call(fr.i, fr, instr.Call.Pos, fn, args)
 
 	case *ssa.Conv:
 		fr.env[instr] = conv(instr.Type(), instr.X.Type(), fr.get(instr.X))
@@ -218,13 +218,13 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		return kJump
 
 	case *ssa.Defer:
-		pos := instr.Pos // TODO(gri): workaround for bug in typeswitch+funclit.
-		fn, args := prepareCall(fr, &instr.CallCommon)
+		pos := instr.Call.Pos // TODO(gri): workaround for go/types bug in typeswitch+funclit.
+		fn, args := prepareCall(fr, &instr.Call)
 		fr.defers = append(fr.defers, func() { call(fr.i, fr, pos, fn, args) })
 
 	case *ssa.Go:
-		fn, args := prepareCall(fr, &instr.CallCommon)
-		go call(fr.i, nil, instr.Pos, fn, args)
+		fn, args := prepareCall(fr, &instr.Call)
+		go call(fr.i, nil, instr.Call.Pos, fn, args)
 
 	case *ssa.MakeChan:
 		fr.env[instr] = make(chan value, asInt(fr.get(instr.Size)))

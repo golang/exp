@@ -5,6 +5,7 @@ package ssa
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"io"
 	"os"
 
@@ -360,17 +361,17 @@ func (f *Function) removeNilBlocks() {
 // Precondition: f.syntax != nil (i.e. a Go source function).
 //
 func (f *Function) addNamedLocal(obj types.Object) *Alloc {
-	l := f.addLocal(obj.GetType())
+	l := f.addLocal(obj.GetType(), obj.GetPos())
 	l.Name_ = obj.GetName()
 	f.objects[obj] = l
 	return l
 }
 
 // addLocal creates an anonymous local variable of type typ, adds it
-// to function f and returns it.
+// to function f and returns it.  pos is the optional source location.
 //
-func (f *Function) addLocal(typ types.Type) *Alloc {
-	v := &Alloc{Type_: pointer(typ)}
+func (f *Function) addLocal(typ types.Type, pos token.Pos) *Alloc {
+	v := &Alloc{Type_: pointer(typ), Pos: pos}
 	f.Locals = append(f.Locals, v)
 	f.emit(v)
 	return v
