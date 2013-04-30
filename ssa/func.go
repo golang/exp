@@ -209,6 +209,8 @@ func (f *Function) startBody() {
 // Preconditions:
 // f.syntax != nil, i.e. this is a Go source function.
 // f.startBody() was called.
+// Postcondition:
+// len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv ? 1 : 0)
 //
 func (f *Function) createSyntacticParams(idents map[*ast.Ident]types.Object) {
 	// Receiver (at most one inner iteration).
@@ -217,17 +219,25 @@ func (f *Function) createSyntacticParams(idents map[*ast.Ident]types.Object) {
 			for _, n := range field.Names {
 				f.addSpilledParam(idents[n])
 			}
+			// Anonymous receiver?  No need to spill.
 			if field.Names == nil {
-				f.addParam(f.Signature.Recv.Name, f.Signature.Recv.Type)
+				recvVar := f.Signature.Recv
+				f.addParam(recvVar.Name, recvVar.Type)
 			}
 		}
 	}
 
 	// Parameters.
 	if f.syntax.paramFields != nil {
+		n := len(f.Params) // 1 if has recv, 0 otherwise
 		for _, field := range f.syntax.paramFields.List {
 			for _, n := range field.Names {
 				f.addSpilledParam(idents[n])
+			}
+			// Anonymous parameter?  No need to spill.
+			if field.Names == nil {
+				paramVar := f.Signature.Params[len(f.Params)-n]
+				f.addParam(paramVar.Name, paramVar.Type)
 			}
 		}
 	}

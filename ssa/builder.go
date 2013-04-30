@@ -21,9 +21,6 @@ package ssa
 // remain constant.  The sole exception is Prog.methodSets, which is
 // protected by a dedicated mutex.
 
-// TODO(adonovan):
-// - fix: support f(g()) where g has multiple result parameters.
-
 import (
 	"fmt"
 	"go/ast"
@@ -56,7 +53,7 @@ var (
 	// The result type of a "select".
 	tSelect = &types.Result{Values: []*types.Var{
 		{Name: "index", Type: tInt},
-		{Name: "recv", Type: tInvalid},
+		{Name: "recv", Type: tEface},
 		varOk,
 	}}
 
@@ -294,8 +291,6 @@ func (b *Builder) logicalBinop(fn *Function, e *ast.BinaryExpr) Value {
 	emitJump(fn, done)
 	fn.currentBlock = done
 
-	// TODO(adonovan): do we need emitConv on each edge?
-	// Test with named boolean types.
 	phi := &Phi{Edges: edges, Comment: e.Op.String()}
 	phi.Type_ = phi.Edges[0].Type()
 	return done.emit(phi)
@@ -631,10 +626,6 @@ func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 // exprInPlace emits to fn code to initialize the lvalue loc with the
 // value of expression e.
 //
-// typ is the type of the lvalue, which may be provided by the caller
-// since it is sometimes only an inherited attribute (e.g. within in
-// composite literals).
-//
 // This is equivalent to loc.store(fn, b.expr(fn, e)) but may
 // generate better code in some cases, e.g. for composite literals
 // in an addressable location.
@@ -690,6 +681,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 				body:         e.Body,
 			},
 		}
+		fn.AnonFuncs = append(fn.AnonFuncs, fn2)
 		b.buildFunction(fn2)
 		if fn2.FreeVars == nil {
 			return fn2
@@ -883,6 +875,7 @@ func (b *Builder) stmtList(fn *Function, list []ast.Stmt) {
 //
 func (b *Builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	c.Pos = e.Lparen
+	c.HasEllipsis = e.Ellipsis != 0
 
 	// Is the call of the form x.f()?
 	sel, ok := noparens(e.Fun).(*ast.SelectorExpr)
@@ -974,178 +967,62 @@ func (b *Builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	}
 }
 
-// setCall emits to fn code to evaluate all the parameters of a function
-// call e, and populates *c with those values.
+// emitCallArgs emits to f code for the actual parameters of call e to
+// a (possibly built-in) function of effective type sig.
+// The argument values are appended to args, which is then returned.
 //
-func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
-	// First deal with the f(...) part.
-	b.setCallFunc(fn, e, c)
-
-	// Argument passing.  There are 4 cases to consider:
-	// 1. Ordinary call to non-variadic function.
-	//    All args are treated in the usual manner.
-	// 2. Ordinary call to variadic function, f(a, b, v1, ..., vn).
-	//    Caller constructs a slice from the varargs arguments v_i.
-	// 3. Ellipsis call f(a, b, rest...) to variadic function.
-	//    'rest' is already a slice; all args treated in the usual manner.
-	// 4. f(g()) where g has >1 return parameters.  f may also be variadic.
-	//    TODO(adonovan): fix: implement.
-
-	var args, varargs []ast.Expr = e.Args, nil
-	c.HasEllipsis = e.Ellipsis != 0
-
-	// Determine which suffix (if any) of Args is a varargs slice.
-	var vt types.Type // element type of the variadic slice
-	switch typ := underlyingType(fn.Pkg.TypeOf(e.Fun)).(type) {
-	case *types.Signature:
-		np := len(typ.Params)
-		if !c.HasEllipsis {
-			if typ.IsVariadic {
-				// case 2: ordinary call of variadic function.
-				vt = typ.Params[np-1].Type
-				args, varargs = args[:np-1], args[np-1:]
-			}
-
-			// TODO(adonovan): fix: not disjoint with case above!
-			// Consider f(...int) called with g() (int,int)
-			// Incomplete.
-			if len(args) == 1 && (np > 1 || typ.IsVariadic) {
-				if res, ok := fn.Pkg.TypeOf(args[0]).(*types.Result); ok {
-					res = res
-					// case 4: f(g()) where g is a multi.
-					// TODO(adonovan): generate:
-					//   tuple := g()
-					//   args = [extract 0, ... extract n]
-					//   f(args)
-				}
-			}
-		}
-
-		// Non-varargs.
-		for i, arg := range args {
-			// TODO(gri): annoyingly Signature.Params
-			// doesn't reflect the slice type for a final
-			// ...T param.
-			t := typ.Params[i].Type
-			if typ.IsVariadic && c.HasEllipsis && i == len(args)-1 {
+func (b *Builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallExpr, args []Value) []Value {
+	// f(x, y, z...): pass slice z straight through.
+	if e.Ellipsis != 0 {
+		for i, arg := range e.Args {
+			// TODO(gri): annoyingly Signature.Params doesn't
+			// reflect the slice type for a final ...T param.
+			t := sig.Params[i].Type
+			if sig.IsVariadic && i == len(e.Args)-1 {
 				t = &types.Slice{Elt: t}
 			}
-			v := emitConv(fn, b.expr(fn, arg), t)
-			c.Args = append(c.Args, v)
+			args = append(args, emitConv(fn, b.expr(fn, arg), t))
 		}
+		return args
+	}
 
-	default:
-		// builtin: ad-hoc typing rules are required for all
-		// variadic (append, print, println) and polymorphic
-		// (append, copy, delete, close) built-ins.
-		//
-		// TODO(adonovan): it would so much cleaner if the
-		// typechecker would ascribe a unique Signature type
-		// to each e.Fun expression calling a built-in.
-		// Then we could use the same logic as above.
-		//
-		// TODO(adonovan): fix: support case 4.  But know that the
-		// other tools don't support it for built-ins yet
-		// (http://code.google.com/p/go/issues/detail?id=4573),
-		// so there's no rush.
+	offset := len(args) // 1 if call has receiver, 0 otherwise
 
-		var bptypes []types.Type // formal parameter types of builtins
-		switch builtin := noparens(e.Fun).(*ast.Ident).Name; builtin {
-		case "append":
-			// Infer arg types from result type:
-			rt := fn.Pkg.TypeOf(e)
-			bptypes = append(bptypes, rt)
-			if c.HasEllipsis {
-				// 2-arg '...' call form.  No conversions.
-				// append([]T, []T) []T
-				// append([]byte, string) []byte
-			} else {
-				// variadic call form.
-				// append([]T, ...T) []T
-				args, varargs = args[:1], args[1:]
-				vt = underlyingType(rt).(*types.Slice).Elt
+	// Evaluate actual parameter expressions.
+	//
+	// If this is a chained call of the form f(g()) where g has
+	// multiple return values (MRV), they are flattened out into
+	// args; a suffix of them may end up in a varargs slice.
+	for _, arg := range e.Args {
+		v := b.expr(fn, arg)
+		if ttuple, ok := v.Type().(*types.Result); ok { // MRV chain
+			for i, t := range ttuple.Values {
+				args = append(args, emitExtract(fn, v, i, t.Type))
 			}
-		case "close":
-			// no conv
-		case "copy":
-			// copy([]T, []T) int
-			// Infer arg types from each other.  Sleazy.
-			if st, ok := underlyingType(fn.Pkg.TypeOf(args[0])).(*types.Slice); ok {
-				bptypes = append(bptypes, st, st)
-			} else if st, ok := underlyingType(fn.Pkg.TypeOf(args[1])).(*types.Slice); ok {
-				bptypes = append(bptypes, st, st)
-			} else {
-				panic("cannot infer types in call to copy()")
-			}
-		case "delete":
-			// delete(map[K]V, K)
-			tkey := underlyingType(fn.Pkg.TypeOf(args[0])).(*types.Map).Key
-			bptypes = append(bptypes, nil)  // map: no conv
-			bptypes = append(bptypes, tkey) // key
-		case "print", "println": // print{,ln}(any, ...any)
-			// Note, arg0 may have any type, not necessarily tEface.
-			vt = tEface // variadic
-			if !c.HasEllipsis {
-				args, varargs = args[:1], args[1:]
-			}
-		case "len":
-			// no conv
-		case "cap":
-			// no conv
-		case "real", "imag":
-			// Reverse conversion to "complex" case below.
-			// Typechecker, help us out. :(
-			var argType types.Type
-			switch fn.Pkg.TypeOf(e).(*types.Basic).Kind {
-			case types.UntypedFloat:
-				argType = types.Typ[types.UntypedComplex]
-			case types.Float64:
-				argType = tComplex128
-			case types.Float32:
-				argType = tComplex64
-			default:
-				unreachable()
-			}
-			bptypes = append(bptypes, argType, argType)
-		case "complex":
-			// Typechecker, help us out. :(
-			var argType types.Type
-			switch fn.Pkg.TypeOf(e).(*types.Basic).Kind {
-			case types.UntypedComplex:
-				argType = types.Typ[types.UntypedFloat]
-			case types.Complex128:
-				argType = tFloat64
-			case types.Complex64:
-				argType = tFloat32
-			default:
-				unreachable()
-			}
-			bptypes = append(bptypes, argType, argType)
-		case "panic":
-			bptypes = append(bptypes, tEface)
-		case "recover":
-			// no-op
-		default:
-			panic("unknown builtin: " + builtin)
-		}
-
-		// Non-varargs.
-		for i, arg := range args {
-			v := b.expr(fn, arg)
-			if i < len(bptypes) && bptypes[i] != nil {
-				v = emitConv(fn, v, bptypes[i])
-			}
-			c.Args = append(c.Args, v)
+		} else {
+			args = append(args, v)
 		}
 	}
 
-	// Common code for varargs.
-	if vt != nil { // case 2
+	// Actual->formal assignability conversions for normal parameters.
+	np := len(sig.Params) // number of normal parameters
+	if sig.IsVariadic {
+		np--
+	}
+	for i := 0; i < np; i++ {
+		args[offset+i] = emitConv(fn, args[offset+i], sig.Params[i].Type)
+	}
+
+	// Actual->formal assignability conversions for variadic parameter,
+	// and construction of slice.
+	if sig.IsVariadic {
+		varargs := args[offset+np:]
+		vt := sig.Params[np].Type
 		st := &types.Slice{Elt: vt}
-		var vaslice Value
 		if len(varargs) == 0 {
-			vaslice = nilLiteral(st)
+			args = append(args, nilLiteral(st))
 		} else {
+			// Replace a suffix of args with a slice containing it.
 			at := &types.Array{
 				Elt: vt,
 				Len: int64(len(varargs)),
@@ -1158,14 +1035,30 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 				}
 				iaddr.setType(pointer(vt))
 				fn.emit(iaddr)
-				emitStore(fn, iaddr, b.expr(fn, arg))
+				emitStore(fn, iaddr, arg)
 			}
 			s := &Slice{X: a}
 			s.setType(st)
-			vaslice = fn.emit(s)
+			args[offset+np] = fn.emit(s)
+			args = args[:offset+np+1]
 		}
-		c.Args = append(c.Args, vaslice)
 	}
+	return args
+}
+
+// setCall emits to fn code to evaluate all the parameters of a function
+// call e, and populates *c with those values.
+//
+func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
+	// First deal with the f(...) part and optional receiver.
+	b.setCallFunc(fn, e, c)
+
+	// Then append the other actual parameters.
+	sig, _ := underlyingType(fn.Pkg.TypeOf(e.Fun)).(*types.Signature)
+	if sig == nil {
+		sig = builtinCallSignature(&fn.Pkg.TypeInfo, e)
+	}
+	c.Args = b.emitCallArgs(fn, sig, e, c.Args)
 }
 
 // assignOp emits to fn code to perform loc += incr or loc -= incr.
@@ -1392,8 +1285,8 @@ func (b *Builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool) {
 // where possible.
 //
 func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ types.Type) {
-	// TODO(adonovan): test whether typ ever differs from
-	// fn.Pkg.TypeOf(e) and if so document why.
+	// TODO(adonovan): document how and why typ ever differs from
+	// fn.Pkg.TypeOf(e).
 
 	switch t := underlyingType(typ).(type) {
 	case *types.Struct:
@@ -1762,20 +1655,20 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 	//
 	// idx, recv, recvOk := select(...)
 	// if idx == 0 {  // receive on channel 0
-	//     x, ok := recv, recvOk
+	//     x, ok := recv.(T0), recvOk
 	//     ...state0...
 	// } else if v == 1 {   // send on channel 1
 	//     ...state1...
 	// } else {
 	//     ...default...
 	// }
-	pair := &Select{
+	triple := &Select{
 		States:   states,
 		Blocking: blocking,
 	}
-	pair.setType(tSelect)
-	fn.emit(pair)
-	idx := emitExtract(fn, pair, 0, tInt)
+	triple.setType(tSelect)
+	fn.emit(triple)
+	idx := emitExtract(fn, triple, 0, tInt)
 
 	done := fn.newBasicBlock("select.done")
 	if label != nil {
@@ -1801,11 +1694,19 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 		switch comm := clause.Comm.(type) {
 		case *ast.AssignStmt: // x := <-states[state].Chan
 			xdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[0].(*ast.Ident)))
+			// TODO(adonovan): should we be using
+			// ChangeInterface if underlyingType(xt).(*types.Interface)?
+			assert := &TypeAssert{
+				X:            emitExtract(fn, triple, 1, tEface),
+				AssertedType: indirectType(xdecl.Type()),
+			}
+			assert.setType(assert.AssertedType)
+			recv := fn.emit(assert)
+			emitStore(fn, xdecl, recv)
 
-			emitStore(fn, xdecl, emitExtract(fn, pair, 1, indirectType(xdecl.Type())))
 			if len(comm.Lhs) == 2 { // x, ok := ...
 				okdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[1].(*ast.Ident)))
-				emitStore(fn, okdecl, emitExtract(fn, pair, 2, indirectType(okdecl.Type())))
+				emitStore(fn, okdecl, emitExtract(fn, triple, 2, indirectType(okdecl.Type())))
 			}
 		}
 		b.stmtList(fn, clause.Body)
@@ -2241,7 +2142,9 @@ start:
 			// Return of one expression in a multi-valued function.
 			tuple := b.exprN(fn, s.Results[0])
 			for i, v := range tuple.Type().(*types.Result).Values {
-				results = append(results, emitExtract(fn, tuple, i, v.Type))
+				results = append(results,
+					emitConv(fn, emitExtract(fn, tuple, i, v.Type),
+						fn.Signature.Results[i].Type))
 			}
 		} else {
 			// 1:1 return, or no-arg return in non-void function.
@@ -2506,6 +2409,9 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 	case *ast.FuncDecl:
 		id := decl.Name
 		if decl.Recv == nil && id.Name == "init" {
+			if !pkg.Init.Pos.IsValid() {
+				pkg.Init.Pos = decl.Name.Pos()
+			}
 			return // init blocks aren't functions
 		}
 		if !isBlankIdent(id) {
@@ -2602,12 +2508,18 @@ func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, fil
 	b.packages[typkg] = p
 	b.Prog.Packages[importPath] = p
 
+	// Add init() function (but not to Members since it can't be referenced).
+	p.Init = &Function{
+		Name_:     "init",
+		Signature: new(types.Signature),
+		Pkg:       p,
+		Prog:      b.Prog,
+	}
+
 	// CREATE phase.
 	// Allocate all package members: vars, funcs and consts and types.
 	if len(files) > 0 {
 		// Go source package.
-
-		p.Pos = files[0].Package // arbitrary file
 
 		// TODO(gri): make it a typechecker error for there to
 		// be duplicate (e.g.) main functions in the same package.
@@ -2633,15 +2545,6 @@ func (b *Builder) createPackageImpl(typkg *types.Package, importPath string, fil
 			t.Methods = b.Prog.MethodSet(t.NamedType)
 			t.PtrMethods = b.Prog.MethodSet(pointer(t.NamedType))
 		}
-	}
-
-	// Add init() function (but not to Members since it can't be referenced).
-	p.Init = &Function{
-		Name_:     "init",
-		Signature: new(types.Signature),
-		Pos:       p.Pos,
-		Pkg:       p,
-		Prog:      b.Prog,
 	}
 
 	// Add initializer guard variable.

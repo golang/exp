@@ -28,7 +28,7 @@ type Program struct {
 	mode            BuilderMode                 // set of mode bits
 }
 
-// A Package is a single analyzed Go package, containing Members for
+// A Package is a single analyzed Go package containing Members for
 // all package-level functions, variables, constants and types it
 // declares.  These may be accessed directly via Members, or via the
 // type-specific accessor methods Func, Type, Var and Const.
@@ -36,12 +36,11 @@ type Program struct {
 type Package struct {
 	Prog    *Program          // the owning program
 	Types   *types.Package    // the type checker's package object for this package.
-	Pos     token.Pos         // position of an arbitrary file in the package
 	Members map[string]Member // all exported and unexported members of the package
 	Init    *Function         // the package's (concatenated) init function
 
 	// These fields are available between package creation and SSA
-	// building, but are then cleared unless Client.RetainAST(pkg).
+	// building, but are then cleared unless Context.RetainAST(pkg).
 	Files    []*ast.File // abstract syntax for the package's files
 	TypeInfo             // type-checker intermediate results
 
@@ -244,6 +243,7 @@ type Function struct {
 	FreeVars  []*Capture   // free variables whose values must be supplied by closure
 	Locals    []*Alloc
 	Blocks    []*BasicBlock // basic blocks of the function; nil => external
+	AnonFuncs []*Function   // anonymous functions directly beneath this one
 
 	// The following fields are set transiently during building,
 	// then cleared.
@@ -497,7 +497,9 @@ type Conv struct {
 // ChangeInterface constructs a value of one interface type from a
 // value of another interface type known to be assignable to it.
 //
-// TODO(adonovan): state whether this can fail dynamically.
+// TODO(adonovan): decide whether this should be used for interface
+// narrowing (currently: yes), in which case it may fail dynamically.
+// Test.
 //
 // Example printed form:
 // 	t1 = change interface interface{} <- I (t0)
@@ -592,7 +594,6 @@ type MakeSlice struct {
 //
 // Type() returns string if the type of X was string, otherwise a
 // *types.Slice with the same element type as X.
-// TODO(adonovan): check that named string types are preserved.
 //
 // Example printed form:
 // 	t1 = slice t0[1:]
@@ -693,8 +694,8 @@ type SelectState struct {
 // Select tests whether (or blocks until) one or more of the specified
 // sent or received states is entered.
 //
-// It returns a triple (index int, recv ?, recvOk bool) whose
-// components, described below, must be accessed via the Extract
+// It returns a triple (index int, recv interface{}, recvOk bool)
+// whose components, described below, must be accessed via the Extract
 // instruction.
 //
 // If Blocking, select waits until exactly one state holds, i.e. a
@@ -707,9 +708,7 @@ type SelectState struct {
 // returns immediately with index equal to -1.
 //
 // If the chosen channel was used for a receive, 'recv' is set to the
-// received value; Otherwise it is unspecified.  recv has no useful
-// type since it is conceptually the union of all possible received
-// values.
+// received value; otherwise it is nil.
 //
 // The third component of the triple, recvOk, is a boolean whose value
 // is true iff the selected operation was a receive and the receive
@@ -777,6 +776,10 @@ type Next struct {
 //
 // Type() reflects the actual type of the result, possibly a pair
 // (types.Result); AssertedType is the asserted type.
+//
+// TODO(adonovan): decide whether AssertedType can also be an
+// interface (currently: yes) or whether ChangeInterface should be
+// used in that case.  Test.
 //
 // Example printed form:
 // 	t1 = typeassert t0.(int)

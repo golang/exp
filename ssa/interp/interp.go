@@ -346,13 +346,15 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		if !instr.Blocking {
 			chosen-- // default case should have index -1.
 		}
-		var recvV value
-		if recvOk {
-			// No need to copy since send makes an unaliased copy.
-			recvV = recv.Interface().(value)
-		} else if chosen != -1 {
-			// Ensure we provide a type-appropriate zero value.
-			recvV = zero(underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elt)
+		var recvV iface
+		if chosen != -1 {
+			recvV.t = underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elt
+			if recvOk {
+				// No need to copy since send makes an unaliased copy.
+				recvV.v = recv.Interface().(value)
+			} else {
+				recvV.v = zero(recvV.t)
+			}
 		}
 		fr.env[instr] = tuple{chosen, recvV, recvOk}
 

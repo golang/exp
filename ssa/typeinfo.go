@@ -88,3 +88,114 @@ func (info *TypeInfo) isPackageRef(sel *ast.SelectorExpr) types.Object {
 	}
 	return nil
 }
+
+// builtinCallSignature returns a new Signature describing the
+// effective type of a builtin operator for the particular call e.
+//
+// This requires ad-hoc typing rules for all variadic (append, print,
+// println) and polymorphic (append, copy, delete, close) built-ins.
+// This logic could be part of the typechecker, and should arguably
+// be moved there and made accessible via an additional types.Context
+// callback.
+//
+// The returned Signature is degenerate and only intended for use by
+// emitCallArgs.
+//
+func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
+	var params []*types.Var
+	var isVariadic bool
+
+	switch builtin := noparens(e.Fun).(*ast.Ident).Name; builtin {
+	case "append":
+		var t0, t1 types.Type
+		t0 = info.TypeOf(e) // infer arg[0] type from result type
+		if e.Ellipsis != 0 {
+			// append([]T, []T) []T
+			// append([]byte, string) []byte
+			t1 = info.TypeOf(e.Args[1]) // no conversion
+		} else {
+			// append([]T, ...T) []T
+			t1 = underlyingType(t0).(*types.Slice).Elt
+			isVariadic = true
+		}
+		params = append(params,
+			&types.Var{Type: t0},
+			&types.Var{Type: t1})
+
+	case "print", "println": // print{,ln}(any, ...interface{})
+		isVariadic = true
+		// Note, arg0 may have any type, not necessarily tEface.
+		params = append(params,
+			&types.Var{Type: info.TypeOf(e.Args[0])},
+			&types.Var{Type: tEface})
+
+	case "close":
+		params = append(params, &types.Var{Type: info.TypeOf(e.Args[0])})
+
+	case "copy":
+		// copy([]T, []T) int
+		// Infer arg types from each other.  Sleazy.
+		var st *types.Slice
+		if t, ok := underlyingType(info.TypeOf(e.Args[0])).(*types.Slice); ok {
+			st = t
+		} else if t, ok := underlyingType(info.TypeOf(e.Args[1])).(*types.Slice); ok {
+			st = t
+		} else {
+			panic("cannot infer types in call to copy()")
+		}
+		stvar := &types.Var{Type: st}
+		params = append(params, stvar, stvar)
+
+	case "delete":
+		// delete(map[K]V, K)
+		tmap := info.TypeOf(e.Args[0])
+		tkey := underlyingType(tmap).(*types.Map).Key
+		params = append(params,
+			&types.Var{Type: tmap},
+			&types.Var{Type: tkey})
+
+	case "len", "cap":
+		params = append(params, &types.Var{Type: info.TypeOf(e.Args[0])})
+
+	case "real", "imag":
+		// Reverse conversion to "complex" case below.
+		var argType types.Type
+		switch info.TypeOf(e).(*types.Basic).Kind {
+		case types.UntypedFloat:
+			argType = types.Typ[types.UntypedComplex]
+		case types.Float64:
+			argType = tComplex128
+		case types.Float32:
+			argType = tComplex64
+		default:
+			unreachable()
+		}
+		params = append(params, &types.Var{Type: argType})
+
+	case "complex":
+		var argType types.Type
+		switch info.TypeOf(e).(*types.Basic).Kind {
+		case types.UntypedComplex:
+			argType = types.Typ[types.UntypedFloat]
+		case types.Complex128:
+			argType = tFloat64
+		case types.Complex64:
+			argType = tFloat32
+		default:
+			unreachable()
+		}
+		v := &types.Var{Type: argType}
+		params = append(params, v, v)
+
+	case "panic":
+		params = append(params, &types.Var{Type: tEface})
+
+	case "recover":
+		// no params
+
+	default:
+		panic("unknown builtin: " + builtin)
+	}
+
+	return &types.Signature{Params: params, IsVariadic: isVariadic}
+}

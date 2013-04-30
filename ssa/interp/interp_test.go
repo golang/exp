@@ -54,6 +54,8 @@ var gorootTests = []string{
 	"reorder2.go",
 	"closure.go",
 	"gc.go",
+	"simassign.go",
+	"iota.go",
 	"goprint.go", // doesn't actually assert anything
 	"utf.go",
 	"method.go",
@@ -99,16 +101,15 @@ var gorootTests = []string{
 	// "init1.go",     // too slow (80s) and not that interesting. Cheats on ReadMemStats check too.
 
 	// Typechecker failures:
-	// "switch.go",    // bug re: switch ... { case 1.0:... case 1:... }
-	// "iota.go",      // crash
-	// "rune.go",      // error re: rune as index
-	// "64bit.go",     // error re: comparison
-	// "cmp.go",       // error re: comparison
+	// "switch.go",            // bug re: switch ... { case 1.0:... case 1:... }
+	// "rune.go",              // error re: rune as index
+	// "64bit.go",             // error re: comparison
+	// "cmp.go",               // error re: comparison
 	// "rotate.go rotate0.go", // error re: shifts
 	// "rotate.go rotate1.go", // error re: shifts
 	// "rotate.go rotate2.go", // error re: shifts
 	// "rotate.go rotate3.go", // error re: shifts
-	// "run.go",       // produces wrong constant for bufio.runeError; also, not really a test.
+	// "run.go",               // produces wrong constant for bufio.runeError; also, not really a test.
 
 	// Broken.  TODO(adonovan): fix.
 	// copy.go         // very slow; but with N=4 quickly crashes, slice index out of range.
@@ -116,7 +117,6 @@ var gorootTests = []string{
 	// recover1.go     // error: "spurious recover"
 	// recover2.go     // panic: interface conversion: string is not error: missing method Error
 	// recover3.go     // logic errors: panicked with wrong Error.
-	// simassign.go    // requires support for f(f(x,y)).
 	// method3.go      // Fails dynamically; (*T).f vs (T).f are distinct methods.
 	// args.go         // works, but requires specific os.Args from the driver.
 	// index.go        // a template, not a real test.
@@ -129,6 +129,7 @@ var gorootTests = []string{
 // These are files in go.exp/ssa/interp/testdata/.
 var testdataTests = []string{
 	"coverage.go",
+	"mrvchain.go",
 }
 
 func run(t *testing.T, dir, input string) bool {

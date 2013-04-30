@@ -356,7 +356,7 @@ func (p *Package) String() string {
 }
 
 func (p *Package) DumpTo(w io.Writer) {
-	fmt.Fprintf(w, "Package %s at %s:\n", p.Types.Path, p.Prog.Files.File(p.Pos).Name())
+	fmt.Fprintf(w, "Package %s:\n", p.Types.Path)
 
 	var names []string
 	maxname := 0

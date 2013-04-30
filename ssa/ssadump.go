@@ -50,8 +50,6 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	// TODO(adonovan): perhaps we need a more extensible option
-	// API than a bitset, e.g. a struct with a sane zero value?
 	var mode ssa.BuilderMode
 	for _, c := range *buildFlag {
 		switch c {
