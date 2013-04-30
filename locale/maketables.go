@@ -30,7 +30,7 @@ import (
 
 var (
 	url = flag.String("cldr",
-		"http://www.unicode.org/Public/cldr/22/core.zip",
+		"http://www.unicode.org/Public/cldr/"+cldr.Version+"/core.zip",
 		"URL of CLDR archive.")
 	iana = flag.String("iana",
 		"http://www.iana.org/assignments/language-subtag-registry",
@@ -529,16 +529,6 @@ func (b *builder) writeMapFunc(name string, m map[string]string, f func(string) 
 	b.p("}")
 }
 
-func (ss *stringSet) parseKeyed(slice interface{}, key, value string) {
-	v := reflect.ValueOf(slice)
-	for i := 0; i < v.Len(); i++ {
-		if v.Index(i).Elem().FieldByName(key).String() == value {
-			ss.parse(v.Index(i).Interface().(cldr.Elem).GetCommon().Data())
-			break
-		}
-	}
-}
-
 func (b *builder) langIndex(s string) uint16 {
 	if i, ok := b.lang.find(s); ok {
 		return uint16(i)
@@ -584,7 +574,11 @@ func (b *builder) parseIndices() {
 	}
 
 	// currency codes
-	b.currency.parseKeyed(meta.Validity.Variable, "Id", "$currency")
+	for _, reg := range b.supp.CurrencyData.Region {
+		for _, cur := range reg.Currency {
+			b.currency.add(cur.Iso4217)
+		}
+	}
 
 	// common locales
 	b.locale.parse(meta.DefaultContent.Locales)

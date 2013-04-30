@@ -54,7 +54,7 @@ type Builder struct {
 // The table is defined by specifying tailorings to the underlying table.
 // See http://unicode.org/reports/tr35/ for an overview of tailoring
 // collation tables.  The CLDR contains pre-defined tailorings for a variety
-// of languages (See http://www.unicode.org/Public/cldr/2.0.1/core.zip.)
+// of languages (See http://www.unicode.org/Public/cldr/<version>/core.zip.)
 type Tailoring struct {
 	id      string
 	builder *Builder

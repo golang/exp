@@ -39,7 +39,7 @@ var (
 		`URL of the Default Unicode Collation Element Table (DUCET). This can be a zip
 file containing the file allkeys_CLDR.txt or an allkeys.txt file.`)
 	cldrzip = flag.String("cldr",
-		"http://www.unicode.org/Public/cldr/22/core.zip",
+		"http://www.unicode.org/Public/cldr/"+cldr.Version+"/core.zip",
 		"URL of CLDR archive.")
 	test = flag.Bool("test", false,
 		"test existing tables; can be used to compare web data with package data.")

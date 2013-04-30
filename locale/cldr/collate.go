@@ -6,8 +6,8 @@ package cldr
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 )
 
@@ -43,27 +43,37 @@ type rulesElem struct {
 }
 
 type rule struct {
-	Value  string `xml:",innerxml"`
+	Value  string `xml:",chardata"`
 	Before string `xml:"before,attr"`
 	Any    []*struct {
 		XMLName xml.Name
 		rule
-	} `xml:",any"` // for <x> elements
+	} `xml:",any"`
 }
 
-var tagRe = regexp.MustCompile(`< *([a-z_]*)  */>`)
+var emptyValueError = errors.New("cldr: empty rule value")
 
-func (r *rule) value() string {
+func (r *rule) value() (string, error) {
 	// Convert hexadecimal Unicode codepoint notation to a string.
-	r.Value = charRe.ReplaceAllStringFunc(r.Value, replaceUnicode)
-
-	// Strip spaces from reset positions.
-	r.Value = tagRe.ReplaceAllString(r.Value, "<$1/>")
-	return r.Value
+	s := charRe.ReplaceAllStringFunc(r.Value, replaceUnicode)
+	r.Value = s
+	if len(s) == 0 {
+		if len(r.Any) != 1 {
+			return "", emptyValueError
+		}
+		r.Value = fmt.Sprintf("<%s/>", r.Any[0].XMLName.Local)
+		r.Any = nil
+	} else if len(r.Any) != 0 {
+		return "", fmt.Errorf("cldr: XML elements found in collation rule: %v", r.Any)
+	}
+	return r.Value, nil
 }
 
 func (r rule) process(p RuleProcessor, name, context, extend string) error {
-	v := r.value()
+	v, err := r.value()
+	if err != nil {
+		return err
+	}
 	switch name {
 	case "p", "s", "t", "i":
 		if strings.HasPrefix(v, cldrIndex) {
@@ -88,8 +98,9 @@ func (r rule) process(p RuleProcessor, name, context, extend string) error {
 
 // Process parses the rules for the tailorings of this collation
 // and calls the respective methods of p for each rule found.
-func (c Collation) Process(p RuleProcessor) error {
+func (c Collation) Process(p RuleProcessor) (err error) {
 	// Collation is generated and defined in xml.go.
+	var v string
 	for _, r := range c.Rules.Any {
 		switch r.XMLName.Local {
 		case "reset":
@@ -105,17 +116,19 @@ func (c Collation) Process(p RuleProcessor) error {
 			default:
 				return fmt.Errorf("cldr: unknown level %q", r.Before)
 			}
-			if err := p.Reset(r.value(), level); err != nil {
-				return err
+			v, err = r.value()
+			if err == nil {
+				err = p.Reset(v, level)
 			}
 		case "x":
 			var context, extend string
 			for _, r1 := range r.Any {
+				v, err = r1.value()
 				switch r1.XMLName.Local {
 				case "context":
-					context = r1.value()
+					context = v
 				case "extend":
-					extend = r1.value()
+					extend = v
 				}
 			}
 			for _, r1 := range r.Any {
@@ -125,9 +138,10 @@ func (c Collation) Process(p RuleProcessor) error {
 				r1.rule.process(p, r1.XMLName.Local, context, extend)
 			}
 		default:
-			if err := r.rule.process(p, r.XMLName.Local, "", ""); err != nil {
-				return err
-			}
+			err = r.rule.process(p, r.XMLName.Local, "", "")
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil
