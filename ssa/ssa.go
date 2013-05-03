@@ -497,9 +497,9 @@ type Conv struct {
 // ChangeInterface constructs a value of one interface type from a
 // value of another interface type known to be assignable to it.
 //
-// TODO(adonovan): decide whether this should be used for interface
-// narrowing (currently: yes), in which case it may fail dynamically.
-// Test.
+// This operation cannot fail.  Use TypeAssert for interface
+// conversions that may fail dynamically.
+// TODO(adonovan): rename to "{Narrow,Restrict}Interface"?
 //
 // Example printed form:
 // 	t1 = change interface interface{} <- I (t0)
@@ -763,23 +763,28 @@ type Next struct {
 	IsString bool // true => string iterator; false => map iterator.
 }
 
-// TypeAssert tests whether interface value X has type
-// AssertedType.
+// TypeAssert tests whether interface value X has type AssertedType.
 //
-// If CommaOk: on success it returns a pair (v, true) where v is a
-// copy of value X; on failure it returns (z, false) where z is the
-// zero value of that type.  The components of the pair must be
+// If !CommaOk, on success it returns v, the result of the conversion
+// (defined below); on failure it panics.
+//
+// If CommaOk: on success it returns a pair (v, true) where v is the
+// result of the conversion; on failure it returns (z, false) where z
+// is AssertedType's zero value.  The components of the pair must be
 // accessed using the Extract instruction.
 //
-// If !CommaOk, on success it returns just the single value v; on
-// failure it panics.
+// If AssertedType is a concrete type, TypeAssert checks whether the
+// dynamic type in interface X is equal to it, and if so, the result
+// of the conversion is a copy of the value in the interface.
+//
+// If AssertedType is an interface, TypeAssert checks whether the
+// dynamic type of the interface is assignable to it, and if so, the
+// result of the conversion is a copy of the interface value X.
+// If AssertedType is a superinterface of X.Type(), the operation
+// cannot fail; ChangeInterface is preferred in this case.
 //
 // Type() reflects the actual type of the result, possibly a pair
 // (types.Result); AssertedType is the asserted type.
-//
-// TODO(adonovan): decide whether AssertedType can also be an
-// interface (currently: yes) or whether ChangeInterface should be
-// used in that case.  Test.
 //
 // Example printed form:
 // 	t1 = typeassert t0.(int)

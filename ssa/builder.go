@@ -331,12 +331,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 		})
 
 	case *ast.TypeAssertExpr:
-		typ = fn.Pkg.TypeOf(e)
-		tuple = fn.emit(&TypeAssert{
-			X:            b.expr(fn, e.X),
-			AssertedType: typ,
-			CommaOk:      true,
-		})
+		return emitTypeTest(fn, b.expr(fn, e.X), fn.Pkg.TypeOf(e))
 
 	case *ast.UnaryExpr: // must be receive <-
 		typ = underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Chan).Elt
@@ -697,12 +692,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		return b.expr(fn, e.X)
 
 	case *ast.TypeAssertExpr: // single-result form only
-		v := &TypeAssert{
-			X:            b.expr(fn, e.X),
-			AssertedType: fn.Pkg.TypeOf(e),
-		}
-		v.setType(v.AssertedType)
-		return fn.emit(v)
+		return emitTypeAssert(fn, b.expr(fn, e.X), fn.Pkg.TypeOf(e))
 
 	case *ast.CallExpr:
 		typ := fn.Pkg.TypeOf(e)
@@ -1543,16 +1533,7 @@ func (b *Builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 			if casetype == tUntypedNil {
 				condv = emitCompare(fn, token.EQL, x, nilLiteral(x.Type()))
 			} else {
-				yok := &TypeAssert{
-					X:            x,
-					AssertedType: casetype,
-					CommaOk:      true,
-				}
-				yok.setType(&types.Result{Values: []*types.Var{
-					{Name: "value", Type: casetype},
-					varOk,
-				}})
-				fn.emit(yok)
+				yok := emitTypeTest(fn, x, casetype)
 				ti = emitExtract(fn, yok, 0, casetype)
 				condv = emitExtract(fn, yok, 1, tBool)
 			}
@@ -1694,14 +1675,7 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 		switch comm := clause.Comm.(type) {
 		case *ast.AssignStmt: // x := <-states[state].Chan
 			xdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[0].(*ast.Ident)))
-			// TODO(adonovan): should we be using
-			// ChangeInterface if underlyingType(xt).(*types.Interface)?
-			assert := &TypeAssert{
-				X:            emitExtract(fn, triple, 1, tEface),
-				AssertedType: indirectType(xdecl.Type()),
-			}
-			assert.setType(assert.AssertedType)
-			recv := fn.emit(assert)
+			recv := emitTypeAssert(fn, emitExtract(fn, triple, 1, tEface), indirectType(xdecl.Type()))
 			emitStore(fn, xdecl, recv)
 
 			if len(comm.Lhs) == 2 { // x, ok := ...

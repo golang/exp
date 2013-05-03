@@ -105,6 +105,29 @@ func methodIndex(typ types.Type, methods []*types.Method, id Id) (i int, m *type
 	panic(fmt.Sprint("method not found: ", id, " in interface ", typ))
 }
 
+// isSuperinterface returns true if x is a superinterface of y,
+// i.e.  x's methods are a subset of y's.
+//
+func isSuperinterface(x, y *types.Interface) bool {
+	if len(y.Methods) < len(x.Methods) {
+		return false
+	}
+	// TODO(adonovan): opt: this is quadratic.
+outer:
+	for _, xm := range x.Methods {
+		for _, ym := range y.Methods {
+			if IdFromQualifiedName(xm.QualifiedName) == IdFromQualifiedName(ym.QualifiedName) {
+				if !types.IsIdentical(xm.Type, ym.Type) {
+					return false // common name but conflicting types
+				}
+				continue outer
+			}
+		}
+		return false // y doesn't have this method
+	}
+	return true
+}
+
 // objKind returns the syntactic category of the named entity denoted by obj.
 func objKind(obj types.Object) ast.ObjKind {
 	switch obj.(type) {

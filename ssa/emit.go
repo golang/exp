@@ -138,11 +138,9 @@ func emitConv(f *Function, val Value, typ types.Type) Value {
 	// Conversion to, or construction of a value of, an interface type?
 	if _, ok := ut_dst.(*types.Interface); ok {
 
-		// Assignment from one interface type to a different one?
+		// Assignment from one interface type to another?
 		if _, ok := ut_src.(*types.Interface); ok {
-			c := &ChangeInterface{X: val}
-			c.setType(typ)
-			return f.emit(c)
+			return emitTypeAssert(f, val, typ)
 		}
 
 		// Untyped nil literal?  Return interface-typed nil literal.
@@ -221,6 +219,48 @@ func emitExtract(f *Function, tuple Value, index int, typ types.Type) Value {
 	// tuple.Type().(*types.Result).Values[index].Type.
 	e.setType(typ)
 	return f.emit(e)
+}
+
+// emitTypeAssert emits to f a type assertion value := x.(t) and
+// returns the value.  x.Type() must be an interface.
+//
+func emitTypeAssert(f *Function, x Value, t types.Type) Value {
+	// Simplify infallible assertions.
+	txi := underlyingType(x.Type()).(*types.Interface)
+	if ti, ok := underlyingType(t).(*types.Interface); ok {
+		if types.IsIdentical(ti, txi) {
+			return x
+		}
+		if isSuperinterface(ti, txi) {
+			c := &ChangeInterface{X: x}
+			c.setType(t)
+			return f.emit(c)
+		}
+	}
+
+	a := &TypeAssert{X: x, AssertedType: t}
+	a.setType(t)
+	return f.emit(a)
+}
+
+// emitTypeTest emits to f a type test value,ok := x.(t) and returns
+// a (value, ok) tuple.  x.Type() must be an interface.
+//
+func emitTypeTest(f *Function, x Value, t types.Type) Value {
+	// TODO(adonovan): opt: simplify infallible tests as per
+	// emitTypeAssert, and return (x, vTrue).
+	// (Requires that exprN returns a slice of extracted values,
+	// not a single Value of type *types.Results.)
+	a := &TypeAssert{
+		X:            x,
+		AssertedType: t,
+		CommaOk:      true,
+	}
+	a.setType(&types.Result{Values: []*types.Var{
+		{Name: "value", Type: t},
+		varOk,
+	}})
+	return f.emit(a)
 }
 
 // emitTailCall emits to f a function call in tail position,
