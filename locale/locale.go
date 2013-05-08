@@ -23,8 +23,8 @@ var (
 )
 
 var (
-	de    = ID{lang: getLangID([]byte("de"))}
-	en    = ID{lang: getLangID([]byte("en"))}
+	de    = ID{lang: getLangID([]byte("de")), region: unknownRegion, script: unknownScript}
+	en    = ID{lang: getLangID([]byte("en")), region: unknownRegion, script: unknownScript}
 	en_US = en
 	und   = ID{lang: unknownLang, region: unknownRegion, script: unknownScript}
 )
