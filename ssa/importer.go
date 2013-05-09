@@ -53,7 +53,7 @@ func (b *Builder) doImport(imports map[string]*types.Package, path string) (typk
 	} else {
 		files, err = b.Context.Loader(b.Prog.Files, path)
 		if err == nil {
-			typkg, info, err = b.typecheck(files)
+			typkg, info, err = b.typecheck(path, files)
 		}
 	}
 	if err != nil {

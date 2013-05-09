@@ -22,10 +22,10 @@ type Program struct {
 	Packages map[string]*Package       // all loaded Packages, keyed by import path
 	Builtins map[types.Object]*Builtin // all built-in functions, keyed by typechecker objects.
 
-	methodSets      map[types.Type]MethodSet    // concrete method sets for all needed types  [TODO(adonovan): de-dup]
-	methodSetsMu    sync.Mutex                  // serializes all accesses to methodSets
-	concreteMethods map[*types.Method]*Function // maps named concrete methods to their code
-	mode            BuilderMode                 // set of mode bits
+	methodSets      map[types.Type]MethodSet  // concrete method sets for all needed types  [TODO(adonovan): de-dup]
+	methodSetsMu    sync.Mutex                // serializes all accesses to methodSets
+	concreteMethods map[*types.Func]*Function // maps named concrete methods to their code
+	mode            BuilderMode               // set of mode bits
 }
 
 // A Package is a single analyzed Go package containing Members for
@@ -93,7 +93,7 @@ type MethodSet map[Id]*Function
 // type and method set of a named type declared at package scope.
 //
 type Type struct {
-	NamedType  *types.NamedType
+	NamedType  *types.Named
 	Methods    MethodSet // concrete method set of N
 	PtrMethods MethodSet // concrete method set of (*N)
 }
@@ -1068,8 +1068,8 @@ func (c *CallCommon) StaticCallee() *Function {
 // MethodId returns the Id for the method called by c, which must
 // have "invoke" mode.
 func (c *CallCommon) MethodId() Id {
-	meth := underlyingType(c.Recv.Type()).(*types.Interface).Methods[c.Method]
-	return IdFromQualifiedName(meth.QualifiedName)
+	m := underlyingType(c.Recv.Type()).(*types.Interface).Method(c.Method)
+	return MakeId(m.Name(), m.Pkg())
 }
 
 // Description returns a description of the mode of this call suitable
@@ -1089,8 +1089,8 @@ func (c *CallCommon) Description() string {
 	return "dynamic function call"
 }
 
-func (v *Builtin) Type() types.Type        { return v.Object.GetType() }
-func (v *Builtin) Name() string            { return v.Object.GetName() }
+func (v *Builtin) Type() types.Type        { return v.Object.Type() }
+func (v *Builtin) Name() string            { return v.Object.Name() }
 func (*Builtin) Referrers() *[]Instruction { return nil }
 
 func (v *Capture) Type() types.Type          { return v.Outer.Type() }
@@ -1125,12 +1125,12 @@ func (v *Register) asRegister() *Register     { return v }
 func (v *anInstruction) Block() *BasicBlock         { return v.Block_ }
 func (v *anInstruction) SetBlock(block *BasicBlock) { v.Block_ = block }
 
-func (t *Type) Name() string     { return t.NamedType.Obj.Name }
-func (t *Type) Posn() token.Pos  { return t.NamedType.Obj.GetPos() }
+func (t *Type) Name() string     { return t.NamedType.Obj().Name() }
+func (t *Type) Posn() token.Pos  { return t.NamedType.Obj().Pos() }
 func (t *Type) String() string   { return t.Name() }
 func (t *Type) Type() types.Type { return t.NamedType }
 
-func (p *Package) Name() string { return p.Types.Name }
+func (p *Package) Name() string { return p.Types.Name() }
 
 func (c *Constant) Name() string     { return c.Name_ }
 func (c *Constant) Posn() token.Pos  { return c.Pos }

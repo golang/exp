@@ -239,7 +239,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 
 	case *ssa.MakeSlice:
 		slice := make([]value, asInt(fr.get(instr.Cap)))
-		tElt := underlyingType(instr.Type()).(*types.Slice).Elt
+		tElt := underlyingType(instr.Type()).(*types.Slice).Elt()
 		for i := range slice {
 			slice[i] = zero(tElt)
 		}
@@ -250,7 +250,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		if instr.Reserve != nil {
 			reserve = asInt(fr.get(instr.Reserve))
 		}
-		fr.env[instr] = makeMap(underlyingType(instr.Type()).(*types.Map).Key, reserve)
+		fr.env[instr] = makeMap(underlyingType(instr.Type()).(*types.Map).Key(), reserve)
 
 	case *ssa.Range:
 		fr.env[instr] = rangeIter(fr.get(instr.X), instr.X.Type())
@@ -344,7 +344,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		var recvV iface
 		if chosen != -1 {
-			recvV.t = underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elt
+			recvV.t = underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elt()
 			if recvOk {
 				// No need to copy since send makes an unaliased copy.
 				recvV.v = recv.Interface().(value)
@@ -385,8 +385,8 @@ func prepareCall(fr *frame, call *ssa.CallCommon) (fn value, args []value) {
 			// Unreachable in well-typed programs.
 			panic(fmt.Sprintf("method set for dynamic type %v does not contain %s", recv.t, id))
 		}
-		_, aptr := recv.v.(*value)                        // actual pointerness
-		_, fptr := m.Signature.Recv.Type.(*types.Pointer) // formal pointerness
+		_, aptr := recv.v.(*value)                            // actual pointerness
+		_, fptr := m.Signature.Recv().Type().(*types.Pointer) // formal pointerness
 		switch {
 		case aptr == fptr:
 			args = append(args, copyVal(recv.v))

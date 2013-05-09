@@ -71,7 +71,7 @@ func emitCompare(f *Function, op token.Token, x, y Value) Value {
 	// even in the case when e's type is an interface.
 	// TODO(adonovan): opt: generalise to x==true, false!=y, etc.
 	if x == vTrue && op == token.EQL {
-		if yt, ok := yt.(*types.Basic); ok && yt.Info&types.IsBoolean != 0 {
+		if yt, ok := yt.(*types.Basic); ok && yt.Info()&types.IsBoolean != 0 {
 			return y
 		}
 	}
@@ -150,7 +150,7 @@ func emitConv(f *Function, val Value, typ types.Type) Value {
 
 		// Convert (non-nil) "untyped" literals to their default type.
 		// TODO(gri): expose types.isUntyped().
-		if t, ok := ut_src.(*types.Basic); ok && t.Info&types.IsUntyped != 0 {
+		if t, ok := ut_src.(*types.Basic); ok && t.Info()&types.IsUntyped != 0 {
 			val = emitConv(f, val, DefaultType(ut_src))
 		}
 
@@ -256,10 +256,10 @@ func emitTypeTest(f *Function, x Value, t types.Type) Value {
 		AssertedType: t,
 		CommaOk:      true,
 	}
-	a.setType(&types.Result{Values: []*types.Var{
-		{Name: "value", Type: t},
+	a.setType(types.NewResult(
+		types.NewVar(nil, "value", t),
 		varOk,
-	}})
+	))
 	return f.emit(a)
 }
 
@@ -273,11 +273,13 @@ func emitTailCall(f *Function, call *Call) {
 	for _, arg := range f.Params[1:] {
 		call.Call.Args = append(call.Call.Args, arg)
 	}
-	nr := len(f.Signature.Results)
+	nr := f.Signature.NumResults()
 	if nr == 1 {
-		call.Type_ = f.Signature.Results[0].Type
+		call.Type_ = f.Signature.Result(0).Type()
 	} else {
-		call.Type_ = &types.Result{Values: f.Signature.Results}
+		var results []*types.Var
+		f.Signature.ForEachResult(func(v *types.Var) { results = append(results, v) })
+		call.Type_ = types.NewResult(results...)
 	}
 	tuple := f.emit(call)
 	var ret Ret
@@ -287,14 +289,16 @@ func emitTailCall(f *Function, call *Call) {
 	case 1:
 		ret.Results = []Value{tuple}
 	default:
-		for i, o := range call.Type().(*types.Result).Values {
-			v := emitExtract(f, tuple, i, o.Type)
+		i := 0
+		call.Type().(*types.Result).ForEachValue(func(o *types.Var) {
+			v := emitExtract(f, tuple, i, o.Type())
 			// TODO(adonovan): in principle, this is required:
 			//   v = emitConv(f, o.Type, f.Signature.Results[i].Type)
 			// but in practice emitTailCall is only used when
 			// the types exactly match.
 			ret.Results = append(ret.Results, v)
-		}
+			i++
+		})
 	}
 	f.emit(&ret)
 	f.currentBlock = nil

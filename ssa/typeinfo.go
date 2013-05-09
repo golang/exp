@@ -32,7 +32,7 @@ func (info *TypeInfo) TypeOf(e ast.Expr) types.Type {
 	// TODO(gri): This is a typechecker bug.  When fixed,
 	// eliminate this case and panic.
 	if id, ok := e.(*ast.Ident); ok {
-		return info.ObjectOf(id).GetType()
+		return info.ObjectOf(id).Type()
 	}
 	panic("no type for expression")
 }
@@ -83,7 +83,7 @@ func (info *TypeInfo) IsType(e ast.Expr) bool {
 func (info *TypeInfo) isPackageRef(sel *ast.SelectorExpr) types.Object {
 	if id, ok := sel.X.(*ast.Ident); ok {
 		if obj := info.ObjectOf(id); objKind(obj) == ast.Pkg {
-			return obj.(*types.Package).Scope.Lookup(sel.Sel.Name)
+			return obj.(*types.Package).Scope().Lookup(sel.Sel.Name)
 		}
 	}
 	return nil
@@ -115,22 +115,22 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 			t1 = info.TypeOf(e.Args[1]) // no conversion
 		} else {
 			// append([]T, ...T) []T
-			t1 = underlyingType(t0).(*types.Slice).Elt
+			t1 = underlyingType(t0).(*types.Slice).Elt()
 			isVariadic = true
 		}
 		params = append(params,
-			&types.Var{Type: t0},
-			&types.Var{Type: t1})
+			types.NewVar(nil, "", t0),
+			types.NewVar(nil, "", t1))
 
 	case "print", "println": // print{,ln}(any, ...interface{})
 		isVariadic = true
 		// Note, arg0 may have any type, not necessarily tEface.
 		params = append(params,
-			&types.Var{Type: info.TypeOf(e.Args[0])},
-			&types.Var{Type: tEface})
+			types.NewVar(nil, "", info.TypeOf(e.Args[0])),
+			types.NewVar(nil, "", tEface))
 
 	case "close":
-		params = append(params, &types.Var{Type: info.TypeOf(e.Args[0])})
+		params = append(params, types.NewVar(nil, "", info.TypeOf(e.Args[0])))
 
 	case "copy":
 		// copy([]T, []T) int
@@ -143,24 +143,24 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 		} else {
 			panic("cannot infer types in call to copy()")
 		}
-		stvar := &types.Var{Type: st}
+		stvar := types.NewVar(nil, "", st)
 		params = append(params, stvar, stvar)
 
 	case "delete":
 		// delete(map[K]V, K)
 		tmap := info.TypeOf(e.Args[0])
-		tkey := underlyingType(tmap).(*types.Map).Key
+		tkey := underlyingType(tmap).(*types.Map).Key()
 		params = append(params,
-			&types.Var{Type: tmap},
-			&types.Var{Type: tkey})
+			types.NewVar(nil, "", tmap),
+			types.NewVar(nil, "", tkey))
 
 	case "len", "cap":
-		params = append(params, &types.Var{Type: info.TypeOf(e.Args[0])})
+		params = append(params, types.NewVar(nil, "", info.TypeOf(e.Args[0])))
 
 	case "real", "imag":
 		// Reverse conversion to "complex" case below.
 		var argType types.Type
-		switch info.TypeOf(e).(*types.Basic).Kind {
+		switch info.TypeOf(e).(*types.Basic).Kind() {
 		case types.UntypedFloat:
 			argType = types.Typ[types.UntypedComplex]
 		case types.Float64:
@@ -170,11 +170,11 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 		default:
 			unreachable()
 		}
-		params = append(params, &types.Var{Type: argType})
+		params = append(params, types.NewVar(nil, "", argType))
 
 	case "complex":
 		var argType types.Type
-		switch info.TypeOf(e).(*types.Basic).Kind {
+		switch info.TypeOf(e).(*types.Basic).Kind() {
 		case types.UntypedComplex:
 			argType = types.Typ[types.UntypedFloat]
 		case types.Complex128:
@@ -184,11 +184,11 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 		default:
 			unreachable()
 		}
-		v := &types.Var{Type: argType}
+		v := types.NewVar(nil, "", argType)
 		params = append(params, v, v)
 
 	case "panic":
-		params = append(params, &types.Var{Type: tEface})
+		params = append(params, types.NewVar(nil, "", tEface))
 
 	case "recover":
 		// no params
@@ -197,5 +197,5 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 		panic("unknown builtin: " + builtin)
 	}
 
-	return &types.Signature{Params: params, IsVariadic: isVariadic}
+	return types.NewSignature(nil, params, nil, isVariadic)
 }

@@ -70,7 +70,7 @@ func (p *anonFieldPath) isIndirect() bool {
 // type's method-set.
 //
 type candidate struct {
-	method   *types.Method  // method object of abstract or concrete type
+	method   *types.Func    // method object of abstract or concrete type
 	concrete *Function      // actual method (iff concrete)
 	path     *anonFieldPath // desugared selector path
 }
@@ -82,12 +82,12 @@ func (c candidate) String() string {
 	for p := c.path; p != nil; p = p.tail {
 		s = "." + p.field.Name + s
 	}
-	return "@" + s + "." + c.method.Name
+	return "@" + s + "." + c.method.Name()
 }
 
 // ptrRecv returns true if this candidate has a pointer receiver.
 func (c candidate) ptrRecv() bool {
-	return c.concrete != nil && isPointer(c.concrete.Signature.Recv.Type)
+	return c.concrete != nil && isPointer(c.concrete.Signature.Recv().Type())
 }
 
 // MethodSet returns the method set for type typ,
@@ -148,22 +148,23 @@ func buildMethodSet(prog *Program, typ types.Type) MethodSet {
 			}
 			t = deref(t)
 
-			if nt, ok := t.(*types.NamedType); ok {
-				for _, meth := range nt.Methods {
-					addCandidate(nextcands, IdFromQualifiedName(meth.QualifiedName), meth, prog.concreteMethods[meth], node)
-				}
-				t = nt.Underlying
+			if nt, ok := t.(*types.Named); ok {
+				nt.ForEachMethod(func(m *types.Func) {
+					addCandidate(nextcands, MakeId(m.Name(), m.Pkg()), m, prog.concreteMethods[m], node)
+				})
+				t = nt.Underlying()
 			}
 
 			switch t := t.(type) {
 			case *types.Interface:
-				for _, meth := range t.Methods {
-					addCandidate(nextcands, IdFromQualifiedName(meth.QualifiedName), meth, nil, node)
-				}
+				t.ForEachMethod(func(m *types.Func) {
+					addCandidate(nextcands, MakeId(m.Name(), m.Pkg()), m, nil, node)
+				})
 
 			case *types.Struct:
-				for i, f := range t.Fields {
-					nextcands[IdFromQualifiedName(f.QualifiedName)] = nil // a field: block id
+				for i, n := 0, t.NumFields(); i < n; i++ {
+					f := t.Field(i)
+					nextcands[MakeId(f.Name, f.Pkg)] = nil // a field: block id
 					// Queue up anonymous fields for next iteration.
 					// Break cycles to ensure termination.
 					if f.IsAnonymous && !node.contains(f) {
@@ -226,7 +227,7 @@ func buildMethodSet(prog *Program, typ types.Type) MethodSet {
 // If m[id] already exists (whether nil or not), m[id] is set to nil.
 // If method denotes a concrete method, concrete is its implementation.
 //
-func addCandidate(m map[Id]*candidate, id Id, method *types.Method, concrete *Function, node *anonFieldPath) {
+func addCandidate(m map[Id]*candidate, id Id, method *types.Func, concrete *Function, node *anonFieldPath) {
 	prev, found := m[id]
 	switch {
 	case prev != nil:
@@ -259,20 +260,23 @@ func addCandidate(m map[Id]*candidate, id Id, method *types.Method, concrete *Fu
 // method.
 //
 func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function {
-	sig := *cand.method.Type // make a copy, sharing underlying Values
-	sig.Recv = &types.Var{Name: "recv", Type: typ}
+	old := cand.method.Type().(*types.Signature)
+	var params, results []*types.Var
+	old.ForEachParam(func(v *types.Var) { params = append(params, v) })
+	old.ForEachResult(func(v *types.Var) { results = append(results, v) })
+	sig := types.NewSignature(types.NewVar(nil, "recv", typ), params, results, old.IsVariadic())
 
 	if prog.mode&LogSource != 0 {
 		defer logStack("makeBridgeMethod %s, %s, type %s", typ, cand, &sig)()
 	}
 
 	fn := &Function{
-		Name_:     cand.method.Name,
-		Signature: &sig,
+		Name_:     cand.method.Name(),
+		Signature: sig,
 		Prog:      prog,
 	}
 	fn.startBody()
-	fn.addSpilledParam(sig.Recv)
+	fn.addSpilledParam(sig.Recv())
 	createParams(fn)
 
 	// Each bridge method performs a sequence of selections,
@@ -322,15 +326,17 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 // createParams creates parameters for bridge method fn based on its Signature.
 func createParams(fn *Function) {
 	var last *Parameter
-	for i, p := range fn.Signature.Params {
-		name := p.Name
+	i := 0
+	fn.Signature.ForEachParam(func(p *types.Var) {
+		name := p.Name()
 		if name == "" {
 			name = fmt.Sprintf("arg%d", i)
 		}
-		last = fn.addParam(name, p.Type)
-	}
-	if fn.Signature.IsVariadic {
-		last.Type_ = &types.Slice{Elt: last.Type_}
+		last = fn.addParam(name, p.Type())
+		i++
+	})
+	if fn.Signature.IsVariadic() {
+		last.Type_ = types.NewSlice(last.Type_)
 	}
 }
 
@@ -366,10 +372,10 @@ func makeImethodThunk(prog *Program, typ types.Type, id Id) *Function {
 		defer logStack("makeImethodThunk %s.%s", typ, id)()
 	}
 	itf := underlyingType(typ).(*types.Interface)
-	index, meth := methodIndex(itf, itf.Methods, id)
-	sig := *meth.Type // copy; shared Values
+	index, meth := methodIndex(itf, id)
+	sig := *meth.Type().(*types.Signature) // copy; shared Values
 	fn := &Function{
-		Name_:     meth.Name,
+		Name_:     meth.Name(),
 		Signature: &sig,
 		Prog:      prog,
 	}
@@ -398,41 +404,45 @@ func makeImethodThunk(prog *Program, typ types.Type, id Id) *Function {
 //
 func findPromotedField(st *types.Struct, id Id) (*anonFieldPath, int) {
 	// visited records the types that have been searched already.
-	// Invariant: keys are all *types.NamedType.
+	// Invariant: keys are all *types.Named.
 	// (types.Type is not a sound map key in general.)
 	visited := make(map[types.Type]bool)
 
 	var list, next []*anonFieldPath
-	for i, f := range st.Fields {
+	i := 0
+	st.ForEachField(func(f *types.Field) {
 		if f.IsAnonymous {
 			list = append(list, &anonFieldPath{nil, i, f})
 		}
-	}
+		i++
+	})
 
 	// Search the current level if there is any work to do and collect
 	// embedded types of the next lower level in the next list.
 	for {
 		// look for name in all types at this level
 		for _, node := range list {
-			typ := deref(node.field.Type).(*types.NamedType)
+			typ := deref(node.field.Type).(*types.Named)
 			if visited[typ] {
 				continue
 			}
 			visited[typ] = true
 
-			switch typ := typ.Underlying.(type) {
+			switch typ := typ.Underlying().(type) {
 			case *types.Struct:
-				for i, f := range typ.Fields {
-					if IdFromQualifiedName(f.QualifiedName) == id {
+				for i, n := 0, typ.NumFields(); i < n; i++ {
+					f := typ.Field(i)
+					if MakeId(f.Name, f.Pkg) == id {
 						return node, i
 					}
 				}
-				for i, f := range typ.Fields {
+				i := 0
+				typ.ForEachField(func(f *types.Field) {
 					if f.IsAnonymous {
 						next = append(next, &anonFieldPath{node, i, f})
 					}
-				}
-
+					i++
+				})
 			}
 		}
 

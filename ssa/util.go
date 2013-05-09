@@ -47,8 +47,8 @@ func isBlankIdent(e ast.Expr) bool {
 // TODO(gri): this is a copy of go/types.underlying; export that function.
 //
 func underlyingType(typ types.Type) types.Type {
-	if typ, ok := typ.(*types.NamedType); ok {
-		return typ.Underlying // underlying types are never NamedTypes
+	if typ, ok := typ.(*types.Named); ok {
+		return typ.Underlying() // underlying types are never NamedTypes
 	}
 	if typ == nil {
 		panic("underlyingType(nil)")
@@ -58,8 +58,8 @@ func underlyingType(typ types.Type) types.Type {
 
 // isPointer returns true for types whose underlying type is a pointer.
 func isPointer(typ types.Type) bool {
-	if nt, ok := typ.(*types.NamedType); ok {
-		typ = nt.Underlying
+	if nt, ok := typ.(*types.Named); ok {
+		typ = nt.Underlying()
 	}
 	_, ok := typ.(*types.Pointer)
 	return ok
@@ -67,7 +67,7 @@ func isPointer(typ types.Type) bool {
 
 // pointer(typ) returns the type that is a pointer to typ.
 func pointer(typ types.Type) *types.Pointer {
-	return &types.Pointer{Base: typ}
+	return types.NewPointer(typ)
 }
 
 // indirect(typ) assumes that typ is a pointer type,
@@ -76,7 +76,7 @@ func pointer(typ types.Type) *types.Pointer {
 //
 func indirectType(ptr types.Type) types.Type {
 	if v, ok := underlyingType(ptr).(*types.Pointer); ok {
-		return v.Base
+		return v.Elt()
 	}
 	// When debugging it is convenient to comment out this line
 	// and let it continue to print the (illegal) SSA form.
@@ -87,19 +87,20 @@ func indirectType(ptr types.Type) types.Type {
 // deref returns a pointer's base type; otherwise it returns typ.
 func deref(typ types.Type) types.Type {
 	if typ, ok := underlyingType(typ).(*types.Pointer); ok {
-		return typ.Base
+		return typ.Elt()
 	}
 	return typ
 }
 
 // methodIndex returns the method (and its index) named id within the
-// method table methods of named or interface type typ.  If not found,
+// method table of named or interface type typ.  If not found,
 // panic ensues.
 //
-func methodIndex(typ types.Type, methods []*types.Method, id Id) (i int, m *types.Method) {
-	for i, m = range methods {
-		if IdFromQualifiedName(m.QualifiedName) == id {
-			return
+func methodIndex(typ types.Type, id Id) (int, *types.Func) {
+	for i, n := 0, typ.NumMethods(); i < n; i++ {
+		m := typ.Method(i)
+		if MakeId(m.Name(), m.Pkg()) == id {
+			return i, m
 		}
 	}
 	panic(fmt.Sprint("method not found: ", id, " in interface ", typ))
@@ -109,15 +110,17 @@ func methodIndex(typ types.Type, methods []*types.Method, id Id) (i int, m *type
 // i.e.  x's methods are a subset of y's.
 //
 func isSuperinterface(x, y *types.Interface) bool {
-	if len(y.Methods) < len(x.Methods) {
+	if y.NumMethods() < x.NumMethods() {
 		return false
 	}
 	// TODO(adonovan): opt: this is quadratic.
 outer:
-	for _, xm := range x.Methods {
-		for _, ym := range y.Methods {
-			if IdFromQualifiedName(xm.QualifiedName) == IdFromQualifiedName(ym.QualifiedName) {
-				if !types.IsIdentical(xm.Type, ym.Type) {
+	for i, n := 0, x.NumMethods(); i < n; i++ {
+		xm := x.Method(i)
+		for j, m := 0, y.NumMethods(); j < m; j++ {
+			ym := y.Method(j)
+			if MakeId(xm.Name(), xm.Pkg()) == MakeId(ym.Name(), ym.Pkg()) {
+				if !types.IsIdentical(xm.Type(), ym.Type()) {
 					return false // common name but conflicting types
 				}
 				continue outer
@@ -152,9 +155,9 @@ func objKind(obj types.Object) ast.ObjKind {
 func canHaveConcreteMethods(typ types.Type, allowPtr bool) bool {
 	switch typ := typ.(type) {
 	case *types.Pointer:
-		return allowPtr && canHaveConcreteMethods(typ.Base, false)
-	case *types.NamedType:
-		switch typ.Underlying.(type) {
+		return allowPtr && canHaveConcreteMethods(typ.Elt(), false)
+	case *types.Named:
+		switch typ.Underlying().(type) {
 		case *types.Pointer, *types.Interface:
 			return false
 		}
@@ -176,7 +179,7 @@ func canHaveConcreteMethods(typ types.Type, allowPtr bool) bool {
 func DefaultType(typ types.Type) types.Type {
 	if t, ok := typ.(*types.Basic); ok {
 		k := types.Invalid
-		switch t.Kind {
+		switch t.Kind() {
 		// case UntypedNil:
 		//      There is no default type for nil. For a good error message,
 		//      catch this case before calling this function.
@@ -201,7 +204,9 @@ func DefaultType(typ types.Type) types.Type {
 // makeId returns the Id (name, pkg) if the name is exported or
 // (name, nil) otherwise.
 //
-func makeId(name string, pkg *types.Package) (id Id) {
+// Exported to exp/ssa/interp.
+//
+func MakeId(name string, pkg *types.Package) (id Id) {
 	id.Name = name
 	if !ast.IsExported(name) {
 		id.Pkg = pkg
@@ -211,15 +216,6 @@ func makeId(name string, pkg *types.Package) (id Id) {
 		// }
 	}
 	return
-}
-
-// IdFromQualifiedName returns the Id (qn.Name, qn.Pkg) if qn is an
-// exported name or (qn.Name, nil) otherwise.
-//
-// Exported to exp/ssa/interp.
-//
-func IdFromQualifiedName(qn types.QualifiedName) Id {
-	return makeId(qn.Name, qn.Pkg)
 }
 
 type ids []Id // a sortable slice of Id

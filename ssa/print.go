@@ -120,7 +120,7 @@ func printCall(v *CallCommon, prefix string, instr Instruction) string {
 	if !v.IsInvoke() {
 		b.WriteString(relName(v.Func, instr))
 	} else {
-		name := underlyingType(v.Recv.Type()).(*types.Interface).Methods[v.Method].Name
+		name := underlyingType(v.Recv.Type()).(*types.Interface).Method(v.Method).Name
 		fmt.Fprintf(&b, "invoke %s.%s [#%d]", relName(v.Recv, instr), name, v.Method)
 	}
 	b.WriteString("(")
@@ -221,21 +221,21 @@ func (v *MakeChan) String() string {
 }
 
 func (v *FieldAddr) String() string {
-	fields := underlyingType(indirectType(v.X.Type())).(*types.Struct).Fields
+	st := underlyingType(indirectType(v.X.Type())).(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
-	if v.Field >= 0 && v.Field < len(fields) {
-		name = fields[v.Field].Name
+	if 0 <= v.Field && v.Field < st.NumFields() {
+		name = st.Field(v.Field).Name
 	}
 	return fmt.Sprintf("&%s.%s [#%d]", relName(v.X, v), name, v.Field)
 }
 
 func (v *Field) String() string {
-	fields := underlyingType(v.X.Type()).(*types.Struct).Fields
+	st := underlyingType(v.X.Type()).(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
-	if v.Field >= 0 && v.Field < len(fields) {
-		name = fields[v.Field].Name
+	if 0 <= v.Field && v.Field < st.NumFields() {
+		name = st.Field(v.Field).Name
 	}
 	return fmt.Sprintf("%s.%s [#%d]", relName(v.X, v), name, v.Field)
 }
@@ -352,7 +352,7 @@ func (s *MapUpdate) String() string {
 }
 
 func (p *Package) String() string {
-	return "Package " + p.Types.Path
+	return "Package " + p.Types.Path()
 }
 
 func (p *Package) DumpTo(w io.Writer) {
@@ -377,7 +377,7 @@ func (p *Package) DumpTo(w io.Writer) {
 			fmt.Fprintf(w, "  func  %-*s %s\n", maxname, name, mem.Type())
 
 		case *Type:
-			fmt.Fprintf(w, "  type  %-*s %s\n", maxname, name, mem.NamedType.Underlying)
+			fmt.Fprintf(w, "  type  %-*s %s\n", maxname, name, mem.NamedType.Underlying())
 			// We display only PtrMethods since its keys
 			// are a superset of Methods' keys, though the
 			// methods themselves may differ,
