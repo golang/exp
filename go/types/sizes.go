@@ -21,9 +21,9 @@ func (ctxt *Context) offsetsof(s *Struct) []int64 {
 	if offsets == nil {
 		// compute offsets on demand
 		if f := ctxt.Offsetsof; f != nil {
-			offsets = f(s.Fields)
+			offsets = f(s.fields)
 			// sanity checks
-			if len(offsets) != len(s.Fields) {
+			if len(offsets) != len(s.fields) {
 				panic("Context.Offsetsof returned the wrong number of offsets")
 			}
 			for _, o := range offsets {
@@ -32,7 +32,7 @@ func (ctxt *Context) offsetsof(s *Struct) []int64 {
 				}
 			}
 		} else {
-			offsets = DefaultOffsetsof(s.Fields)
+			offsets = DefaultOffsetsof(s.fields)
 		}
 		s.offsets = offsets
 	}
@@ -50,7 +50,7 @@ func (ctxt *Context) offsetof(typ Type, index []int) int64 {
 			return -1
 		}
 		o += ctxt.offsetsof(s)[i]
-		typ = s.Fields[i].Type
+		typ = s.fields[i].Type
 	}
 	return o
 }
@@ -78,13 +78,13 @@ func DefaultAlignof(typ Type) int64 {
 	case *Array:
 		// spec: "For a variable x of array type: unsafe.Alignof(x)
 		// is the same as unsafe.Alignof(x[0]), but at least 1."
-		return DefaultAlignof(t.Elt)
+		return DefaultAlignof(t.elt)
 	case *Struct:
 		// spec: "For a variable x of struct type: unsafe.Alignof(x)
 		// is the largest of the values unsafe.Alignof(x.f) for each
 		// field f of x, but at least 1."
 		max := int64(1)
-		for _, f := range t.Fields {
+		for _, f := range t.fields {
 			if a := DefaultAlignof(f.Type); a > max {
 				max = a
 			}
@@ -134,27 +134,27 @@ func DefaultSizeof(typ Type) int64 {
 		if s := t.size; s > 0 {
 			return s
 		}
-		if t.Kind == String {
+		if t.kind == String {
 			return DefaultPtrSize * 2
 		}
 	case *Array:
-		a := DefaultAlignof(t.Elt)
-		s := DefaultSizeof(t.Elt)
-		return align(s, a) * t.Len // may be 0
+		a := DefaultAlignof(t.elt)
+		s := DefaultSizeof(t.elt)
+		return align(s, a) * t.len // may be 0
 	case *Slice:
 		return DefaultPtrSize * 3
 	case *Struct:
-		n := len(t.Fields)
+		n := len(t.fields)
 		if n == 0 {
 			return 0
 		}
 		offsets := t.offsets
 		if t.offsets == nil {
 			// compute offsets on demand
-			offsets = DefaultOffsetsof(t.Fields)
+			offsets = DefaultOffsetsof(t.fields)
 			t.offsets = offsets
 		}
-		return offsets[n-1] + DefaultSizeof(t.Fields[n-1].Type)
+		return offsets[n-1] + DefaultSizeof(t.fields[n-1].Type)
 	case *Signature:
 		return DefaultPtrSize * 2
 	}

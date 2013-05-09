@@ -155,8 +155,8 @@ func (x *operand) isAssignable(ctxt *Context, T Type) bool {
 	// x is a bidirectional channel value, T is a channel
 	// type, x's type V and T have identical element types,
 	// and at least one of V or T is not a named type
-	if Vc, ok := Vu.(*Chan); ok && Vc.Dir == ast.SEND|ast.RECV {
-		if Tc, ok := Tu.(*Chan); ok && IsIdentical(Vc.Elt, Tc.Elt) {
+	if Vc, ok := Vu.(*Chan); ok && Vc.dir == ast.SEND|ast.RECV {
+		if Tc, ok := Tu.(*Chan); ok && IsIdentical(Vc.elt, Tc.elt) {
 			return !isNamed(V) || !isNamed(T)
 		}
 	}
@@ -166,7 +166,7 @@ func (x *operand) isAssignable(ctxt *Context, T Type) bool {
 	if x.isNil() {
 		switch t := Tu.(type) {
 		case *Basic:
-			if t.Kind == UnsafePointer {
+			if t.kind == UnsafePointer {
 				return true
 			}
 		case *Pointer, *Signature, *Slice, *Map, *Chan, *Interface:
@@ -182,15 +182,15 @@ func (x *operand) isAssignable(ctxt *Context, T Type) bool {
 		switch t := Tu.(type) {
 		case *Basic:
 			if x.mode == constant {
-				return isRepresentableConst(x.val, ctxt, t.Kind)
+				return isRepresentableConst(x.val, ctxt, t.kind)
 			}
 			// The result of a comparison is an untyped boolean,
 			// but may not be a constant.
 			if Vb, _ := Vu.(*Basic); Vb != nil {
-				return Vb.Kind == UntypedBool && isBoolean(Tu)
+				return Vb.kind == UntypedBool && isBoolean(Tu)
 			}
 		case *Interface:
-			return x.isNil() || len(t.Methods) == 0
+			return x.isNil() || t.IsEmpty()
 		case *Pointer, *Signature, *Slice, *Map, *Chan:
 			return x.isNil()
 		}
@@ -214,7 +214,7 @@ type lookupResult struct {
 }
 
 type embeddedType struct {
-	typ       *NamedType
+	typ       *Named
 	index     []int // field index sequence
 	multiples bool  // if set, typ is embedded multiple times at the same level
 }
@@ -226,7 +226,7 @@ type embeddedType struct {
 //
 func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res lookupResult) {
 	// visited records the types that have been searched already.
-	visited := make(map[*NamedType]bool)
+	visited := make(map[*Named]bool)
 
 	// embedded types of the next lower level
 	var next []embeddedType
@@ -264,19 +264,18 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 			visited[typ] = true
 
 			// look for a matching attached method
-			for _, m := range typ.Methods {
-				if name.IsSame(m.QualifiedName) {
-					assert(m.Type != nil)
-					if !potentialMatch(e.multiples, value, m.Type) {
-						return // name collision
-					}
+			if obj := typ.methods.Lookup(name.Pkg, name.Name); obj != nil {
+				m := obj.(*Func)
+				assert(m.typ != nil)
+				if !potentialMatch(e.multiples, value, m.typ) {
+					return // name collision
 				}
 			}
 
-			switch t := typ.Underlying.(type) {
+			switch t := typ.underlying.(type) {
 			case *Struct:
 				// look for a matching field and collect embedded types
-				for i, f := range t.Fields {
+				for i, f := range t.fields {
 					if name.IsSame(f.QualifiedName) {
 						assert(f.Type != nil)
 						if !potentialMatch(e.multiples, variable, f.Type) {
@@ -300,7 +299,7 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 					if f.IsAnonymous && res.mode == invalid {
 						// Ignore embedded basic types - only user-defined
 						// named types can have methods or have struct fields.
-						if t, _ := deref(f.Type).(*NamedType); t != nil {
+						if t, _ := deref(f.Type).(*Named); t != nil {
 							var index []int
 							index = append(index, e.index...) // copy e.index
 							index = append(index, i)
@@ -311,12 +310,11 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 
 			case *Interface:
 				// look for a matching method
-				for _, m := range t.Methods {
-					if name.IsSame(m.QualifiedName) {
-						assert(m.Type != nil)
-						if !potentialMatch(e.multiples, value, m.Type) {
-							return // name collision
-						}
+				if obj := t.methods.Lookup(name.Pkg, name.Name); obj != nil {
+					m := obj.(*Func)
+					assert(m.typ != nil)
+					if !potentialMatch(e.multiples, value, m.typ) {
+						return // name collision
 					}
 				}
 			}
@@ -349,7 +347,7 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 	return
 }
 
-func findType(list []embeddedType, typ *NamedType) *embeddedType {
+func findType(list []embeddedType, typ *Named) *embeddedType {
 	for i := range list {
 		if p := &list[i]; p.typ == typ {
 			return p
@@ -361,20 +359,19 @@ func findType(list []embeddedType, typ *NamedType) *embeddedType {
 func lookupField(typ Type, name QualifiedName) lookupResult {
 	typ = deref(typ)
 
-	if t, ok := typ.(*NamedType); ok {
-		for _, m := range t.Methods {
-			if name.IsSame(m.QualifiedName) {
-				assert(m.Type != nil)
-				return lookupResult{value, m.Type, nil}
-			}
+	if t, ok := typ.(*Named); ok {
+		if obj := t.methods.Lookup(name.Pkg, name.Name); obj != nil {
+			m := obj.(*Func)
+			assert(m.typ != nil)
+			return lookupResult{value, m.typ, nil}
 		}
-		typ = t.Underlying
+		typ = t.underlying
 	}
 
 	switch t := typ.(type) {
 	case *Struct:
 		var next []embeddedType
-		for i, f := range t.Fields {
+		for i, f := range t.fields {
 			if name.IsSame(f.QualifiedName) {
 				return lookupResult{variable, f.Type, []int{i}}
 			}
@@ -384,7 +381,7 @@ func lookupField(typ Type, name QualifiedName) lookupResult {
 				// ignore it.
 				// Ignore embedded basic types - only user-defined
 				// named types can have methods or have struct fields.
-				if t, _ := deref(f.Type).(*NamedType); t != nil {
+				if t, _ := deref(f.Type).(*Named); t != nil {
 					next = append(next, embeddedType{t, []int{i}, false})
 				}
 			}
@@ -394,10 +391,10 @@ func lookupField(typ Type, name QualifiedName) lookupResult {
 		}
 
 	case *Interface:
-		for _, m := range t.Methods {
-			if name.IsSame(m.QualifiedName) {
-				return lookupResult{value, m.Type, nil}
-			}
+		if obj := t.methods.Lookup(name.Pkg, name.Name); obj != nil {
+			m := obj.(*Func)
+			assert(m.typ != nil)
+			return lookupResult{value, m.typ, nil}
 		}
 	}
 

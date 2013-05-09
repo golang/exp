@@ -189,7 +189,7 @@ func checkFiles(t *testing.T, testname string, testfiles []string) {
 	// typecheck and collect typechecker errors
 	var ctxt Context
 	ctxt.Error = func(err error) { errlist = append(errlist, err) }
-	ctxt.Check(fset, files)
+	ctxt.Check(testname, fset, files...)
 
 	if *listErrors {
 		t.Errorf("--- %s: %d errors found:", testname, len(errlist))
@@ -224,8 +224,8 @@ func TestCheck(t *testing.T) {
 	if !testBuiltinsDeclared {
 		testBuiltinsDeclared = true
 		// Pkg == nil for Universe objects
-		def(&Func{Name: "assert", Type: &builtin{_Assert, "assert", 1, false, true}})
-		def(&Func{Name: "trace", Type: &builtin{_Trace, "trace", 0, true, true}})
+		def(&Func{name: "assert", typ: &builtin{aType{}, _Assert, "assert", 1, false, true}})
+		def(&Func{name: "trace", typ: &builtin{aType{}, _Trace, "trace", 0, true, true}})
 	}
 
 	// For easy debugging w/o changing the testing code,
