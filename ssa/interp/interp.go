@@ -160,11 +160,14 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		fn, args := prepareCall(fr, &instr.Call)
 		fr.env[instr] = call(fr.i, fr, instr.Call.Pos, fn, args)
 
-	case *ssa.Conv:
-		fr.env[instr] = conv(instr.Type(), instr.X.Type(), fr.get(instr.X))
-
 	case *ssa.ChangeInterface:
 		fr.env[instr] = fr.get(instr.X) // (can't fail)
+
+	case *ssa.ChangeType:
+		fr.env[instr] = fr.get(instr.X) // (can't fail)
+
+	case *ssa.Convert:
+		fr.env[instr] = conv(instr.Type(), instr.X.Type(), fr.get(instr.X))
 
 	case *ssa.MakeInterface:
 		fr.env[instr] = iface{t: instr.X.Type(), v: fr.get(instr.X)}

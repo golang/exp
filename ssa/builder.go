@@ -705,8 +705,20 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 	case *ast.CallExpr:
 		typ := fn.Pkg.TypeOf(e)
 		if fn.Pkg.IsType(e.Fun) {
-			// Type conversion, e.g. string(x) or big.Int(x)
-			return emitConv(fn, b.expr(fn, e.Args[0]), typ)
+			// Explicit type conversion, e.g. string(x) or big.Int(x)
+			x := b.expr(fn, e.Args[0])
+			y := emitConv(fn, x, typ)
+			if y != x {
+				switch y := y.(type) {
+				case *Convert:
+					y.Pos = e.Lparen
+				case *ChangeType:
+					y.Pos = e.Lparen
+				case *MakeInterface:
+					y.Pos = e.Lparen
+				}
+			}
+			return y
 		}
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := e.Fun.(*ast.Ident); ok {
@@ -2329,7 +2341,6 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 
 	case *types.Func:
 		var fs *funcSyntax
-		var pos token.Pos
 		if decl, ok := syntax.(*ast.FuncDecl); ok {
 			fs = &funcSyntax{
 				recvField:    decl.Recv,
@@ -2337,16 +2348,12 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 				resultFields: decl.Type.Results,
 				body:         decl.Body,
 			}
-			// TODO(gri): make GcImported types.Object
-			// implement the full object interface
-			// including Pos().  Or at least not crash.
-			pos = obj.Pos()
 		}
 		sig := obj.Type().(*types.Signature)
 		fn := &Function{
 			Name_:     name,
 			Signature: sig,
-			Pos:       pos,
+			Pos:       obj.Pos(), // (iff syntax)
 			Pkg:       pkg,
 			Prog:      b.Prog,
 			syntax:    fs,

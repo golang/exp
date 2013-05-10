@@ -73,7 +73,7 @@ func (v *Function) String() string {
 
 // FullName returns g's package-qualified name.
 func (g *Global) FullName() string {
-	return fmt.Sprintf("%s.%s", g.Pkg.Types.Path, g.Name_)
+	return fmt.Sprintf("%s.%s", g.Pkg.Types.Path(), g.Name_)
 }
 
 // Instruction.String()
@@ -145,6 +145,10 @@ func (v *Call) String() string {
 	return printCall(&v.Call, "", v)
 }
 
+func (v *ChangeType) String() string {
+	return fmt.Sprintf("changetype %s <- %s (%s)", v.Type(), v.X.Type(), relName(v.X, v))
+}
+
 func (v *BinOp) String() string {
 	return fmt.Sprintf("%s %s %s", relName(v.X, v), v.Op.String(), relName(v.Y, v))
 }
@@ -153,7 +157,7 @@ func (v *UnOp) String() string {
 	return fmt.Sprintf("%s%s%s", v.Op, relName(v.X, v), commaOk(v.CommaOk))
 }
 
-func (v *Conv) String() string {
+func (v *Convert) String() string {
 	return fmt.Sprintf("convert %s <- %s (%s)", v.Type(), v.X.Type(), relName(v.X, v))
 }
 

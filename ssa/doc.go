@@ -59,32 +59,31 @@
 //
 //      const message = "Hello, World!"
 //
-//      func hello() {
+//      func main() {
 //              fmt.Println(message)
 //      }
 //
 // The SSA Builder creates a *Program containing a main *Package such
 // as this:
 //
-//      Package(Name: "main")
+//      Package (Name: "main")
 //        Members:
-//          "message":          *Literal (Type: untyped string, Value: "Hello, World!")
+//          "message":          *Constant (Type: untyped string, Value: "Hello, World!")
 //          "init·guard":       *Global (Type: *bool)
-//          "hello":            *Function (Type: func())
+//          "main":             *Function (Type: func())
 //        Init:                 *Function (Type: func())
 //
-// The printed representation of the function main.hello is shown
+// The printed representation of the function main.main is shown
 // below.  Within the function listing, the name of each BasicBlock
 // such as ".0.entry" is printed left-aligned, followed by the block's
-// instructions, i.e. implementations of Instruction.
+// Instructions.
 // For each instruction that defines an SSA virtual register
 // (i.e. implements Value), the type of that value is shown in the
 // right column.
 //
-//      # Name: main.hello
+//      # Name: main.main
 //      # Declared at hello.go:7:6
-//      # Type: func()
-//      func hello():
+//      func main():
 //      .0.entry:
 //              t0 = new [1]interface{}                                                 *[1]interface{}
 //              t1 = &t0[0:untyped integer]                                             *interface{}
@@ -103,8 +102,8 @@
 // parameters and control flow at the least.
 //
 // TODO(adonovan): Consider how token.Pos source location information
-// should be made available generally.  Currently it is only present in
-// Package, Function and CallCommon.
+// should be made available generally.  Currently it is only present
+// in package Members and selected Instructions.
 //
 // TODO(adonovan): Consider the exceptional control-flow implications
 // of defer and recover().
@@ -112,4 +111,12 @@
 // TODO(adonovan): build tables/functions that relate source variables
 // to SSA variables to assist user interfaces that make queries about
 // specific source entities.
+//
+// TODO(adonovan): it is practically impossible for clients to
+// construct well-formed SSA functions/packages/programs directly; we
+// assume this is the job of the ssa.Builder alone.
+// Nonetheless it may be wise to give clients a little more
+// flexibility.  For example, analysis tools may wish to construct a
+// fake ssa.Function for the root of the callgraph, a fake "reflect"
+// package, etc.
 package ssa

@@ -3,7 +3,6 @@ package interp
 import (
 	"fmt"
 	"go/token"
-	"os"
 	"runtime"
 	"strings"
 	"unsafe"
@@ -1089,31 +1088,24 @@ func widen(x value) value {
 }
 
 // conv converts the value x of type t_src to type t_dst and returns
-// the result.  Possible cases are described with the ssa.Conv
-// operator.  Panics if the dynamic conversion fails.
+// the result.
+// Possible cases are described with the ssa.Convert operator.
 //
 func conv(t_dst, t_src types.Type, x value) value {
 	ut_src := underlyingType(t_src)
 	ut_dst := underlyingType(t_dst)
 
-	// Same underlying types?
-	// TODO(adonovan): consider a dedicated ssa.ChangeType instruction.
-	// TODO(adonovan): fix: what about channels of different direction?
-	if types.IsIdentical(ut_dst, ut_src) {
-		return x
-	}
-
 	// Destination type is not an "untyped" type.
 	if b, ok := ut_dst.(*types.Basic); ok && b.Info()&types.IsUntyped != 0 {
-		panic("conversion to 'untyped' type: " + b.String())
+		panic("oops: conversion to 'untyped' type: " + b.String())
 	}
 
 	// Nor is it an interface type.
 	if _, ok := ut_dst.(*types.Interface); ok {
 		if _, ok := ut_src.(*types.Interface); ok {
-			panic("oops: Conv should be ChangeInterface")
+			panic("oops: Convert should be ChangeInterface")
 		} else {
-			panic("oops: Conv should be MakeInterface")
+			panic("oops: Convert should be MakeInterface")
 		}
 	}
 
@@ -1126,19 +1118,10 @@ func conv(t_dst, t_src types.Type, x value) value {
 	//    + string -> []byte/[]rune.
 	//
 	// All are treated the same: first we extract the value to the
-	// widest representation (bool, int64, uint64, float64,
-	// complex128, or string), then we convert it to the desired
-	// type.
+	// widest representation (int64, uint64, float64, complex128,
+	// or string), then we convert it to the desired type.
 
 	switch ut_src := ut_src.(type) {
-	case *types.Signature:
-		// TODO(adonovan): fix: this is a hacky workaround for the
-		// unsound conversion of Signature types from
-		// func(T)() to func()(T), i.e. arg0 <-> receiver
-		// conversion.  Talk to gri about correct approach.
-		fmt.Fprintln(os.Stderr, "Warning: unsound Signature conversion")
-		return x
-
 	case *types.Pointer:
 		switch ut_dst := ut_dst.(type) {
 		case *types.Basic:
@@ -1146,8 +1129,6 @@ func conv(t_dst, t_src types.Type, x value) value {
 			if ut_dst.Kind() == types.UnsafePointer {
 				return unsafe.Pointer(x.(*value))
 			}
-		case *types.Pointer:
-			return x
 		}
 
 	case *types.Slice:
@@ -1173,11 +1154,6 @@ func conv(t_dst, t_src types.Type, x value) value {
 
 	case *types.Basic:
 		x = widen(x)
-
-		// bool?
-		if _, ok := x.(bool); ok {
-			return x
-		}
 
 		// integer -> string?
 		// TODO(adonovan): fix: test integer -> named alias of string.
@@ -1344,7 +1320,7 @@ func conv(t_dst, t_src types.Type, x value) value {
 // interface itype.
 // On success it returns "", on failure, an error message.
 //
-func checkInterface(i *interpreter, itype types.Type, x iface) string {
+func checkInterface(i *interpreter, itype *types.Interface, x iface) string {
 	mset := findMethodSet(i, x.t)
 	it := underlyingType(itype).(*types.Interface)
 	for i, n := 0, it.NumMethods(); i < n; i++ {

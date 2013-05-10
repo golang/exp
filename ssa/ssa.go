@@ -226,7 +226,7 @@ type Instruction interface {
 // MakeClosure which, via its Bindings, supplies values for these
 // parameters.  Captures are always addresses.
 //
-// If the function is a method (Signature.Recv != nil) then the first
+// If the function is a method (Signature.Recv() != nil) then the first
 // element of Params is the receiver parameter.
 //
 // Type() returns the function's Signature.
@@ -303,19 +303,23 @@ type Parameter struct {
 	referrers []Instruction
 }
 
-// A Literal represents a literal nil, boolean, string or numeric
-// (integer, fraction or complex) value.
+// A Literal represents the value of a constant expression.
+
+// It may have a nil, boolean, string or numeric (integer, fraction or
+// complex) value, or a []byte or []rune conversion of a string
+// literal.
 //
-// A literal's underlying Type() can be a basic type, possibly one of
-// the "untyped" types.  A nil literal can have any reference type:
-// interface, map, channel, pointer, slice, or function---but not
-// "untyped nil".
+// Literals may be of named types.  A literal's underlying type can be
+// a basic type, possibly one of the "untyped" types, or a slice type
+// whose elements' underlying type is byte or rune.  A nil literal can
+// have any reference type: interface, map, channel, pointer, slice,
+// or function---but not "untyped nil".
 //
 // All source-level constant expressions are represented by a Literal
 // of equal type and value.
 //
 // Value holds the exact value of the literal, independent of its
-// Type(), using the same representation as package go/types uses for
+// Type(), using the same representation as package go/exact uses for
 // constants.
 //
 // Example printed form:
@@ -458,40 +462,49 @@ type UnOp struct {
 	CommaOk bool
 }
 
-// Conv yields the conversion of X to type Type().
+// ChangeType applies to X a value-preserving type change to Type().
 //
-// A conversion is one of the following kinds.  The behaviour of the
-// conversion operator may depend on both Type() and X.Type(), as well
-// as the dynamic value.
+// Type changes are permitted:
+// - between a named type and its underlying type.
+// - between two named types of the same underlying type.
+// - between (possibly named) pointers to identical base types.
+// - between f(T) functions and (T) func f() methods.
+// - from a bidirectional channel to a read- or write-channel,
+//   optionally adding/removing a name.
 //
-// A '+' indicates that a dynamic representation change may occur.
-// A '-' indicates that the conversion is a value-preserving change
-// to types only.
+// This operation cannot fail dynamically.
 //
-// 1. implicit conversions (arising from assignability rules):
-//    - adding/removing a name, same underlying types.
-//    - channel type restriction, possibly adding/removing a name.
-// 2. explicit conversions (in addition to the above):
-//    - changing a name, same underlying types.
-//    - between pointers to identical base types.
-//    + conversions between real numeric types.
-//    + conversions between complex numeric types.
-//    + integer/[]byte/[]rune -> string.
-//    + string -> []byte/[]rune.
+// Example printed form:
+// 	t1 = changetype *int <- IntPtr (t0)
 //
-// TODO(adonovan): split into two cases:
-// - rename value (ChangeType)
-// + value to type with different representation (Conv)
+type ChangeType struct {
+	Register
+	X   Value
+	Pos token.Pos // source position of explicit conversion
+}
+
+// Convert yields the conversion of value X to type Type().
+//
+// A conversion may change the value and representation of its operand.
+// Conversions are permitted:
+// - between real numeric types.
+// - between complex numeric types.
+// - between string and []byte or []rune.
+// - from (Unicode) integer to (UTF-8) string.
+// A conversion may imply a type name change also.
+//
+// This operation cannot fail dynamically.
 //
 // Conversions of untyped string/number/bool constants to a specific
 // representation are eliminated during SSA construction.
 //
 // Example printed form:
-// 	t1 = convert interface{} <- int (t0)
+// 	t1 = convert []byte <- string (t0)
 //
-type Conv struct {
+type Convert struct {
 	Register
-	X Value
+	X   Value
+	Pos token.Pos // source position of explicit conversion
 }
 
 // ChangeInterface constructs a value of one interface type from a
@@ -499,7 +512,6 @@ type Conv struct {
 //
 // This operation cannot fail.  Use TypeAssert for interface
 // conversions that may fail dynamically.
-// TODO(adonovan): rename to "{Narrow,Restrict}Interface"?
 //
 // Example printed form:
 // 	t1 = change interface interface{} <- I (t0)
@@ -513,7 +525,7 @@ type ChangeInterface struct {
 // value and its method-set.
 //
 // To construct the zero value of an interface type T, use:
-// 	&Literal{types.nilType{}, T}
+// 	&Literal{exact.MakeNil(), T}
 //
 // Example printed form:
 // 	t1 = make interface interface{} <- int (42:int)
@@ -522,6 +534,7 @@ type MakeInterface struct {
 	Register
 	X       Value
 	Methods MethodSet // method set of (non-interface) X
+	Pos     token.Pos // source position of explicit conversion
 }
 
 // A MakeClosure instruction yields an anonymous function value whose
@@ -1081,7 +1094,7 @@ func (c *CallCommon) Description() string {
 	case *MakeClosure:
 		return "static function closure call"
 	case *Function:
-		if fn.Signature.Recv != nil {
+		if fn.Signature.Recv() != nil {
 			return "static method call"
 		}
 		return "static function call"
@@ -1179,7 +1192,8 @@ func (*Builtin) ImplementsValue()         {}
 func (*Call) ImplementsValue()            {}
 func (*Capture) ImplementsValue()         {}
 func (*ChangeInterface) ImplementsValue() {}
-func (*Conv) ImplementsValue()            {}
+func (*ChangeType) ImplementsValue()      {}
+func (*Convert) ImplementsValue()         {}
 func (*Extract) ImplementsValue()         {}
 func (*Field) ImplementsValue()           {}
 func (*FieldAddr) ImplementsValue()       {}
@@ -1212,7 +1226,8 @@ func (*Alloc) ImplementsInstruction()           {}
 func (*BinOp) ImplementsInstruction()           {}
 func (*Call) ImplementsInstruction()            {}
 func (*ChangeInterface) ImplementsInstruction() {}
-func (*Conv) ImplementsInstruction()            {}
+func (*ChangeType) ImplementsInstruction()      {}
+func (*Convert) ImplementsInstruction()         {}
 func (*Defer) ImplementsInstruction()           {}
 func (*Extract) ImplementsInstruction()         {}
 func (*Field) ImplementsInstruction()           {}
@@ -1278,7 +1293,11 @@ func (v *ChangeInterface) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 
-func (v *Conv) Operands(rands []*Value) []*Value {
+func (v *ChangeType) Operands(rands []*Value) []*Value {
+	return append(rands, &v.X)
+}
+
+func (v *Convert) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 

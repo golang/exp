@@ -210,7 +210,7 @@ func (f *Function) startBody() {
 // f.syntax != nil, i.e. this is a Go source function.
 // f.startBody() was called.
 // Postcondition:
-// len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv ? 1 : 0)
+// len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
 //
 func (f *Function) createSyntacticParams(idents map[*ast.Ident]types.Object) {
 	// Receiver (at most one inner iteration).
@@ -484,7 +484,7 @@ func (f *Function) fullName(from *Package) string {
 //
 func writeSignature(w io.Writer, name string, sig *types.Signature, params []*Parameter) {
 	io.WriteString(w, "func ")
-	if sig.Recv != nil {
+	if recv := sig.Recv(); recv != nil {
 		io.WriteString(w, "(")
 		if n := params[0].Name(); n != "" {
 			io.WriteString(w, n)

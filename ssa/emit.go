@@ -99,38 +99,55 @@ func emitCompare(f *Function, op token.Token, x, y Value) Value {
 	return f.emit(v)
 }
 
-// emitConv emits to f code to convert Value val to exactly type typ,
-// and returns the converted value.  Implicit conversions are implied
-// by language assignability rules in the following operations:
+// isValuePreserving returns true if a conversion from ut_src to
+// ut_dst is value-preserving, i.e. just a change of type.
+// Precondition: neither argument is a named type.
 //
-// - from rvalue type to lvalue type in assignments.
-// - from actual- to formal-parameter types in function calls.
-// - from return value type to result type in return statements.
-// - population of struct fields, array and slice elements, and map
-//   keys and values within compoisite literals
-// - from index value to index type in indexing expressions.
-// - for both arguments of comparisons.
-// - from value type to channel type in send expressions.
+func isValuePreserving(ut_src, ut_dst types.Type) bool {
+	// Identical underlying types?
+	if types.IsIdentical(ut_dst, ut_src) {
+		return true
+	}
+
+	switch ut_dst.(type) {
+	case *types.Chan:
+		// Conversion between channel types?
+		_, ok := ut_src.(*types.Chan)
+		return ok
+
+	case *types.Pointer:
+		// Conversion between pointers with identical base types?
+		_, ok := ut_src.(*types.Pointer)
+		return ok
+
+	case *types.Signature:
+		// Conversion between f(T) function and (T) func f() method?
+		// TODO(adonovan): is this sound?  Discuss with gri.
+		_, ok := ut_src.(*types.Signature)
+		return ok
+	}
+	return false
+}
+
+// emitConv emits to f code to convert Value val to exactly type typ,
+// and returns the converted value.  Implicit conversions are required
+// by language assignability rules in assignments, parameter passing,
+// etc.
 //
 func emitConv(f *Function, val Value, typ types.Type) Value {
-	// fmt.Printf("emitConv %s -> %s, %T", val.Type(), typ, val) // debugging
+	t_src := val.Type()
 
 	// Identical types?  Conversion is a no-op.
-	if types.IsIdentical(val.Type(), typ) {
+	if types.IsIdentical(t_src, typ) {
 		return val
 	}
 
 	ut_dst := underlyingType(typ)
-	ut_src := underlyingType(val.Type())
+	ut_src := underlyingType(t_src)
 
-	// Identical underlying types?  Conversion is a name change.
-	if types.IsIdentical(ut_dst, ut_src) {
-		// TODO(adonovan): make this use a distinct
-		// instruction, ChangeType.  This instruction must
-		// also cover the cases of channel type restrictions and
-		// conversions between pointers to identical base
-		// types.
-		c := &Conv{X: val}
+	// Just a change of type, but not value or representation?
+	if isValuePreserving(ut_src, ut_dst) {
+		c := &ChangeType{X: val}
 		c.setType(typ)
 		return f.emit(c)
 	}
@@ -156,7 +173,7 @@ func emitConv(f *Function, val Value, typ types.Type) Value {
 
 		mi := &MakeInterface{
 			X:       val,
-			Methods: f.Prog.MethodSet(val.Type()),
+			Methods: f.Prog.MethodSet(t_src),
 		}
 		mi.setType(typ)
 		return f.emit(mi)
@@ -172,7 +189,7 @@ func emitConv(f *Function, val Value, typ types.Type) Value {
 	}
 
 	// A representation-changing conversion.
-	c := &Conv{X: val}
+	c := &Convert{X: val}
 	c.setType(typ)
 	return f.emit(c)
 }
