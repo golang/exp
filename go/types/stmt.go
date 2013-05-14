@@ -24,9 +24,9 @@ func (check *checker) assignment(x *operand, to Type) bool {
 		return false
 	}
 
-	if t, ok := x.typ.(*Result); ok {
+	if t, ok := x.typ.(*Tuple); ok {
 		// TODO(gri) elsewhere we use "assignment count mismatch" (consolidate)
-		check.errorf(x.pos(), "%d-valued expression %s used as single value", len(t.values), x)
+		check.errorf(x.pos(), "%d-valued expression %s used as single value", t.Arity(), x)
 		x.mode = invalid
 		return false
 	}
@@ -190,10 +190,10 @@ func (check *checker) assignNtoM(lhs, rhs []ast.Expr, decl bool, iota int) {
 			goto Error
 		}
 
-		if t, _ := x.typ.(*Result); t != nil && len(lhs) == len(t.values) {
+		if t, _ := x.typ.(*Tuple); t != nil && len(lhs) == t.Arity() {
 			// function result
 			x.mode = value
-			for i, obj := range t.values {
+			for i, obj := range t.vars {
 				x.expr = nil // TODO(gri) should do better here
 				x.typ = obj.typ
 				check.assign1to1(lhs[i], nil, &x, decl, iota)
@@ -423,11 +423,11 @@ func (check *checker) stmt(s ast.Stmt) {
 
 	case *ast.ReturnStmt:
 		sig := check.funcsig
-		if n := len(sig.results); n > 0 {
+		if n := sig.results.Arity(); n > 0 {
 			// TODO(gri) should not have to compute lhs, named every single time - clean this up
 			lhs := make([]ast.Expr, n)
 			named := false // if set, function has named results
-			for i, res := range sig.results {
+			for i, res := range sig.results.vars {
 				if len(res.name) > 0 {
 					// a blank (_) result parameter is a named result
 					named = true

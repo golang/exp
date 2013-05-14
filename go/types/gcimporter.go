@@ -568,7 +568,7 @@ func (p *gcParser) parseSignature() *Signature {
 		}
 	}
 
-	return &Signature{params: params, results: results, isVariadic: isVariadic}
+	return &Signature{params: NewTuple(params...), results: NewTuple(results...), isVariadic: isVariadic}
 }
 
 // InterfaceType = "interface" "{" [ MethodList ] "}" .

@@ -225,20 +225,35 @@ type Pointer struct {
 func NewPointer(elt Type) *Pointer { return &Pointer{aType{}, elt} }
 func (p *Pointer) Elt() Type       { return p.base }
 
-// A Result represents a (multi-value) function call result.
-type Result struct {
+// A Tuple represents an ordered list of variables.
+// A nil *Tuple is a valid (empty) tuple.
+// Note that tuples are not first-class types in the language.
+type Tuple struct {
 	aType
-	values []*Var // Signature.Results of the function called
+	vars []*Var
 }
 
-func NewResult(x ...*Var) *Result {
-	return &Result{aType{}, x}
+func NewTuple(x ...*Var) *Tuple {
+	if len(x) > 0 {
+		return &Tuple{aType{}, x}
+	}
+	return nil
 }
-func (r *Result) NumValues() int   { return len(r.values) }
-func (r *Result) Value(i int) *Var { return r.values[i] }
-func (r *Result) ForEachValue(f func(*Var)) {
-	for _, val := range r.values {
-		f(val)
+
+func (t *Tuple) Arity() int {
+	if t != nil {
+		return len(t.vars)
+	}
+	return 0
+}
+
+func (t *Tuple) At(i int) *Var { return t.vars[i] }
+
+func (t *Tuple) ForEach(f func(*Var)) {
+	if t != nil {
+		for _, x := range t.vars {
+			f(x)
+		}
 	}
 }
 
@@ -246,34 +261,21 @@ func (r *Result) ForEachValue(f func(*Var)) {
 type Signature struct {
 	aType
 	recv       *Var   // nil if not a method
-	params     []*Var // (incoming) parameters from left to right; or nil
-	results    []*Var // (outgoing) results from left to right; or nil
+	params     *Tuple // (incoming) parameters from left to right; or nil
+	results    *Tuple // (outgoing) results from left to right; or nil
 	isVariadic bool   // true if the last parameter's type is of the form ...T
 }
 
-func NewSignature(recv *Var, params, results []*Var, isVariadic bool) *Signature {
+func NewSignature(recv *Var, params, results *Tuple, isVariadic bool) *Signature {
 	return &Signature{aType{}, recv, params, results, isVariadic}
 }
 
 func (s *Signature) Recv() *Var       { return s.recv }
+func (s *Signature) Params() *Tuple   { return s.params }
+func (s *Signature) Results() *Tuple  { return s.results }
 func (s *Signature) IsVariadic() bool { return s.isVariadic }
 
-func (s *Signature) NumParams() int   { return len(s.params) }
-func (s *Signature) Param(i int) *Var { return s.params[i] }
-func (s *Signature) ForEachParam(f func(*Var)) {
-	for _, par := range s.params {
-		f(par)
-	}
-}
-
-func (s *Signature) NumResults() int   { return len(s.results) }
-func (s *Signature) Result(i int) *Var { return s.results[i] }
-func (s *Signature) ForEachResult(f func(*Var)) {
-	for _, res := range s.results {
-		f(res)
-	}
-}
-
+// TODO(gri) Expose builtin-related types
 // builtinId is an id of a builtin function.
 type builtinId int
 

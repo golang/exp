@@ -16,11 +16,12 @@ import (
 // All objects implement the Object interface.
 //
 type Object interface {
-	Pkg() *Package
+	Pkg() *Package // nil for objects in the Universe scope
 	Scope() *Scope
 	Name() string
 	Type() Type
 	Pos() token.Pos
+	// TODO(gri) provide String method!
 }
 
 // A Package represents the contents (objects) of a Go package.

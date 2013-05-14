@@ -196,40 +196,44 @@ func typeString(typ Type) string {
 	return buf.String()
 }
 
-func writeParams(buf *bytes.Buffer, params []*Var, isVariadic bool) {
+func writeTuple(buf *bytes.Buffer, tup *Tuple, isVariadic bool) {
 	buf.WriteByte('(')
-	for i, par := range params {
-		if i > 0 {
-			buf.WriteString(", ")
+	if tup != nil {
+		for i, v := range tup.vars {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			if v.name != "" {
+				buf.WriteString(v.name)
+				buf.WriteByte(' ')
+			}
+			if isVariadic && i == len(tup.vars)-1 {
+				buf.WriteString("...")
+			}
+			writeType(buf, v.typ)
 		}
-		if par.name != "" {
-			buf.WriteString(par.name)
-			buf.WriteByte(' ')
-		}
-		if isVariadic && i == len(params)-1 {
-			buf.WriteString("...")
-		}
-		writeType(buf, par.typ)
 	}
 	buf.WriteByte(')')
 }
 
 func writeSignature(buf *bytes.Buffer, sig *Signature) {
-	writeParams(buf, sig.params, sig.isVariadic)
-	if len(sig.results) == 0 {
+	writeTuple(buf, sig.params, sig.isVariadic)
+
+	n := sig.results.Arity()
+	if n == 0 {
 		// no result
 		return
 	}
 
 	buf.WriteByte(' ')
-	if len(sig.results) == 1 && sig.results[0].name == "" {
+	if n == 1 && sig.results.vars[0].name == "" {
 		// single unnamed result
-		writeType(buf, sig.results[0].typ)
+		writeType(buf, sig.results.vars[0].typ)
 		return
 	}
 
 	// multiple or named result(s)
-	writeParams(buf, sig.results, false)
+	writeTuple(buf, sig.results, false)
 }
 
 func writeType(buf *bytes.Buffer, typ Type) {
@@ -269,8 +273,8 @@ func writeType(buf *bytes.Buffer, typ Type) {
 		buf.WriteByte('*')
 		writeType(buf, t.base)
 
-	case *Result:
-		writeParams(buf, t.values, false)
+	case *Tuple:
+		writeTuple(buf, t, false)
 
 	case *Signature:
 		buf.WriteString("func")
@@ -334,7 +338,7 @@ func (t *Interface) String() string { return typeString(t) }
 func (t *Map) String() string       { return typeString(t) }
 func (t *Named) String() string     { return typeString(t) }
 func (t *Pointer) String() string   { return typeString(t) }
-func (t *Result) String() string    { return typeString(t) }
+func (t *Tuple) String() string     { return typeString(t) }
 func (t *Signature) String() string { return typeString(t) }
 func (t *Slice) String() string     { return typeString(t) }
 func (t *Struct) String() string    { return typeString(t) }

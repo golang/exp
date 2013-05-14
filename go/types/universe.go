@@ -101,7 +101,7 @@ func init() {
 	{
 		// Error has a nil package in its qualified name since it is in no package
 		var methods ObjSet
-		sig := &Signature{results: []*Var{{name: "", typ: Typ[String]}}}
+		sig := &Signature{results: NewTuple(&Var{name: "", typ: Typ[String]})}
 		methods.Insert(&Func{nil, "Error", sig, nil})
 		def(&TypeName{name: "error", typ: &Named{underlying: &Interface{methods: methods}}})
 	}

@@ -937,11 +937,11 @@ func (check *checker) indexedElts(elts []ast.Expr, typ Type, length int64, iota 
 func (check *checker) argument(sig *Signature, i int, arg ast.Expr, x *operand, passSlice bool) {
 	// determine parameter
 	var par *Var
-	n := len(sig.params)
+	n := sig.params.Arity()
 	if i < n {
-		par = sig.params[i]
+		par = sig.params.vars[i]
 	} else if sig.isVariadic {
-		par = sig.params[n-1]
+		par = sig.params.vars[n-1]
 	} else {
 		check.errorf(arg.Pos(), "too many arguments")
 		return
@@ -977,8 +977,6 @@ func (check *checker) argument(sig *Signature, i int, arg ast.Expr, x *operand, 
 	}
 }
 
-var emptyResult Result
-
 func (check *checker) callExpr(x *operand) {
 	// convert x into a user-friendly set of values
 	var typ Type
@@ -987,7 +985,7 @@ func (check *checker) callExpr(x *operand) {
 	case invalid:
 		return // nothing to do
 	case novalue:
-		typ = &emptyResult
+		typ = (*Tuple)(nil)
 	case constant:
 		typ = x.typ
 		val = x.val
@@ -1314,9 +1312,13 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			// argument of the method expression's function type
 			// TODO(gri) at the moment, method sets don't correctly track
 			// pointer vs non-pointer receivers => typechecker is too lenient
+			var params []*Var
+			if sig.params != nil {
+				params = sig.params.vars
+			}
 			x.mode = value
 			x.typ = &Signature{
-				params:     append([]*Var{{typ: x.typ}}, sig.params...),
+				params:     NewTuple(append([]*Var{{typ: x.typ}}, params...)...),
 				results:    sig.results,
 				isVariadic: sig.isVariadic,
 			}
@@ -1543,10 +1545,10 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				if x.mode == invalid {
 					goto Error // TODO(gri): we can do better
 				}
-				if t, _ := x.typ.(*Result); t != nil {
+				if t, _ := x.typ.(*Tuple); t != nil {
 					// multiple result values
-					n = len(t.values)
-					for i, obj := range t.values {
+					n = len(t.vars)
+					for i, obj := range t.vars {
 						x.mode = value
 						x.expr = nil // TODO(gri) can we do better here? (for good error messages)
 						x.typ = obj.typ
@@ -1572,21 +1574,21 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				// last argument: count one extra
 				n++
 			}
-			if n < len(sig.params) {
+			if n < sig.params.Arity() {
 				check.errorf(e.Fun.Pos(), "too few arguments in call to %s", e.Fun)
 				// ok to continue
 			}
 
 			// determine result
-			switch len(sig.results) {
+			switch sig.results.Arity() {
 			case 0:
 				x.mode = novalue
 			case 1:
 				x.mode = value
-				x.typ = sig.results[0].typ
+				x.typ = sig.results.vars[0].typ
 			default:
 				x.mode = value
-				x.typ = &Result{values: sig.results}
+				x.typ = sig.results
 			}
 
 		} else if bin, ok := x.typ.(*builtin); ok {
@@ -1671,7 +1673,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 		params, isVariadic := check.collectParams(e.Params, true)
 		results, _ := check.collectParams(e.Results, false)
 		x.mode = typexpr
-		x.typ = &Signature{recv: nil, params: params, results: results, isVariadic: isVariadic}
+		x.typ = &Signature{recv: nil, params: NewTuple(params...), results: NewTuple(results...), isVariadic: isVariadic}
 
 	case *ast.InterfaceType:
 		x.mode = typexpr

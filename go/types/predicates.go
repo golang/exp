@@ -191,14 +191,16 @@ func IsIdentical(x, y Type) bool {
 
 // identicalTypes returns true if both lists a and b have the
 // same length and corresponding objects have identical types.
-func identicalTypes(a, b []*Var) bool {
-	if len(a) != len(b) {
+func identicalTypes(a, b *Tuple) bool {
+	if a.Arity() != b.Arity() {
 		return false
 	}
-	for i, x := range a {
-		y := b[i]
-		if !IsIdentical(x.typ, y.typ) {
-			return false
+	if a != nil {
+		for i, x := range a.vars {
+			y := b.vars[i]
+			if !IsIdentical(x.typ, y.typ) {
+				return false
+			}
 		}
 	}
 	return true
