@@ -943,7 +943,16 @@ func (check *checker) argument(sig *Signature, i int, arg ast.Expr, x *operand, 
 	} else if sig.isVariadic {
 		par = sig.params.vars[n-1]
 	} else {
-		check.errorf(arg.Pos(), "too many arguments")
+		var pos token.Pos
+		switch {
+		case arg != nil:
+			pos = arg.Pos()
+		case x != nil:
+			pos = x.pos()
+		default:
+			// TODO(gri) what position to use?
+		}
+		check.errorf(pos, "too many arguments")
 		return
 	}
 
@@ -1545,10 +1554,11 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				if x.mode == invalid {
 					goto Error // TODO(gri): we can do better
 				}
-				if t, _ := x.typ.(*Tuple); t != nil {
+				if t, ok := x.typ.(*Tuple); ok {
 					// multiple result values
-					n = len(t.vars)
-					for i, obj := range t.vars {
+					n = t.Arity()
+					for i := 0; i < n; i++ {
+						obj := t.At(i)
 						x.mode = value
 						x.expr = nil // TODO(gri) can we do better here? (for good error messages)
 						x.typ = obj.typ

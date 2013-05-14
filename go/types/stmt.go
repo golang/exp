@@ -190,10 +190,11 @@ func (check *checker) assignNtoM(lhs, rhs []ast.Expr, decl bool, iota int) {
 			goto Error
 		}
 
-		if t, _ := x.typ.(*Tuple); t != nil && len(lhs) == t.Arity() {
+		if t, ok := x.typ.(*Tuple); ok && len(lhs) == t.Arity() {
 			// function result
 			x.mode = value
-			for i, obj := range t.vars {
+			for i := 0; i < len(lhs); i++ {
+				obj := t.At(i)
 				x.expr = nil // TODO(gri) should do better here
 				x.typ = obj.typ
 				check.assign1to1(lhs[i], nil, &x, decl, iota)
