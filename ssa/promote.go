@@ -308,8 +308,8 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 	var c Call
 	if cand.concrete != nil {
 		c.Call.Func = cand.concrete
-		fn.Pos = c.Call.Func.(*Function).Pos // TODO(adonovan): fix: wrong.
-		c.Call.Pos = fn.Pos                  // TODO(adonovan): fix: wrong.
+		fn.pos = c.Call.Func.(*Function).pos // TODO(adonovan): fix: wrong.
+		c.Call.pos = fn.pos                  // TODO(adonovan): fix: wrong.
 		c.Call.Args = append(c.Call.Args, v)
 	} else {
 		c.Call.Recv = v

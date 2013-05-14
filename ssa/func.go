@@ -184,6 +184,7 @@ func (f *Function) addSpilledParam(obj types.Object) {
 	spill := &Alloc{
 		Name_: name + "~", // "~" means "spilled"
 		Type_: pointer(obj.Type()),
+		pos:   obj.Pos(),
 	}
 	f.objects[obj] = spill
 	f.Locals = append(f.Locals, spill)
@@ -381,7 +382,7 @@ func (f *Function) addNamedLocal(obj types.Object) *Alloc {
 // to function f and returns it.  pos is the optional source location.
 //
 func (f *Function) addLocal(typ types.Type, pos token.Pos) *Alloc {
-	v := &Alloc{Type_: pointer(typ), Pos: pos}
+	v := &Alloc{Type_: pointer(typ), pos: pos}
 	f.Locals = append(f.Locals, v)
 	f.emit(v)
 	return v
@@ -510,9 +511,9 @@ func writeSignature(w io.Writer, name string, sig *types.Signature, params []*Pa
 		}
 	}
 	io.WriteString(w, ")")
-	r := sig.Results()
-	if n := r.Arity(); n > 0 {
+	if n := sig.Results().Arity(); n > 0 {
 		io.WriteString(w, " ")
+		r := sig.Results()
 		if n == 1 && r.At(0).Name() == "" {
 			io.WriteString(w, r.At(0).Type().String())
 		} else {
@@ -526,7 +527,7 @@ func writeSignature(w io.Writer, name string, sig *types.Signature, params []*Pa
 //
 func (f *Function) DumpTo(w io.Writer) {
 	fmt.Fprintf(w, "# Name: %s\n", f.FullName())
-	fmt.Fprintf(w, "# Declared at %s\n", f.Prog.Files.Position(f.Pos))
+	fmt.Fprintf(w, "# Declared at %s\n", f.Prog.Files.Position(f.Pos()))
 
 	if f.Enclosing != nil {
 		fmt.Fprintf(w, "# Parent: %s\n", f.Enclosing.Name())

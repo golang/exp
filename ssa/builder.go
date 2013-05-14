@@ -61,8 +61,7 @@ var (
 	tSelect = types.NewTuple(
 		types.NewVar(nil, "index", tInt),
 		types.NewVar(nil, "recv", tEface),
-		varOk,
-	)
+		varOk)
 
 	// SSA Value constants.
 	vZero  = intLiteral(0)
@@ -331,22 +330,26 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 	case *ast.IndexExpr:
 		mapt := underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Map)
 		typ = mapt.Elt()
-		tuple = fn.emit(&Lookup{
+		lookup := &Lookup{
 			X:       b.expr(fn, e.X),
 			Index:   emitConv(fn, b.expr(fn, e.Index), mapt.Key()),
 			CommaOk: true,
-		})
+		}
+		lookup.setPos(e.Lbrack)
+		tuple = fn.emit(lookup)
 
 	case *ast.TypeAssertExpr:
 		return emitTypeTest(fn, b.expr(fn, e.X), fn.Pkg.TypeOf(e))
 
 	case *ast.UnaryExpr: // must be receive <-
 		typ = underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Chan).Elt()
-		tuple = fn.emit(&UnOp{
+		unop := &UnOp{
 			Op:      token.ARROW,
 			X:       b.expr(fn, e.X),
 			CommaOk: true,
-		})
+		}
+		unop.setPos(e.OpPos)
+		tuple = fn.emit(unop)
 
 	default:
 		panic(fmt.Sprintf("unexpected exprN: %T", e))
@@ -386,8 +389,8 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 			v := &MakeSlice{
 				Len: n,
 				Cap: m,
-				Pos: pos,
 			}
+			v.setPos(pos)
 			v.setType(typ)
 			return fn.emit(v)
 
@@ -396,7 +399,8 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 			if len(args) == 2 {
 				res = b.expr(fn, args[1])
 			}
-			v := &MakeMap{Reserve: res, Pos: pos}
+			v := &MakeMap{Reserve: res}
+			v.setPos(pos)
 			v.setType(typ)
 			return fn.emit(v)
 
@@ -405,7 +409,8 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 			if len(args) == 2 {
 				sz = b.expr(fn, args[1])
 			}
-			v := &MakeChan{Size: sz, Pos: pos}
+			v := &MakeChan{Size: sz}
+			v.setPos(pos)
 			v.setType(typ)
 			return fn.emit(v)
 		}
@@ -427,7 +432,10 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 		// Otherwise treat as normal.
 
 	case "panic":
-		fn.emit(&Panic{X: emitConv(fn, b.expr(fn, args[0]), tEface)})
+		fn.emit(&Panic{
+			X:   emitConv(fn, b.expr(fn, args[0]), tEface),
+			pos: pos,
+		})
 		fn.currentBlock = fn.newBasicBlock("unreachable")
 		return vFalse // any non-nil Value will do
 	}
@@ -459,10 +467,11 @@ func (b *Builder) selector(fn *Function, e *ast.SelectorExpr, wantAddr, escaping
 		}
 	}
 	fieldType := fn.Pkg.TypeOf(e)
+	pos := e.Sel.Pos()
 	if wantAddr {
-		return b.fieldAddr(fn, e.X, path, index, fieldType, escaping)
+		return b.fieldAddr(fn, e.X, path, index, fieldType, pos, escaping)
 	}
-	return b.fieldExpr(fn, e.X, path, index, fieldType)
+	return b.fieldExpr(fn, e.X, path, index, fieldType, pos)
 }
 
 // fieldAddr evaluates the base expression (a struct or *struct),
@@ -472,14 +481,14 @@ func (b *Builder) selector(fn *Function, e *ast.SelectorExpr, wantAddr, escaping
 //
 // (fieldType can be derived from base+index.)
 //
-func (b *Builder) fieldAddr(fn *Function, base ast.Expr, path *anonFieldPath, index int, fieldType types.Type, escaping bool) Value {
+func (b *Builder) fieldAddr(fn *Function, base ast.Expr, path *anonFieldPath, index int, fieldType types.Type, pos token.Pos, escaping bool) Value {
 	var x Value
 	if path != nil {
 		switch underlyingType(path.field.Type).(type) {
 		case *types.Struct:
-			x = b.fieldAddr(fn, base, path.tail, path.index, path.field.Type, escaping)
+			x = b.fieldAddr(fn, base, path.tail, path.index, path.field.Type, token.NoPos, escaping)
 		case *types.Pointer:
-			x = b.fieldExpr(fn, base, path.tail, path.index, path.field.Type)
+			x = b.fieldExpr(fn, base, path.tail, path.index, path.field.Type, token.NoPos)
 		}
 	} else {
 		switch underlyingType(fn.Pkg.TypeOf(base)).(type) {
@@ -493,6 +502,7 @@ func (b *Builder) fieldAddr(fn *Function, base ast.Expr, path *anonFieldPath, in
 		X:     x,
 		Field: index,
 	}
+	v.setPos(pos)
 	v.setType(pointer(fieldType))
 	return fn.emit(v)
 }
@@ -504,10 +514,10 @@ func (b *Builder) fieldAddr(fn *Function, base ast.Expr, path *anonFieldPath, in
 //
 // (fieldType can be derived from base+index.)
 //
-func (b *Builder) fieldExpr(fn *Function, base ast.Expr, path *anonFieldPath, index int, fieldType types.Type) Value {
+func (b *Builder) fieldExpr(fn *Function, base ast.Expr, path *anonFieldPath, index int, fieldType types.Type, pos token.Pos) Value {
 	var x Value
 	if path != nil {
-		x = b.fieldExpr(fn, base, path.tail, path.index, path.field.Type)
+		x = b.fieldExpr(fn, base, path.tail, path.index, path.field.Type, token.NoPos)
 	} else {
 		x = b.expr(fn, base)
 	}
@@ -517,6 +527,7 @@ func (b *Builder) fieldExpr(fn *Function, base ast.Expr, path *anonFieldPath, in
 			X:     x,
 			Field: index,
 		}
+		v.setPos(pos)
 		v.setType(fieldType)
 		return fn.emit(v)
 
@@ -525,6 +536,7 @@ func (b *Builder) fieldExpr(fn *Function, base ast.Expr, path *anonFieldPath, in
 			X:     x,
 			Field: index,
 		}
+		v.setPos(pos)
 		v.setType(pointer(fieldType))
 		return emitLoad(fn, fn.emit(v))
 	}
@@ -674,7 +686,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		fn2 := &Function{
 			Name_:     fmt.Sprintf("func@%d.%d", posn.Line, posn.Column),
 			Signature: underlyingType(fn.Pkg.TypeOf(e.Type)).(*types.Signature),
-			Pos:       e.Type.Func,
+			pos:       e.Type.Func,
 			Enclosing: fn,
 			Pkg:       fn.Pkg,
 			Prog:      b.Prog,
@@ -711,11 +723,11 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 			if y != x {
 				switch y := y.(type) {
 				case *Convert:
-					y.Pos = e.Lparen
+					y.pos = e.Lparen
 				case *ChangeType:
-					y.Pos = e.Lparen
+					y.pos = e.Lparen
 				case *MakeInterface:
-					y.Pos = e.Lparen
+					y.pos = e.Lparen
 				}
 			}
 			return y
@@ -746,6 +758,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 				Op: e.Op,
 				X:  b.expr(fn, e.X),
 			}
+			v.setPos(e.OpPos)
 			v.setType(fn.Pkg.TypeOf(e))
 			return fn.emit(v)
 		default:
@@ -844,6 +857,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 				X:     b.expr(fn, e.X),
 				Index: emitConv(fn, b.expr(fn, e.Index), mapt.Key()),
 			}
+			v.setPos(e.Lbrack)
 			v.setType(mapt.Elt())
 			return fn.emit(v)
 
@@ -853,6 +867,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 				X:     b.expr(fn, e.X),
 				Index: b.expr(fn, e.Index),
 			}
+			v.setPos(e.Lbrack)
 			v.setType(tByte)
 			return fn.emit(v)
 
@@ -884,7 +899,7 @@ func (b *Builder) stmtList(fn *Function, list []ast.Stmt) {
 // occurring in e.
 //
 func (b *Builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
-	c.Pos = e.Lparen
+	c.pos = e.Lparen
 	c.HasEllipsis = e.Ellipsis != 0
 
 	// Is the call of the form x.f()?
@@ -1370,12 +1385,14 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 		}
 		if t != at { // slice
 			s := &Slice{X: array}
+			s.setPos(e.Lbrace)
 			s.setType(t)
 			emitStore(fn, addr, fn.emit(s))
 		}
 
 	case *types.Map:
-		m := &MakeMap{Reserve: intLiteral(int64(len(e.Elts))), Pos: e.Lbrace}
+		m := &MakeMap{Reserve: intLiteral(int64(len(e.Elts)))}
+		m.setPos(e.Lbrace)
 		m.setType(typ)
 		emitStore(fn, addr, fn.emit(m))
 		for _, e := range e.Elts {
@@ -1384,6 +1401,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 				Map:   m,
 				Key:   emitConv(fn, b.expr(fn, e.Key), t.Key()),
 				Value: emitConv(fn, b.expr(fn, e.Value), t.Elt()),
+				pos:   e.Colon,
 			}
 			fn.emit(up)
 		}
@@ -1677,6 +1695,7 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 		States:   states,
 		Blocking: blocking,
 	}
+	triple.setPos(s.Select)
 	triple.setType(tSelect)
 	fn.emit(triple)
 	idx := emitExtract(fn, triple, 0, tInt)
@@ -1881,7 +1900,7 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 // tk and tv are the types of the key/value results k and v, or nil
 // if the respective component is not wanted.
 //
-func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Value, loop, done *BasicBlock) {
+func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type, pos token.Pos) (k, v Value, loop, done *BasicBlock) {
 	//
 	//	it = range x
 	// loop:                                   (target of continue)
@@ -1904,6 +1923,7 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Valu
 	}
 
 	rng := &Range{X: x}
+	rng.setPos(pos)
 	rng.setType(tRangeIter)
 	it := fn.emit(rng)
 
@@ -2017,7 +2037,7 @@ func (b *Builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock) {
 		k, loop, done = b.rangeChan(fn, x, tk)
 
 	case *types.Map, *types.Basic: // string
-		k, v, loop, done = b.rangeIter(fn, x, tk, tv)
+		k, v, loop, done = b.rangeIter(fn, x, tk, tv, s.For)
 
 	default:
 		panic("Cannot range over: " + rt.String())
@@ -2089,6 +2109,7 @@ start:
 			Chan: b.expr(fn, s.Chan),
 			X: emitConv(fn, b.expr(fn, s.Value),
 				underlyingType(fn.Pkg.TypeOf(s.Chan)).(*types.Chan).Elt()),
+			pos: s.Arrow,
 		})
 
 	case *ast.IncDecStmt:
@@ -2175,7 +2196,7 @@ start:
 				results = append(results, emitLoad(fn, r))
 			}
 		}
-		fn.emit(&Ret{Results: results})
+		fn.emit(&Ret{Results: results, pos: s.Return})
 		fn.currentBlock = fn.newBasicBlock("unreachable")
 
 	case *ast.BranchStmt:
@@ -2290,7 +2311,7 @@ func (b *Builder) buildFunction(fn *Function) {
 	}
 	if fn.Prog.mode&LogSource != 0 {
 		defer logStack("build function %s @ %s",
-			fn.FullName(), fn.Prog.Files.Position(fn.Pos))()
+			fn.FullName(), fn.Prog.Files.Position(fn.pos))()
 	}
 	fn.startBody()
 	fn.createSyntacticParams(fn.Pkg.idents)
@@ -2321,7 +2342,7 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 		pkg.Members[name] = &Constant{
 			Name_: name,
 			Value: newLiteral(obj.Val(), obj.Type()),
-			Pos:   obj.Pos(),
+			pos:   obj.Pos(),
 		}
 
 	case *types.Var:
@@ -2330,7 +2351,7 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 			Pkg:   pkg,
 			Name_: name,
 			Type_: pointer(obj.Type()), // address
-			Pos:   obj.Pos(),
+			pos:   obj.Pos(),
 			spec:  spec,
 		}
 		b.globals[obj] = g
@@ -2350,7 +2371,7 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 		fn := &Function{
 			Name_:     name,
 			Signature: sig,
-			Pos:       obj.Pos(), // (iff syntax)
+			pos:       obj.Pos(), // (iff syntax)
 			Pkg:       pkg,
 			Prog:      b.Prog,
 			syntax:    fs,
@@ -2409,8 +2430,8 @@ func (b *Builder) membersFromDecl(pkg *Package, decl ast.Decl) {
 	case *ast.FuncDecl:
 		id := decl.Name
 		if decl.Recv == nil && id.Name == "init" {
-			if !pkg.Init.Pos.IsValid() {
-				pkg.Init.Pos = decl.Name.Pos()
+			if !pkg.Init.pos.IsValid() {
+				pkg.Init.pos = decl.Name.Pos()
 			}
 			return // init blocks aren't functions
 		}
@@ -2686,7 +2707,7 @@ func (b *Builder) BuildPackage(p *Package) {
 
 		var v Call
 		v.Call.Func = p2.Init
-		v.Call.Pos = init.Pos
+		v.Call.pos = init.pos
 		v.setType(types.NewTuple())
 		init.emit(&v)
 	}

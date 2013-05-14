@@ -158,7 +158,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 
 	case *ssa.Call:
 		fn, args := prepareCall(fr, &instr.Call)
-		fr.env[instr] = call(fr.i, fr, instr.Call.Pos, fn, args)
+		fr.env[instr] = call(fr.i, fr, instr.Pos(), fn, args)
 
 	case *ssa.ChangeInterface:
 		fr.env[instr] = fr.get(instr.X) // (can't fail)
@@ -217,13 +217,13 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		return kJump
 
 	case *ssa.Defer:
-		pos := instr.Call.Pos // TODO(gri): workaround for go/types bug in typeswitch+funclit.
+		pos := instr.Pos() // TODO(gri): workaround for go/types bug in typeswitch+funclit.
 		fn, args := prepareCall(fr, &instr.Call)
 		fr.defers = append(fr.defers, func() { call(fr.i, fr, pos, fn, args) })
 
 	case *ssa.Go:
 		fn, args := prepareCall(fr, &instr.Call)
-		go call(fr.i, nil, instr.Call.Pos, fn, args)
+		go call(fr.i, nil, instr.Pos(), fn, args)
 
 	case *ssa.MakeChan:
 		fr.env[instr] = make(chan value, asInt(fr.get(instr.Size)))
@@ -441,7 +441,7 @@ func callSSA(i *interpreter, caller *frame, callpos token.Pos, fn *ssa.Function,
 	if i.mode&EnableTracing != 0 {
 		fset := fn.Prog.Files
 		// TODO(adonovan): fix: loc() lies for external functions.
-		fmt.Fprintf(os.Stderr, "Entering %s%s.\n", fn.FullName(), loc(fset, fn.Pos))
+		fmt.Fprintf(os.Stderr, "Entering %s%s.\n", fn.FullName(), loc(fset, fn.Pos()))
 		suffix := ""
 		if caller != nil {
 			suffix = ", resuming " + caller.fn.FullName() + loc(fset, callpos)

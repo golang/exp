@@ -15,7 +15,7 @@ func emitNew(f *Function, typ types.Type, pos token.Pos) Value {
 	return f.emit(&Alloc{
 		Type_: pointer(typ),
 		Heap:  true,
-		Pos:   pos,
+		pos:   pos,
 	})
 }
 
