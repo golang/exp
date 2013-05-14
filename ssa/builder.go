@@ -58,7 +58,7 @@ var (
 	tEface      = new(types.Interface)
 
 	// The result type of a "select".
-	tSelect = types.NewResult(
+	tSelect = types.NewTuple(
 		types.NewVar(nil, "index", tInt),
 		types.NewVar(nil, "recv", tEface),
 		varOk,
@@ -358,7 +358,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 
 	tuple.(interface {
 		setType(types.Type)
-	}).setType(types.NewResult(
+	}).setType(types.NewTuple(
 		types.NewVar(nil, "value", typ),
 		varOk,
 	))
@@ -987,7 +987,7 @@ func (b *Builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallEx
 		for i, arg := range e.Args {
 			// TODO(gri): annoyingly Signature.Params doesn't
 			// reflect the slice type for a final ...T param.
-			t := sig.Param(i).Type()
+			t := sig.Params().At(i).Type()
 			if sig.IsVariadic() && i == len(e.Args)-1 {
 				t = types.NewSlice(t)
 			}
@@ -1005,31 +1005,29 @@ func (b *Builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallEx
 	// args; a suffix of them may end up in a varargs slice.
 	for _, arg := range e.Args {
 		v := b.expr(fn, arg)
-		if ttuple, ok := v.Type().(*types.Result); ok { // MRV chain
-			i := 0
-			ttuple.ForEachValue(func(t *types.Var) {
-				args = append(args, emitExtract(fn, v, i, t.Type()))
-				i++
-			})
+		if ttuple, ok := v.Type().(*types.Tuple); ok { // MRV chain
+			for i, n := 0, ttuple.Arity(); i < n; i++ {
+				args = append(args, emitExtract(fn, v, i, ttuple.At(i).Type()))
+			}
 		} else {
 			args = append(args, v)
 		}
 	}
 
 	// Actual->formal assignability conversions for normal parameters.
-	np := sig.NumParams() // number of normal parameters
+	np := sig.Params().Arity() // number of normal parameters
 	if sig.IsVariadic() {
 		np--
 	}
 	for i := 0; i < np; i++ {
-		args[offset+i] = emitConv(fn, args[offset+i], sig.Param(i).Type())
+		args[offset+i] = emitConv(fn, args[offset+i], sig.Params().At(i).Type())
 	}
 
 	// Actual->formal assignability conversions for variadic parameter,
 	// and construction of slice.
 	if sig.IsVariadic() {
 		varargs := args[offset+np:]
-		vt := sig.Param(np).Type()
+		vt := sig.Params().At(np).Type()
 		st := types.NewSlice(vt)
 		if len(varargs) == 0 {
 			args = append(args, nilLiteral(st))
@@ -1180,12 +1178,12 @@ func (b *Builder) globalValueSpec(init *Function, spec *ast.ValueSpec, g *Global
 				defer logStack("build globals %s", spec.Names)()
 			}
 			tuple := b.exprN(init, spec.Values[0])
-			result := tuple.Type().(*types.Result)
+			result := tuple.Type().(*types.Tuple)
 			for i, id := range spec.Names {
 				if !isBlankIdent(id) {
 					g := b.globals[init.Pkg.ObjectOf(id)].(*Global)
 					g.spec = nil // just an optimization
-					emitStore(init, g, emitExtract(init, tuple, i, result.Value(i).Type()))
+					emitStore(init, g, emitExtract(init, tuple, i, result.At(i).Type()))
 				}
 			}
 		}
@@ -1224,11 +1222,11 @@ func (b *Builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 	default:
 		// e.g. var x, y = pos()
 		tuple := b.exprN(fn, spec.Values[0])
-		result := tuple.Type().(*types.Result)
+		result := tuple.Type().(*types.Tuple)
 		for i, id := range spec.Names {
 			if !isBlankIdent(id) {
 				lhs := fn.addNamedLocal(fn.Pkg.ObjectOf(id))
-				emitStore(fn, lhs, emitExtract(fn, tuple, i, result.Value(i).Type()))
+				emitStore(fn, lhs, emitExtract(fn, tuple, i, result.At(i).Type()))
 			}
 		}
 	}
@@ -1280,9 +1278,9 @@ func (b *Builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool) {
 	} else {
 		// e.g. x, y = pos()
 		tuple := b.exprN(fn, rhss[0])
-		result := tuple.Type().(*types.Result)
+		result := tuple.Type().(*types.Tuple)
 		for i, lval := range lvals {
-			lval.store(fn, emitExtract(fn, tuple, i, result.Value(i).Type()))
+			lval.store(fn, emitExtract(fn, tuple, i, result.At(i).Type()))
 		}
 	}
 }
@@ -1919,7 +1917,7 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type) (k, v Valu
 		Iter:     it,
 		IsString: isString,
 	}
-	okv.setType(types.NewResult(
+	okv.setType(types.NewTuple(
 		varOk,
 		types.NewVar(nil, "k", tk),
 		types.NewVar(nil, "v", tv),
@@ -1965,7 +1963,7 @@ func (b *Builder) rangeChan(fn *Function, x Value, tk types.Type) (k Value, loop
 		X:       x,
 		CommaOk: true,
 	}
-	recv.setType(types.NewResult(
+	recv.setType(types.NewTuple(
 		types.NewVar(nil, "k", tk),
 		varOk,
 	))
@@ -2144,20 +2142,19 @@ start:
 		}
 
 		var results []Value
-		if len(s.Results) == 1 && fn.Signature.NumResults() > 1 {
+		if len(s.Results) == 1 && fn.Signature.Results().Arity() > 1 {
 			// Return of one expression in a multi-valued function.
 			tuple := b.exprN(fn, s.Results[0])
-			i := 0
-			tuple.Type().(*types.Result).ForEachValue(func(v *types.Var) {
+			ttuple := tuple.Type().(*types.Tuple)
+			for i, n := 0, ttuple.Arity(); i < n; i++ {
 				results = append(results,
-					emitConv(fn, emitExtract(fn, tuple, i, v.Type()),
-						fn.Signature.Result(i).Type()))
-				i++
-			})
+					emitConv(fn, emitExtract(fn, tuple, i, ttuple.At(i).Type()),
+						fn.Signature.Results().At(i).Type()))
+			}
 		} else {
 			// 1:1 return, or no-arg return in non-void function.
 			for i, r := range s.Results {
-				v := emitConv(fn, b.expr(fn, r), fn.Signature.Result(i).Type())
+				v := emitConv(fn, b.expr(fn, r), fn.Signature.Results().At(i).Type())
 				results = append(results, v)
 			}
 		}
@@ -2285,7 +2282,7 @@ func (b *Builder) buildFunction(fn *Function) {
 			if recv := fn.Signature.Recv(); recv != nil {
 				fn.addParam(recv.Name(), recv.Type())
 			}
-			fn.Signature.ForEachParam(func(p *types.Var) {
+			fn.Signature.Params().ForEach(func(p *types.Var) {
 				fn.addParam(p.Name(), p.Type())
 			})
 		}
@@ -2690,7 +2687,7 @@ func (b *Builder) BuildPackage(p *Package) {
 		var v Call
 		v.Call.Func = p2.Init
 		v.Call.Pos = init.Pos
-		v.setType(new(types.Result))
+		v.setType(types.NewTuple())
 		init.emit(&v)
 	}
 

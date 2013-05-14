@@ -273,7 +273,7 @@ func emitTypeTest(f *Function, x Value, t types.Type) Value {
 		AssertedType: t,
 		CommaOk:      true,
 	}
-	a.setType(types.NewResult(
+	a.setType(types.NewTuple(
 		types.NewVar(nil, "value", t),
 		varOk,
 	))
@@ -290,13 +290,12 @@ func emitTailCall(f *Function, call *Call) {
 	for _, arg := range f.Params[1:] {
 		call.Call.Args = append(call.Call.Args, arg)
 	}
-	nr := f.Signature.NumResults()
+	tresults := f.Signature.Results()
+	nr := tresults.Arity()
 	if nr == 1 {
-		call.Type_ = f.Signature.Result(0).Type()
+		call.Type_ = tresults.At(0).Type()
 	} else {
-		var results []*types.Var
-		f.Signature.ForEachResult(func(v *types.Var) { results = append(results, v) })
-		call.Type_ = types.NewResult(results...)
+		call.Type_ = tresults
 	}
 	tuple := f.emit(call)
 	var ret Ret
@@ -306,16 +305,14 @@ func emitTailCall(f *Function, call *Call) {
 	case 1:
 		ret.Results = []Value{tuple}
 	default:
-		i := 0
-		call.Type().(*types.Result).ForEachValue(func(o *types.Var) {
-			v := emitExtract(f, tuple, i, o.Type())
+		for i := 0; i < nr; i++ {
+			v := emitExtract(f, tuple, i, tresults.At(i).Type())
 			// TODO(adonovan): in principle, this is required:
 			//   v = emitConv(f, o.Type, f.Signature.Results[i].Type)
 			// but in practice emitTailCall is only used when
 			// the types exactly match.
 			ret.Results = append(ret.Results, v)
-			i++
-		})
+		}
 	}
 	f.emit(&ret)
 	f.currentBlock = nil

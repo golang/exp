@@ -48,7 +48,7 @@ func relName(v Value, i Instruction) string {
 // It never appears in disassembly, which uses Value.Name().
 
 func (v *Literal) String() string {
-	return fmt.Sprintf("literal %s rep=%T", v.Name(), v.Value)
+	return fmt.Sprintf("literal %s", v.Name())
 }
 
 func (v *Parameter) String() string {
@@ -120,7 +120,7 @@ func printCall(v *CallCommon, prefix string, instr Instruction) string {
 	if !v.IsInvoke() {
 		b.WriteString(relName(v.Func, instr))
 	} else {
-		name := underlyingType(v.Recv.Type()).(*types.Interface).Method(v.Method).Name
+		name := underlyingType(v.Recv.Type()).(*types.Interface).Method(v.Method).Name()
 		fmt.Fprintf(&b, "invoke %s.%s [#%d]", relName(v.Recv, instr), name, v.Method)
 	}
 	b.WriteString("(")

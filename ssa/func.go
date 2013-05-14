@@ -236,7 +236,7 @@ func (f *Function) createSyntacticParams(idents map[*ast.Ident]types.Object) {
 			}
 			// Anonymous parameter?  No need to spill.
 			if field.Names == nil {
-				paramVar := f.Signature.Param(len(f.Params) - n)
+				paramVar := f.Signature.Params().At(len(f.Params) - n)
 				f.addParam(paramVar.Name(), paramVar.Type())
 			}
 		}
@@ -510,17 +510,14 @@ func writeSignature(w io.Writer, name string, sig *types.Signature, params []*Pa
 		}
 	}
 	io.WriteString(w, ")")
-	if n := sig.NumResults(); n > 0 {
+	r := sig.Results()
+	if n := r.Arity(); n > 0 {
 		io.WriteString(w, " ")
-		var t types.Type
-		if n == 1 && sig.Result(0).Name() == "" {
-			t = sig.Result(0).Type()
+		if n == 1 && r.At(0).Name() == "" {
+			io.WriteString(w, r.At(0).Type().String())
 		} else {
-			var results []*types.Var
-			sig.ForEachResult(func(v *types.Var) { results = append(results, v) })
-			t = types.NewResult(results...)
+			io.WriteString(w, r.String())
 		}
-		io.WriteString(w, t.String())
 	}
 }
 

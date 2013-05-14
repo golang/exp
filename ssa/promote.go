@@ -261,10 +261,7 @@ func addCandidate(m map[Id]*candidate, id Id, method *types.Func, concrete *Func
 //
 func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function {
 	old := cand.method.Type().(*types.Signature)
-	var params, results []*types.Var
-	old.ForEachParam(func(v *types.Var) { params = append(params, v) })
-	old.ForEachResult(func(v *types.Var) { results = append(results, v) })
-	sig := types.NewSignature(types.NewVar(nil, "recv", typ), params, results, old.IsVariadic())
+	sig := types.NewSignature(types.NewVar(nil, "recv", typ), old.Params(), old.Results(), old.IsVariadic())
 
 	if prog.mode&LogSource != 0 {
 		defer logStack("makeBridgeMethod %s, %s, type %s", typ, cand, &sig)()
@@ -326,15 +323,15 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 // createParams creates parameters for bridge method fn based on its Signature.
 func createParams(fn *Function) {
 	var last *Parameter
-	i := 0
-	fn.Signature.ForEachParam(func(p *types.Var) {
+	tparams := fn.Signature.Params()
+	for i, n := 0, tparams.Arity(); i < n; i++ {
+		p := tparams.At(i)
 		name := p.Name()
 		if name == "" {
 			name = fmt.Sprintf("arg%d", i)
 		}
 		last = fn.addParam(name, p.Type())
-		i++
-	})
+	}
 	if fn.Signature.IsVariadic() {
 		last.Type_ = types.NewSlice(last.Type_)
 	}

@@ -197,5 +197,5 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 		panic("unknown builtin: " + builtin)
 	}
 
-	return types.NewSignature(nil, params, nil, isVariadic)
+	return types.NewSignature(nil, types.NewTuple(params...), nil, isVariadic)
 }

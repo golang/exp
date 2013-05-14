@@ -117,13 +117,13 @@ func ext۰reflect۰rtype۰Kind(fn *ssa.Function, args []value) value {
 
 func ext۰reflect۰rtype۰NumOut(fn *ssa.Function, args []value) value {
 	// Signature: func (t reflect.rtype) int
-	return args[0].(rtype).t.(*types.Signature).NumResults()
+	return args[0].(rtype).t.(*types.Signature).Results().Arity()
 }
 
 func ext۰reflect۰rtype۰Out(fn *ssa.Function, args []value) value {
 	// Signature: func (t reflect.rtype, i int) int
 	i := args[1].(int)
-	return makeReflectType(rtype{args[0].(rtype).t.(*types.Signature).Result(i).Type()})
+	return makeReflectType(rtype{args[0].(rtype).t.(*types.Signature).Results().At(i).Type()})
 }
 
 func ext۰reflect۰rtype۰String(fn *ssa.Function, args []value) value {
