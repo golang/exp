@@ -142,6 +142,10 @@ type Struct struct {
 	offsets []int64  // field offsets in bytes, lazily computed
 }
 
+func NewStruct(fields []*Field, tags []string) *Struct {
+	return &Struct{fields: fields, tags: tags}
+}
+
 func (s *Struct) NumFields() int     { return len(s.fields) }
 func (s *Struct) Field(i int) *Field { return s.fields[i] }
 func (s *Struct) Tag(i int) string {
