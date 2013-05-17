@@ -107,7 +107,9 @@ func ext۰reflect۰rtype۰Bits(fn *ssa.Function, args []value) value {
 
 func ext۰reflect۰rtype۰Elem(fn *ssa.Function, args []value) value {
 	// Signature: func (t reflect.rtype) reflect.Type
-	return makeReflectType(rtype{underlyingType(args[0].(rtype).t).Elt()})
+	return makeReflectType(rtype{args[0].(rtype).t.Underlying().(interface {
+		Elem() types.Type
+	}).Elem()})
 }
 
 func ext۰reflect۰rtype۰Kind(fn *ssa.Function, args []value) value {
@@ -117,7 +119,7 @@ func ext۰reflect۰rtype۰Kind(fn *ssa.Function, args []value) value {
 
 func ext۰reflect۰rtype۰NumOut(fn *ssa.Function, args []value) value {
 	// Signature: func (t reflect.rtype) int
-	return args[0].(rtype).t.(*types.Signature).Results().Arity()
+	return args[0].(rtype).t.(*types.Signature).Results().Len()
 }
 
 func ext۰reflect۰rtype۰Out(fn *ssa.Function, args []value) value {
@@ -273,9 +275,9 @@ func ext۰reflect۰Value۰Index(fn *ssa.Function, args []value) value {
 	t := underlyingType(rV2T(args[0]).t)
 	switch v := rV2V(args[0]).(type) {
 	case array:
-		return makeReflectValue(t.(*types.Array).Elt(), v[i])
+		return makeReflectValue(t.(*types.Array).Elem(), v[i])
 	case []value:
-		return makeReflectValue(t.(*types.Slice).Elt(), v[i])
+		return makeReflectValue(t.(*types.Slice).Elem(), v[i])
 	default:
 		panic(fmt.Sprintf("reflect.(Value).Index(%T)", v))
 	}
@@ -305,7 +307,7 @@ func ext۰reflect۰Value۰Elem(fn *ssa.Function, args []value) value {
 	case iface:
 		return makeReflectValue(x.t, x.v)
 	case *value:
-		return makeReflectValue(underlyingType(rV2T(args[0]).t).(*types.Pointer).Elt(), *x)
+		return makeReflectValue(underlyingType(rV2T(args[0]).t).(*types.Pointer).Elem(), *x)
 	default:
 		panic(fmt.Sprintf("reflect.(Value).Elem(%T)", x))
 	}

@@ -146,7 +146,7 @@ func buildMethodSet(prog *Program, typ types.Type) MethodSet {
 			if node != nil {
 				t = node.field.Type
 			}
-			t = deref(t)
+			t = t.Deref()
 
 			if nt, ok := t.(*types.Named); ok {
 				nt.ForEachMethod(func(m *types.Func) {
@@ -288,7 +288,7 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 	// Iterate over selections e.A.B.C.f in the natural order [A,B,C].
 	for _, p := range cand.path.reverse() {
 		// Loop invariant: v holds a pointer to a struct.
-		if _, ok := underlyingType(indirectType(v.Type())).(*types.Struct); !ok {
+		if _, ok := indirectType(v.Type()).Underlying().(*types.Struct); !ok {
 			panic(fmt.Sprint("not a *struct: ", v.Type(), p.field.Type))
 		}
 		sel := &FieldAddr{
@@ -324,7 +324,7 @@ func makeBridgeMethod(prog *Program, typ types.Type, cand *candidate) *Function 
 func createParams(fn *Function) {
 	var last *Parameter
 	tparams := fn.Signature.Params()
-	for i, n := 0, tparams.Arity(); i < n; i++ {
+	for i, n := 0, tparams.Len(); i < n; i++ {
 		p := tparams.At(i)
 		name := p.Name()
 		if name == "" {
@@ -368,7 +368,7 @@ func makeImethodThunk(prog *Program, typ types.Type, id Id) *Function {
 	if prog.mode&LogSource != 0 {
 		defer logStack("makeImethodThunk %s.%s", typ, id)()
 	}
-	itf := underlyingType(typ).(*types.Interface)
+	itf := typ.Underlying().(*types.Interface)
 	index, meth := methodIndex(itf, id)
 	sig := *meth.Type().(*types.Signature) // copy; shared Values
 	fn := &Function{
@@ -419,7 +419,7 @@ func findPromotedField(st *types.Struct, id Id) (*anonFieldPath, int) {
 	for {
 		// look for name in all types at this level
 		for _, node := range list {
-			typ := deref(node.field.Type).(*types.Named)
+			typ := node.field.Type.Deref().(*types.Named)
 			if visited[typ] {
 				continue
 			}

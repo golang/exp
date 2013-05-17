@@ -306,7 +306,7 @@ type newPhiMap map[*BasicBlock][]newPhi
 func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap) bool {
 	// Don't lift aggregates into registers.
 	// We'll need a separate SRA pass for that.
-	switch underlyingType(indirectType(alloc.Type())).(type) {
+	switch indirectType(alloc.Type()).Underlying().(type) {
 	case *types.Array, *types.Struct:
 		return false
 	}

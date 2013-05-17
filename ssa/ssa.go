@@ -1189,7 +1189,7 @@ func (c *CallCommon) StaticCallee() *Function {
 // MethodId returns the Id for the method called by c, which must
 // have "invoke" mode.
 func (c *CallCommon) MethodId() Id {
-	m := underlyingType(c.Recv.Type()).(*types.Interface).Method(c.Method)
+	m := c.Recv.Type().Underlying().(*types.Interface).Method(c.Method)
 	return MakeId(m.Name(), m.Pkg())
 }
 

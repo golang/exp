@@ -6,64 +6,24 @@ package types
 
 import "go/ast"
 
+// A Type represents a type of Go.
 // All types implement the Type interface.
 type Type interface {
-	// TODO(gri) define a Kind accessor and TypeKind type?
+	// Underlying returns the underlying type of a type.
+	Underlying() Type
 
-	// Len returns an array type's length.
-	// It panics if the type is not an array.
-	Len() int64
-
-	// Key returns a map type's key type.
-	// It panics if the type is not a map.
-	Key() Type
-
-	// Elt returns a type's element type.
-	// It panics if the type is not an array, slice, pointer, map, or channel.
-	Elt() Type
-
-	// Dir returns a channel type's direction.
-	// It panics if the type is not a channel.
-	Dir() ast.ChanDir
-
-	// NumField returns a struct type's field count.
-	// It panics if the type is not a struct.
-	NumFields() int
-
-	// Field returns the i'th field of a struct.
-	// It panics if the type is not a struct or if the field index i is out of bounds.
-	Field(i int) *Field
-
-	// Tag returns the i'th field tag of a struct.
-	// It panics if the type is not a struct or if the field index i is out of bounds.
-	Tag(i int) string
-
-	// NumMethods returns the number of methods in the type's method set.
-	NumMethods() int
-
-	// Method returns the i'th method in the type's method set.
-	// It panics if the method index i is out of bounds.
-	Method(i int) *Func
-
-	// TODO(gri) Do we expose all methods of all types?
+	// For a pointer type (or a named type denoting a pointer type),
+	// Deref returns the pointer's element type. For all other types,
+	// Deref returns the receiver.
+	Deref() Type
 
 	// String returns a string representation of a type.
 	String() string
+
+	// TODO(gri) Which other functionality should move here?
+	// Candidates are all predicates (IsIdentical(), etc.),
+	// and some others. What is the design principle?
 }
-
-// aType provides default implementations for a Type's methods.
-type aType struct{}
-
-func (aType) Len() int64       { panic("types: Len of non-array type") }
-func (aType) Key() Type        { panic("types: Key of non-map type") }
-func (aType) Elt() Type        { panic("types: Elt of invalid type") }
-func (aType) Dir() ast.ChanDir { panic("types: Dir of non-chan type") }
-func (aType) NumFields() int   { panic("types: NumFields of non-struct type") }
-func (aType) Field(int) *Field { panic("types: Field of non-struct type") }
-func (aType) Tag(int) string   { panic("types: Tag of non-struct type") }
-func (aType) NumMethods() int  { panic("types: NumMethods of non-interface or unnamed type") }
-func (aType) Method(int) *Func { panic("types: Method of type with no methods") }
-func (aType) String() string   { panic("types: String of invalid type") }
 
 // BasicKind describes the kind of basic type.
 type BasicKind int
@@ -125,69 +85,58 @@ const (
 
 // A Basic represents a basic type.
 type Basic struct {
-	aType
 	kind BasicKind
 	info BasicInfo
 	size int64 // use DefaultSizeof to get size
 	name string
 }
 
+// Kind returns the kind of basic type b.
 func (b *Basic) Kind() BasicKind { return b.kind }
-func (b *Basic) Info() BasicInfo { return b.info }
-func (b *Basic) Name() string    { return b.name }
 
-// An Array represents an array type [Len]Elt.
+// Info returns information about properties of basic type b.
+func (b *Basic) Info() BasicInfo { return b.info }
+
+// Name returns the name of basic type b.
+func (b *Basic) Name() string { return b.name }
+
+// An Array represents an array type.
 type Array struct {
-	aType
 	len int64
 	elt Type
 }
 
-func NewArray(elt Type, len int64) *Array { return &Array{aType{}, len, elt} }
-func (a *Array) Len() int64               { return a.len }
-func (a *Array) Elt() Type                { return a.elt }
+// NewArray returns a new array type for the given element type and length.
+func NewArray(elem Type, len int64) *Array { return &Array{len, elem} }
 
-// A Slice represents a slice type []Elt.
+// Len returns the length of array a.
+func (a *Array) Len() int64 { return a.len }
+
+// Elem returns element type of array a.
+func (a *Array) Elem() Type { return a.elt }
+
+// A Slice represents a slice type.
 type Slice struct {
-	aType
 	elt Type
 }
 
-func NewSlice(elt Type) *Slice { return &Slice{aType{}, elt} }
-func (s *Slice) Elt() Type     { return s.elt }
+// NewSlice returns a new slice type for the given element type.
+func NewSlice(elem Type) *Slice { return &Slice{elem} }
 
-// A QualifiedName is a name qualified with the package that declared the name.
-// Note: Pkg may be a fake package (no name, no scope) because the GC compiler's
-// export information doesn't provide full information in some cases.
-// TODO(gri): Should change Pkg to PkgPath since it's the only thing we care about.
-type QualifiedName struct {
-	Pkg  *Package // nil only for predeclared error.Error (exported)
-	Name string   // unqualified type name for anonymous fields
-}
-
-// IsSame reports whether p and q are the same.
-func (p QualifiedName) IsSame(q QualifiedName) bool {
-	// spec:
-	// "Two identifiers are different if they are spelled differently,
-	// or if they appear in different packages and are not exported.
-	// Otherwise, they are the same."
-	if p.Name != q.Name {
-		return false
-	}
-	// p.Name == q.Name
-	return ast.IsExported(p.Name) || p.Pkg.path == q.Pkg.path
-}
+// Elem returns the element type of slice s.
+func (s *Slice) Elem() Type { return s.elt }
 
 // A Field represents a field of a struct.
+// TODO(gri): Should make this just a Var?
 type Field struct {
-	QualifiedName
+	Pkg         *Package
+	Name        string
 	Type        Type
 	IsAnonymous bool
 }
 
-// A Struct represents a struct type struct{...}.
+// A Struct represents a struct type.
 type Struct struct {
-	aType
 	fields  []*Field
 	tags    []string // field tags; nil of there are no tags
 	offsets []int64  // field offsets in bytes, lazily computed
@@ -207,48 +156,66 @@ func (s *Struct) ForEachField(f func(*Field)) {
 	}
 }
 
-func (s *Struct) fieldIndex(name QualifiedName) int {
+func (f *Field) isMatch(pkg *Package, name string) bool {
+	// spec:
+	// "Two identifiers are different if they are spelled differently,
+	// or if they appear in different packages and are not exported.
+	// Otherwise, they are the same."
+	if name != f.Name {
+		return false
+	}
+	// f.Name == name
+	return ast.IsExported(name) || pkg.path == f.Pkg.path
+}
+
+func (s *Struct) fieldIndex(pkg *Package, name string) int {
 	for i, f := range s.fields {
-		if f.QualifiedName.IsSame(name) {
+		if f.isMatch(pkg, name) {
 			return i
 		}
 	}
 	return -1
 }
 
-// A Pointer represents a pointer type *Base.
+// A Pointer represents a pointer type.
 type Pointer struct {
-	aType
 	base Type
 }
 
-func NewPointer(elt Type) *Pointer { return &Pointer{aType{}, elt} }
-func (p *Pointer) Elt() Type       { return p.base }
+// NewPointer returns a new pointer type for the given element (base) type.
+func NewPointer(elem Type) *Pointer { return &Pointer{elem} }
 
-// A Tuple represents an ordered list of variables.
-// A nil *Tuple is a valid (empty) tuple.
-// Note that tuples are not first-class types in the language.
+// Elem returns the element type for the given pointer p.
+func (p *Pointer) Elem() Type { return p.base }
+
+// A Tuple represents an ordered list of variables; a nil *Tuple is a valid (empty) tuple.
+// Tuples are used as components of signatures and to represent the type of multiple
+// assignments; they are not first class types of Go.
 type Tuple struct {
-	aType
 	vars []*Var
 }
 
+// NewTuple returns a new tuple for the given variables.
 func NewTuple(x ...*Var) *Tuple {
 	if len(x) > 0 {
-		return &Tuple{aType{}, x}
+		return &Tuple{x}
 	}
 	return nil
 }
 
-func (t *Tuple) Arity() int {
+// Len returns the number variables of tuple t.
+func (t *Tuple) Len() int {
 	if t != nil {
 		return len(t.vars)
 	}
 	return 0
 }
 
+// At returns the i'th variable of tuple t.
 func (t *Tuple) At(i int) *Var { return t.vars[i] }
 
+// ForEach calls f with each variable of tuple t in index order.
+// TODO(gri): Do we keep ForEach or should we abandon it in favor or Len and At?
 func (t *Tuple) ForEach(f func(*Var)) {
 	if t != nil {
 		for _, x := range t.vars {
@@ -257,25 +224,33 @@ func (t *Tuple) ForEach(f func(*Var)) {
 	}
 }
 
-// A Signature represents a user-defined function type func(...) (...).
+// A Signature represents a (non-builtin) function type.
 type Signature struct {
-	aType
 	recv       *Var   // nil if not a method
 	params     *Tuple // (incoming) parameters from left to right; or nil
 	results    *Tuple // (outgoing) results from left to right; or nil
 	isVariadic bool   // true if the last parameter's type is of the form ...T
 }
 
+// NewSignature returns a new function type for the given receiver, parameters,
+// and results, either of which may be nil. If isVariadic is set, the function
+// is variadic.
 func NewSignature(recv *Var, params, results *Tuple, isVariadic bool) *Signature {
-	return &Signature{aType{}, recv, params, results, isVariadic}
+	return &Signature{recv, params, results, isVariadic}
 }
 
-func (s *Signature) Recv() *Var       { return s.recv }
-func (s *Signature) Params() *Tuple   { return s.params }
-func (s *Signature) Results() *Tuple  { return s.results }
+// Recv returns the receiver of signature s, or nil.
+func (s *Signature) Recv() *Var { return s.recv }
+
+// Params returns the parameters of signature s, or nil.
+func (s *Signature) Params() *Tuple { return s.params }
+
+// Results returns the results of signature s, or nil.
+func (s *Signature) Results() *Tuple { return s.results }
+
+// IsVariadic reports whether the signature s is variadic.
 func (s *Signature) IsVariadic() bool { return s.isVariadic }
 
-// TODO(gri) Expose builtin-related types
 // builtinId is an id of a builtin function.
 type builtinId int
 
@@ -308,9 +283,8 @@ const (
 	_Trace
 )
 
-// A builtin represents the type of a built-in function.
-type builtin struct {
-	aType
+// A Builtin represents the type of a built-in function.
+type Builtin struct {
 	id          builtinId
 	name        string
 	nargs       int // number of arguments (minimum if variadic)
@@ -318,69 +292,145 @@ type builtin struct {
 	isStatement bool // true if the built-in is valid as an expression statement
 }
 
-// An Interface represents an interface type interface{...}.
+// Name returns the name of the built-in function b.
+func (b *Builtin) Name() string {
+	return b.name
+}
+
+// An Interface represents an interface type.
 type Interface struct {
-	aType
 	methods ObjSet
 }
 
+// NumMethods returns the number of methods of interface t.
 func (t *Interface) NumMethods() int { return len(t.methods.entries) }
+
+// Method returns the i'th method of interface t for 0 <= i < t.NumMethods().
 func (t *Interface) Method(i int) *Func {
 	return t.methods.entries[i].(*Func)
 }
+
+// IsEmpty() reports whether t is an empty interface.
 func (t *Interface) IsEmpty() bool { return len(t.methods.entries) == 0 }
-func (t *Interface) ForEachMethod(fn func(*Func)) {
+
+// ForEachMethod calls f with each method of interface t in index order.
+// TODO(gri) Should we abandon this in favor of NumMethods and Method?
+func (t *Interface) ForEachMethod(f func(*Func)) {
 	for _, obj := range t.methods.entries {
-		fn(obj.(*Func))
+		f(obj.(*Func))
 	}
 }
 
-// A Map represents a map type map[key]elt.
+// A Map represents a map type.
 type Map struct {
-	aType
 	key, elt Type
 }
 
-func (m *Map) Key() Type { return m.key }
-func (m *Map) Elt() Type { return m.elt }
+// NewMap returns a new map for the given key and element types.
+func NewMap(key, elem Type) *Map {
+	return &Map{key, elem}
+}
 
-// A Chan represents a channel type chan elt, <-chan elt, or chan<-elt.
+// Key returns the key type of map m.
+func (m *Map) Key() Type { return m.key }
+
+// Elem returns the element type of map m.
+func (m *Map) Elem() Type { return m.elt }
+
+// A Chan represents a channel type.
 type Chan struct {
-	aType
 	dir ast.ChanDir
 	elt Type
 }
 
-func (c *Chan) Dir() ast.ChanDir { return c.dir }
-func (c *Chan) Elt() Type        { return c.elt }
-
-// A Named represents a named type as declared in a type declaration.
-type Named struct {
-	aType
-	obj        *TypeName // corresponding declared object
-	underlying Type      // nil if not fully declared yet; never a *Named
-	methods    ObjSet
+// NewChan returns a new channel type for the given direction and element type.
+func NewChan(dir ast.ChanDir, elem Type) *Chan {
+	return &Chan{dir, elem}
 }
 
+// Dir returns the direction of channel c.
+func (c *Chan) Dir() ast.ChanDir { return c.dir }
+
+// Elem returns the element type of channel c.
+func (c *Chan) Elem() Type { return c.elt }
+
+// A Named represents a named type.
+type Named struct {
+	obj        *TypeName // corresponding declared object
+	underlying Type      // nil if not fully declared yet; never a *Named
+	methods    ObjSet    // directly associated methods (not the method set of this type)
+}
+
+// NewNamed returns a new named type for the given type name, underlying type, and associated methods.
 func NewNamed(obj *TypeName, underlying Type, methods ObjSet) *Named {
-	typ := &Named{aType{}, obj, underlying, methods}
+	typ := &Named{obj, underlying, methods}
 	if obj.typ == nil {
 		obj.typ = typ
 	}
 	return typ
 }
 
-func (t *Named) Obj() *TypeName   { return t.obj }
-func (t *Named) Underlying() Type { return t.underlying }
+// TypeName returns the type name for the named type t.
+func (t *Named) Obj() *TypeName { return t.obj }
 
-// TODO(gri) Define MethodSet type and move these accessors there.
+// NumMethods returns the number of methods directly associated with named type t.
 func (t *Named) NumMethods() int { return len(t.methods.entries) }
+
+// Method returns the i'th method of named type t for 0 <= i < t.NumMethods().
 func (t *Named) Method(i int) *Func {
 	return t.methods.entries[i].(*Func)
 }
-func (t *Named) IsEmpty() bool { return len(t.methods.entries) == 0 }
+
+// ForEachMethod calls f with each method associated with t in index order.
+// TODO(gri) Should we abandon this in favor of NumMethods and Method?
 func (t *Named) ForEachMethod(fn func(*Func)) {
 	for _, obj := range t.methods.entries {
 		fn(obj.(*Func))
 	}
 }
+
+// Implementations for Type methods.
+
+func (t *Basic) Underlying() Type     { return t }
+func (t *Array) Underlying() Type     { return t }
+func (t *Slice) Underlying() Type     { return t }
+func (t *Struct) Underlying() Type    { return t }
+func (t *Pointer) Underlying() Type   { return t }
+func (t *Tuple) Underlying() Type     { return t }
+func (t *Signature) Underlying() Type { return t }
+func (t *Builtin) Underlying() Type   { return t }
+func (t *Interface) Underlying() Type { return t }
+func (t *Map) Underlying() Type       { return t }
+func (t *Chan) Underlying() Type      { return t }
+func (t *Named) Underlying() Type     { return t.underlying }
+
+func (t *Basic) Deref() Type     { return t }
+func (t *Array) Deref() Type     { return t }
+func (t *Slice) Deref() Type     { return t }
+func (t *Struct) Deref() Type    { return t }
+func (t *Pointer) Deref() Type   { return t.base }
+func (t *Tuple) Deref() Type     { return t }
+func (t *Signature) Deref() Type { return t }
+func (t *Builtin) Deref() Type   { return t }
+func (t *Interface) Deref() Type { return t }
+func (t *Map) Deref() Type       { return t }
+func (t *Chan) Deref() Type      { return t }
+func (t *Named) Deref() Type {
+	if p, ok := t.underlying.(*Pointer); ok {
+		return p.base
+	}
+	return t
+}
+
+func (t *Basic) String() string     { return typeString(t) }
+func (t *Array) String() string     { return typeString(t) }
+func (t *Slice) String() string     { return typeString(t) }
+func (t *Struct) String() string    { return typeString(t) }
+func (t *Pointer) String() string   { return typeString(t) }
+func (t *Tuple) String() string     { return typeString(t) }
+func (t *Signature) String() string { return typeString(t) }
+func (t *Builtin) String() string   { return typeString(t) }
+func (t *Interface) String() string { return typeString(t) }
+func (t *Map) String() string       { return typeString(t) }
+func (t *Chan) String() string      { return typeString(t) }
+func (t *Named) String() string     { return typeString(t) }

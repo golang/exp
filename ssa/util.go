@@ -43,19 +43,6 @@ func isBlankIdent(e ast.Expr) bool {
 
 //// Type utilities.  Some of these belong in go/types.
 
-// underlyingType returns the underlying type of typ.
-// TODO(gri): this is a copy of go/types.underlying; export that function.
-//
-func underlyingType(typ types.Type) types.Type {
-	if typ, ok := typ.(*types.Named); ok {
-		return typ.Underlying() // underlying types are never NamedTypes
-	}
-	if typ == nil {
-		panic("underlyingType(nil)")
-	}
-	return typ
-}
-
 // isPointer returns true for types whose underlying type is a pointer.
 func isPointer(typ types.Type) bool {
 	if nt, ok := typ.(*types.Named); ok {
@@ -75,8 +62,8 @@ func pointer(typ types.Type) *types.Pointer {
 // Panic ensures if it is not a pointer.
 //
 func indirectType(ptr types.Type) types.Type {
-	if v, ok := underlyingType(ptr).(*types.Pointer); ok {
-		return v.Elt()
+	if v, ok := ptr.Underlying().(*types.Pointer); ok {
+		return v.Elem()
 	}
 	// When debugging it is convenient to comment out this line
 	// and let it continue to print the (illegal) SSA form.
@@ -84,21 +71,17 @@ func indirectType(ptr types.Type) types.Type {
 	return nil
 }
 
-// deref returns a pointer's base type; otherwise it returns typ.
-func deref(typ types.Type) types.Type {
-	if typ, ok := underlyingType(typ).(*types.Pointer); ok {
-		return typ.Elt()
-	}
-	return typ
-}
-
 // methodIndex returns the method (and its index) named id within the
 // method table of named or interface type typ.  If not found,
 // panic ensues.
 //
 func methodIndex(typ types.Type, id Id) (int, *types.Func) {
-	for i, n := 0, typ.NumMethods(); i < n; i++ {
-		m := typ.Method(i)
+	t := typ.(interface {
+		NumMethods() int
+		Method(i int) *types.Func
+	})
+	for i, n := 0, t.NumMethods(); i < n; i++ {
+		m := t.Method(i)
 		if MakeId(m.Name(), m.Pkg()) == id {
 			return i, m
 		}
@@ -155,7 +138,7 @@ func objKind(obj types.Object) ast.ObjKind {
 func canHaveConcreteMethods(typ types.Type, allowPtr bool) bool {
 	switch typ := typ.(type) {
 	case *types.Pointer:
-		return allowPtr && canHaveConcreteMethods(typ.Elt(), false)
+		return allowPtr && canHaveConcreteMethods(typ.Elem(), false)
 	case *types.Named:
 		switch typ.Underlying().(type) {
 		case *types.Pointer, *types.Interface:

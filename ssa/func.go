@@ -505,13 +505,13 @@ func writeSignature(w io.Writer, name string, sig *types.Signature, params []*Pa
 		io.WriteString(w, " ")
 		if sig.IsVariadic() && i == len(params)-1 {
 			io.WriteString(w, "...")
-			io.WriteString(w, underlyingType(v.Type()).(*types.Slice).Elt().String())
+			io.WriteString(w, v.Type().Underlying().(*types.Slice).Elem().String())
 		} else {
 			io.WriteString(w, v.Type().String())
 		}
 	}
 	io.WriteString(w, ")")
-	if n := sig.Results().Arity(); n > 0 {
+	if n := sig.Results().Len(); n > 0 {
 		io.WriteString(w, " ")
 		r := sig.Results()
 		if n == 1 && r.At(0).Name() == "" {

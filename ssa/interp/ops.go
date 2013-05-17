@@ -78,7 +78,7 @@ func literalValue(l *ssa.Literal) value {
 		}
 
 	case *types.Slice:
-		switch et := underlyingType(t.Elt()).(type) {
+		switch et := underlyingType(t.Elem()).(type) {
 		case *types.Basic:
 			switch et.Kind() {
 			case types.Byte: // string -> []byte
@@ -205,7 +205,7 @@ func zero(t types.Type) value {
 	case *types.Array:
 		a := make(array, t.Len())
 		for i := range a {
-			a[i] = zero(t.Elt())
+			a[i] = zero(t.Elem())
 		}
 		return a
 	case *types.Named:
@@ -276,7 +276,7 @@ func lookup(instr *ssa.Lookup, x, idx value) value {
 		if ok {
 			v = copyVal(v)
 		} else {
-			v = zero(underlyingType(instr.X.Type()).(*types.Map).Elt())
+			v = zero(underlyingType(instr.X.Type()).(*types.Map).Elem())
 		}
 		if instr.CommaOk {
 			v = tuple{v, ok}
@@ -758,7 +758,7 @@ func unop(instr *ssa.UnOp, x value) value {
 	case token.ARROW: // receive
 		v, ok := <-x.(chan value)
 		if !ok {
-			v = zero(underlyingType(instr.X.Type()).(*types.Chan).Elt())
+			v = zero(underlyingType(instr.X.Type()).(*types.Chan).Elem())
 		}
 		if instr.CommaOk {
 			v = tuple{v, ok}
@@ -1134,7 +1134,7 @@ func conv(t_dst, t_src types.Type, x value) value {
 	case *types.Slice:
 		// []byte or []rune -> string
 		// TODO(adonovan): fix: type B byte; conv([]B -> string).
-		switch ut_src.Elt().(*types.Basic).Kind() {
+		switch ut_src.Elem().(*types.Basic).Kind() {
 		case types.Byte:
 			x := x.([]value)
 			b := make([]byte, 0, len(x))
@@ -1169,7 +1169,7 @@ func conv(t_dst, t_src types.Type, x value) value {
 			case *types.Slice:
 				var res []value
 				// TODO(adonovan): fix: test named alias of rune, byte.
-				switch ut_dst.Elt().(*types.Basic).Kind() {
+				switch ut_dst.Elem().(*types.Basic).Kind() {
 				case types.Rune:
 					for _, r := range []rune(s) {
 						res = append(res, r)
@@ -1349,5 +1349,5 @@ func underlyingType(typ types.Type) types.Type {
 // Copied from exp/ssa.indirectType.
 //
 func indirectType(ptr types.Type) types.Type {
-	return underlyingType(ptr).(*types.Pointer).Elt()
+	return underlyingType(ptr).(*types.Pointer).Elem()
 }

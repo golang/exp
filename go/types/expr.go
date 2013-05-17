@@ -139,7 +139,7 @@ func (check *checker) collectMethods(list *ast.FieldList) (methods ObjSet) {
 			}
 		} else {
 			// embedded interface
-			utyp := underlying(typ)
+			utyp := typ.Underlying()
 			if ityp, ok := utyp.(*Interface); ok {
 				for _, obj := range ityp.methods.entries {
 					if alt := methods.Insert(obj); alt != nil {
@@ -182,7 +182,7 @@ func (check *checker) collectFields(list *ast.FieldList, cycleOk bool) (fields [
 		if tags != nil {
 			tags = append(tags, tag)
 		}
-		fields = append(fields, &Field{QualifiedName{check.pkg, name}, typ, isAnonymous})
+		fields = append(fields, &Field{check.pkg, name, typ, isAnonymous})
 	}
 
 	for _, f := range list.List {
@@ -195,7 +195,7 @@ func (check *checker) collectFields(list *ast.FieldList, cycleOk bool) (fields [
 			}
 		} else {
 			// anonymous field
-			switch t := deref(typ).(type) {
+			switch t := typ.Deref().(type) {
 			case *Basic:
 				add(t.name, true)
 			case *Named:
@@ -249,7 +249,7 @@ func (check *checker) unary(x *operand, op token.Token) {
 		return
 
 	case token.ARROW:
-		typ, ok := underlying(x.typ).(*Chan)
+		typ, ok := x.typ.Underlying().(*Chan)
 		if !ok {
 			check.invalidOp(x.pos(), "cannot receive from non-channel %s", x)
 			goto Error
@@ -268,7 +268,7 @@ func (check *checker) unary(x *operand, op token.Token) {
 	}
 
 	if x.mode == constant {
-		typ := underlying(x.typ).(*Basic)
+		typ := x.typ.Underlying().(*Basic)
 		size := -1
 		if isUnsigned(typ) {
 			size = int(check.ctxt.sizeof(typ))
@@ -517,7 +517,7 @@ func (check *checker) updateExprType(x ast.Expr, typ Type, final bool) {
 	// If the new type is not final and still untyped, just
 	// update the recorded type.
 	if !final && isUntyped(typ) {
-		old.typ = underlying(typ).(*Basic)
+		old.typ = typ.Underlying().(*Basic)
 		check.untyped[x] = old
 		return
 	}
@@ -565,7 +565,7 @@ func (check *checker) convertUntyped(x *operand, target Type) {
 	}
 
 	// typed target
-	switch t := underlying(target).(type) {
+	switch t := target.Underlying().(type) {
 	case nil:
 		// We may reach here due to previous type errors.
 		// Be conservative and don't crash.
@@ -814,7 +814,7 @@ func (check *checker) binary(x *operand, lhs, rhs ast.Expr, op token.Token, iota
 	}
 
 	if x.mode == constant && y.mode == constant {
-		typ := underlying(x.typ).(*Basic)
+		typ := x.typ.Underlying().(*Basic)
 		// force integer division of integer operands
 		if op == token.QUO && isInteger(typ) {
 			op = token.QUO_ASSIGN
@@ -937,7 +937,7 @@ func (check *checker) indexedElts(elts []ast.Expr, typ Type, length int64, iota 
 func (check *checker) argument(sig *Signature, i int, arg ast.Expr, x *operand, passSlice bool) {
 	// determine parameter
 	var par *Var
-	n := sig.params.Arity()
+	n := sig.params.Len()
 	if i < n {
 		par = sig.params.vars[i]
 	} else if sig.isVariadic {
@@ -1072,7 +1072,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			}
 		case *TypeName:
 			x.mode = typexpr
-			if !cycleOk && underlying(obj.typ) == nil {
+			if !cycleOk && obj.typ.Underlying() == nil {
 				check.errorf(obj.spec.Pos(), "illegal cycle in declaration of %s", obj.Name)
 				x.expr = e
 				x.typ = Typ[Invalid]
@@ -1135,7 +1135,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			goto Error
 		}
 
-		switch utyp := underlying(deref(typ)).(type) {
+		switch utyp := typ.Deref().Underlying().(type) {
 		case *Struct:
 			if len(e.Elts) == 0 {
 				break
@@ -1155,7 +1155,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 						check.errorf(kv.Pos(), "invalid field name %s in struct literal", kv.Key)
 						continue
 					}
-					i := utyp.fieldIndex(QualifiedName{check.pkg, key.Name})
+					i := utyp.fieldIndex(check.pkg, key.Name)
 					if i < 0 {
 						check.errorf(kv.Pos(), "unknown field %s in struct literal", key.Name)
 						continue
@@ -1224,7 +1224,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				check.expr(x, kv.Key, nil, iota)
 				if !check.assignment(x, utyp.key) {
 					if x.mode != invalid {
-						check.errorf(x.pos(), "cannot use %s as %s key in map literal", x, utyp.Key)
+						check.errorf(x.pos(), "cannot use %s as %s key in map literal", x, utyp.key)
 					}
 					continue
 				}
@@ -1238,7 +1238,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				check.expr(x, kv.Value, utyp.elt, iota)
 				if !check.assignment(x, utyp.elt) {
 					if x.mode != invalid {
-						check.errorf(x.pos(), "cannot use %s as %s value in map literal", x, utyp.Elt)
+						check.errorf(x.pos(), "cannot use %s as %s value in map literal", x, utyp.elt)
 					}
 					continue
 				}
@@ -1305,7 +1305,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 		if x.mode == invalid {
 			goto Error
 		}
-		res := lookupField(x.typ, QualifiedName{check.pkg, sel})
+		res := lookupField(x.typ, check.pkg, sel)
 		if res.mode == invalid {
 			check.invalidOp(e.Pos(), "%s has no single field or method %s", x, sel)
 			goto Error
@@ -1345,7 +1345,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 
 		valid := false
 		length := int64(-1) // valid if >= 0
-		switch typ := underlying(x.typ).(type) {
+		switch typ := x.typ.Underlying().(type) {
 		case *Basic:
 			if isString(typ) {
 				valid = true
@@ -1368,7 +1368,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			x.typ = typ.elt
 
 		case *Pointer:
-			if typ, _ := underlying(typ.base).(*Array); typ != nil {
+			if typ, _ := typ.base.Underlying().(*Array); typ != nil {
 				valid = true
 				length = typ.len
 				x.mode = variable
@@ -1416,7 +1416,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 
 		valid := false
 		length := int64(-1) // valid if >= 0
-		switch typ := underlying(x.typ).(type) {
+		switch typ := x.typ.Underlying().(type) {
 		case *Basic:
 			if isString(typ) {
 				valid = true
@@ -1445,7 +1445,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			x.typ = &Slice{elt: typ.elt}
 
 		case *Pointer:
-			if typ, _ := underlying(typ.base).(*Array); typ != nil {
+			if typ, _ := typ.base.Underlying().(*Array); typ != nil {
 				valid = true
 				length = typ.len + 1 // +1 for slice
 				x.mode = variable
@@ -1490,7 +1490,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			goto Error
 		}
 		var T *Interface
-		if T, _ = underlying(x.typ).(*Interface); T == nil {
+		if T, _ = x.typ.Underlying().(*Interface); T == nil {
 			check.invalidOp(x.pos(), "%s is not an interface", x)
 			goto Error
 		}
@@ -1523,7 +1523,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 			goto Error
 		} else if x.mode == typexpr {
 			check.conversion(x, e, x.typ, iota)
-		} else if sig, ok := underlying(x.typ).(*Signature); ok {
+		} else if sig, ok := x.typ.Underlying().(*Signature); ok {
 			// check parameters
 
 			// If we have a trailing ... at the end of the parameter
@@ -1556,7 +1556,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				}
 				if t, ok := x.typ.(*Tuple); ok {
 					// multiple result values
-					n = t.Arity()
+					n = t.Len()
 					for i := 0; i < n; i++ {
 						obj := t.At(i)
 						x.mode = value
@@ -1584,13 +1584,13 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				// last argument: count one extra
 				n++
 			}
-			if n < sig.params.Arity() {
+			if n < sig.params.Len() {
 				check.errorf(e.Fun.Pos(), "too few arguments in call to %s", e.Fun)
 				// ok to continue
 			}
 
 			// determine result
-			switch sig.results.Arity() {
+			switch sig.results.Len() {
 			case 0:
 				x.mode = novalue
 			case 1:
@@ -1601,7 +1601,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 				x.typ = sig.results
 			}
 
-		} else if bin, ok := x.typ.(*builtin); ok {
+		} else if bin, ok := x.typ.(*Builtin); ok {
 			check.builtin(x, e, bin, iota)
 
 		} else {
@@ -1617,7 +1617,7 @@ func (check *checker) rawExpr(x *operand, e ast.Expr, hint Type, iota int, cycle
 		case typexpr:
 			x.typ = &Pointer{base: x.typ}
 		default:
-			if typ, ok := underlying(x.typ).(*Pointer); ok {
+			if typ, ok := x.typ.Underlying().(*Pointer); ok {
 				x.mode = variable
 				x.typ = typ.base
 			} else {

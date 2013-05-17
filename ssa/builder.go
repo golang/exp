@@ -328,8 +328,8 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 		return fn.emit(&c)
 
 	case *ast.IndexExpr:
-		mapt := underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Map)
-		typ = mapt.Elt()
+		mapt := fn.Pkg.TypeOf(e.X).Underlying().(*types.Map)
+		typ = mapt.Elem()
 		lookup := &Lookup{
 			X:       b.expr(fn, e.X),
 			Index:   emitConv(fn, b.expr(fn, e.Index), mapt.Key()),
@@ -342,7 +342,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 		return emitTypeTest(fn, b.expr(fn, e.X), fn.Pkg.TypeOf(e))
 
 	case *ast.UnaryExpr: // must be receive <-
-		typ = underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Chan).Elt()
+		typ = fn.Pkg.TypeOf(e.X).Underlying().(*types.Chan).Elem()
 		unop := &UnOp{
 			Op:      token.ARROW,
 			X:       b.expr(fn, e.X),
@@ -379,7 +379,7 @@ func (b *Builder) exprN(fn *Function, e ast.Expr) Value {
 func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.Type, pos token.Pos) Value {
 	switch name {
 	case "make":
-		switch underlyingType(typ).(type) {
+		switch typ.Underlying().(type) {
 		case *types.Slice:
 			n := b.expr(fn, args[1])
 			m := n
@@ -416,7 +416,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 		}
 
 	case "new":
-		return emitNew(fn, indirectType(underlyingType(typ)), pos)
+		return emitNew(fn, indirectType(typ.Underlying()), pos)
 
 	case "len", "cap":
 		// Special case: len or cap of an array or *array is
@@ -424,7 +424,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 		// We must still evaluate the value, though.  (If it
 		// was side-effect free, the whole call would have
 		// been constant-folded.)
-		t := underlyingType(deref(fn.Pkg.TypeOf(args[0])))
+		t := fn.Pkg.TypeOf(args[0]).Deref().Underlying()
 		if at, ok := t.(*types.Array); ok {
 			b.expr(fn, args[0]) // for effects only
 			return intLiteral(at.Len())
@@ -449,7 +449,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 //
 func (b *Builder) selector(fn *Function, e *ast.SelectorExpr, wantAddr, escaping bool) Value {
 	id := MakeId(e.Sel.Name, fn.Pkg.Types)
-	st := underlyingType(deref(fn.Pkg.TypeOf(e.X))).(*types.Struct)
+	st := fn.Pkg.TypeOf(e.X).Deref().Underlying().(*types.Struct)
 	index := -1
 	for i, n := 0, st.NumFields(); i < n; i++ {
 		f := st.Field(i)
@@ -484,14 +484,14 @@ func (b *Builder) selector(fn *Function, e *ast.SelectorExpr, wantAddr, escaping
 func (b *Builder) fieldAddr(fn *Function, base ast.Expr, path *anonFieldPath, index int, fieldType types.Type, pos token.Pos, escaping bool) Value {
 	var x Value
 	if path != nil {
-		switch underlyingType(path.field.Type).(type) {
+		switch path.field.Type.Underlying().(type) {
 		case *types.Struct:
 			x = b.fieldAddr(fn, base, path.tail, path.index, path.field.Type, token.NoPos, escaping)
 		case *types.Pointer:
 			x = b.fieldExpr(fn, base, path.tail, path.index, path.field.Type, token.NoPos)
 		}
 	} else {
-		switch underlyingType(fn.Pkg.TypeOf(base)).(type) {
+		switch fn.Pkg.TypeOf(base).Underlying().(type) {
 		case *types.Struct:
 			x = b.addr(fn, base, escaping).(address).addr
 		case *types.Pointer:
@@ -521,7 +521,7 @@ func (b *Builder) fieldExpr(fn *Function, base ast.Expr, path *anonFieldPath, in
 	} else {
 		x = b.expr(fn, base)
 	}
-	switch underlyingType(x.Type()).(type) {
+	switch x.Type().Underlying().(type) {
 	case *types.Struct:
 		v := &Field{
 			X:     x,
@@ -577,7 +577,7 @@ func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 		return address{v}
 
 	case *ast.CompositeLit:
-		t := deref(fn.Pkg.TypeOf(e))
+		t := fn.Pkg.TypeOf(e).Deref()
 		var v Value
 		if escaping {
 			v = emitNew(fn, t, e.Lbrace)
@@ -605,21 +605,21 @@ func (b *Builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 	case *ast.IndexExpr:
 		var x Value
 		var et types.Type
-		switch t := underlyingType(fn.Pkg.TypeOf(e.X)).(type) {
+		switch t := fn.Pkg.TypeOf(e.X).Underlying().(type) {
 		case *types.Array:
 			x = b.addr(fn, e.X, escaping).(address).addr
-			et = pointer(t.Elt())
+			et = pointer(t.Elem())
 		case *types.Pointer: // *array
 			x = b.expr(fn, e.X)
-			et = pointer(underlyingType(t.Elt()).(*types.Array).Elt())
+			et = pointer(t.Elem().Underlying().(*types.Array).Elem())
 		case *types.Slice:
 			x = b.expr(fn, e.X)
-			et = pointer(t.Elt())
+			et = pointer(t.Elem())
 		case *types.Map:
 			return &element{
 				m: b.expr(fn, e.X),
 				k: emitConv(fn, b.expr(fn, e.Index), t.Key()),
-				t: t.Elt(),
+				t: t.Elem(),
 			}
 		default:
 			panic("unexpected container type in IndexExpr: " + t.String())
@@ -649,7 +649,7 @@ func (b *Builder) exprInPlace(fn *Function, loc lvalue, e ast.Expr) {
 	if addr, ok := loc.(address); ok {
 		if e, ok := e.(*ast.CompositeLit); ok {
 			typ := addr.typ()
-			switch underlyingType(typ).(type) {
+			switch typ.Underlying().(type) {
 			case *types.Pointer: // implicit & -- possibly escaping
 				ptr := b.addr(fn, e, true).(address).addr
 				addr.store(fn, ptr) // copy address
@@ -685,7 +685,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		posn := b.Prog.Files.Position(e.Type.Func)
 		fn2 := &Function{
 			Name_:     fmt.Sprintf("func@%d.%d", posn.Line, posn.Column),
-			Signature: underlyingType(fn.Pkg.TypeOf(e.Type)).(*types.Signature),
+			Signature: fn.Pkg.TypeOf(e.Type).Underlying().(*types.Signature),
 			pos:       e.Type.Func,
 			Enclosing: fn,
 			Pkg:       fn.Pkg,
@@ -783,7 +783,7 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 	case *ast.SliceExpr:
 		var low, high Value
 		var x Value
-		switch underlyingType(fn.Pkg.TypeOf(e.X)).(type) {
+		switch fn.Pkg.TypeOf(e.X).Underlying().(type) {
 		case *types.Array:
 			// Potentially escaping.
 			x = b.addr(fn, e.X, true).(address).addr
@@ -840,25 +840,25 @@ func (b *Builder) expr(fn *Function, e ast.Expr) Value {
 		return b.selector(fn, e, false, false)
 
 	case *ast.IndexExpr:
-		switch t := underlyingType(fn.Pkg.TypeOf(e.X)).(type) {
+		switch t := fn.Pkg.TypeOf(e.X).Underlying().(type) {
 		case *types.Array:
 			// Non-addressable array (in a register).
 			v := &Index{
 				X:     b.expr(fn, e.X),
 				Index: emitConv(fn, b.expr(fn, e.Index), tInt),
 			}
-			v.setType(t.Elt())
+			v.setType(t.Elem())
 			return fn.emit(v)
 
 		case *types.Map:
 			// Maps are not addressable.
-			mapt := underlyingType(fn.Pkg.TypeOf(e.X)).(*types.Map)
+			mapt := fn.Pkg.TypeOf(e.X).Underlying().(*types.Map)
 			v := &Lookup{
 				X:     b.expr(fn, e.X),
 				Index: emitConv(fn, b.expr(fn, e.Index), mapt.Key()),
 			}
 			v.setPos(e.Lbrack)
-			v.setType(mapt.Elt())
+			v.setType(mapt.Elem())
 			return fn.emit(v)
 
 		case *types.Basic: // => string
@@ -972,7 +972,7 @@ func (b *Builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 		}
 	}
 
-	switch t := underlyingType(typ).(type) {
+	switch t := typ.Underlying().(type) {
 	case *types.Struct, *types.Pointer:
 		// Case 3: x.f() where x.f is a function value in a
 		// struct field f; not a method call.  f is a 'var'
@@ -1021,7 +1021,7 @@ func (b *Builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallEx
 	for _, arg := range e.Args {
 		v := b.expr(fn, arg)
 		if ttuple, ok := v.Type().(*types.Tuple); ok { // MRV chain
-			for i, n := 0, ttuple.Arity(); i < n; i++ {
+			for i, n := 0, ttuple.Len(); i < n; i++ {
 				args = append(args, emitExtract(fn, v, i, ttuple.At(i).Type()))
 			}
 		} else {
@@ -1030,7 +1030,7 @@ func (b *Builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallEx
 	}
 
 	// Actual->formal assignability conversions for normal parameters.
-	np := sig.Params().Arity() // number of normal parameters
+	np := sig.Params().Len() // number of normal parameters
 	if sig.IsVariadic() {
 		np--
 	}
@@ -1076,7 +1076,7 @@ func (b *Builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	b.setCallFunc(fn, e, c)
 
 	// Then append the other actual parameters.
-	sig, _ := underlyingType(fn.Pkg.TypeOf(e.Fun)).(*types.Signature)
+	sig, _ := fn.Pkg.TypeOf(e.Fun).Underlying().(*types.Signature)
 	if sig == nil {
 		sig = builtinCallSignature(&fn.Pkg.TypeInfo, e)
 	}
@@ -1326,7 +1326,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 	// TODO(adonovan): document how and why typ ever differs from
 	// fn.Pkg.TypeOf(e).
 
-	switch t := underlyingType(typ).(type) {
+	switch t := typ.Underlying().(type) {
 	case *types.Struct:
 		for i, e := range e.Elts {
 			fieldIndex := i
@@ -1356,7 +1356,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 		var array Value
 		switch t := t.(type) {
 		case *types.Slice:
-			at = types.NewArray(t.Elt(), b.arrayLen(fn, e.Elts))
+			at = types.NewArray(t.Elem(), b.arrayLen(fn, e.Elts))
 			array = emitNew(fn, at, e.Lbrace)
 		case *types.Array:
 			at = t
@@ -1379,7 +1379,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 				X:     array,
 				Index: idx,
 			}
-			iaddr.setType(pointer(at.Elt()))
+			iaddr.setType(pointer(at.Elem()))
 			fn.emit(iaddr)
 			b.exprInPlace(fn, address{iaddr}, e)
 		}
@@ -1400,7 +1400,7 @@ func (b *Builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, typ typ
 			up := &MapUpdate{
 				Map:   m,
 				Key:   emitConv(fn, b.expr(fn, e.Key), t.Key()),
-				Value: emitConv(fn, b.expr(fn, e.Value), t.Elt()),
+				Value: emitConv(fn, b.expr(fn, e.Value), t.Elem()),
 				pos:   e.Colon,
 			}
 			fn.emit(up)
@@ -1662,7 +1662,7 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 				Dir:  ast.SEND,
 				Chan: ch,
 				Send: emitConv(fn, b.expr(fn, comm.Value),
-					underlyingType(ch.Type()).(*types.Chan).Elt()),
+					ch.Type().Underlying().(*types.Chan).Elem()),
 			})
 
 		case *ast.AssignStmt: // x := <-ch
@@ -1825,7 +1825,7 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 
 	// Determine number of iterations.
 	var length Value
-	if arr, ok := deref(x.Type()).(*types.Array); ok {
+	if arr, ok := x.Type().Deref().(*types.Array); ok {
 		// For array or *array, the number of iterations is
 		// known statically thanks to the type.  We avoid a
 		// data dependence upon x, permitting later dead-code
@@ -1863,13 +1863,13 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 
 	k = emitLoad(fn, index)
 	if tv != nil {
-		switch t := underlyingType(x.Type()).(type) {
+		switch t := x.Type().Underlying().(type) {
 		case *types.Array:
 			instr := &Index{
 				X:     x,
 				Index: k,
 			}
-			instr.setType(t.Elt())
+			instr.setType(t.Elem())
 			v = fn.emit(instr)
 
 		case *types.Pointer: // *array
@@ -1877,7 +1877,7 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 				X:     x,
 				Index: k,
 			}
-			instr.setType(pointer(t.Elt().(*types.Array).Elt()))
+			instr.setType(pointer(t.Elem().(*types.Array).Elem()))
 			v = emitLoad(fn, fn.emit(instr))
 
 		case *types.Slice:
@@ -1885,7 +1885,7 @@ func (b *Builder) rangeIndexed(fn *Function, x Value, tv types.Type) (k, v Value
 				X:     x,
 				Index: k,
 			}
-			instr.setType(pointer(t.Elt()))
+			instr.setType(pointer(t.Elem()))
 			v = emitLoad(fn, fn.emit(instr))
 
 		default:
@@ -1931,7 +1931,7 @@ func (b *Builder) rangeIter(fn *Function, x Value, tk, tv types.Type, pos token.
 	emitJump(fn, loop)
 	fn.currentBlock = loop
 
-	_, isString := underlyingType(x.Type()).(*types.Basic)
+	_, isString := x.Type().Underlying().(*types.Basic)
 
 	okv := &Next{
 		Iter:     it,
@@ -2029,7 +2029,7 @@ func (b *Builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock) {
 
 	var k, v Value
 	var loop, done *BasicBlock
-	switch rt := underlyingType(x.Type()).(type) {
+	switch rt := x.Type().Underlying().(type) {
 	case *types.Slice, *types.Array, *types.Pointer: // *array
 		k, v, loop, done = b.rangeIndexed(fn, x, tv)
 
@@ -2108,7 +2108,7 @@ start:
 		fn.emit(&Send{
 			Chan: b.expr(fn, s.Chan),
 			X: emitConv(fn, b.expr(fn, s.Value),
-				underlyingType(fn.Pkg.TypeOf(s.Chan)).(*types.Chan).Elt()),
+				fn.Pkg.TypeOf(s.Chan).Underlying().(*types.Chan).Elem()),
 			pos: s.Arrow,
 		})
 
@@ -2163,11 +2163,11 @@ start:
 		}
 
 		var results []Value
-		if len(s.Results) == 1 && fn.Signature.Results().Arity() > 1 {
+		if len(s.Results) == 1 && fn.Signature.Results().Len() > 1 {
 			// Return of one expression in a multi-valued function.
 			tuple := b.exprN(fn, s.Results[0])
 			ttuple := tuple.Type().(*types.Tuple)
-			for i, n := 0, ttuple.Arity(); i < n; i++ {
+			for i, n := 0, ttuple.Len(); i < n; i++ {
 				results = append(results,
 					emitConv(fn, emitExtract(fn, tuple, i, ttuple.At(i).Type()),
 						fn.Signature.Results().At(i).Type()))
@@ -2382,7 +2382,7 @@ func (b *Builder) memberFromObject(pkg *Package, obj types.Object, syntax ast.No
 			pkg.Members[name] = fn
 		} else {
 			// Method declaration.
-			nt := deref(sig.Recv().Type()).(*types.Named)
+			nt := sig.Recv().Type().Deref().(*types.Named)
 			_, method := methodIndex(nt, MakeId(name, pkg.Types))
 			b.Prog.concreteMethods[method] = fn
 		}

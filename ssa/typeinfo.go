@@ -115,7 +115,7 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 			t1 = info.TypeOf(e.Args[1]) // no conversion
 		} else {
 			// append([]T, ...T) []T
-			t1 = underlyingType(t0).(*types.Slice).Elt()
+			t1 = t0.Underlying().(*types.Slice).Elem()
 			isVariadic = true
 		}
 		params = append(params,
@@ -136,9 +136,9 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 		// copy([]T, []T) int
 		// Infer arg types from each other.  Sleazy.
 		var st *types.Slice
-		if t, ok := underlyingType(info.TypeOf(e.Args[0])).(*types.Slice); ok {
+		if t, ok := info.TypeOf(e.Args[0]).Underlying().(*types.Slice); ok {
 			st = t
-		} else if t, ok := underlyingType(info.TypeOf(e.Args[1])).(*types.Slice); ok {
+		} else if t, ok := info.TypeOf(e.Args[1]).Underlying().(*types.Slice); ok {
 			st = t
 		} else {
 			panic("cannot infer types in call to copy()")
@@ -149,7 +149,7 @@ func builtinCallSignature(info *TypeInfo, e *ast.CallExpr) *types.Signature {
 	case "delete":
 		// delete(map[K]V, K)
 		tmap := info.TypeOf(e.Args[0])
-		tkey := underlyingType(tmap).(*types.Map).Key()
+		tkey := tmap.Underlying().(*types.Map).Key()
 		params = append(params,
 			types.NewVar(nil, "", tmap),
 			types.NewVar(nil, "", tkey))

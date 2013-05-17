@@ -172,7 +172,7 @@ func TestGcImportedTypes(t *testing.T) {
 			t.Errorf("%s: got kind = %q; want %q", test.name, kind, test.kind)
 		}
 
-		str := typeString(underlying(typ))
+		str := typeString(typ.Underlying())
 		if str != test.typ {
 			t.Errorf("%s: got type = %q; want %q", test.name, typ, test.typ)
 		}

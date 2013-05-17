@@ -60,8 +60,8 @@ func emitArith(f *Function, op token.Token, x, y Value, t types.Type) Value {
 // comparison comparison 'x op y'.
 //
 func emitCompare(f *Function, op token.Token, x, y Value) Value {
-	xt := underlyingType(x.Type())
-	yt := underlyingType(y.Type())
+	xt := x.Type().Underlying()
+	yt := y.Type().Underlying()
 
 	// Special case to optimise a tagless SwitchStmt so that
 	// these are equivalent
@@ -142,8 +142,8 @@ func emitConv(f *Function, val Value, typ types.Type) Value {
 		return val
 	}
 
-	ut_dst := underlyingType(typ)
-	ut_src := underlyingType(t_src)
+	ut_dst := typ.Underlying()
+	ut_src := t_src.Underlying()
 
 	// Just a change of type, but not value or representation?
 	if isValuePreserving(ut_src, ut_dst) {
@@ -243,8 +243,8 @@ func emitExtract(f *Function, tuple Value, index int, typ types.Type) Value {
 //
 func emitTypeAssert(f *Function, x Value, t types.Type) Value {
 	// Simplify infallible assertions.
-	txi := underlyingType(x.Type()).(*types.Interface)
-	if ti, ok := underlyingType(t).(*types.Interface); ok {
+	txi := x.Type().Underlying().(*types.Interface)
+	if ti, ok := t.Underlying().(*types.Interface); ok {
 		if types.IsIdentical(ti, txi) {
 			return x
 		}
@@ -291,7 +291,7 @@ func emitTailCall(f *Function, call *Call) {
 		call.Call.Args = append(call.Call.Args, arg)
 	}
 	tresults := f.Signature.Results()
-	nr := tresults.Arity()
+	nr := tresults.Len()
 	if nr == 1 {
 		call.Type_ = tresults.At(0).Type()
 	} else {

@@ -219,7 +219,7 @@ func writeTuple(buf *bytes.Buffer, tup *Tuple, isVariadic bool) {
 func writeSignature(buf *bytes.Buffer, sig *Signature) {
 	writeTuple(buf, sig.params, sig.isVariadic)
 
-	n := sig.results.Arity()
+	n := sig.results.Len()
 	if n == 0 {
 		// no result
 		return
@@ -280,7 +280,7 @@ func writeType(buf *bytes.Buffer, typ Type) {
 		buf.WriteString("func")
 		writeSignature(buf, t)
 
-	case *builtin:
+	case *Builtin:
 		fmt.Fprintf(buf, "<type of %s>", t.name)
 
 	case *Interface:
@@ -330,16 +330,3 @@ func writeType(buf *bytes.Buffer, typ Type) {
 		buf.WriteString(t.String())
 	}
 }
-
-func (t *Array) String() string     { return typeString(t) }
-func (t *Basic) String() string     { return typeString(t) }
-func (t *Chan) String() string      { return typeString(t) }
-func (t *Interface) String() string { return typeString(t) }
-func (t *Map) String() string       { return typeString(t) }
-func (t *Named) String() string     { return typeString(t) }
-func (t *Pointer) String() string   { return typeString(t) }
-func (t *Tuple) String() string     { return typeString(t) }
-func (t *Signature) String() string { return typeString(t) }
-func (t *Slice) String() string     { return typeString(t) }
-func (t *Struct) String() string    { return typeString(t) }
-func (t *builtin) String() string   { return typeString(t) }

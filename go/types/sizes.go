@@ -45,7 +45,7 @@ func (ctxt *Context) offsetsof(s *Struct) []int64 {
 func (ctxt *Context) offsetof(typ Type, index []int) int64 {
 	var o int64
 	for _, i := range index {
-		s, _ := underlying(typ).(*Struct)
+		s, _ := typ.Underlying().(*Struct)
 		if s == nil {
 			return -1
 		}
@@ -74,7 +74,7 @@ const DefaultMaxAlign = 8
 func DefaultAlignof(typ Type) int64 {
 	// For arrays and structs, alignment is defined in terms
 	// of alignment of the elements and fields, respectively.
-	switch t := underlying(typ).(type) {
+	switch t := typ.Underlying().(type) {
 	case *Array:
 		// spec: "For a variable x of array type: unsafe.Alignof(x)
 		// is the same as unsafe.Alignof(x[0]), but at least 1."
@@ -129,7 +129,7 @@ const DefaultPtrSize = 8
 // DefaultSizeof implements the default size computation
 // for unsafe.Sizeof. It is used if Context.Sizeof == nil.
 func DefaultSizeof(typ Type) int64 {
-	switch t := underlying(typ).(type) {
+	switch t := typ.Underlying().(type) {
 	case *Basic:
 		if s := t.size; s > 0 {
 			return s

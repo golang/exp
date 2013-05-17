@@ -26,7 +26,7 @@ func (check *checker) assignment(x *operand, to Type) bool {
 
 	if t, ok := x.typ.(*Tuple); ok {
 		// TODO(gri) elsewhere we use "assignment count mismatch" (consolidate)
-		check.errorf(x.pos(), "%d-valued expression %s used as single value", t.Arity(), x)
+		check.errorf(x.pos(), "%d-valued expression %s used as single value", t.Len(), x)
 		x.mode = invalid
 		return false
 	}
@@ -190,7 +190,7 @@ func (check *checker) assignNtoM(lhs, rhs []ast.Expr, decl bool, iota int) {
 			goto Error
 		}
 
-		if t, ok := x.typ.(*Tuple); ok && len(lhs) == t.Arity() {
+		if t, ok := x.typ.(*Tuple); ok && len(lhs) == t.Len() {
 			// function result
 			x.mode = value
 			for i := 0; i < len(lhs); i++ {
@@ -314,7 +314,7 @@ func (check *checker) stmt(s ast.Stmt) {
 			//           check.register. Perhaps this can be avoided.)
 			check.expr(&x, e.Fun, nil, -1)
 			if x.mode != invalid {
-				if b, ok := x.typ.(*builtin); ok && !b.isStatement {
+				if b, ok := x.typ.(*Builtin); ok && !b.isStatement {
 					used = false
 				}
 			}
@@ -340,7 +340,7 @@ func (check *checker) stmt(s ast.Stmt) {
 		if ch.mode == invalid || x.mode == invalid {
 			return
 		}
-		if tch, ok := underlying(ch.typ).(*Chan); !ok || tch.dir&ast.SEND == 0 || !check.assignment(&x, tch.elt) {
+		if tch, ok := ch.typ.Underlying().(*Chan); !ok || tch.dir&ast.SEND == 0 || !check.assignment(&x, tch.elt) {
 			if x.mode != invalid {
 				check.invalidOp(ch.pos(), "cannot send %s to channel %s", &x, &ch)
 			}
@@ -424,7 +424,7 @@ func (check *checker) stmt(s ast.Stmt) {
 
 	case *ast.ReturnStmt:
 		sig := check.funcsig
-		if n := sig.results.Arity(); n > 0 {
+		if n := sig.results.Len(); n > 0 {
 			// TODO(gri) should not have to compute lhs, named every single time - clean this up
 			lhs := make([]ast.Expr, n)
 			named := false // if set, function has named results
@@ -571,7 +571,7 @@ func (check *checker) stmt(s ast.Stmt) {
 			return
 		}
 		var T *Interface
-		if T, _ = underlying(x.typ).(*Interface); T == nil {
+		if T, _ = x.typ.Underlying().(*Interface); T == nil {
 			check.errorf(x.pos(), "%s is not an interface", &x)
 			return
 		}
@@ -656,7 +656,7 @@ func (check *checker) stmt(s ast.Stmt) {
 
 		// determine key/value types
 		var key, val Type
-		switch typ := underlying(x.typ).(type) {
+		switch typ := x.typ.Underlying().(type) {
 		case *Basic:
 			if isString(typ) {
 				key = Typ[UntypedInt]
@@ -669,7 +669,7 @@ func (check *checker) stmt(s ast.Stmt) {
 			key = Typ[UntypedInt]
 			val = typ.elt
 		case *Pointer:
-			if typ, _ := underlying(typ.base).(*Array); typ != nil {
+			if typ, _ := typ.base.Underlying().(*Array); typ != nil {
 				key = Typ[UntypedInt]
 				val = typ.elt
 			}

@@ -257,7 +257,7 @@ func (check *checker) object(obj Object, cycleOk bool) {
 		}
 		typ := &Named{obj: obj}
 		obj.typ = typ // "mark" object so recursion terminates
-		typ.underlying = underlying(check.typ(obj.spec.Type, cycleOk))
+		typ.underlying = check.typ(obj.spec.Type, cycleOk).Underlying()
 		// typecheck associated method signatures
 		if scope := check.methods[obj]; scope != nil {
 			switch t := typ.underlying.(type) {
@@ -300,7 +300,7 @@ func (check *checker) object(obj Object, cycleOk bool) {
 		// methods are typechecked when their receivers are typechecked
 		if fdecl.Recv == nil {
 			sig := check.typ(fdecl.Type, cycleOk).(*Signature)
-			if obj.name == "init" && (sig.params.Arity() > 0 || sig.results.Arity() > 0) {
+			if obj.name == "init" && (sig.params.Len() > 0 || sig.results.Len() > 0) {
 				check.errorf(fdecl.Pos(), "func init must have no arguments and no return values")
 				// ok to continue
 			}
@@ -483,7 +483,7 @@ func check(ctxt *Context, path string, fset *token.FileSet, files ...*ast.File) 
 		}
 		check.funcsig = f.sig
 		check.stmtList(f.body.List)
-		if f.sig.results.Arity() > 0 && f.body != nil && !check.isTerminating(f.body, "") {
+		if f.sig.results.Len() > 0 && f.body != nil && !check.isTerminating(f.body, "") {
 			check.errorf(f.body.Rbrace, "missing return")
 		}
 	}

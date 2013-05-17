@@ -15,57 +15,57 @@ func isNamed(typ Type) bool {
 }
 
 func isBoolean(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsBoolean != 0
 }
 
 func isInteger(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsInteger != 0
 }
 
 func isUnsigned(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsUnsigned != 0
 }
 
 func isFloat(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsFloat != 0
 }
 
 func isComplex(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsComplex != 0
 }
 
 func isNumeric(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsNumeric != 0
 }
 
 func isString(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsString != 0
 }
 
 func isUntyped(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsUntyped != 0
 }
 
 func isOrdered(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsOrdered != 0
 }
 
 func isConstType(typ Type) bool {
-	t, ok := underlying(typ).(*Basic)
+	t, ok := typ.Underlying().(*Basic)
 	return ok && t.info&IsConstType != 0
 }
 
 func isComparable(typ Type) bool {
-	switch t := underlying(typ).(type) {
+	switch t := typ.Underlying().(type) {
 	case *Basic:
 		return t.kind != Invalid && t.kind != UntypedNil
 	case *Pointer, *Interface, *Chan:
@@ -85,7 +85,7 @@ func isComparable(typ Type) bool {
 }
 
 func hasNil(typ Type) bool {
-	switch underlying(typ).(type) {
+	switch typ.Underlying().(type) {
 	case *Slice, *Pointer, *Signature, *Interface, *Map, *Chan:
 		return true
 	}
@@ -131,7 +131,7 @@ func IsIdentical(x, y Type) bool {
 					g := y.fields[i]
 					if f.IsAnonymous != g.IsAnonymous ||
 						x.Tag(i) != y.Tag(i) ||
-						!f.QualifiedName.IsSame(g.QualifiedName) ||
+						!f.isMatch(g.Pkg, g.Name) ||
 						!IsIdentical(f.Type, g.Type) {
 						return false
 					}
@@ -192,7 +192,7 @@ func IsIdentical(x, y Type) bool {
 // identicalTypes returns true if both lists a and b have the
 // same length and corresponding objects have identical types.
 func identicalTypes(a, b *Tuple) bool {
-	if a.Arity() != b.Arity() {
+	if a.Len() != b.Len() {
 		return false
 	}
 	if a != nil {
@@ -213,38 +213,21 @@ func identicalMethods(a, b ObjSet) bool {
 	if len(a.entries) != len(b.entries) {
 		return false
 	}
-	m := make(map[QualifiedName]*Func)
+	m := make(map[string]*Func)
 	for _, obj := range a.entries {
 		x := obj.(*Func)
-		qname := QualifiedName{x.pkg, x.name}
+		qname := x.pkg.path + "." + x.name
 		assert(m[qname] == nil) // method list must not have duplicate entries
 		m[qname] = x
 	}
 	for _, obj := range b.entries {
 		y := obj.(*Func)
-		qname := QualifiedName{y.pkg, y.name}
+		qname := y.pkg.path + "." + y.name
 		if x := m[qname]; x == nil || !IsIdentical(x.typ, y.typ) {
 			return false
 		}
 	}
 	return true
-}
-
-// underlying returns the underlying type of typ.
-func underlying(typ Type) Type {
-	// Basic types are representing themselves directly even though they are named.
-	if typ, ok := typ.(*Named); ok {
-		return typ.underlying // underlying types are never Nameds
-	}
-	return typ
-}
-
-// deref returns a pointer's base type; otherwise it returns typ.
-func deref(typ Type) Type {
-	if typ, ok := underlying(typ).(*Pointer); ok {
-		return typ.base
-	}
-	return typ
 }
 
 // defaultType returns the default "typed" type for an "untyped" type;
@@ -286,10 +269,10 @@ func missingMethod(typ Type, T *Interface) (method *Func, wrongType bool) {
 	// TODO(gri): distinguish pointer and non-pointer receivers
 	// an interface type implements T if it has no methods with conflicting signatures
 	// Note: This is stronger than the current spec. Should the spec require this?
-	if ityp, _ := underlying(typ).(*Interface); ityp != nil {
+	if ityp, _ := typ.Underlying().(*Interface); ityp != nil {
 		for _, obj := range T.methods.entries {
 			m := obj.(*Func)
-			res := lookupField(ityp, QualifiedName{m.pkg, m.name}) // TODO(gri) no need to go via lookupField
+			res := lookupField(ityp, m.pkg, m.name) // TODO(gri) no need to go via lookupField
 			if res.mode != invalid && !IsIdentical(res.typ, m.typ) {
 				return m, true
 			}
@@ -300,7 +283,7 @@ func missingMethod(typ Type, T *Interface) (method *Func, wrongType bool) {
 	// a concrete type implements T if it implements all methods of T.
 	for _, obj := range T.methods.entries {
 		m := obj.(*Func)
-		res := lookupField(typ, QualifiedName{m.pkg, m.name})
+		res := lookupField(typ, m.pkg, m.name)
 		if res.mode == invalid {
 			return m, false
 		}

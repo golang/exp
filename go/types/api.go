@@ -30,7 +30,6 @@ package types
 // The API is still slightly in flux and the following changes are considered:
 //
 // API(gri): Provide position information for all objects.
-// API(gri): The semantics of QualifiedIdent needs to be revisited.
 // API(gri): The GcImporter should probably be in its own package - it is only one of possible importers.
 
 import (

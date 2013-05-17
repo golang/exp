@@ -136,8 +136,8 @@ func (x *operand) isAssignable(ctxt *Context, T Type) bool {
 		return true
 	}
 
-	Vu := underlying(V)
-	Tu := underlying(T)
+	Vu := V.Underlying()
+	Tu := T.Underlying()
 
 	// x's type V and T have identical underlying types
 	// and at least one of V or T is not a named type
@@ -224,7 +224,7 @@ type embeddedType struct {
 // the result describes the field mode and type; otherwise the result mode is invalid.
 // (This function is similar in structure to FieldByNameFunc in reflect/type.go)
 //
-func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res lookupResult) {
+func lookupFieldBreadthFirst(list []embeddedType, pkg *Package, name string) (res lookupResult) {
 	// visited records the types that have been searched already.
 	visited := make(map[*Named]bool)
 
@@ -264,7 +264,7 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 			visited[typ] = true
 
 			// look for a matching attached method
-			if obj := typ.methods.Lookup(name.Pkg, name.Name); obj != nil {
+			if obj := typ.methods.Lookup(pkg, name); obj != nil {
 				m := obj.(*Func)
 				assert(m.typ != nil)
 				if !potentialMatch(e.multiples, value, m.typ) {
@@ -276,7 +276,7 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 			case *Struct:
 				// look for a matching field and collect embedded types
 				for i, f := range t.fields {
-					if name.IsSame(f.QualifiedName) {
+					if f.isMatch(pkg, name) {
 						assert(f.Type != nil)
 						if !potentialMatch(e.multiples, variable, f.Type) {
 							return // name collision
@@ -299,7 +299,7 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 					if f.IsAnonymous && res.mode == invalid {
 						// Ignore embedded basic types - only user-defined
 						// named types can have methods or have struct fields.
-						if t, _ := deref(f.Type).(*Named); t != nil {
+						if t, _ := f.Type.Deref().(*Named); t != nil {
 							var index []int
 							index = append(index, e.index...) // copy e.index
 							index = append(index, i)
@@ -310,7 +310,7 @@ func lookupFieldBreadthFirst(list []embeddedType, name QualifiedName) (res looku
 
 			case *Interface:
 				// look for a matching method
-				if obj := t.methods.Lookup(name.Pkg, name.Name); obj != nil {
+				if obj := t.methods.Lookup(pkg, name); obj != nil {
 					m := obj.(*Func)
 					assert(m.typ != nil)
 					if !potentialMatch(e.multiples, value, m.typ) {
@@ -356,11 +356,11 @@ func findType(list []embeddedType, typ *Named) *embeddedType {
 	return nil
 }
 
-func lookupField(typ Type, name QualifiedName) lookupResult {
-	typ = deref(typ)
+func lookupField(typ Type, pkg *Package, name string) lookupResult {
+	typ = typ.Deref()
 
 	if t, ok := typ.(*Named); ok {
-		if obj := t.methods.Lookup(name.Pkg, name.Name); obj != nil {
+		if obj := t.methods.Lookup(pkg, name); obj != nil {
 			m := obj.(*Func)
 			assert(m.typ != nil)
 			return lookupResult{value, m.typ, nil}
@@ -372,7 +372,7 @@ func lookupField(typ Type, name QualifiedName) lookupResult {
 	case *Struct:
 		var next []embeddedType
 		for i, f := range t.fields {
-			if name.IsSame(f.QualifiedName) {
+			if f.isMatch(pkg, name) {
 				return lookupResult{variable, f.Type, []int{i}}
 			}
 			if f.IsAnonymous {
@@ -381,17 +381,17 @@ func lookupField(typ Type, name QualifiedName) lookupResult {
 				// ignore it.
 				// Ignore embedded basic types - only user-defined
 				// named types can have methods or have struct fields.
-				if t, _ := deref(f.Type).(*Named); t != nil {
+				if t, _ := f.Type.Deref().(*Named); t != nil {
 					next = append(next, embeddedType{t, []int{i}, false})
 				}
 			}
 		}
 		if len(next) > 0 {
-			return lookupFieldBreadthFirst(next, name)
+			return lookupFieldBreadthFirst(next, pkg, name)
 		}
 
 	case *Interface:
-		if obj := t.methods.Lookup(name.Pkg, name.Name); obj != nil {
+		if obj := t.methods.Lookup(pkg, name); obj != nil {
 			m := obj.(*Func)
 			assert(m.typ != nil)
 			return lookupResult{value, m.typ, nil}

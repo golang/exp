@@ -120,7 +120,7 @@ func printCall(v *CallCommon, prefix string, instr Instruction) string {
 	if !v.IsInvoke() {
 		b.WriteString(relName(v.Func, instr))
 	} else {
-		name := underlyingType(v.Recv.Type()).(*types.Interface).Method(v.Method).Name()
+		name := v.Recv.Type().Underlying().(*types.Interface).Method(v.Method).Name()
 		fmt.Fprintf(&b, "invoke %s.%s [#%d]", relName(v.Recv, instr), name, v.Method)
 	}
 	b.WriteString("(")
@@ -225,7 +225,7 @@ func (v *MakeChan) String() string {
 }
 
 func (v *FieldAddr) String() string {
-	st := underlyingType(indirectType(v.X.Type())).(*types.Struct)
+	st := indirectType(v.X.Type()).Underlying().(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {
@@ -235,7 +235,7 @@ func (v *FieldAddr) String() string {
 }
 
 func (v *Field) String() string {
-	st := underlyingType(v.X.Type()).(*types.Struct)
+	st := v.X.Type().Underlying().(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {

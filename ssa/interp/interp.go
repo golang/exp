@@ -242,7 +242,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 
 	case *ssa.MakeSlice:
 		slice := make([]value, asInt(fr.get(instr.Cap)))
-		tElt := underlyingType(instr.Type()).(*types.Slice).Elt()
+		tElt := underlyingType(instr.Type()).(*types.Slice).Elem()
 		for i := range slice {
 			slice[i] = zero(tElt)
 		}
@@ -347,7 +347,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		var recvV iface
 		if chosen != -1 {
-			recvV.t = underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elt()
+			recvV.t = underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elem()
 			if recvOk {
 				// No need to copy since send makes an unaliased copy.
 				recvV.v = recv.Interface().(value)
