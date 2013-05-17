@@ -83,7 +83,7 @@ func (v *Alloc) String() string {
 	if v.Heap {
 		op = "new"
 	}
-	return fmt.Sprintf("%s %s", op, indirectType(v.Type()))
+	return fmt.Sprintf("%s %s", op, v.Type().Deref())
 }
 
 func (v *Phi) String() string {
@@ -225,7 +225,7 @@ func (v *MakeChan) String() string {
 }
 
 func (v *FieldAddr) String() string {
-	st := indirectType(v.X.Type()).Underlying().(*types.Struct)
+	st := v.X.Type().Deref().Underlying().(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {

@@ -28,7 +28,7 @@ func literalValue(l *ssa.Literal) value {
 	}
 
 	// By destination type:
-	switch t := underlyingType(l.Type()).(type) {
+	switch t := l.Type().Underlying().(type) {
 	case *types.Basic:
 		switch t.Kind() {
 		case types.Bool, types.UntypedBool:
@@ -78,7 +78,7 @@ func literalValue(l *ssa.Literal) value {
 		}
 
 	case *types.Slice:
-		switch et := underlyingType(t.Elem()).(type) {
+		switch et := t.Elem().Underlying().(type) {
 		case *types.Basic:
 			switch et.Kind() {
 			case types.Byte: // string -> []byte
@@ -276,7 +276,7 @@ func lookup(instr *ssa.Lookup, x, idx value) value {
 		if ok {
 			v = copyVal(v)
 		} else {
-			v = zero(underlyingType(instr.X.Type()).(*types.Map).Elem())
+			v = zero(instr.X.Type().Underlying().(*types.Map).Elem())
 		}
 		if instr.CommaOk {
 			v = tuple{v, ok}
@@ -758,7 +758,7 @@ func unop(instr *ssa.UnOp, x value) value {
 	case token.ARROW: // receive
 		v, ok := <-x.(chan value)
 		if !ok {
-			v = zero(underlyingType(instr.X.Type()).(*types.Chan).Elem())
+			v = zero(instr.X.Type().Underlying().(*types.Chan).Elem())
 		}
 		if instr.CommaOk {
 			v = tuple{v, ok}
@@ -833,7 +833,7 @@ func unop(instr *ssa.UnOp, x value) value {
 func typeAssert(i *interpreter, instr *ssa.TypeAssert, itf iface) value {
 	var v value
 	err := ""
-	if idst, ok := underlyingType(instr.AssertedType).(*types.Interface); ok {
+	if idst, ok := instr.AssertedType.Underlying().(*types.Interface); ok {
 		v = itf
 		err = checkInterface(i, idst, itf)
 
@@ -1092,8 +1092,8 @@ func widen(x value) value {
 // Possible cases are described with the ssa.Convert operator.
 //
 func conv(t_dst, t_src types.Type, x value) value {
-	ut_src := underlyingType(t_src)
-	ut_dst := underlyingType(t_dst)
+	ut_src := t_src.Underlying()
+	ut_dst := t_dst.Underlying()
 
 	// Destination type is not an "untyped" type.
 	if b, ok := ut_dst.(*types.Basic); ok && b.Info()&types.IsUntyped != 0 {
@@ -1322,7 +1322,7 @@ func conv(t_dst, t_src types.Type, x value) value {
 //
 func checkInterface(i *interpreter, itype *types.Interface, x iface) string {
 	mset := findMethodSet(i, x.t)
-	it := underlyingType(itype).(*types.Interface)
+	it := itype.Underlying().(*types.Interface)
 	for i, n := 0, it.NumMethods(); i < n; i++ {
 		m := it.Method(i)
 		id := ssa.MakeId(m.Name(), m.Pkg())
@@ -1331,23 +1331,4 @@ func checkInterface(i *interpreter, itype *types.Interface, x iface) string {
 		}
 	}
 	return "" // ok
-}
-
-// underlyingType returns the underlying type of typ.
-// Copied from go/types.underlying.
-//
-func underlyingType(typ types.Type) types.Type {
-	if typ, ok := typ.(*types.Named); ok {
-		return typ.Underlying()
-	}
-	return typ
-}
-
-// indirectType(typ) assumes that typ is a pointer type,
-// or named alias thereof, and returns its base type.
-// Panic ensues if it is not a pointer.
-// Copied from exp/ssa.indirectType.
-//
-func indirectType(ptr types.Type) types.Type {
-	return underlyingType(ptr).(*types.Pointer).Elem()
 }

@@ -57,20 +57,6 @@ func pointer(typ types.Type) *types.Pointer {
 	return types.NewPointer(typ)
 }
 
-// indirect(typ) assumes that typ is a pointer type,
-// or named alias thereof, and returns its base type.
-// Panic ensures if it is not a pointer.
-//
-func indirectType(ptr types.Type) types.Type {
-	if v, ok := ptr.Underlying().(*types.Pointer); ok {
-		return v.Elem()
-	}
-	// When debugging it is convenient to comment out this line
-	// and let it continue to print the (illegal) SSA form.
-	panic("indirect() of non-pointer type: " + ptr.String())
-	return nil
-}
-
 // methodIndex returns the method (and its index) named id within the
 // method table of named or interface type typ.  If not found,
 // panic ensues.

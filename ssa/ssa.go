@@ -104,6 +104,9 @@ type Type struct {
 // Pos() returns the position of the declaring ast.ValueSpec.Names[*]
 // identifier.
 //
+// NB: a Constant is not a Value; it contains a literal Value, which
+// it augments with the name and position of its 'const' declaration.
+//
 type Constant struct {
 	Name_ string
 	Value *Literal
@@ -372,9 +375,9 @@ type Global struct {
 //
 // Builtins are immutable values.  Builtins do not have addresses.
 //
-// Type() returns an inscrutable *types.builtin.  Built-in functions
-// may have polymorphic or variadic types that are not expressible in
-// Go's type system.
+// Type() returns a *types.Builtin.
+// Built-in functions may have polymorphic or variadic types that are
+// not expressible in Go's type system.
 //
 type Builtin struct {
 	Object *types.Func // canonical types.Universe object for this built-in

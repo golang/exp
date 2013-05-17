@@ -72,7 +72,7 @@ func ext۰reflect۰Init(fn *ssa.Function, args []value) value {
 func ext۰reflect۰rtype۰Bits(fn *ssa.Function, args []value) value {
 	// Signature: func (t reflect.rtype) int
 	rt := args[0].(rtype).t
-	basic, ok := underlyingType(rt).(*types.Basic)
+	basic, ok := rt.Underlying().(*types.Basic)
 	if !ok {
 		panic(fmt.Sprintf("reflect.Type.Bits(%T): non-basic type", rt))
 	}
@@ -272,7 +272,7 @@ func ext۰reflect۰Value۰Pointer(fn *ssa.Function, args []value) value {
 func ext۰reflect۰Value۰Index(fn *ssa.Function, args []value) value {
 	// Signature: func (v reflect.Value, i int) Value
 	i := args[1].(int)
-	t := underlyingType(rV2T(args[0]).t)
+	t := rV2T(args[0]).t.Underlying()
 	switch v := rV2V(args[0]).(type) {
 	case array:
 		return makeReflectValue(t.(*types.Array).Elem(), v[i])
@@ -307,7 +307,7 @@ func ext۰reflect۰Value۰Elem(fn *ssa.Function, args []value) value {
 	case iface:
 		return makeReflectValue(x.t, x.v)
 	case *value:
-		return makeReflectValue(underlyingType(rV2T(args[0]).t).(*types.Pointer).Elem(), *x)
+		return makeReflectValue(rV2T(args[0]).t.Underlying().(*types.Pointer).Elem(), *x)
 	default:
 		panic(fmt.Sprintf("reflect.(Value).Elem(%T)", x))
 	}
@@ -318,7 +318,7 @@ func ext۰reflect۰Value۰Field(fn *ssa.Function, args []value) value {
 	// Signature: func (v reflect.Value, i int) reflect.Value
 	v := args[0]
 	i := args[1].(int)
-	return makeReflectValue(underlyingType(rV2T(v).t).(*types.Struct).Field(i).Type, rV2V(v).(structure)[i])
+	return makeReflectValue(rV2T(v).t.Underlying().(*types.Struct).Field(i).Type, rV2V(v).(structure)[i])
 }
 
 func ext۰reflect۰Value۰Interface(fn *ssa.Function, args []value) value {

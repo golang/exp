@@ -83,7 +83,7 @@ type Context struct {
 	// Loader is a SourceLoader function that finds, loads and
 	// parses Go source files for a given import path.  (It is
 	// ignored if the mode bits include UseGCImporter.)
-	// See (e.g.) GoRootLoader.
+	// See (e.g.) MakeGoBuildLoader.
 	Loader SourceLoader
 
 	// RetainAST is an optional user predicate that determines
@@ -416,7 +416,7 @@ func (b *Builder) builtin(fn *Function, name string, args []ast.Expr, typ types.
 		}
 
 	case "new":
-		return emitNew(fn, indirectType(typ.Underlying()), pos)
+		return emitNew(fn, typ.Underlying().Deref(), pos)
 
 	case "len", "cap":
 		// Special case: len or cap of an array or *array is
@@ -1724,12 +1724,12 @@ func (b *Builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) {
 		switch comm := clause.Comm.(type) {
 		case *ast.AssignStmt: // x := <-states[state].Chan
 			xdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[0].(*ast.Ident)))
-			recv := emitTypeAssert(fn, emitExtract(fn, triple, 1, tEface), indirectType(xdecl.Type()))
+			recv := emitTypeAssert(fn, emitExtract(fn, triple, 1, tEface), xdecl.Type().Deref())
 			emitStore(fn, xdecl, recv)
 
 			if len(comm.Lhs) == 2 { // x, ok := ...
 				okdecl := fn.addNamedLocal(fn.Pkg.ObjectOf(comm.Lhs[1].(*ast.Ident)))
-				emitStore(fn, okdecl, emitExtract(fn, triple, 2, indirectType(okdecl.Type())))
+				emitStore(fn, okdecl, emitExtract(fn, triple, 2, okdecl.Type().Deref()))
 			}
 		}
 		b.stmtList(fn, clause.Body)
@@ -2684,32 +2684,35 @@ func (b *Builder) BuildPackage(p *Package) {
 	init.currentBlock = doinit
 	emitStore(init, initguard, vTrue)
 
-	// TODO(gri): fix: the types.Package.Imports map may contains
-	// entries for other package's import statements, if produced
-	// by GcImport.  Project it down to just the ones for us.
-	imports := make(map[string]*types.Package)
+	// Call the init() function of each package we import.
+	// We iterate over the syntax (p.Files.Imports) not the types
+	// (p.Types.Imports()) because the latter may contain the
+	// transitive closure of dependencies,
+	// e.g. when using GcImporter.
+	seen := make(map[*types.Package]bool)
 	for _, file := range p.Files {
 		for _, imp := range file.Imports {
 			path, _ := strconv.Unquote(imp.Path.Value)
-			if path != "unsafe" {
-				imports[path] = p.Types.Imports()[path]
+			if path == "unsafe" {
+				continue
 			}
-		}
-	}
+			typkg := p.Types.Imports()[path]
+			if seen[typkg] {
+				continue
+			}
+			seen[typkg] = true
 
-	// Call the init() function of each package we import.
-	// Order is unspecified (and is in fact nondeterministic).
-	for name, imported := range imports {
-		p2 := b.packages[imported]
-		if p2 == nil {
-			panic("Building " + p.Name() + ": CreatePackage has not been called for package " + name)
-		}
+			p2 := b.packages[typkg]
+			if p2 == nil {
+				panic("Building " + p.Name() + ": CreatePackage has not been called for package " + path)
+			}
 
-		var v Call
-		v.Call.Func = p2.Init
-		v.Call.pos = init.pos
-		v.setType(types.NewTuple())
-		init.emit(&v)
+			var v Call
+			v.Call.Func = p2.Init
+			v.Call.pos = init.pos
+			v.setType(types.NewTuple())
+			init.emit(&v)
+		}
 	}
 
 	// Visit the package's var decls and init funcs in source

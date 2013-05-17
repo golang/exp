@@ -63,13 +63,16 @@ func zeroLiteral(t types.Type) *Literal {
 }
 
 func (l *Literal) Name() string {
-	s := l.Value.String()
+	var s string
 	if l.Value.Kind() == exact.String {
-		const n = 20
-		if len(s) > n {
-			s = s[:n-3] + "..." // abbreviate
+		s = exact.StringVal(l.Value)
+		const maxLit = 20
+		if len(s) > maxLit {
+			s = s[:maxLit-3] + "..." // abbreviate
 		}
 		s = strconv.Quote(s)
+	} else {
+		s = l.Value.String()
 	}
 	return s + ":" + l.Type_.String()
 }

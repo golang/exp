@@ -238,11 +238,11 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			// local
 			addr = fr.env[instr].(*value)
 		}
-		*addr = zero(indirectType(instr.Type()))
+		*addr = zero(instr.Type().Deref())
 
 	case *ssa.MakeSlice:
 		slice := make([]value, asInt(fr.get(instr.Cap)))
-		tElt := underlyingType(instr.Type()).(*types.Slice).Elem()
+		tElt := instr.Type().Underlying().(*types.Slice).Elem()
 		for i := range slice {
 			slice[i] = zero(tElt)
 		}
@@ -253,7 +253,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		if instr.Reserve != nil {
 			reserve = asInt(fr.get(instr.Reserve))
 		}
-		fr.env[instr] = makeMap(underlyingType(instr.Type()).(*types.Map).Key(), reserve)
+		fr.env[instr] = makeMap(instr.Type().Underlying().(*types.Map).Key(), reserve)
 
 	case *ssa.Range:
 		fr.env[instr] = rangeIter(fr.get(instr.X), instr.X.Type())
@@ -347,7 +347,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		var recvV iface
 		if chosen != -1 {
-			recvV.t = underlyingType(instr.States[chosen].Chan.Type()).(*types.Chan).Elem()
+			recvV.t = instr.States[chosen].Chan.Type().Underlying().(*types.Chan).Elem()
 			if recvOk {
 				// No need to copy since send makes an unaliased copy.
 				recvV.v = recv.Interface().(value)
@@ -469,7 +469,7 @@ func callSSA(i *interpreter, caller *frame, callpos token.Pos, fn *ssa.Function,
 		locals: make([]value, len(fn.Locals)),
 	}
 	for i, l := range fn.Locals {
-		fr.locals[i] = zero(indirectType(l.Type()))
+		fr.locals[i] = zero(l.Type().Deref())
 		fr.env[l] = &fr.locals[i]
 	}
 	for i, p := range fn.Params {
@@ -553,7 +553,7 @@ func Interpret(mainpkg *ssa.Package, mode Mode, filename string, args []string) 
 		for _, m := range pkg.Members {
 			switch v := m.(type) {
 			case *ssa.Global:
-				cell := zero(indirectType(v.Type()))
+				cell := zero(v.Type().Deref())
 				i.globals[v] = &cell
 			}
 		}

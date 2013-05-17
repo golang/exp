@@ -543,7 +543,7 @@ func (f *Function) DumpTo(w io.Writer) {
 	if len(f.Locals) > 0 {
 		io.WriteString(w, "# Locals:\n")
 		for i, l := range f.Locals {
-			fmt.Fprintf(w, "# % 3d:\t%s %s\n", i, l.Name(), indirectType(l.Type()))
+			fmt.Fprintf(w, "# % 3d:\t%s %s\n", i, l.Name(), l.Type().Deref())
 		}
 	}
 

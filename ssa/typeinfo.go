@@ -56,6 +56,8 @@ func (info *TypeInfo) ObjectOf(id *ast.Ident) types.Object {
 
 // IsType returns true iff expression e denotes a type.
 // Precondition: e belongs to the package's ASTs.
+// e must be a true expression, not a KeyValueExpr, or an Ident
+// appearing in a SelectorExpr or declaration.
 //
 func (info *TypeInfo) IsType(e ast.Expr) bool {
 	switch e := e.(type) {
