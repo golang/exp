@@ -11,7 +11,7 @@ package main
 
 import (
 	"bufio"
-	"code.google.com/p/go.exp/locale/cldr"
+	"code.google.com/p/go.text/cldr"
 	"flag"
 	"fmt"
 	"hash"
