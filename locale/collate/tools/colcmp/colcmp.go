@@ -26,7 +26,7 @@ var (
 	cases   = flag.Bool("case", false, "generate case variants")
 	verbose = flag.Bool("verbose", false, "print results")
 	debug   = flag.Bool("debug", false, "output debug information")
-	locale  = flag.String("locale", "en_US", "the locale to use. May be a comma-separated list for some commands.")
+	locales = flag.String("locale", "en_US", "the locale to use. May be a comma-separated list for some commands.")
 	col     = flag.String("col", "go", "collator to test")
 	gold    = flag.String("gold", "go", "collator used as the gold standard")
 	usecmp  = flag.Bool("usecmp", false,
@@ -240,7 +240,7 @@ func (ts *Context) flush() {
 func parseTests() *Context {
 	ctxt := &Context{}
 	colls := strings.Split(*col, ",")
-	for _, loc := range strings.Split(*locale, ",") {
+	for _, loc := range strings.Split(*locales, ",") {
 		loc = strings.TrimSpace(loc)
 		for _, name := range colls {
 			name = strings.TrimSpace(name)

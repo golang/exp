@@ -9,10 +9,11 @@ import (
 	"testing"
 
 	"code.google.com/p/go.exp/locale/collate"
+	"code.google.com/p/go.text/locale"
 )
 
 func ExampleCollator_Strings() {
-	c := collate.New("root")
+	c := collate.New(locale.Und)
 	strings := []string{
 		"ad",
 		"ab",
@@ -39,7 +40,7 @@ func (s sorter) Bytes(i int) []byte {
 }
 
 func TestSort(t *testing.T) {
-	c := collate.New("en")
+	c := collate.New(locale.En)
 	strings := []string{
 		"bcd",
 		"abc",

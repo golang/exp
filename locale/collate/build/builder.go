@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"code.google.com/p/go.exp/locale/collate/colltab"
+	"code.google.com/p/go.text/locale"
 	"code.google.com/p/go.text/unicode/norm"
 )
 
@@ -77,9 +78,9 @@ func NewBuilder() *Builder {
 
 // Tailoring returns a Tailoring for the given locale.  One should
 // have completed all calls to Add before calling Tailoring.
-func (b *Builder) Tailoring(locale string) *Tailoring {
+func (b *Builder) Tailoring(loc locale.ID) *Tailoring {
 	t := &Tailoring{
-		id:      locale,
+		id:      loc.String(),
 		builder: b,
 		index:   b.root.clone(),
 	}

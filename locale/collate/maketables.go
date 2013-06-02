@@ -17,6 +17,7 @@ import (
 	"code.google.com/p/go.exp/locale/collate/build"
 	"code.google.com/p/go.exp/locale/collate/colltab"
 	"code.google.com/p/go.text/cldr"
+	"code.google.com/p/go.text/locale"
 	"flag"
 	"fmt"
 	"io"
@@ -370,22 +371,23 @@ func parseMain() {
 	d.SetDirFilter("main")
 	d.SetSectionFilter("characters")
 	data := decodeCLDR(d)
-	for _, locale := range data.Locales() {
-		x := data.RawLDML(locale)
+	for _, loc := range data.Locales() {
+		x := data.RawLDML(loc)
 		if skipLang(x.Identity.Language.Type) {
 			continue
 		}
 		if x.Characters != nil {
-			x, _ = data.LDML(locale)
+			x, _ = data.LDML(loc)
+			loc = locale.Make(loc).String()
 			for _, ec := range x.Characters.ExemplarCharacters {
 				if ec.Draft != "" {
 					continue
 				}
-				if _, ok := localeChars[locale]; !ok {
-					mainLocales = append(mainLocales, locale)
-					localeChars[locale] = make(charSets)
+				if _, ok := localeChars[loc]; !ok {
+					mainLocales = append(mainLocales, loc)
+					localeChars[loc] = make(charSets)
 				}
-				localeChars[locale][ec.Type] = parseCharacters(ec.Data())
+				localeChars[loc][ec.Type] = parseCharacters(ec.Data())
 			}
 		}
 	}
@@ -464,11 +466,14 @@ func parseCollation(b *build.Builder) {
 		sl.SelectOnePerGroup("alt", altInclude())
 
 		for _, c := range cs {
-			locale := loc
+			m := make(map[locale.Part]string)
+			m[locale.TagPart] = loc
 			if c.Type != x.Collations.Default() {
-				locale += "_u_co_" + c.Type
+				m[locale.Extension('u')] = "co-" + c.Type
 			}
-			t := b.Tailoring(locale)
+			id, err := locale.Compose(m)
+			failOnError(err)
+			t := b.Tailoring(id)
 			c.Process(processor{t})
 		}
 	}
@@ -503,7 +508,7 @@ func (p processor) Index(id string) {
 }
 
 func testCollator(c *collate.Collator) {
-	c0 := collate.New("")
+	c0 := collate.New(locale.Und)
 
 	// iterator over all characters for all locales and check
 	// whether Key is equal.
