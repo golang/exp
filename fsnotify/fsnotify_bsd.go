@@ -16,6 +16,23 @@ import (
 	"syscall"
 )
 
+const (
+	// Flags (from <sys/event.h>)
+	sys_NOTE_DELETE = 0x0001 /* vnode was removed */
+	sys_NOTE_WRITE  = 0x0002 /* data contents changed */
+	sys_NOTE_EXTEND = 0x0004 /* size increased */
+	sys_NOTE_ATTRIB = 0x0008 /* attributes changed */
+	sys_NOTE_LINK   = 0x0010 /* link count changed */
+	sys_NOTE_RENAME = 0x0020 /* vnode was renamed */
+	sys_NOTE_REVOKE = 0x0040 /* vnode access was revoked */
+
+	// Watch all events
+	sys_NOTE_ALLEVENTS = sys_NOTE_DELETE | sys_NOTE_WRITE | sys_NOTE_ATTRIB | sys_NOTE_RENAME
+
+	// Block for 100 ms on each call to kevent
+	keventWaitTime = 100e6
+)
+
 type FileEvent struct {
 	mask   uint32 // Mask of events
 	Name   string // File name (optional)
@@ -26,15 +43,15 @@ type FileEvent struct {
 func (e *FileEvent) IsCreate() bool { return e.create }
 
 // IsDelete reports whether the FileEvent was triggerd by a delete
-func (e *FileEvent) IsDelete() bool { return (e.mask & NOTE_DELETE) == NOTE_DELETE }
+func (e *FileEvent) IsDelete() bool { return (e.mask & sys_NOTE_DELETE) == sys_NOTE_DELETE }
 
 // IsModify reports whether the FileEvent was triggerd by a file modification
 func (e *FileEvent) IsModify() bool {
-	return ((e.mask&NOTE_WRITE) == NOTE_WRITE || (e.mask&NOTE_ATTRIB) == NOTE_ATTRIB)
+	return ((e.mask&sys_NOTE_WRITE) == sys_NOTE_WRITE || (e.mask&sys_NOTE_ATTRIB) == sys_NOTE_ATTRIB)
 }
 
 // IsRename reports whether the FileEvent was triggerd by a change name
-func (e *FileEvent) IsRename() bool { return (e.mask & NOTE_RENAME) == NOTE_RENAME }
+func (e *FileEvent) IsRename() bool { return (e.mask & sys_NOTE_RENAME) == sys_NOTE_RENAME }
 
 type Watcher struct {
 	mu            sync.Mutex          // Mutex for the Watcher itself.
@@ -152,7 +169,7 @@ func (w *Watcher) addWatch(path string, flags uint32) error {
 			}
 		}
 
-		fd, errno := syscall.Open(path, syscall.O_NONBLOCK|syscall.O_RDONLY, 0700)
+		fd, errno := syscall.Open(path, open_FLAGS, 0700)
 		if fd == -1 {
 			return errno
 		}
@@ -171,8 +188,8 @@ func (w *Watcher) addWatch(path string, flags uint32) error {
 	w.pmut.Lock()
 	w.enmut.Lock()
 	if w.finfo[watchfd].IsDir() &&
-		(flags&NOTE_WRITE) == NOTE_WRITE &&
-		(!found || (w.enFlags[path]&NOTE_WRITE) != NOTE_WRITE) {
+		(flags&sys_NOTE_WRITE) == sys_NOTE_WRITE &&
+		(!found || (w.enFlags[path]&sys_NOTE_WRITE) != sys_NOTE_WRITE) {
 		watchDir = true
 	}
 	w.enmut.Unlock()
@@ -207,7 +224,7 @@ func (w *Watcher) addWatch(path string, flags uint32) error {
 
 // Watch adds path to the watched file set, watching all events.
 func (w *Watcher) watch(path string) error {
-	return w.addWatch(path, NOTE_ALLEVENTS)
+	return w.addWatch(path, sys_NOTE_ALLEVENTS)
 }
 
 // RemoveWatch removes path from the watched file set.
@@ -232,6 +249,13 @@ func (w *Watcher) removeWatch(path string) error {
 	w.wmut.Lock()
 	delete(w.watches, path)
 	w.wmut.Unlock()
+	w.enmut.Lock()
+	delete(w.enFlags, path)
+	w.enmut.Unlock()
+	w.pmut.Lock()
+	delete(w.paths, watchfd)
+	delete(w.finfo, watchfd)
+	w.pmut.Unlock()
 	return nil
 }
 
@@ -301,7 +325,7 @@ func (w *Watcher) readEvents() {
 				// receive the delete event
 				if _, err := os.Lstat(fileEvent.Name); os.IsNotExist(err) {
 					// mark is as delete event
-					fileEvent.mask |= NOTE_DELETE
+					fileEvent.mask |= sys_NOTE_DELETE
 				}
 			}
 
@@ -358,12 +382,19 @@ func (w *Watcher) watchDirectoryFiles(dirPath string) error {
 	// Search for new files
 	for _, fileInfo := range files {
 		filePath := filepath.Join(dirPath, fileInfo.Name())
+
+		// Inherit fsnFlags from parent directory
+		w.fsnmut.Lock()
+		if flags, found := w.fsnFlags[dirPath]; found {
+			w.fsnFlags[filePath] = flags
+		} else {
+			w.fsnFlags[filePath] = FSN_ALL
+		}
+		w.fsnmut.Unlock()
+
 		if fileInfo.IsDir() == false {
 			// Watch file to mimic linux fsnotify
-			e := w.addWatch(filePath, NOTE_DELETE|NOTE_WRITE|NOTE_RENAME)
-			w.fsnmut.Lock()
-			w.fsnFlags[filePath] = FSN_ALL
-			w.fsnmut.Unlock()
+			e := w.addWatch(filePath, sys_NOTE_ALLEVENTS)
 			if e != nil {
 				return e
 			}
@@ -373,16 +404,13 @@ func (w *Watcher) watchDirectoryFiles(dirPath string) error {
 			w.enmut.Lock()
 			currFlags, found := w.enFlags[filePath]
 			w.enmut.Unlock()
-			var newFlags uint32 = NOTE_DELETE
+			var newFlags uint32 = sys_NOTE_DELETE
 			if found {
 				newFlags |= currFlags
 			}
 
 			// Linux gives deletes if not explicitly watching
 			e := w.addWatch(filePath, newFlags)
-			w.fsnmut.Lock()
-			w.fsnFlags[filePath] = FSN_ALL
-			w.fsnmut.Unlock()
 			if e != nil {
 				return e
 			}
@@ -413,9 +441,15 @@ func (w *Watcher) sendDirectoryChangeEvents(dirPath string) {
 		_, doesExist := w.fileExists[filePath]
 		w.femut.Unlock()
 		if !doesExist {
+			// Inherit fsnFlags from parent directory
 			w.fsnmut.Lock()
-			w.fsnFlags[filePath] = FSN_ALL
+			if flags, found := w.fsnFlags[dirPath]; found {
+				w.fsnFlags[filePath] = flags
+			} else {
+				w.fsnFlags[filePath] = FSN_ALL
+			}
 			w.fsnmut.Unlock()
+
 			// Send create event
 			fileEvent := new(FileEvent)
 			fileEvent.Name = filePath
@@ -428,20 +462,3 @@ func (w *Watcher) sendDirectoryChangeEvents(dirPath string) {
 	}
 	w.watchDirectoryFiles(dirPath)
 }
-
-const (
-	// Flags (from <sys/event.h>)
-	NOTE_DELETE = 0x0001 /* vnode was removed */
-	NOTE_WRITE  = 0x0002 /* data contents changed */
-	NOTE_EXTEND = 0x0004 /* size increased */
-	NOTE_ATTRIB = 0x0008 /* attributes changed */
-	NOTE_LINK   = 0x0010 /* link count changed */
-	NOTE_RENAME = 0x0020 /* vnode was renamed */
-	NOTE_REVOKE = 0x0040 /* vnode access was revoked */
-
-	// Watch all events
-	NOTE_ALLEVENTS = NOTE_DELETE | NOTE_WRITE | NOTE_ATTRIB | NOTE_RENAME
-
-	// Block for 100 ms on each call to kevent
-	keventWaitTime = 100e6
-)
