@@ -12,7 +12,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"code.google.com/p/go.text/locale"
+	"code.google.com/p/go.text/language"
 	"code.google.com/p/go.text/unicode/norm"
 )
 
@@ -82,7 +82,7 @@ type phraseGenerator struct {
 
 func (g *phraseGenerator) init(id string) {
 	ec := exemplarCharacters
-	loc := locale.Make(id).String()
+	loc := language.Make(id).String()
 	// get sets for locale or parent locale if the set is not defined.
 	for i := range g.sets {
 		for p, ok := loc, true; ok; p, ok = parent(p) {

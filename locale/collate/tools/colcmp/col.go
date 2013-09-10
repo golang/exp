@@ -9,7 +9,7 @@ import (
 	"unicode/utf16"
 
 	"code.google.com/p/go.exp/locale/collate"
-	"code.google.com/p/go.text/locale"
+	"code.google.com/p/go.text/language"
 )
 
 // Input holds an input string in both UTF-8 and UTF-16 format.
@@ -84,7 +84,7 @@ func init() {
 }
 
 func newGoCollator(loc string) (Collator, error) {
-	c := &goCollator{c: collate.New(locale.Make(loc))}
+	c := &goCollator{c: collate.New(language.Make(loc))}
 	return c, nil
 }
 
