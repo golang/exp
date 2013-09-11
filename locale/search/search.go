@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package search provides locale-sensitive string search functionality.
+// Package search provides language-sensitive string search functionality.
 package search
 
 import (
-	"code.google.com/p/go.exp/locale"
-	"code.google.com/p/go.exp/locale/collate/colltab"
+	"code.google.com/p/go.text/collate/colltab"
+	"code.google.com/p/go.text/language"
 )
 
 // An Option specifies a search-related feature.
@@ -23,13 +23,13 @@ const (
 	Loose = IgnoreCase | IgnoreDiacritics | IgnoreWidth
 )
 
-// Search provides locale-sensitive search functionality.
+// Search provides language-sensitive search functionality.
 type Search struct {
 	c colltab.Weigher
 }
 
-// New returns a new Search for the given locale.
-func New(l locale.ID) *Search {
+// New returns a new Search for the given language.
+func New(l language.Tag) *Search {
 	return nil
 }
 
