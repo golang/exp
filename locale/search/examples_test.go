@@ -14,7 +14,7 @@ func ExampleSearch() {
 	p := func(x ...interface{}) {
 		fmt.Println(x...)
 	}
-	s := search.New(language.En)
+	s := search.New(language.English)
 	s.SetOptions(search.IgnoreCase | search.IgnoreDiacritics)
 
 	p(s.MatchString("A", "a"))
@@ -22,7 +22,7 @@ func ExampleSearch() {
 	p(s.FindString("gruss", "Schöne Gruße"))
 	p(s.CommonPrefixString("Lösung", "lost"))
 
-	s = search.New(language.De)
+	s = search.New(language.German)
 	p(s.FindString("gruss", "Schöne Gruße"))
 
 	// TODO:Output:
@@ -34,7 +34,7 @@ func ExampleSearch() {
 }
 
 func ExamplePattern() {
-	s := search.New(language.De)
+	s := search.New(language.German)
 	pat := s.CompileString("gruss")
 	fmt.Println(pat.FindString("Schöne Gruße"))
 	fmt.Println(pat.FindLastString("Schöne Gruße"))
