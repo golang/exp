@@ -15,7 +15,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"code.google.com/p/go.exp/ebnf"
+	"golang.org/x/exp/ebnf"
 )
 
 var fset = token.NewFileSet()

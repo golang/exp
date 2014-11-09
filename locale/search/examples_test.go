@@ -5,9 +5,9 @@
 package search_test
 
 import (
-	"code.google.com/p/go.exp/locale/search"
-	"code.google.com/p/go.text/language"
 	"fmt"
+	"golang.org/x/exp/locale/search"
+	"golang.org/x/text/language"
 )
 
 func ExampleSearch() {

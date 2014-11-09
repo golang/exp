@@ -6,8 +6,8 @@
 package search
 
 import (
-	"code.google.com/p/go.text/collate/colltab"
-	"code.google.com/p/go.text/language"
+	"golang.org/x/text/collate/colltab"
+	"golang.org/x/text/language"
 )
 
 // An Option specifies a search-related feature.
