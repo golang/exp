@@ -17,7 +17,7 @@
 	Networked channels are not synchronized; they always behave
 	as if they are buffered channels of at least one element.
 */
-package netchan
+package netchan // import "golang.org/x/exp/old/netchan"
 
 // BUG: can't use range clause to receive when using ImportNValues to limit the count.
 

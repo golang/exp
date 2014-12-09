@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package search provides language-sensitive string search functionality.
-package search
+package search // import "golang.org/x/exp/locale/search"
 
 import (
 	"golang.org/x/text/collate/colltab"

@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package utf8string provides an efficient way to index strings by rune rather than by byte.
-package utf8string
+package utf8string // import "golang.org/x/exp/utf8string"
 
 import (
 	"errors"

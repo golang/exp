@@ -19,4 +19,4 @@ The --start flag specifies the name of the start production for
 the grammar; it defaults to "Start".
 
 */
-package main
+package main // import "golang.org/x/exp/ebnflint"

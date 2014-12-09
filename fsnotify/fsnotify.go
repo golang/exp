@@ -5,7 +5,7 @@
 // +build !plan9,!solaris
 
 // Package fsnotify implements file system notification.
-package fsnotify
+package fsnotify // import "golang.org/x/exp/fsnotify"
 
 import "fmt"
 
