@@ -4,6 +4,33 @@
 
 // Package screen provides interfaces for portable two-dimensional graphics and
 // input events.
+//
+// Screens are not created directly. Instead, driver packages provide access to
+// the screen through a Main function that is designed to be called by the
+// program's main function. The golang.org/x/exp/shiny/driver package provides
+// the default driver for the system, such as the X11 driver for desktop Linux,
+// but other drivers, such as the OpenGL driver, can be explicitly invoked by
+// calling that driver's Main function. To use the default driver:
+//
+//	package main
+//
+//	import (
+//		"golang.org/x/exp/shiny/driver"
+//		"golang.org/x/exp/shiny/screen"
+//	)
+//
+//	func main() {
+//		driver.Main(func(s screen.Screen) {
+//			w, err := s.NewWindow(nil)
+//			if err != nil {
+//				handleError(err)
+//				return
+//			}
+//			for e := range w.Events() {
+//				handleEvent(e)
+//			}
+//		})
+//	}
 package screen
 
 import (
@@ -16,8 +43,6 @@ import (
 // TODO: specify image format (Alpha or Gray, not just RGBA) for NewBuffer
 // and/or NewTexture?
 
-// TODO: say how to make a Screen, and a Window.
-
 // Screen creates Buffers, Textures and Windows.
 type Screen interface {
 	// NewBuffer returns a new Buffer for this screen.
@@ -26,7 +51,8 @@ type Screen interface {
 	// NewTexture returns a new Texture for this screen.
 	NewTexture(size image.Point) (Texture, error)
 
-	// TODO: NewWindow.
+	// NewWindow returns a new Window for this screen.
+	NewWindow(opts *NewWindowOptions) (Window, error)
 }
 
 // Buffer is an in-memory pixel buffer. Its pixels can be modified by any Go
@@ -95,6 +121,11 @@ type Window interface {
 	// EndPaint flushes any pending Upload and Draw calls to the window's
 	// screen.
 	EndPaint()
+}
+
+// NewWindowOptions are optional arguments to NewWindow.
+type NewWindowOptions struct {
+	// TODO: size, fullscreen, title, icon, cursorHidden?
 }
 
 // Uploader is something you can upload a Buffer to.
