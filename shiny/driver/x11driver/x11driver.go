@@ -11,8 +11,13 @@ package x11driver
 // or OpenGL library.
 
 import (
-	"errors"
+	"fmt"
 	"image"
+
+	"github.com/BurntSushi/xgb"
+	"github.com/BurntSushi/xgb/render"
+	"github.com/BurntSushi/xgb/shm"
+	"github.com/BurntSushi/xgb/xproto"
 
 	"golang.org/x/exp/shiny/screen"
 )
@@ -24,21 +29,59 @@ import (
 // specific libraries require being on 'the main thread'. It returns when f
 // returns.
 func Main(f func(screen.Screen)) {
-	f(stub{})
+	if err := main(f); err != nil {
+		f(errScreen{err})
+	}
 }
 
-type stub struct{}
+func main(f func(screen.Screen)) (retErr error) {
+	xc, err := xgb.NewConn()
+	if err != nil {
+		return fmt.Errorf("x11driver: xgb.NewConn failed: %v", err)
+	}
+	defer func() {
+		if retErr != nil {
+			xc.Close()
+		}
+	}()
 
-func (stub) NewBuffer(size image.Point) (screen.Buffer, error) {
-	return nil, errTODO
+	if err := render.Init(xc); err != nil {
+		return fmt.Errorf("x11driver: render.Init failed: %v", err)
+	}
+	if err := shm.Init(xc); err != nil {
+		return fmt.Errorf("x11driver: shm.Init failed: %v", err)
+	}
+
+	s := &screenImpl{
+		xc:      xc,
+		xsi:     xproto.Setup(xc).DefaultScreen(xc),
+		windows: map[xproto.Window]*windowImpl{},
+	}
+
+	if err := s.initAtoms(); err != nil {
+		return err
+	}
+
+	go s.run()
+	f(s)
+	// TODO: tear down the s.run goroutine? It's probably not worth the
+	// complexity of doing it cleanly, if the app is about to exit anyway.
+	return nil
 }
 
-func (stub) NewTexture(size image.Point) (screen.Texture, error) {
-	return nil, errTODO
+// errScreen is a screen.Screen.
+type errScreen struct {
+	err error
 }
 
-func (stub) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	return nil, errTODO
+func (e errScreen) NewBuffer(size image.Point) (screen.Buffer, error) {
+	return nil, e.err
 }
 
-var errTODO = errors.New("TODO: write the X11 driver")
+func (e errScreen) NewTexture(size image.Point) (screen.Texture, error) {
+	return nil, e.err
+}
+
+func (e errScreen) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
+	return nil, e.err
+}
