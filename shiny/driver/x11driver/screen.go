@@ -85,8 +85,54 @@ func (s *screenImpl) run() {
 
 var errTODO = errors.New("TODO: write the X11 driver")
 
-func (s *screenImpl) NewBuffer(size image.Point) (screen.Buffer, error) {
-	return nil, errTODO
+const (
+	maxShmSide = 0x00007fff // 32,767 pixels.
+	maxShmSize = 0x10000000 // 268,435,456 bytes.
+)
+
+func (s *screenImpl) NewBuffer(size image.Point) (b screen.Buffer, retErr error) {
+	// TODO: detect if the X11 server or connection cannot support SHM pixmaps,
+	// and fall back to regular pixmaps.
+
+	w, h := int64(size.X), int64(size.Y)
+	if w < 0 || maxShmSide < w || h < 0 || maxShmSide < h || maxShmSize < 4*w*h {
+		return nil, fmt.Errorf("x11driver: invalid buffer size %v", size)
+	}
+	xs, err := shm.NewSegId(s.xc)
+	if err != nil {
+		return nil, fmt.Errorf("x11driver: shm.NewSegId: %v", err)
+	}
+
+	bufLen := 4 * size.X * size.Y
+	shmid, addr, err := shmOpen(bufLen)
+	if err != nil {
+		return nil, fmt.Errorf("x11driver: shmOpen: %v", err)
+	}
+	defer func() {
+		if retErr != nil {
+			shmClose(addr)
+		}
+	}()
+	a := (*[maxShmSize]byte)(addr)
+	buf := (*a)[:bufLen:bufLen]
+
+	// readOnly is whether the shared memory is read-only from the X11 server's
+	// point of view. We need false to use SHM pixmaps.
+	const readOnly = false
+	shm.Attach(s.xc, xs, uint32(shmid), readOnly)
+
+	return &bufferImpl{
+		s:    s,
+		addr: addr,
+		buf:  buf,
+		rgba: image.RGBA{
+			Pix:    buf,
+			Stride: 4 * size.X,
+			Rect:   image.Rectangle{Max: size},
+		},
+		size: size,
+		xs:   xs,
+	}, nil
 }
 
 func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
