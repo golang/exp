@@ -11,6 +11,7 @@ import (
 
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/render"
+	"github.com/BurntSushi/xgb/shm"
 	"github.com/BurntSushi/xgb/xproto"
 
 	"golang.org/x/exp/shiny/screen"
@@ -33,8 +34,16 @@ func (w *windowImpl) run() {
 		// TODO: things other than X11 events.
 
 		case ev := <-w.xevents:
-			// TODO: implement.
-			log.Println(ev)
+			switch ev := ev.(type) {
+			default:
+				// TODO: implement.
+				log.Println(ev)
+
+			case shm.CompletionEvent:
+				b := w.s.findBuffer(ev.Shmseg)
+				b.postUpload()
+				// TODO: send a screen.UploadedEvent.
+			}
 		}
 	}
 }
@@ -53,7 +62,21 @@ func (w *windowImpl) Send(event interface{}) {
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	// TODO.
+	b := src.(*bufferImpl)
+	b.preUpload()
+
+	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
+	dr := sr.Sub(sr.Min).Add(dp)
+
+	shm.PutImage(
+		w.s.xc, xproto.Drawable(w.xw), w.xg,
+		uint16(b.size.X), uint16(b.size.Y), // TotalWidth, TotalHeight,
+		uint16(sr.Min.X), uint16(sr.Min.Y), // SrcX, SrcY,
+		uint16(dr.Dx()), uint16(dr.Dy()), // SrcWidth, SrcHeight,
+		int16(dr.Min.X), int16(dr.Min.Y), // DstX, DstY,
+		w.s.xsi.RootDepth, xproto.ImageFormatZPixmap,
+		1, b.xs, 0, // 1 means send a completion event, 0 means a zero offset.
+	)
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {

@@ -55,6 +55,7 @@ func main(f func(screen.Screen)) (retErr error) {
 	s := &screenImpl{
 		xc:      xc,
 		xsi:     xproto.Setup(xc).DefaultScreen(xc),
+		buffers: map[shm.Seg]*bufferImpl{},
 		windows: map[xproto.Window]*windowImpl{},
 	}
 

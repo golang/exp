@@ -32,6 +32,7 @@ type screenImpl struct {
 	atomWMTakeFocus    xproto.Atom
 
 	mu      sync.Mutex
+	buffers map[shm.Seg]*bufferImpl
 	windows map[xproto.Window]*windowImpl
 }
 
@@ -48,7 +49,10 @@ func (s *screenImpl) run() {
 		default:
 			continue
 		case shm.CompletionEvent:
-			// TODO.
+			// TODO: the dst might have been a texture, not a window. How do we
+			// pick which window's event channel to send a screen.UploadedEvent
+			// on?
+			xw = xproto.Window(ev.Drawable)
 		case xproto.ClientMessageEvent:
 			xw = ev.Window
 		case xproto.ConfigureNotifyEvent:
@@ -83,6 +87,13 @@ func (s *screenImpl) run() {
 	}
 }
 
+func (s *screenImpl) findBuffer(key shm.Seg) *bufferImpl {
+	s.mu.Lock()
+	b := s.buffers[key]
+	s.mu.Unlock()
+	return b
+}
+
 var errTODO = errors.New("TODO: write the X11 driver")
 
 const (
@@ -90,7 +101,7 @@ const (
 	maxShmSize = 0x10000000 // 268,435,456 bytes.
 )
 
-func (s *screenImpl) NewBuffer(size image.Point) (b screen.Buffer, retErr error) {
+func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr error) {
 	// TODO: detect if the X11 server or connection cannot support SHM pixmaps,
 	// and fall back to regular pixmaps.
 
@@ -121,7 +132,7 @@ func (s *screenImpl) NewBuffer(size image.Point) (b screen.Buffer, retErr error)
 	const readOnly = false
 	shm.Attach(s.xc, xs, uint32(shmid), readOnly)
 
-	return &bufferImpl{
+	b := &bufferImpl{
 		s:    s,
 		addr: addr,
 		buf:  buf,
@@ -132,7 +143,13 @@ func (s *screenImpl) NewBuffer(size image.Point) (b screen.Buffer, retErr error)
 		},
 		size: size,
 		xs:   xs,
-	}, nil
+	}
+
+	s.mu.Lock()
+	s.buffers[b.xs] = b
+	s.mu.Unlock()
+
+	return b, nil
 }
 
 func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
