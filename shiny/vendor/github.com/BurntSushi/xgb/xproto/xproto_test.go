@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -32,19 +33,21 @@ import (
 // The X connection used throughout testing.
 var X *xgb.Conn
 
-// init initializes the X connection, seeds the RNG and starts waiting
-// for events.
-func init() {
-	var err error
+func TestMain(m *testing.M) {
+	if os.Getenv("DISPLAY") == "" {
+		log.Printf("No X; Skipping tests")
+		os.Exit(0)
+	}
 
+	var err error
 	X, err = xgb.NewConn()
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	rand.Seed(time.Now().UnixNano())
-
 	go grabEvents()
+
+	os.Exit(m.Run())
 }
 
 /******************************************************************************/
