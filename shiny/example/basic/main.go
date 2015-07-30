@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/paint"
 )
 
 func main() {
@@ -37,8 +38,13 @@ func main() {
 		w.Upload(image.Point{}, b, b.RGBA().Bounds(), w)
 
 		for e := range w.Events() {
-			// TODO: be more interesting.
-			fmt.Println(e)
+			switch e := e.(type) {
+			case paint.Event:
+				w.EndPaint(e)
+			default:
+				// TODO: be more interesting.
+				fmt.Println(e)
+			}
 		}
 	})
 }

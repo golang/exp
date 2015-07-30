@@ -112,7 +112,7 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	// TODO.
 }
 
-func (w *windowImpl) EndPaint() {
+func (w *windowImpl) EndPaint(e paint.Event) {
 	// gl.Flush is a lightweight (on modern GL drivers) blocking call
 	// that ensures all GL functions pending in the gl package have
 	// been passed onto the GL driver before the app package attempts
@@ -121,5 +121,5 @@ func (w *windowImpl) EndPaint() {
 	// This enforces that the final receive (for this paint cycle) on
 	// gl.WorkAvailable happens before the send on endPaint.
 	gl.Flush()
-	w.endPaint <- paint.Event{} // TODO send real generation number
+	w.endPaint <- e
 }

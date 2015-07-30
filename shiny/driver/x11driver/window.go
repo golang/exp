@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/paint"
 )
 
 type windowImpl struct {
@@ -102,6 +103,6 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	// TODO.
 }
 
-func (w *windowImpl) EndPaint() {
+func (w *windowImpl) EndPaint(e paint.Event) {
 	// TODO.
 }

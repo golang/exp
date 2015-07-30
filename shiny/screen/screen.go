@@ -38,6 +38,7 @@ import (
 	"image/draw"
 
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/paint"
 )
 
 // TODO: specify image format (Alpha or Gray, not just RGBA) for NewBuffer
@@ -117,9 +118,9 @@ type Window interface {
 
 	Drawer
 
-	// EndPaint flushes any pending Upload and Draw calls to the window's
-	// screen.
-	EndPaint()
+	// EndPaint flushes any pending Upload and Draw calls to the window.
+	// If EndPaint is called with an old generation number, it is ignored.
+	EndPaint(p paint.Event)
 }
 
 // NewWindowOptions are optional arguments to NewWindow.
