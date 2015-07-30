@@ -111,8 +111,7 @@ type Window interface {
 	// TODO: define and describe these events.
 	Events() <-chan interface{}
 
-	// Send sends an event on the window's event channel.
-	Send(event interface{})
+	Sender
 
 	Uploader
 
@@ -128,18 +127,28 @@ type NewWindowOptions struct {
 	// TODO: size, fullscreen, title, icon, cursorHidden?
 }
 
+// Sender is something you can send events to.
+type Sender interface {
+	// Send sends an event.
+	Send(event interface{})
+}
+
 // Uploader is something you can upload a Buffer to.
 type Uploader interface {
 	// Upload uploads the sub-Buffer defined by src and sr to the destination
 	// (the method receiver), such that sr.Min in src-space aligns with dp in
-	// dst-space.
+	// dst-space. If sender is not nil, an UploadedEvent will be sent to sender
+	// after the upload is complete.
 	//
-	// The src Buffer is re-usable, but only after an UploadedEvent for that
-	// Buffer is received on the event channel.
+	// It is valid to upload a Buffer while another upload of the same Buffer
+	// is in progress, but a Buffer's image.RGBA pixel contents should not be
+	// accessed while it is uploading. A Buffer is re-usable, in that its pixel
+	// contents can be further modified, once all of its UploadedEvents have
+	// been received.
 	//
 	// When uploading to a Window, there might not be any visible effect until
 	// EndPaint is called.
-	Upload(dp image.Point, src Buffer, sr image.Rectangle)
+	Upload(dp image.Point, src Buffer, sr image.Rectangle, sender Sender)
 }
 
 // UploadedEvent records that a Buffer was uploaded.

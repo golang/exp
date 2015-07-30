@@ -34,7 +34,7 @@ func main() {
 		}
 		defer b.Release()
 		fill(b.RGBA())
-		w.Upload(image.Point{}, b, b.RGBA().Bounds())
+		w.Upload(image.Point{}, b, b.RGBA().Bounds(), w)
 
 		for e := range w.Events() {
 			// TODO: be more interesting.

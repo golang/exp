@@ -23,6 +23,11 @@ import (
 // For example, its Conn.WaitForEvent concept is a method, not a channel, so
 // it's not obvious how to interrupt it to service a NewWindow request.
 
+type completion struct {
+	sender screen.Sender
+	event  screen.UploadedEvent
+}
+
 type screenImpl struct {
 	xc  *xgb.Conn
 	xsi *xproto.ScreenInfo
@@ -33,6 +38,7 @@ type screenImpl struct {
 
 	mu      sync.Mutex
 	buffers map[shm.Seg]*bufferImpl
+	uploads map[uint16]completion
 	windows map[xproto.Window]*windowImpl
 }
 
@@ -49,10 +55,8 @@ func (s *screenImpl) run() {
 		default:
 			continue
 		case shm.CompletionEvent:
-			// TODO: the dst might have been a texture, not a window. How do we
-			// pick which window's event channel to send a screen.UploadedEvent
-			// on?
-			xw = xproto.Window(ev.Drawable)
+			s.handleCompletion(ev)
+			continue
 		case xproto.ClientMessageEvent:
 			xw = ev.Window
 		case xproto.ConfigureNotifyEvent:
@@ -87,11 +91,30 @@ func (s *screenImpl) run() {
 	}
 }
 
+// TODO: is findBuffer and the s.buffers field unused? Delete?
+
 func (s *screenImpl) findBuffer(key shm.Seg) *bufferImpl {
 	s.mu.Lock()
 	b := s.buffers[key]
 	s.mu.Unlock()
 	return b
+}
+
+func (s *screenImpl) handleCompletion(ev shm.CompletionEvent) {
+	s.mu.Lock()
+	completion, ok := s.uploads[ev.Sequence]
+	s.mu.Unlock()
+
+	if !ok {
+		log.Printf("x11driver: no matching upload for a SHM completion event")
+		return
+	}
+	completion.event.Buffer.(*bufferImpl).postUpload()
+	if completion.sender != nil {
+		// Call Send in a separate goroutine, so that this event-handling
+		// goroutine doesn't block.
+		go completion.sender.Send(completion.event)
+	}
 }
 
 var errTODO = errors.New("TODO: write the X11 driver")

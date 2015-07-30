@@ -38,11 +38,6 @@ func (w *windowImpl) run() {
 			default:
 				// TODO: implement.
 				log.Println(ev)
-
-			case shm.CompletionEvent:
-				b := w.s.findBuffer(ev.Shmseg)
-				b.postUpload()
-				// TODO: send a screen.UploadedEvent.
 			}
 		}
 	}
@@ -61,14 +56,14 @@ func (w *windowImpl) Send(event interface{}) {
 	// TODO.
 }
 
-func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
 	b := src.(*bufferImpl)
 	b.preUpload()
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	dr := sr.Sub(sr.Min).Add(dp)
 
-	shm.PutImage(
+	cookie := shm.PutImageChecked(
 		w.s.xc, xproto.Drawable(w.xw), w.xg,
 		uint16(b.size.X), uint16(b.size.Y), // TotalWidth, TotalHeight,
 		uint16(sr.Min.X), uint16(sr.Min.Y), // SrcX, SrcY,
@@ -77,6 +72,16 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 		w.s.xsi.RootDepth, xproto.ImageFormatZPixmap,
 		1, b.xs, 0, // 1 means send a completion event, 0 means a zero offset.
 	)
+
+	w.s.mu.Lock()
+	w.s.uploads[cookie.Sequence] = completion{
+		sender: sender,
+		event: screen.UploadedEvent{
+			Buffer:   src,
+			Uploader: w,
+		},
+	}
+	w.s.mu.Unlock()
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
