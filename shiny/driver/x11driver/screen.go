@@ -16,6 +16,7 @@ import (
 	"github.com/BurntSushi/xgb/shm"
 	"github.com/BurntSushi/xgb/xproto"
 
+	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 )
 
@@ -50,7 +51,7 @@ func (s *screenImpl) run() {
 			continue
 		}
 
-		var xw xproto.Window
+		xw, destroy := xproto.Window(0), false
 		switch ev := ev.(type) {
 		default:
 			continue
@@ -61,6 +62,9 @@ func (s *screenImpl) run() {
 			xw = ev.Window
 		case xproto.ConfigureNotifyEvent:
 			xw = ev.Window
+		case xproto.DestroyNotifyEvent:
+			xw = ev.Window
+			destroy = true
 		case xproto.ExposeEvent:
 			xw = ev.Window
 		case xproto.FocusInEvent:
@@ -81,13 +85,20 @@ func (s *screenImpl) run() {
 
 		s.mu.Lock()
 		w := s.windows[xw]
+		if destroy {
+			delete(s.windows, xw)
+		}
 		s.mu.Unlock()
 
 		if w == nil {
 			log.Printf("x11driver: no window found for event %T", ev)
 			continue
 		}
-		w.xevents <- ev
+		if destroy {
+			close(w.xevents)
+		} else {
+			w.xevents <- ev
+		}
 	}
 }
 
@@ -201,6 +212,7 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 		xw:      xw,
 		xg:      xg,
 		xp:      xp,
+		pump:    pump.Make(),
 		xevents: make(chan xgb.Event),
 	}
 	go w.run()

@@ -8,12 +8,14 @@ import (
 	"image"
 	"image/draw"
 	"log"
+	"sync"
 
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/render"
 	"github.com/BurntSushi/xgb/shm"
 	"github.com/BurntSushi/xgb/xproto"
 
+	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 )
@@ -25,7 +27,11 @@ type windowImpl struct {
 	xg xproto.Gcontext
 	xp render.Picture
 
+	pump    pump.Pump
 	xevents chan xgb.Event
+
+	mu       sync.Mutex
+	released bool
 }
 
 func (w *windowImpl) run() {
@@ -33,7 +39,10 @@ func (w *windowImpl) run() {
 		select {
 		// TODO: things other than X11 events.
 
-		case ev := <-w.xevents:
+		case ev, ok := <-w.xevents:
+			if !ok {
+				return
+			}
 			switch ev := ev.(type) {
 			default:
 				// TODO: implement.
@@ -43,17 +52,22 @@ func (w *windowImpl) run() {
 	}
 }
 
+func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
+func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
+
 func (w *windowImpl) Release() {
-	// TODO.
-}
+	w.mu.Lock()
+	released := w.released
+	w.released = true
+	w.mu.Unlock()
 
-func (w *windowImpl) Events() <-chan interface{} {
-	// TODO.
-	return nil
-}
-
-func (w *windowImpl) Send(event interface{}) {
-	// TODO.
+	if released {
+		return
+	}
+	// TODO: call render.FreePicture.
+	xproto.FreeGC(w.s.xc, w.xg)
+	xproto.DestroyWindow(w.s.xc, w.xw)
+	w.pump.Release()
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
