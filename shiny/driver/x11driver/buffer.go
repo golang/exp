@@ -11,6 +11,8 @@ import (
 	"unsafe"
 
 	"github.com/BurntSushi/xgb/shm"
+
+	"golang.org/x/exp/shiny/driver/internal/swizzle"
 )
 
 type bufferImpl struct {
@@ -42,20 +44,7 @@ func (b *bufferImpl) preUpload() {
 	b.mu.Unlock()
 
 	if needsSwizzle {
-		swizzle(b.buf)
-	}
-}
-
-// swizzle converts a pixel buffer between Go's RGBA byte order and X11's BGRA
-// byte order.
-//
-// TODO: optimize this.
-func swizzle(p []byte) {
-	if len(p)%4 != 0 {
-		return
-	}
-	for i := 0; i < len(p); i += 4 {
-		p[i+0], p[i+2] = p[i+2], p[i+0]
+		swizzle.BGRA(b.buf)
 	}
 }
 
@@ -72,7 +61,7 @@ func (b *bufferImpl) postUpload() {
 	if released {
 		b.cleanUp()
 	} else {
-		swizzle(b.buf)
+		swizzle.BGRA(b.buf)
 	}
 }
 
