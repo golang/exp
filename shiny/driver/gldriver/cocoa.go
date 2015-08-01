@@ -90,23 +90,38 @@ func drawgl(id uintptr) {
 // when the window is resized.
 func (w *windowImpl) drawLoop(ctx uintptr) {
 	runtime.LockOSThread()
-	// TODO(crawshaw): confirm that different windows have different GL contexts.
+	// TODO(crawshaw): there are several problematic issues around having
+	// a draw loop per window, but resolving them requires some thought.
+	// Firstly, nothing should race on gl.DoWork, so only one person can
+	// do that at a time. Secondly, which GL ctx we use matters. A ctx
+	// carries window-specific state (for example, the current glViewport
+	// value), so we only want to run GL commands on the right context
+	// between a <-w.draw and a <-w.drawDone. Thirdly, some GL functions
+	// can be legitimately called outside of a window draw cycle, for
+	// example, gl.CreateTexture. It doesn't matter which GL ctx we use
+	// for that, but we have to use a valid one. So if a window gets
+	// closed, it's important we swap the default ctx. More work needed.
 	C.makeCurrentContext(C.uintptr_t(ctx))
 
 	// TODO(crawshaw): exit this goroutine on Release.
-	for range w.draw {
-		w.eventsIn <- paint.Event{}
-	loop:
-		for {
-			select {
-			case <-gl.WorkAvailable:
-				gl.DoWork()
-			case <-w.endPaint:
-				C.CGLFlushDrawable(C.CGLGetCurrentContext())
-				break loop
+	for {
+		select {
+		case <-gl.WorkAvailable:
+			gl.DoWork()
+		case <-w.draw:
+			w.eventsIn <- paint.Event{}
+		loop:
+			for {
+				select {
+				case <-gl.WorkAvailable:
+					gl.DoWork()
+				case <-w.endPaint:
+					C.CGLFlushDrawable(C.CGLGetCurrentContext())
+					break loop
+				}
 			}
+			w.drawDone <- struct{}{}
 		}
-		w.drawDone <- struct{}{}
 	}
 }
 
@@ -116,13 +131,19 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
 
-	w.eventsIn <- config.Event{
+	cfg := config.Event{
 		WidthPx:     widthPx,
 		HeightPx:    heightPx,
 		WidthPt:     geom.Pt(float32(widthPx) / ppp),
 		HeightPt:    geom.Pt(float32(heightPx) / ppp),
 		PixelsPerPt: ppp,
 	}
+
+	w.mu.Lock()
+	w.cfg = cfg
+	w.mu.Unlock()
+
+	w.eventsIn <- cfg
 }
 
 //export eventMouseDown
