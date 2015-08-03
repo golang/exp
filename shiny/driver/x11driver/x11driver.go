@@ -17,7 +17,6 @@ import (
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/render"
 	"github.com/BurntSushi/xgb/shm"
-	"github.com/BurntSushi/xgb/xproto"
 
 	"golang.org/x/exp/shiny/screen"
 )
@@ -52,19 +51,10 @@ func main(f func(screen.Screen)) (retErr error) {
 		return fmt.Errorf("x11driver: shm.Init failed: %v", err)
 	}
 
-	s := &screenImpl{
-		xc:      xc,
-		xsi:     xproto.Setup(xc).DefaultScreen(xc),
-		buffers: map[shm.Seg]*bufferImpl{},
-		uploads: map[uint16]completion{},
-		windows: map[xproto.Window]*windowImpl{},
-	}
-
-	if err := s.initAtoms(); err != nil {
+	s, err := newScreenImpl(xc)
+	if err != nil {
 		return err
 	}
-
-	go s.run()
 	f(s)
 	// TODO: tear down the s.run goroutine? It's probably not worth the
 	// complexity of doing it cleanly, if the app is about to exit anyway.
