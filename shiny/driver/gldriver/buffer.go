@@ -11,6 +11,7 @@ type bufferImpl struct {
 	size image.Point
 }
 
-func (b *bufferImpl) Release()          {}
-func (b *bufferImpl) Size() image.Point { return b.size }
-func (b *bufferImpl) RGBA() *image.RGBA { return b.rgba }
+func (b *bufferImpl) Release()                {}
+func (b *bufferImpl) Size() image.Point       { return b.size }
+func (b *bufferImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
+func (b *bufferImpl) RGBA() *image.RGBA       { return b.rgba }

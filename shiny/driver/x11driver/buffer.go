@@ -32,8 +32,9 @@ type bufferImpl struct {
 	cleanedUp bool
 }
 
-func (b *bufferImpl) Size() image.Point { return b.size }
-func (b *bufferImpl) RGBA() *image.RGBA { return &b.rgba }
+func (b *bufferImpl) Size() image.Point       { return b.size }
+func (b *bufferImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
+func (b *bufferImpl) RGBA() *image.RGBA       { return &b.rgba }
 
 func (b *bufferImpl) preUpload() {
 	b.mu.Lock()

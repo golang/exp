@@ -29,7 +29,8 @@ type textureImpl struct {
 	released bool
 }
 
-func (t *textureImpl) Size() image.Point { return t.size }
+func (t *textureImpl) Size() image.Point       { return t.size }
+func (t *textureImpl) Bounds() image.Rectangle { return image.Rectangle{Max: t.size} }
 
 func (t *textureImpl) Release() {
 	t.mu.Lock()

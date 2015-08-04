@@ -37,19 +37,19 @@ func main() {
 		}
 		defer b.Release()
 		fill(b.RGBA())
-		w.Upload(image.Point{}, b, b.RGBA().Bounds(), w)
+		w.Upload(image.Point{}, b, b.Bounds(), w)
 
 		t, err := s.NewTexture(size)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer t.Release()
-		t.Upload(image.Point{}, b, b.RGBA().Bounds(), w)
+		t.Upload(image.Point{}, b, b.Bounds(), w)
 
 		w.Draw(f64.Aff3{
 			1, 0, 100,
 			0, 1, 200,
-		}, t, image.Rectangle{Max: size}, screen.Over, nil)
+		}, t, t.Bounds(), screen.Over, nil)
 
 		for e := range w.Events() {
 			switch e := e.(type) {

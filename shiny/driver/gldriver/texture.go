@@ -14,11 +14,12 @@ type textureImpl struct {
 	size image.Point
 }
 
+func (t *textureImpl) Size() image.Point       { return t.size }
+func (t *textureImpl) Bounds() image.Rectangle { return image.Rectangle{Max: t.size} }
+
 func (t *textureImpl) Release() {
 	// TODO
 }
-
-func (t *textureImpl) Size() image.Point { return t.size }
 
 func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
 }

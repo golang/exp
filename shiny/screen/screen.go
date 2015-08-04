@@ -73,6 +73,10 @@ type Buffer interface {
 	// Size returns the size of the Buffer's image.
 	Size() image.Point
 
+	// Bounds returns the bounds of the Buffer's image. It is equal to
+	// image.Rectangle{Max: b.Size()}.
+	Bounds() image.Rectangle
+
 	// RGBA returns the pixel buffer as an *image.RGBA.
 	//
 	// Its contents should not be accessed while the Buffer is uploading.
@@ -94,6 +98,10 @@ type Texture interface {
 
 	// Size returns the size of the Texture's image.
 	Size() image.Point
+
+	// Bounds returns the bounds of the Texture's image. It is equal to
+	// image.Rectangle{Max: t.Size()}.
+	Bounds() image.Rectangle
 
 	Uploader
 
