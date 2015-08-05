@@ -20,6 +20,7 @@ import (
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/config"
 	"golang.org/x/mobile/event/paint"
 )
 
@@ -46,23 +47,28 @@ func main() {
 		defer t.Release()
 		t.Upload(image.Point{}, b, b.Bounds(), w)
 
-		// TODO: delay drawing to the window until it is on-screen, and we know
-		// what the window size is.
-		w.Fill(image.Rect(0, 0, 500, 500), color.RGBA{0x00, 0x00, 0x3f, 0xff}, draw.Src)
-		w.Upload(image.Point{}, b, b.Bounds(), w)
-		w.Draw(f64.Aff3{
-			1, 0, 100,
-			0, 1, 200,
-		}, t, t.Bounds(), screen.Over, nil)
-
+		var cfg config.Event
 		for e := range w.Events() {
 			switch e := e.(type) {
 			default:
 				// TODO: be more interesting.
 				fmt.Printf("got event %#v\n", e)
 
+			case config.Event:
+				cfg = e
+
 			case paint.Event:
+				wBounds := image.Rectangle{Max: image.Point{cfg.WidthPx, cfg.HeightPx}}
+				w.Fill(wBounds, color.RGBA{0x00, 0x00, 0x3f, 0xff}, draw.Src)
+				w.Upload(image.Point{}, b, b.Bounds(), w)
+				w.Draw(f64.Aff3{
+					1, 0, 100,
+					0, 1, 200,
+				}, t, t.Bounds(), screen.Over, nil)
 				w.EndPaint(e)
+
+			case screen.UploadedEvent:
+				// No-op.
 
 			case error:
 				log.Print(e)

@@ -80,53 +80,54 @@ func (s *screenImpl) run() {
 			continue
 		}
 
-		xw, destroy := xproto.Window(0), false
+		noWindowFound := false
 		switch ev := ev.(type) {
-		default:
-			continue
+		case xproto.DestroyNotifyEvent:
+			s.mu.Lock()
+			delete(s.windows, ev.Window)
+			s.mu.Unlock()
+
 		case shm.CompletionEvent:
 			s.handleCompletion(ev)
-			continue
+
 		case xproto.ClientMessageEvent:
-			xw = ev.Window
+			if ev.Type != s.atomWMProtocols || ev.Format != 32 {
+				break
+			}
+			switch xproto.Atom(ev.Data.Data32[0]) {
+			case s.atomWMDeleteWindow:
+				// TODO.
+			case s.atomWMTakeFocus:
+				xproto.SetInputFocus(s.xc, xproto.InputFocusParent, ev.Window, xproto.Timestamp(ev.Data.Data32[1]))
+			}
+
 		case xproto.ConfigureNotifyEvent:
-			xw = ev.Window
-		case xproto.DestroyNotifyEvent:
-			xw = ev.Window
-			destroy = true
+			if w := s.findWindow(ev.Window); w != nil {
+				w.handleConfigureNotify(ev)
+			} else {
+				noWindowFound = true
+			}
+
 		case xproto.ExposeEvent:
-			xw = ev.Window
+			// TODO: xw = ev.Window
 		case xproto.FocusInEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		case xproto.FocusOutEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		case xproto.KeyPressEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		case xproto.KeyReleaseEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		case xproto.ButtonPressEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		case xproto.ButtonReleaseEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		case xproto.MotionNotifyEvent:
-			xw = ev.Event
+			// TODO: xw = ev.Event
 		}
 
-		s.mu.Lock()
-		w := s.windows[xw]
-		if destroy {
-			delete(s.windows, xw)
-		}
-		s.mu.Unlock()
-
-		if w == nil {
+		if noWindowFound {
 			log.Printf("x11driver: no window found for event %T", ev)
-			continue
-		}
-		if destroy {
-			close(w.xevents)
-		} else {
-			w.xevents <- ev
 		}
 	}
 }
@@ -138,6 +139,13 @@ func (s *screenImpl) findBuffer(key shm.Seg) *bufferImpl {
 	b := s.buffers[key]
 	s.mu.Unlock()
 	return b
+}
+
+func (s *screenImpl) findWindow(key xproto.Window) *windowImpl {
+	s.mu.Lock()
+	w := s.windows[key]
+	s.mu.Unlock()
+	return w
 }
 
 func (s *screenImpl) handleCompletion(ev shm.CompletionEvent) {
@@ -274,7 +282,6 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 		pump:    pump.Make(),
 		xevents: make(chan xgb.Event),
 	}
-	go w.run()
 
 	s.mu.Lock()
 	s.windows[xw] = w
