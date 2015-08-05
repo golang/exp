@@ -35,6 +35,7 @@ package screen
 
 import (
 	"image"
+	"image/color"
 	"image/draw"
 
 	"golang.org/x/image/math/f64"
@@ -158,6 +159,13 @@ type Uploader interface {
 	// When uploading to a Window, there might not be any visible effect until
 	// EndPaint is called.
 	Upload(dp image.Point, src Buffer, sr image.Rectangle, sender Sender)
+
+	// Fill fills that part of the destination (the method receiver) defined by
+	// dr with the given color.
+	//
+	// When filling a Window, there might not be any visible effect until
+	// EndPaint is called.
+	Fill(dr image.Rectangle, src color.Color, op draw.Op)
 }
 
 // UploadedEvent records that a Buffer was uploaded.

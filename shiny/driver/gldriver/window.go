@@ -9,6 +9,7 @@ package gldriver
 
 import (
 	"image"
+	"image/color"
 	"image/draw"
 	"sync"
 
@@ -119,6 +120,10 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 	t.Upload(dp, src, sr, sender)
 	w.Draw(f64.Aff3{1, 0, 0, 0, 1, 0}, t, sr, draw.Src, nil)
 	t.Release()
+}
+
+func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	// TODO.
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {

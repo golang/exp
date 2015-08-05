@@ -6,6 +6,7 @@ package x11driver
 
 import (
 	"image"
+	"image/color"
 	"image/draw"
 	"sync"
 
@@ -49,20 +50,26 @@ func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectang
 	src.(*bufferImpl).upload(t, xproto.Drawable(t.xm), t.s.gcontext32, textureDepth, dp, sr, sender)
 }
 
-func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	renderOp := uint8(render.PictOpOver)
-	if op == draw.Src {
-		renderOp = render.PictOpSrc
-	}
+func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	fill(t.s.xc, t.xp, dr, src, op)
+}
 
+func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	// TODO: honor all of src2dst, not just the translation.
 	dstX := int(src2dst[2]) - sr.Min.X
 	dstY := int(src2dst[5]) - sr.Min.Y
 
-	render.Composite(t.s.xc, renderOp, t.xp, 0, xp,
+	render.Composite(t.s.xc, renderOp(op), t.xp, 0, xp,
 		int16(sr.Min.X), int16(sr.Min.Y), // SrcX, SrcY,
 		0, 0, // MaskX, MaskY,
 		int16(dstX), int16(dstY), // DstX, DstY,
 		uint16(sr.Dx()), uint16(sr.Dy()), // Width, Height,
 	)
+}
+
+func renderOp(op draw.Op) byte {
+	if op == draw.Src {
+		return render.PictOpSrc
+	}
+	return render.PictOpOver
 }

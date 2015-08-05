@@ -6,10 +6,14 @@ package x11driver
 
 import (
 	"image"
+	"image/color"
+	"image/draw"
 	"log"
 	"sync"
 	"unsafe"
 
+	"github.com/BurntSushi/xgb"
+	"github.com/BurntSushi/xgb/render"
 	"github.com/BurntSushi/xgb/shm"
 	"github.com/BurntSushi/xgb/xproto"
 
@@ -126,4 +130,28 @@ func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gco
 		},
 	}
 	b.s.mu.Unlock()
+}
+
+func fill(xc *xgb.Conn, xp render.Picture, dr image.Rectangle, src color.Color, op draw.Op) {
+	r, g, b, a := src.RGBA()
+	c := render.Color{
+		Red:   uint16(r),
+		Green: uint16(g),
+		Blue:  uint16(b),
+		Alpha: uint16(a),
+	}
+	x, y := dr.Min.X, dr.Min.Y
+	if x < -0x8000 || 0x7fff < x || y < -0x8000 || 0x7fff < y {
+		return
+	}
+	dx, dy := dr.Dx(), dr.Dy()
+	if dx < 0 || 0xffff < dx || dy < 0 || 0xffff < dy {
+		return
+	}
+	render.FillRectangles(xc, renderOp(op), xp, c, []xproto.Rectangle{{
+		X:      int16(x),
+		Y:      int16(y),
+		Width:  uint16(dx),
+		Height: uint16(dy),
+	}})
 }

@@ -6,6 +6,7 @@ package x11driver
 
 import (
 	"image"
+	"image/color"
 	"image/draw"
 	"log"
 	"sync"
@@ -72,6 +73,10 @@ func (w *windowImpl) Release() {
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
 	src.(*bufferImpl).upload(w, xproto.Drawable(w.xw), w.xg, w.s.xsi.RootDepth, dp, sr, sender)
+}
+
+func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	fill(w.s.xc, w.xp, dr, src, op)
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {

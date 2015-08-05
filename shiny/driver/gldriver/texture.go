@@ -7,6 +7,8 @@ package gldriver
 import (
 	"encoding/binary"
 	"image"
+	"image/color"
+	"image/draw"
 
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/gl"
@@ -33,6 +35,10 @@ func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectang
 	// TODO check m bounds smaller than t.size
 	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
 	// TODO: send a screen.UploadedEvent.
+}
+
+func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	// TODO.
 }
 
 var quadXYCoords = f32Bytes(binary.LittleEndian,

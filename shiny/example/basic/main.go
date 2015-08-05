@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"log"
 
 	"golang.org/x/exp/shiny/driver"
@@ -36,8 +37,7 @@ func main() {
 			log.Fatal(err)
 		}
 		defer b.Release()
-		fill(b.RGBA())
-		w.Upload(image.Point{}, b, b.Bounds(), w)
+		drawGradient(b.RGBA())
 
 		t, err := s.NewTexture(size)
 		if err != nil {
@@ -46,6 +46,10 @@ func main() {
 		defer t.Release()
 		t.Upload(image.Point{}, b, b.Bounds(), w)
 
+		// TODO: delay drawing to the window until it is on-screen, and we know
+		// what the window size is.
+		w.Fill(image.Rect(0, 0, 500, 500), color.RGBA{0x00, 0x00, 0x3f, 0xff}, draw.Src)
+		w.Upload(image.Point{}, b, b.Bounds(), w)
 		w.Draw(f64.Aff3{
 			1, 0, 100,
 			0, 1, 200,
@@ -67,7 +71,7 @@ func main() {
 	})
 }
 
-func fill(m *image.RGBA) {
+func drawGradient(m *image.RGBA) {
 	b := m.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
