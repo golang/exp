@@ -32,6 +32,13 @@ type screenImpl struct {
 		quadXY  gl.Buffer
 		quadUV  gl.Buffer
 	}
+	fill struct {
+		program gl.Program
+		pos     gl.Attrib
+		mvp     gl.Uniform
+		color   gl.Uniform
+		quadXY  gl.Buffer
+	}
 }
 
 func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr error) {
@@ -46,7 +53,7 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	defer s.mu.Unlock()
 
 	if !gl.IsProgram(s.texture.program) {
-		p, err := compileProgram(vertexShaderSrc, fragmentShaderSrc)
+		p, err := compileProgram(textureVertexSrc, textureFragmentSrc)
 		if err != nil {
 			return nil, err
 		}

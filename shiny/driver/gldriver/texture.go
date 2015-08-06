@@ -55,7 +55,7 @@ var quadUVCoords = f32Bytes(binary.LittleEndian,
 	1, 1, // bottom right
 )
 
-const vertexShaderSrc = `#version 100
+const textureVertexSrc = `#version 100
 uniform mat3 mvp;
 uniform mat3 uvp;
 attribute vec3 pos;
@@ -69,11 +69,29 @@ void main() {
 }
 `
 
-const fragmentShaderSrc = `#version 100
+const textureFragmentSrc = `#version 100
 precision mediump float;
 varying vec2 uv;
 uniform sampler2D sample;
 void main() {
 	gl_FragColor = texture2D(sample, uv);
+}
+`
+
+const fillVertexSrc = `#version 100
+uniform mat3 mvp;
+attribute vec3 pos;
+void main() {
+	vec3 p = pos;
+	p.z = 1.0;
+	gl_Position = vec4(mvp * p, 1);
+}
+`
+
+const fillFragmentSrc = `#version 100
+precision mediump float;
+uniform vec4 color;
+void main() {
+	gl_FragColor = color;
 }
 `

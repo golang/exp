@@ -123,17 +123,49 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 }
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	// TODO.
+	if !gl.IsProgram(w.s.fill.program) {
+		p, err := compileProgram(fillVertexSrc, fillFragmentSrc)
+		if err != nil {
+			// TODO: initialize this somewhere else we can better handle the error.
+			panic(err.Error())
+		}
+		w.s.fill.program = p
+		w.s.fill.pos = gl.GetAttribLocation(p, "pos")
+		w.s.fill.mvp = gl.GetUniformLocation(p, "mvp")
+		w.s.fill.color = gl.GetUniformLocation(p, "color")
+		w.s.fill.quadXY = gl.CreateBuffer()
+
+		gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quadXY)
+		gl.BufferData(gl.ARRAY_BUFFER, quadXYCoords, gl.STATIC_DRAW)
+	}
+
+	gl.UseProgram(w.s.fill.program)
+	writeAff3(w.s.fill.mvp, w.vertexAff3(dr))
+
+	r, g, b, a := src.RGBA()
+	gl.Uniform4f(
+		w.s.fill.color,
+		float32(r)/65535,
+		float32(g)/65535,
+		float32(b)/65535,
+		float32(a)/65535,
+	)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quadXY)
+	gl.EnableVertexAttribArray(w.s.fill.pos)
+	gl.VertexAttribPointer(w.s.fill.pos, 2, gl.FLOAT, false, 0, 0)
+
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+	gl.DisableVertexAttribArray(w.s.fill.pos)
 }
 
-func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	t := src.(*textureImpl)
-
+func (w *windowImpl) vertexAff3(r image.Rectangle) f64.Aff3 {
 	w.mu.Lock()
 	cfg := w.cfg
 	w.mu.Unlock()
 
-	size := sr.Size()
+	size := r.Size()
 	tx, ty := float64(size.X), float64(size.Y)
 	wx, wy := float64(cfg.WidthPx), float64(cfg.HeightPx)
 	rx, ry := tx/wx, ty/wy
@@ -177,10 +209,15 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	//	0    0       1
 	//
 	// These multiply to give:
-	a := f64.Aff3{
+	return f64.Aff3{
 		rx, 0, -1 + rx,
 		0, ry, +1 - ry,
 	}
+}
+
+func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	t := src.(*textureImpl)
+	a := w.vertexAff3(sr)
 
 	gl.UseProgram(w.s.texture.program)
 	writeAff3(w.s.texture.mvp, mul(a, src2dst))
