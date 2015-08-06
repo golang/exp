@@ -106,23 +106,21 @@ uint64 threadID() {
 	}
 }
 
-- (void)mouseDown:(NSEvent *)theEvent {
+- (void)mouseEventNS:(NSEvent *)theEvent {
 	double scale = [[NSScreen mainScreen] backingScaleFactor];
 	NSPoint p = [theEvent locationInWindow];
-	eventMouseDown((GoUintptr)self, p.x * scale, p.y * scale);
+	mouseEvent((GoUintptr)self, p.x * scale, p.y * scale, theEvent.type, theEvent.buttonNumber);
 }
 
-- (void)mouseUp:(NSEvent *)theEvent {
-	double scale = [[NSScreen mainScreen] backingScaleFactor];
-	NSPoint p = [theEvent locationInWindow];
-	eventMouseEnd((GoUintptr)self, p.x * scale, p.y * scale);
-}
-
-- (void)mouseDragged:(NSEvent *)theEvent {
-	double scale = [[NSScreen mainScreen] backingScaleFactor];
-	NSPoint p = [theEvent locationInWindow];
-	eventMouseDragged((GoUintptr)self, p.x * scale, p.y * scale);
-}
+- (void)mouseDown:(NSEvent *)theEvent         { [self mouseEventNS:theEvent]; }
+- (void)mouseUp:(NSEvent *)theEvent           { [self mouseEventNS:theEvent]; }
+- (void)mouseDragged:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
+- (void)rightMouseDown:(NSEvent *)theEvent    { [self mouseEventNS:theEvent]; }
+- (void)rightMouseUp:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
+- (void)rightMouseDragged:(NSEvent *)theEvent { [self mouseEventNS:theEvent]; }
+- (void)otherMouseDown:(NSEvent *)theEvent    { [self mouseEventNS:theEvent]; }
+- (void)otherMouseUp:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
+- (void)otherMouseDragged:(NSEvent *)theEvent { [self mouseEventNS:theEvent]; }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	lifecycleFocused();
