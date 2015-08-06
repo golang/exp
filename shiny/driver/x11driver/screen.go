@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/mouse"
 )
 
 // TODO: check that xgb is safe to use concurrently from multiple goroutines.
@@ -118,12 +119,27 @@ func (s *screenImpl) run() {
 			// TODO: xw = ev.Event
 		case xproto.KeyReleaseEvent:
 			// TODO: xw = ev.Event
+
 		case xproto.ButtonPressEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.handleMouse(ev.EventX, ev.EventY, ev.Detail, ev.State, mouse.DirPress)
+			} else {
+				noWindowFound = true
+			}
+
 		case xproto.ButtonReleaseEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.handleMouse(ev.EventX, ev.EventY, ev.Detail, ev.State, mouse.DirRelease)
+			} else {
+				noWindowFound = true
+			}
+
 		case xproto.MotionNotifyEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.handleMouse(ev.EventX, ev.EventY, 0, ev.State, mouse.DirNone)
+			} else {
+				noWindowFound = true
+			}
 		}
 
 		if noWindowFound {

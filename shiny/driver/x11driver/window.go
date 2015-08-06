@@ -18,6 +18,8 @@ import (
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/config"
+	"golang.org/x/mobile/event/key"
+	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/geom"
 )
@@ -94,4 +96,49 @@ func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
 	// TODO: translate X11 expose events to shiny paint events, instead of
 	// sending this synthetic paint event as a hack.
 	w.Send(paint.Event{})
+}
+
+func (w *windowImpl) handleMouse(x, y int16, b xproto.Button, state uint16, dir mouse.Direction) {
+	// TODO: should a mouse.Event have a separate MouseModifiers field, for
+	// which buttons are pressed during a mouse move?
+	w.Send(mouse.Event{
+		X:         float32(x),
+		Y:         float32(y),
+		Button:    mouse.Button(b),
+		Modifiers: keyModifiers(state),
+		Direction: dir,
+	})
+}
+
+// These constants come from /usr/include/X11/X.h
+const (
+	xShiftMask   = 1 << 0
+	xLockMask    = 1 << 1
+	xControlMask = 1 << 2
+	xMod1Mask    = 1 << 3
+	xMod2Mask    = 1 << 4
+	xMod3Mask    = 1 << 5
+	xMod4Mask    = 1 << 6
+	xMod5Mask    = 1 << 7
+	xButton1Mask = 1 << 8
+	xButton2Mask = 1 << 9
+	xButton3Mask = 1 << 10
+	xButton4Mask = 1 << 11
+	xButton5Mask = 1 << 12
+)
+
+func keyModifiers(state uint16) (m key.Modifiers) {
+	if state&xShiftMask != 0 {
+		m |= key.ModShift
+	}
+	if state&xControlMask != 0 {
+		m |= key.ModControl
+	}
+	if state&xMod1Mask != 0 {
+		m |= key.ModAlt
+	}
+	if state&xMod4Mask != 0 {
+		m |= key.ModMeta
+	}
+	return m
 }
