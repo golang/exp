@@ -110,7 +110,7 @@ func (w *windowImpl) drawLoop(ctx uintptr) {
 		case <-gl.WorkAvailable:
 			gl.DoWork()
 		case <-w.draw:
-			w.eventsIn <- paint.Event{}
+			w.Send(paint.Event{})
 		loop:
 			for {
 				select {
@@ -144,14 +144,14 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 	w.cfg = cfg
 	w.mu.Unlock()
 
-	w.eventsIn <- cfg
+	w.Send(cfg)
 }
 
 func sendWindowEvent(id uintptr, e interface{}) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
-	w.eventsIn <- e
+	w.Send(e)
 }
 
 func cocoaMouseDir(ty int) mouse.Direction {

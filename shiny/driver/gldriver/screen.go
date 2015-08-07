@@ -14,6 +14,7 @@ import (
 	"image"
 	"sync"
 
+	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/gl"
@@ -93,20 +94,18 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 
 	id := C.newWindow(width, height)
 	w := &windowImpl{
-		s:         s,
-		id:        uintptr(id),
-		eventsIn:  make(chan interface{}),
-		eventsOut: make(chan interface{}),
-		endPaint:  make(chan paint.Event, 1),
-		draw:      make(chan struct{}),
-		drawDone:  make(chan struct{}),
+		s:        s,
+		id:       uintptr(id),
+		pump:     pump.Make(),
+		endPaint: make(chan paint.Event, 1),
+		draw:     make(chan struct{}),
+		drawDone: make(chan struct{}),
 	}
 
 	s.mu.Lock()
 	s.windows[uintptr(id)] = w
 	s.mu.Unlock()
 
-	go w.pump()
 	go w.drawLoop(uintptr(C.showWindow(id)))
 
 	return w, nil
