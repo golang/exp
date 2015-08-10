@@ -5,9 +5,9 @@
 // +build ignore
 //
 // This build tag means that "go install golang.org/x/exp/shiny/..." doesn't
-// install this example program. Use "go run main.go" to explicitly run it.
+// install this example program. Use "go run main.go" to run it.
 
-// Program basic is a basic example of a graphical application.
+// Basic is a basic example of a graphical application.
 package main
 
 import (
