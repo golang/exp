@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package plan9font implements font faces for the Plan 9 font file format.
+// Package plan9font implements font faces for the Plan 9 font and subfont file
+// formats. These formats are described at
+// http://plan9.bell-labs.com/magic/man2html/6/font
 package plan9font
 
-// TODO: have a face use an *image.Alpha instead of plan9Image implementing the
-// image.Image interface? The image/draw code has a fast path for *image.Alpha
-// masks.
+// TODO: have a subface use an *image.Alpha instead of plan9Image implementing
+// the image.Image interface? The image/draw code has a fast path for
+// *image.Alpha masks.
 
 import (
 	"bytes"
@@ -15,7 +17,8 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"io"
+	"log"
+	"strconv"
 	"strings"
 
 	"golang.org/x/exp/shiny/font"
@@ -49,8 +52,8 @@ func parseFontchars(p []byte) []fontchar {
 	return fc
 }
 
-// face implements font.Face.
-type face struct {
+// subface implements font.Face for a Plan 9 subfont.
+type subface struct {
 	firstRune rune        // First rune in the subfont.
 	n         int         // Number of characters in the subfont.
 	height    int         // Inter-line spacing.
@@ -59,10 +62,10 @@ type face struct {
 	img       *plan9Image // Image holding the glyphs.
 }
 
-func (f *face) Close() error                   { return nil }
-func (f *face) Kern(r0, r1 rune) fixed.Int26_6 { return 0 }
+func (f *subface) Close() error                   { return nil }
+func (f *subface) Kern(r0, r1 rune) fixed.Int26_6 { return 0 }
 
-func (f *face) Glyph(dot fixed.Point26_6, r rune) (
+func (f *subface) Glyph(dot fixed.Point26_6, r rune) (
 	newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool) {
 
 	r -= f.firstRune
@@ -91,9 +94,132 @@ func (f *face) Glyph(dot fixed.Point26_6, r rune) (
 	return newDot, dr, f.img, image.Point{int(i.x), int(i.top)}, true
 }
 
-// ParseFont parses a Plan 9 font file.
-func ParseFont(data []byte, openFunc func(name string) (io.ReadCloser, error)) (*font.MultiFace, error) {
-	panic("TODO")
+// runeRange maps a single rune range [lo, hi] to a lazily loaded subface. Both
+// ends of the range are inclusive.
+type runeRange struct {
+	lo, hi      rune
+	offset      rune // subfont index that the lo rune maps to.
+	relFilename string
+	subface     *subface
+	bad         bool
+}
+
+// face implements font.Face for a Plan 9 font.
+//
+// It maps multiple rune ranges to *subface values. Rune ranges may overlap;
+// the first match wins.
+type face struct {
+	height     int
+	ascent     int
+	readFile   func(relFilename string) ([]byte, error)
+	runeRanges []runeRange
+}
+
+func (f *face) Close() error                   { return nil }
+func (f *face) Kern(r0, r1 rune) fixed.Int26_6 { return 0 }
+
+func (f *face) Glyph(dot fixed.Point26_6, r rune) (
+	newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool) {
+
+	// Fall back on U+FFFD if we can't find r.
+	for _, rr := range [2]rune{r, '\ufffd'} {
+		// We have to do linear, not binary search. plan9port's
+		// lucsans/unicode.8.font says:
+		//	0x2591  0x2593  ../luc/Altshades.7.0
+		//	0x2500  0x25ee  ../luc/FormBlock.7.0
+		// and the rune ranges overlap.
+		for i := range f.runeRanges {
+			x := &f.runeRanges[i]
+			if rr < x.lo || x.hi < rr || x.bad {
+				continue
+			}
+			if x.subface == nil {
+				data, err := f.readFile(x.relFilename)
+				if err != nil {
+					log.Printf("plan9font: couldn't read subfont %q: %v", x.relFilename, err)
+					x.bad = true
+					continue
+				}
+				sub, err := ParseSubfont(data, x.lo-x.offset)
+				if err != nil {
+					log.Printf("plan9font: couldn't parse subfont %q: %v", x.relFilename, err)
+					x.bad = true
+					continue
+				}
+				x.subface = sub.(*subface)
+			}
+			return x.subface.Glyph(dot, rr)
+		}
+	}
+	return fixed.Point26_6{}, image.Rectangle{}, nil, image.Point{}, false
+}
+
+// ParseFont parses a Plan 9 font file. data is the contents of that font file,
+// which gives relative filenames for subfont files. readFile returns the
+// contents of those subfont files. It is similar to io/ioutil's ReadFile
+// function, except that it takes a relative filename instead of an absolute
+// one.
+func ParseFont(data []byte, readFile func(relFilename string) ([]byte, error)) (font.Face, error) {
+	f := &face{
+		readFile: readFile,
+	}
+	// TODO: don't use strconv, to avoid the conversions from []byte to string?
+	for first := true; len(data) > 0; first = false {
+		i := bytes.IndexByte(data, '\n')
+		if i < 0 {
+			return nil, errors.New("plan9font: invalid font: no final newline")
+		}
+		row := string(data[:i])
+		data = data[i+1:]
+		if first {
+			height, s, ok := nextInt32(row)
+			if !ok {
+				return nil, fmt.Errorf("plan9font: invalid font: invalid header %q", row)
+			}
+			ascent, s, ok := nextInt32(s)
+			if !ok {
+				return nil, fmt.Errorf("plan9font: invalid font: invalid header %q", row)
+			}
+			if height < 0 || 0xffff < height || ascent < 0 || 0xffff < ascent {
+				return nil, fmt.Errorf("plan9font: invalid font: invalid header %q", row)
+			}
+			f.height, f.ascent = int(height), int(ascent)
+			continue
+		}
+		lo, s, ok := nextInt32(row)
+		if !ok {
+			return nil, fmt.Errorf("plan9font: invalid font: invalid row %q", row)
+		}
+		hi, s, ok := nextInt32(s)
+		if !ok {
+			return nil, fmt.Errorf("plan9font: invalid font: invalid row %q", row)
+		}
+		offset, s, _ := nextInt32(s)
+
+		f.runeRanges = append(f.runeRanges, runeRange{
+			lo:          lo,
+			hi:          hi,
+			offset:      offset,
+			relFilename: s,
+		})
+	}
+	return f, nil
+}
+
+func nextInt32(s string) (ret int32, remaining string, ok bool) {
+	i := 0
+	for ; i < len(s) && s[i] <= ' '; i++ {
+	}
+	j := i
+	for ; j < len(s) && s[j] > ' '; j++ {
+	}
+	n, err := strconv.ParseInt(s[i:j], 0, 32)
+	if err != nil {
+		return 0, s, false
+	}
+	for ; j < len(s) && s[j] <= ' '; j++ {
+	}
+	return int32(n), s[j:], true
 }
 
 // ParseSubfont parses a Plan 9 subfont file.
@@ -116,7 +242,7 @@ func ParseSubfont(data []byte, firstRune rune) (font.Face, error) {
 	if len(data) != 6*(n+1) {
 		return nil, errors.New("plan9font: invalid subfont: data length mismatch")
 	}
-	return &face{
+	return &subface{
 		firstRune: firstRune,
 		n:         n,
 		height:    height,

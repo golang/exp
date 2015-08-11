@@ -19,6 +19,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"golang.org/x/exp/shiny/font"
 	"golang.org/x/exp/shiny/font/plan9font"
@@ -26,8 +28,9 @@ import (
 )
 
 var (
-	subfont   = flag.String("subfont", "", `filename of the Plan 9 subfont file, such as "lucsans/lsr.14"`)
-	firstRune = flag.Int("firstrune", 0, "the Unicode code point of the first rune in the subfont file")
+	fontFlag = flag.String("font", "",
+		`filename of the Plan 9 font or subfont file, such as "lucsans/unicode.8.font" or "lucsans/lsr.14"`)
+	firstRuneFlag = flag.Int("firstrune", 0, "the Unicode code point of the first rune in the subfont file")
 )
 
 func pt(p fixed.Point26_6) image.Point {
@@ -40,38 +43,56 @@ func pt(p fixed.Point26_6) image.Point {
 func main() {
 	flag.Parse()
 
-	// TODO: mmap the file.
-	if *subfont == "" {
+	// TODO: mmap the files.
+	if *fontFlag == "" {
 		flag.Usage()
-		log.Fatal("no subfont specified")
+		log.Fatal("no font specified")
 	}
-	fontData, err := ioutil.ReadFile(*subfont)
-	if err != nil {
-		log.Fatal(err)
-	}
-	face, err := plan9font.ParseSubfont(fontData, rune(*firstRune))
-	if err != nil {
-		log.Fatal(err)
+	var face font.Face
+	if strings.HasSuffix(*fontFlag, ".font") {
+		fontData, err := ioutil.ReadFile(*fontFlag)
+		if err != nil {
+			log.Fatal(err)
+		}
+		dir := filepath.Dir(*fontFlag)
+		face, err = plan9font.ParseFont(fontData, func(name string) ([]byte, error) {
+			return ioutil.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		fontData, err := ioutil.ReadFile(*fontFlag)
+		if err != nil {
+			log.Fatal(err)
+		}
+		face, err = plan9font.ParseSubfont(fontData, rune(*firstRuneFlag))
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	dst := image.NewRGBA(image.Rect(0, 0, 800, 100))
+	dst := image.NewRGBA(image.Rect(0, 0, 800, 300))
 	draw.Draw(dst, dst.Bounds(), image.Black, image.Point{}, draw.Src)
 
 	d := &font.Drawer{
 		Dst:  dst,
 		Src:  image.White,
 		Face: face,
-		Dot: fixed.Point26_6{
-			X: 20 << 6,
-			Y: 80 << 6,
-		},
 	}
-	dot0 := pt(d.Dot)
-	d.DrawString("The quick brown fox jumps over the lazy dog.")
-	dot1 := pt(d.Dot)
-
-	dst.SetRGBA(dot0.X, dot0.Y, color.RGBA{0xff, 0x00, 0x00, 0xff})
-	dst.SetRGBA(dot1.X, dot1.Y, color.RGBA{0x00, 0x00, 0xff, 0xff})
+	ss := []string{
+		"The quick brown fox jumps over the lazy dog.",
+		"Hello, 世界.",
+		"U+FFFD is \ufffd.",
+	}
+	for i, s := range ss {
+		d.Dot = fixed.P(20, 100*i+80)
+		dot0 := pt(d.Dot)
+		d.DrawString(s)
+		dot1 := pt(d.Dot)
+		dst.SetRGBA(dot0.X, dot0.Y, color.RGBA{0xff, 0x00, 0x00, 0xff})
+		dst.SetRGBA(dot1.X, dot1.Y, color.RGBA{0x00, 0x00, 0xff, 0xff})
+	}
 
 	out, err := os.Create("out.png")
 	if err != nil {

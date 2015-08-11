@@ -55,10 +55,6 @@ type Face interface {
 	// TODO: Ligatures? Shaping?
 }
 
-type MultiFace struct {
-	// TODO.
-}
-
 // TODO: Drawer.Layout or Drawer.Measure methods to measure text without
 // drawing?
 
