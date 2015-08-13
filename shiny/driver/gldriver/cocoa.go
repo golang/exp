@@ -22,10 +22,10 @@ import (
 	"runtime"
 
 	"golang.org/x/exp/shiny/screen"
-	"golang.org/x/mobile/event/config"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
+	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/geom"
 	"golang.org/x/mobile/gl"
 )
@@ -132,7 +132,7 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
 
-	cfg := config.Event{
+	sz := size.Event{
 		WidthPx:     widthPx,
 		HeightPx:    heightPx,
 		WidthPt:     geom.Pt(float32(widthPx) / ppp),
@@ -141,10 +141,10 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 	}
 
 	w.mu.Lock()
-	w.cfg = cfg
+	w.sz = sz
 	w.mu.Unlock()
 
-	w.Send(cfg)
+	w.Send(sz)
 }
 
 func sendWindowEvent(id uintptr, e interface{}) {

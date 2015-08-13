@@ -20,8 +20,8 @@ import (
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
-	"golang.org/x/mobile/event/config"
 	"golang.org/x/mobile/event/paint"
+	"golang.org/x/mobile/event/size"
 )
 
 func main() {
@@ -32,33 +32,33 @@ func main() {
 		}
 		defer w.Release()
 
-		size := image.Point{256, 256}
-		b, err := s.NewBuffer(size)
+		winSize := image.Point{256, 256}
+		b, err := s.NewBuffer(winSize)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer b.Release()
 		drawGradient(b.RGBA())
 
-		t, err := s.NewTexture(size)
+		t, err := s.NewTexture(winSize)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer t.Release()
 		t.Upload(image.Point{}, b, b.Bounds(), w)
 
-		var cfg config.Event
+		var sz size.Event
 		for e := range w.Events() {
 			switch e := e.(type) {
 			default:
 				// TODO: be more interesting.
 				fmt.Printf("got event %#v\n", e)
 
-			case config.Event:
-				cfg = e
+			case size.Event:
+				sz = e
 
 			case paint.Event:
-				wBounds := image.Rectangle{Max: image.Point{cfg.WidthPx, cfg.HeightPx}}
+				wBounds := image.Rectangle{Max: image.Point{sz.WidthPx, sz.HeightPx}}
 				w.Fill(wBounds, color.RGBA{0x00, 0x00, 0x3f, 0xff}, draw.Src)
 				w.Upload(image.Point{}, b, b.Bounds(), w)
 				w.Draw(f64.Aff3{

@@ -17,10 +17,10 @@ import (
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
-	"golang.org/x/mobile/event/config"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
+	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/geom"
 )
 
@@ -85,7 +85,7 @@ func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
 	}
 	w.width, w.height = newWidth, newHeight
 	// TODO: don't assume that PixelsPerPt == 1.
-	w.Send(config.Event{
+	w.Send(size.Event{
 		WidthPx:     newWidth,
 		HeightPx:    newHeight,
 		WidthPt:     geom.Pt(newWidth),

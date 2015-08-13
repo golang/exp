@@ -16,8 +16,8 @@ import (
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
-	"golang.org/x/mobile/event/config"
 	"golang.org/x/mobile/event/paint"
+	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/gl"
 )
 
@@ -31,8 +31,8 @@ type windowImpl struct {
 	draw     chan struct{}
 	drawDone chan struct{}
 
-	mu  sync.Mutex
-	cfg config.Event
+	mu sync.Mutex
+	sz size.Event
 }
 
 func (w *windowImpl) Release() {
@@ -95,12 +95,12 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 
 func (w *windowImpl) vertexAff3(r image.Rectangle) f64.Aff3 {
 	w.mu.Lock()
-	cfg := w.cfg
+	sz := w.sz
 	w.mu.Unlock()
 
 	size := r.Size()
 	tx, ty := float64(size.X), float64(size.Y)
-	wx, wy := float64(cfg.WidthPx), float64(cfg.HeightPx)
+	wx, wy := float64(sz.WidthPx), float64(sz.HeightPx)
 	rx, ry := tx/wx, ty/wy
 
 	// We are drawing the texture src onto the window's framebuffer.
