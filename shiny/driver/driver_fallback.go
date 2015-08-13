@@ -4,6 +4,7 @@
 
 // +build !darwin
 // +build !linux android
+// +build !windows
 
 package driver
 
