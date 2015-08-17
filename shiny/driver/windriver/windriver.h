@@ -4,6 +4,9 @@
 
 // +build windows
 
+#ifndef __SHINY_WINDRIVER_H__
+#define __SHINY_WINDRIVER_H__
+
 #define UNICODE
 #define _UNICODE
 #define STRICT
@@ -19,6 +22,7 @@
 #define _WIN32_IE 0x0600			/* according to Microsoft's sdkddkver.h */
 #define NTDDI_VERSION 0x05010000	/* according to Microsoft's sdkddkver.h */
 #include <windows.h>
+#include <windowsx.h>
 
 // see http://blogs.msdn.com/b/oldnewthing/archive/2004/10/25/247180.aspx
 // this will work on MinGW too
@@ -54,3 +58,5 @@ extern HRESULT createWindow(HWND *);
 extern LRESULT utilCreateWindow(HWND *);
 extern HRESULT destroyWindow(HWND);
 extern LRESULT utilDestroyWindow(HWND);
+
+#endif

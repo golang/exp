@@ -2,14 +2,46 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+#include "_cgo_export.h"
 #include "windriver.h"
 
 #define windowClass L"shiny_Window"
 
 static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	// TODO(andlabs): this is only for testing that the package works; delete when done
-	if (uMsg == WM_CLOSE) {
-		PostQuitMessage(0);
+	WINDOWPOS *wp = (WINDOWPOS *) lParam;
+	RECT r;
+
+	switch (uMsg) {
+	case WM_PAINT:
+		// TODO
+		break;
+	case WM_WINDOWPOSCHANGED:
+		if ((wp->flags & SWP_NOSIZE) != 0) {
+			break;
+		}
+		if (GetClientRect(hwnd, &r) == 0) {
+			/* TODO(andlabs) */;
+		}
+		sendSizeEvent(hwnd, &r);
+		return 0;
+	case WM_MOUSEMOVE:
+	case WM_LBUTTONDOWN:
+		// TODO(andlabs): call SetFocus()?
+	case WM_LBUTTONUP:
+	case WM_MBUTTONDOWN:
+	case WM_MBUTTONUP:
+	case WM_RBUTTONDOWN:
+	case WM_RBUTTONUP:
+		sendMouseEvent(hwnd, uMsg,
+			GET_X_LPARAM(lParam),
+			GET_Y_LPARAM(lParam));
+		return 0;
+	case WM_KEYDOWN:
+	case WM_KEYUP:
+	case WM_SYSKEYDOWN:
+	case WM_SYSKEYUP:
+		// TODO
+		break;
 	}
 	return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
