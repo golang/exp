@@ -108,3 +108,59 @@ func (d *Drawer) DrawString(s string) {
 		d.Dot, prevC = newDot, c
 	}
 }
+
+// Hinting selects how to quantize a vector font's glyph nodes.
+//
+// Not all fonts support hinting.
+type Hinting int
+
+const (
+	HintingNone Hinting = iota
+	HintingVertical
+	HintingFull
+)
+
+// Stretch selects a normal, condensed, or expanded face.
+//
+// Not all fonts support stretches.
+type Stretch int
+
+const (
+	StretchUltraCondensed Stretch = -4
+	StretchExtraCondensed Stretch = -3
+	StretchCondensed      Stretch = -2
+	StretchSemiCondensed  Stretch = -1
+	StretchNormal         Stretch = +0
+	StretchSemiExpanded   Stretch = +1
+	StretchExpanded       Stretch = +2
+	StretchExtraExpanded  Stretch = +3
+	StretchUltraExpanded  Stretch = +4
+)
+
+// Style selects a normal, italic, or oblique face.
+//
+// Not all fonts support styles.
+type Style int
+
+const (
+	StyleNormal Style = iota
+	StyleItalic
+	StyleOblique
+)
+
+// Weight selects a normal, light or bold face.
+//
+// Not all fonts support weights.
+type Weight int
+
+const (
+	WeightThin       Weight = 100
+	WeightExtraLight Weight = 200
+	WeightLight      Weight = 300
+	WeightNormal     Weight = 400
+	WeightMedium     Weight = 500
+	WeightSemiBold   Weight = 600
+	WeightBold       Weight = 700
+	WeightExtraBold  Weight = 800
+	WeightBlack      Weight = 900
+)
