@@ -20,6 +20,7 @@ import (
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 )
@@ -54,8 +55,15 @@ func main() {
 				// TODO: be more interesting.
 				fmt.Printf("got event %#v\n", e)
 
-			case size.Event:
-				sz = e
+			case key.Event:
+				if e.Rune >= 0 {
+					fmt.Printf("key.Event: %q (%v), %v, %v\n", e.Rune, e.Code, e.Modifiers, e.Direction)
+				} else {
+					fmt.Printf("key.Event: (%v), %v, %v\n", e.Code, e.Modifiers, e.Direction)
+				}
+				if e.Code == key.CodeEscape {
+					return
+				}
 
 			case paint.Event:
 				wBounds := image.Rectangle{Max: image.Point{sz.WidthPx, sz.HeightPx}}
@@ -69,6 +77,9 @@ func main() {
 
 			case screen.UploadedEvent:
 				// No-op.
+
+			case size.Event:
+				sz = e
 
 			case error:
 				log.Print(e)

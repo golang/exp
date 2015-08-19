@@ -98,6 +98,39 @@ func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
 	w.Send(paint.Event{})
 }
 
+func (w *windowImpl) handleKey(detail xproto.Keycode, state uint16, dir key.Direction) {
+	// The key event's rune depends on whether the shift key is down.
+	unshifted := rune(w.s.keysyms[detail][0])
+	r := unshifted
+	if state&xShiftMask != 0 {
+		r = rune(w.s.keysyms[detail][1])
+		// In X11, a zero xproto.Keysym when shift is down means to use what
+		// the xproto.Keysym is when shift is up.
+		if r == 0 {
+			r = unshifted
+		}
+	}
+
+	// The key event's code is independent of whether the shift key is down.
+	var c key.Code
+	if 0 <= unshifted && unshifted < 0x80 {
+		// TODO: distinguish the regular '2' key and number-pad '2' key (with
+		// Num-Lock).
+		c = asciiKeycodes[unshifted]
+	} else {
+		r, c = -1, nonUnicodeKeycodes[unshifted]
+	}
+
+	// TODO: Unicode-but-not-ASCII keysyms like the Swiss keyboard's 'ö'.
+
+	w.Send(key.Event{
+		Rune:      r,
+		Code:      c,
+		Modifiers: keyModifiers(state),
+		Direction: dir,
+	})
+}
+
 func (w *windowImpl) handleMouse(x, y int16, b xproto.Button, state uint16, dir mouse.Direction) {
 	// TODO: should a mouse.Event have a separate MouseModifiers field, for
 	// which buttons are pressed during a mouse move?
@@ -108,37 +141,4 @@ func (w *windowImpl) handleMouse(x, y int16, b xproto.Button, state uint16, dir 
 		Modifiers: keyModifiers(state),
 		Direction: dir,
 	})
-}
-
-// These constants come from /usr/include/X11/X.h
-const (
-	xShiftMask   = 1 << 0
-	xLockMask    = 1 << 1
-	xControlMask = 1 << 2
-	xMod1Mask    = 1 << 3
-	xMod2Mask    = 1 << 4
-	xMod3Mask    = 1 << 5
-	xMod4Mask    = 1 << 6
-	xMod5Mask    = 1 << 7
-	xButton1Mask = 1 << 8
-	xButton2Mask = 1 << 9
-	xButton3Mask = 1 << 10
-	xButton4Mask = 1 << 11
-	xButton5Mask = 1 << 12
-)
-
-func keyModifiers(state uint16) (m key.Modifiers) {
-	if state&xShiftMask != 0 {
-		m |= key.ModShift
-	}
-	if state&xControlMask != 0 {
-		m |= key.ModControl
-	}
-	if state&xMod1Mask != 0 {
-		m |= key.ModAlt
-	}
-	if state&xMod4Mask != 0 {
-		m |= key.ModMeta
-	}
-	return m
 }

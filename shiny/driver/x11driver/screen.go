@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/mouse"
 )
 
@@ -30,8 +31,9 @@ type completion struct {
 }
 
 type screenImpl struct {
-	xc  *xgb.Conn
-	xsi *xproto.ScreenInfo
+	xc      *xgb.Conn
+	xsi     *xproto.ScreenInfo
+	keysyms [256][2]xproto.Keysym
 
 	atomWMDeleteWindow xproto.Atom
 	atomWMProtocols    xproto.Atom
@@ -61,6 +63,9 @@ func newScreenImpl(xc *xgb.Conn) (*screenImpl, error) {
 		windows: map[xproto.Window]*windowImpl{},
 	}
 	if err := s.initAtoms(); err != nil {
+		return nil, err
+	}
+	if err := s.initKeyboardMapping(); err != nil {
 		return nil, err
 	}
 	if err := s.initPictformats(); err != nil {
@@ -115,10 +120,20 @@ func (s *screenImpl) run() {
 			// TODO: xw = ev.Event
 		case xproto.FocusOutEvent:
 			// TODO: xw = ev.Event
+
 		case xproto.KeyPressEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.handleKey(ev.Detail, ev.State, key.DirPress)
+			} else {
+				noWindowFound = true
+			}
+
 		case xproto.KeyReleaseEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.handleKey(ev.Detail, ev.State, key.DirRelease)
+			} else {
+				noWindowFound = true
+			}
 
 		case xproto.ButtonPressEvent:
 			if w := s.findWindow(ev.Event); w != nil {
@@ -351,6 +366,23 @@ func (s *screenImpl) internAtom(name string) (xproto.Atom, error) {
 		return 0, fmt.Errorf("x11driver: xproto.InternAtom failed")
 	}
 	return r.Atom, nil
+}
+
+func (s *screenImpl) initKeyboardMapping() error {
+	const keyLo, keyHi = 8, 255
+	km, err := xproto.GetKeyboardMapping(s.xc, keyLo, keyHi-keyLo+1).Reply()
+	if err != nil {
+		return err
+	}
+	n := int(km.KeysymsPerKeycode)
+	if n < 2 {
+		return fmt.Errorf("x11driver: too few keysyms per keycode: %d", n)
+	}
+	for i := keyLo; i <= keyHi; i++ {
+		s.keysyms[i][0] = km.Keysyms[(i-keyLo)*n+0]
+		s.keysyms[i][1] = km.Keysyms[(i-keyLo)*n+1]
+	}
+	return nil
 }
 
 func (s *screenImpl) initPictformats() error {
