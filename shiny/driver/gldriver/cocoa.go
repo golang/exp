@@ -44,6 +44,14 @@ func init() {
 	initThreadID = C.threadID()
 }
 
+func newWindow(width, height int32) uintptr {
+	return uintptr(C.doNewWindow(width, height))
+}
+
+func showWindow(id uintptr) uintptr {
+	return uintptr(C.doShowWindow(id))
+}
+
 var (
 	theScreen = &screenImpl{
 		windows: make(map[uintptr]*windowImpl),
@@ -82,14 +90,14 @@ func drawgl(id uintptr) {
 // drawLoop is the primary drawing loop.
 //
 // After Cocoa has created an NSWindow on the initial OS thread for
-// processing Cocoa events in newWindow, it starts drawLoop on another
+// processing Cocoa events in doNewWindow, it starts drawLoop on another
 // goroutine. It is locked to an OS thread for its OpenGL context.
 //
 // Two Cocoa threads deliver draw signals to drawLoop. The primary
 // source of draw events is the CVDisplayLink timer, which is tied to
 // the display vsync. Secondary draw events come from [NSView drawRect:]
 // when the window is resized.
-func (w *windowImpl) drawLoop(ctx uintptr) {
+func drawLoop(w *windowImpl, ctx uintptr) {
 	runtime.LockOSThread()
 	// TODO(crawshaw): there are several problematic issues around having
 	// a draw loop per window, but resolving them requires some thought.

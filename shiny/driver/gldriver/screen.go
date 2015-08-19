@@ -2,13 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin
-// +build 386 amd64
-
 package gldriver
-
-// #include "cocoa.h"
-import "C"
 
 import (
 	"image"
@@ -92,10 +86,10 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	// TODO: look at opts.
 	const width, height = 1024, 768
 
-	id := C.newWindow(width, height)
+	id := newWindow(width, height)
 	w := &windowImpl{
 		s:        s,
-		id:       uintptr(id),
+		id:       id,
 		pump:     pump.Make(),
 		endPaint: make(chan paint.Event, 1),
 		draw:     make(chan struct{}),
@@ -103,10 +97,10 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	}
 
 	s.mu.Lock()
-	s.windows[uintptr(id)] = w
+	s.windows[id] = w
 	s.mu.Unlock()
 
-	go w.drawLoop(uintptr(C.showWindow(id)))
+	go drawLoop(w, showWindow(id))
 
 	return w, nil
 }

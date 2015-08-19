@@ -4,6 +4,7 @@
 
 // +build darwin
 // +build 386 amd64
+// +build !ios
 
 #include "_cgo_export.h"
 #include <pthread.h>
@@ -176,7 +177,7 @@ uint64 threadID() {
 }
 @end
 
-uintptr_t newWindow(int width, int height) {
+uintptr_t doNewWindow(int width, int height) {
 	id menuBar = [[NSMenu new] autorelease];
 	id menuItem = [[NSMenuItem new] autorelease];
 	[menuBar addItem:menuItem];
@@ -229,7 +230,7 @@ uintptr_t newWindow(int width, int height) {
 	return (uintptr_t)view;
 }
 
-uintptr_t showWindow(uintptr_t viewID) {
+uintptr_t doShowWindow(uintptr_t viewID) {
 	ScreenGLView* view = (ScreenGLView*)viewID;
 	__block uintptr_t ret = 0;
 	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
