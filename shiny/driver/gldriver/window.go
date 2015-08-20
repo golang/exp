@@ -47,7 +47,7 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 	if err != nil {
 		panic(err)
 	}
-	t.Upload(dp, src, sr, sender)
+	t.(*textureImpl).upload(dp, src, sr, sender, w)
 	w.Draw(f64.Aff3{1, 0, 0, 0, 1, 0}, t, sr, draw.Src, nil)
 	t.Release()
 }
