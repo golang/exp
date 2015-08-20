@@ -178,54 +178,60 @@ uint64 threadID() {
 @end
 
 uintptr_t doNewWindow(int width, int height) {
-	id menuBar = [[NSMenu new] autorelease];
-	id menuItem = [[NSMenuItem new] autorelease];
-	[menuBar addItem:menuItem];
-	[NSApp setMainMenu:menuBar];
+	__block int w = width;
+	__block int h = height;
+	__block ScreenGLView* view = NULL;
 
-	id menu = [[NSMenu new] autorelease];
-	id name = [[NSProcessInfo processInfo] processName];
+	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
+		id menuBar = [[NSMenu new] autorelease];
+		id menuItem = [[NSMenuItem new] autorelease];
+		[menuBar addItem:menuItem];
+		[NSApp setMainMenu:menuBar];
 
-	id hideMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Hide"
-		action:@selector(hide:) keyEquivalent:@"h"]
-		autorelease];
-	[menu addItem:hideMenuItem];
+		id menu = [[NSMenu new] autorelease];
+		NSString* name = [[NSProcessInfo processInfo] processName];
 
-	id quitMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Quit"
-		action:@selector(terminate:) keyEquivalent:@"q"]
-		autorelease];
-	[menu addItem:quitMenuItem];
-	[menuItem setSubmenu:menu];
+		id hideMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Hide"
+			action:@selector(hide:) keyEquivalent:@"h"]
+			autorelease];
+		[menu addItem:hideMenuItem];
 
-	NSRect rect = NSMakeRect(0, 0, width, height);
+		id quitMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Quit"
+			action:@selector(terminate:) keyEquivalent:@"q"]
+			autorelease];
+		[menu addItem:quitMenuItem];
+		[menuItem setSubmenu:menu];
 
-	NSWindow* window = [[[NSWindow alloc] initWithContentRect:rect
-			styleMask:NSTitledWindowMask
-			backing:NSBackingStoreBuffered
-			defer:NO]
-		autorelease];
-	window.styleMask |= NSResizableWindowMask;
-	window.styleMask |= NSMiniaturizableWindowMask ;
-	window.styleMask |= NSClosableWindowMask;
-	window.title = name;
-	[window cascadeTopLeftFromPoint:NSMakePoint(20,20)];
+		NSRect rect = NSMakeRect(0, 0, w, h);
 
-	NSOpenGLPixelFormatAttribute attr[] = {
-		NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
-		NSOpenGLPFAColorSize,     24,
-		NSOpenGLPFAAlphaSize,     8,
-		NSOpenGLPFADepthSize,     16,
-		NSOpenGLPFAAccelerated,
-		NSOpenGLPFADoubleBuffer,
-		NSOpenGLPFAAllowOfflineRenderers,
-		0
-	};
-	id pixFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attr];
-	ScreenGLView* view = [[ScreenGLView alloc] initWithFrame:rect pixelFormat:pixFormat];
-	[window setContentView:view];
-	[window setDelegate:view];
+		// TODO: release window object when closed
+		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
+				styleMask:NSTitledWindowMask
+				backing:NSBackingStoreBuffered
+				defer:NO];
+		window.styleMask |= NSResizableWindowMask;
+		window.styleMask |= NSMiniaturizableWindowMask ;
+		window.styleMask |= NSClosableWindowMask;
+		window.title = name;
+		[window cascadeTopLeftFromPoint:NSMakePoint(20,20)];
 
-	window.nextResponder = [[[WindowResponder alloc] init] autorelease];
+		NSOpenGLPixelFormatAttribute attr[] = {
+			NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
+			NSOpenGLPFAColorSize,     24,
+			NSOpenGLPFAAlphaSize,     8,
+			NSOpenGLPFADepthSize,     16,
+			NSOpenGLPFAAccelerated,
+			NSOpenGLPFADoubleBuffer,
+			NSOpenGLPFAAllowOfflineRenderers,
+			0
+		};
+		id pixFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attr];
+		view = [[ScreenGLView alloc] initWithFrame:rect pixelFormat:pixFormat];
+		[window setContentView:view];
+		[window setDelegate:view];
+
+		window.nextResponder = [[[WindowResponder alloc] init] autorelease];
+	});
 
 	return (uintptr_t)view;
 }
