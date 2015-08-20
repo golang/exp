@@ -53,14 +53,10 @@ func main() {
 			switch e := e.(type) {
 			default:
 				// TODO: be more interesting.
-				fmt.Printf("got event %#v\n", e)
+				fmt.Printf("got %#v\n", e)
 
 			case key.Event:
-				if e.Rune >= 0 {
-					fmt.Printf("key.Event: %q (%v), %v, %v\n", e.Rune, e.Code, e.Modifiers, e.Direction)
-				} else {
-					fmt.Printf("key.Event: (%v), %v, %v\n", e.Code, e.Modifiers, e.Direction)
-				}
+				fmt.Printf("got %v\n", e)
 				if e.Code == key.CodeEscape {
 					return
 				}
