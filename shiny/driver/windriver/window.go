@@ -52,6 +52,16 @@ func newWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
 	windows[hwnd] = w
 	windowsLock.Unlock()
 
+	// Send a fake size event.
+	// Windows won't generate the WM_WINDOWPOSCHANGED
+	// we trigger a resize on for the initial size, so we have to do
+	// it ourselves. The example/basic program assumes it will
+	// receive a size.Event for the initial window size that isn't 0x0.
+	var r C.RECT
+	// TODO(andlabs) error check
+	C.GetClientRect(w.hwnd, &r)
+	sendSizeEvent(w.hwnd, &r)
+
 	return w, nil
 }
 
@@ -68,6 +78,8 @@ func (w *window) Release() {
 	C.destroyWindow(w.hwnd)
 	w.hwnd = nil
 	w.pump.Release()
+
+	// TODO(andlabs): what happens if we're still painting?
 }
 
 func (w *window) Events() <-chan interface{} { return w.pump.Events() }
@@ -78,7 +90,23 @@ func (w *window) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, s
 }
 
 func (w *window) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	// TODO
+	rect := C.RECT{
+		left:   C.LONG(dr.Min.X),
+		top:    C.LONG(dr.Min.Y),
+		right:  C.LONG(dr.Max.X),
+		bottom: C.LONG(dr.Max.Y),
+	}
+	r, g, b, a := src.RGBA()
+	r >>= 8
+	g >>= 8
+	b >>= 8
+	a >>= 8
+	color := (a << 24) | (r << 16) | (g << 8) | b
+	var msg C.UINT = C.msgFillOver
+	if op == draw.Src {
+		msg = C.msgFillSrc
+	}
+	C.sendFill(w.hwnd, msg, rect, C.COLORREF(color))
 }
 
 func (w *window) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
@@ -87,6 +115,22 @@ func (w *window) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, 
 
 func (w *window) EndPaint(p paint.Event) {
 	// TODO
+}
+
+//export handlePaint
+func handlePaint(hwnd C.HWND) {
+	windowsLock.Lock()
+	w := windows[hwnd]
+	windowsLock.Unlock()
+
+	// TODO(andlabs) - this won't be necessary after the Go rewrite
+	// Windows sends spurious WM_PAINT messages at window
+	// creation.
+	if w == nil {
+		return
+	}
+
+	w.Send(paint.Event{}) // TODO(andlabs): fill struct field
 }
 
 //export sendSizeEvent

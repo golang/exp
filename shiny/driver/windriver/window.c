@@ -12,11 +12,12 @@
 static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	WINDOWPOS *wp = (WINDOWPOS *) lParam;
 	RECT r;
+	HDC dc;
 
 	switch (uMsg) {
 	case WM_PAINT:
-		// TODO
-		break;
+		handlePaint(hwnd);
+		break; // explicitly defer to DefWindowProc; it will handle validation for us
 	case WM_WINDOWPOSCHANGED:
 		if ((wp->flags & SWP_NOSIZE) != 0) {
 			break;
@@ -43,6 +44,18 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 	case WM_SYSKEYDOWN:
 	case WM_SYSKEYUP:
 		// TODO
+		break;
+	case msgFillSrc:
+		// TODO error checks
+		dc = GetDC(hwnd);
+		fillSrc(dc, (RECT *) lParam, (COLORREF) wParam);
+		ReleaseDC(hwnd, dc);
+		break;
+	case msgFillOver:
+		// TODO error checks
+		dc = GetDC(hwnd);
+		fillOver(dc, (RECT *) lParam, (COLORREF) wParam);
+		ReleaseDC(hwnd, dc);
 		break;
 	}
 	return DefWindowProcW(hwnd, uMsg, wParam, lParam);
@@ -87,7 +100,7 @@ LRESULT utilCreateWindow(HWND *phwnd) {
 	}
 	// TODO(andlabs): use proper nCmdShow
 	ShowWindow(*phwnd, SW_SHOWDEFAULT);
-	// TODO(andlabs): UpdateWindow()?
+	// TODO(andlabs): call UpdateWindow()
 	return lS_OK;
 }
 
@@ -100,4 +113,8 @@ LRESULT utilDestroyWindow(HWND hwnd) {
 		return lastErrorToLRESULT();
 	}
 	return lS_OK;
+}
+
+void sendFill(HWND hwnd, UINT uMsg, RECT r, COLORREF color) {
+	SendMessage(hwnd, uMsg, (WPARAM) color, (LPARAM) (&r));
 }
