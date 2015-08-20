@@ -43,7 +43,6 @@ enum {
 };
 
 // windriver.c
-extern void mainMessagePump(void);
 extern HRESULT lastErrorToHRESULT(void);
 #define lS_OK ((LRESULT) S_OK)
 #define lastErrorToLRESULT() ((LRESULT) lastErrorToHRESULT())

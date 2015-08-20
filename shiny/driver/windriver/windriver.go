@@ -56,8 +56,22 @@ func main(f func(screen.Screen)) (retErr error) {
 	s := newScreenImpl()
 	go f(s)
 
-	C.mainMessagePump()
+	mainMessagePump()
 	return nil
+}
+
+func mainMessagePump() {
+	var m msg
+	for {
+		// This GetMessage cannot fail: http://blogs.msdn.com/b/oldnewthing/archive/2013/03/22/10404367.aspx
+		// TODO(andlabs): besides, what should we do if a future Windows change makes it fail for some other reason? we can't return an error because it's too late to stop the main function
+		_, err := getMessage(&m, 0, 0, 0)
+		if err != nil {
+			return
+		}
+		translateMessage(&m)
+		dispatchMessage(&m)
+	}
 }
 
 // errScreen is a screen.Screen.
