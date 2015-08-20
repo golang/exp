@@ -45,11 +45,11 @@ func init() {
 }
 
 func newWindow(width, height int32) uintptr {
-	return uintptr(C.doNewWindow(width, height))
+	return uintptr(C.doNewWindow(C.int(width), C.int(height)))
 }
 
 func showWindow(id uintptr) uintptr {
-	return uintptr(C.doShowWindow(id))
+	return uintptr(C.doShowWindow(C.uintptr_t(id)))
 }
 
 var (
