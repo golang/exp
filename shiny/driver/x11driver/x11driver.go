@@ -12,12 +12,12 @@ package x11driver
 
 import (
 	"fmt"
-	"image"
 
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/render"
 	"github.com/BurntSushi/xgb/shm"
 
+	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
 )
 
@@ -29,7 +29,7 @@ import (
 // returns.
 func Main(f func(screen.Screen)) {
 	if err := main(f); err != nil {
-		f(errScreen{err})
+		f(errscreen.Stub(err))
 	}
 }
 
@@ -59,21 +59,4 @@ func main(f func(screen.Screen)) (retErr error) {
 	// TODO: tear down the s.run goroutine? It's probably not worth the
 	// complexity of doing it cleanly, if the app is about to exit anyway.
 	return nil
-}
-
-// errScreen is a screen.Screen.
-type errScreen struct {
-	err error
-}
-
-func (e errScreen) NewBuffer(size image.Point) (screen.Buffer, error) {
-	return nil, e.err
-}
-
-func (e errScreen) NewTexture(size image.Point) (screen.Texture, error) {
-	return nil, e.err
-}
-
-func (e errScreen) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	return nil, e.err
 }

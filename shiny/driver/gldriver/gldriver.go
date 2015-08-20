@@ -8,9 +8,9 @@ package gldriver
 import (
 	"encoding/binary"
 	"fmt"
-	"image"
 	"math"
 
+	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/gl"
@@ -24,25 +24,8 @@ import (
 // returns.
 func Main(f func(screen.Screen)) {
 	if err := main(f); err != nil {
-		f(errScreen{err})
+		f(errscreen.Stub(err))
 	}
-}
-
-// errScreen is a screen.Screen.
-type errScreen struct {
-	err error
-}
-
-func (e errScreen) NewBuffer(size image.Point) (screen.Buffer, error) {
-	return nil, e.err
-}
-
-func (e errScreen) NewTexture(size image.Point) (screen.Texture, error) {
-	return nil, e.err
-}
-
-func (e errScreen) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	return nil, e.err
 }
 
 func mul(a, b f64.Aff3) f64.Aff3 {

@@ -10,27 +10,11 @@ package driver
 
 import (
 	"errors"
-	"image"
 
+	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
 )
 
 func main(f func(screen.Screen)) {
-	f(stub{})
+	f(errscreen.Stub(errors.New("no driver for accessing a screen")))
 }
-
-type stub struct{}
-
-func (stub) NewBuffer(size image.Point) (screen.Buffer, error) {
-	return nil, errNoDriver
-}
-
-func (stub) NewTexture(size image.Point) (screen.Texture, error) {
-	return nil, errNoDriver
-}
-
-func (stub) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	return nil, errNoDriver
-}
-
-var errNoDriver = errors.New("no driver for accessing a screen")

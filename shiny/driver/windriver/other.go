@@ -8,9 +8,9 @@ package windriver
 
 import (
 	"fmt"
-	"image"
 	"runtime"
 
+	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
 )
 
@@ -21,22 +21,6 @@ import (
 // specific libraries require being on 'the main thread'. It returns when f
 // returns.
 func Main(f func(screen.Screen)) {
-	f(errScreen{fmt.Errorf("windriver: unsupported GOOS/GOARCH %s/%s", runtime.GOOS, runtime.GOARCH)})
-}
-
-// errScreen is a screen.Screen.
-type errScreen struct {
-	err error
-}
-
-func (e errScreen) NewBuffer(size image.Point) (screen.Buffer, error) {
-	return nil, e.err
-}
-
-func (e errScreen) NewTexture(size image.Point) (screen.Texture, error) {
-	return nil, e.err
-}
-
-func (e errScreen) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	return nil, e.err
+	f(errscreen.Stub(fmt.Errorf(
+		"windriver: unsupported GOOS/GOARCH %s/%s", runtime.GOOS, runtime.GOARCH)))
 }
