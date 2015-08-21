@@ -12,6 +12,7 @@ import "C"
 import (
 	"runtime"
 
+	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
 )
 
