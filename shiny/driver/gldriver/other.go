@@ -15,6 +15,7 @@ import (
 
 func newWindow(width, height int32) uintptr { return 0 }
 func showWindow(id uintptr) uintptr         { return 0 }
+func closeWindow(id uintptr)                {}
 func drawLoop(w *windowImpl, ctx uintptr)   {}
 
 func main(f func(screen.Screen)) error {

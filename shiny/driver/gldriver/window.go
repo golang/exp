@@ -33,7 +33,23 @@ type windowImpl struct {
 }
 
 func (w *windowImpl) Release() {
-	// TODO.
+	// There are two ways a window can be closed. The first is the user
+	// clicks the red button, in which case windowWillClose is called,
+	// which calls Go's windowClosing, which does cleanup in
+	// releaseCleanup below.
+	//
+	// The second way is Release is called programmatically. This calls
+	// the NSWindow method performClose, which emulates the red button
+	// being clicked.
+	//
+	// If these two approaches race, experiments suggest it is resolved
+	// by performClose (which is called serially on the main thread).
+	// If that stops being true, there is a check in windowWillClose
+	// that avoids the Go cleanup code being invoked more than once.
+	closeWindow(w.id)
+}
+
+func (w *windowImpl) releaseCleanup() {
 	w.pump.Release()
 }
 

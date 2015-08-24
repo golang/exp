@@ -134,9 +134,14 @@ uint64 threadID() {
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
+	if (self.window.nextResponder == NULL) {
+		return; // already called close
+	}
 	CVDisplayLinkStop(displayLink);
 	lifecycleAlive();
-	// TODO(crawshaw): remove w from theScreen.windows
+	windowClosing((GoUintptr)self);
+	[self.window.nextResponder release];
+	self.window.nextResponder = NULL;
 }
 @end
 
@@ -183,28 +188,25 @@ uintptr_t doNewWindow(int width, int height) {
 	__block ScreenGLView* view = NULL;
 
 	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
-		id menuBar = [[NSMenu new] autorelease];
-		id menuItem = [[NSMenuItem new] autorelease];
+		id menuBar = [NSMenu new];
+		id menuItem = [NSMenuItem new];
 		[menuBar addItem:menuItem];
 		[NSApp setMainMenu:menuBar];
 
-		id menu = [[NSMenu new] autorelease];
+		id menu = [NSMenu new];
 		NSString* name = [[NSProcessInfo processInfo] processName];
 
-		id hideMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Hide"
-			action:@selector(hide:) keyEquivalent:@"h"]
-			autorelease];
+		id hideMenuItem = [[NSMenuItem alloc] initWithTitle:@"Hide"
+			action:@selector(hide:) keyEquivalent:@"h"];
 		[menu addItem:hideMenuItem];
 
-		id quitMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Quit"
-			action:@selector(terminate:) keyEquivalent:@"q"]
-			autorelease];
+		id quitMenuItem = [[NSMenuItem alloc] initWithTitle:@"Quit"
+			action:@selector(terminate:) keyEquivalent:@"q"];
 		[menu addItem:quitMenuItem];
 		[menuItem setSubmenu:menu];
 
 		NSRect rect = NSMakeRect(0, 0, w, h);
 
-		// TODO: release window object when closed
 		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
 				styleMask:NSTitledWindowMask
 				backing:NSBackingStoreBuffered
@@ -230,7 +232,7 @@ uintptr_t doNewWindow(int width, int height) {
 		[window setContentView:view];
 		[window setDelegate:view];
 
-		window.nextResponder = [[[WindowResponder alloc] init] autorelease];
+		window.nextResponder = [[WindowResponder alloc] init];
 	});
 
 	return (uintptr_t)view;
@@ -245,6 +247,13 @@ uintptr_t doShowWindow(uintptr_t viewID) {
 		ret = (uintptr_t)[view openGLContext];
 	});
 	return ret;
+}
+
+void doCloseWindow(uintptr_t viewID) {
+	ScreenGLView* view = (ScreenGLView*)viewID;
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		[view.window performClose:view];
+	});
 }
 
 void startDriver() {
