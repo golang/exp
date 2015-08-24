@@ -37,8 +37,9 @@ type Face interface {
 
 	// Glyph returns the draw.DrawMask parameters (dr, mask, maskp) to draw r's
 	// glyph at the sub-pixel destination location dot. It also returns the new
-	// dot after adding the glyph's advance width. It returns !ok if the face
-	// does not contain a glyph for r.
+	// dot after adding the glyph's advance width.
+	//
+	// It returns !ok if the face does not contain a glyph for r.
 	//
 	// The contents of the mask image returned by one Glyph call may change
 	// after the next Glyph call. Callers that want to cache the mask must make
@@ -46,11 +47,26 @@ type Face interface {
 	Glyph(dot fixed.Point26_6, r rune) (
 		newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool)
 
+	// GlyphBounds returns the bounding box of r's glyph, drawn at a dot equal
+	// to the origin, and that glyph's advance width.
+	//
+	// It returns !ok if the face does not contain a glyph for r.
+	//
+	// The glyph's ascent and descent equal -bounds.Min.Y and +bounds.Max.Y. A
+	// visual depiction of what these metrics are is at
+	// https://developer.apple.com/library/mac/documentation/TextFonts/Conceptual/CocoaTextArchitecture/Art/glyph_metrics_2x.png
+	GlyphBounds(r rune) (bounds fixed.Rectangle26_6, advance fixed.Int26_6, ok bool)
+
+	// GlyphAdvance returns the advance width of r's glyph.
+	//
+	// It returns !ok if the face does not contain a glyph for r.
+	GlyphAdvance(r rune) (advance fixed.Int26_6, ok bool)
+
 	// Kern returns the horizontal adjustment for the kerning pair (r0, r1). A
 	// positive kern means to move the glyphs further apart.
 	Kern(r0, r1 rune) fixed.Int26_6
 
-	// TODO: per-font and per-glyph Metrics.
+	// TODO: per-font Metrics.
 	// TODO: ColoredGlyph for various emoji?
 	// TODO: Ligatures? Shaping?
 }
@@ -102,11 +118,32 @@ func (d *Drawer) DrawString(s string) {
 		if !ok {
 			// TODO: is falling back on the U+FFFD glyph the responsibility of
 			// the Drawer or the Face?
+			// TODO: set prevC = '\ufffd'?
 			continue
 		}
 		draw.DrawMask(d.Dst, dr, d.Src, image.Point{}, mask, maskp, draw.Over)
 		d.Dot, prevC = newDot, c
 	}
+}
+
+// MeasureString returns how far dot would advance by drawing s.
+func (d *Drawer) MeasureString(s string) (advance fixed.Int26_6) {
+	var prevC rune
+	for i, c := range s {
+		if i != 0 {
+			advance += d.Face.Kern(prevC, c)
+		}
+		a, ok := d.Face.GlyphAdvance(c)
+		if !ok {
+			// TODO: is falling back on the U+FFFD glyph the responsibility of
+			// the Drawer or the Face?
+			// TODO: set prevC = '\ufffd'?
+			continue
+		}
+		advance += a
+		prevC = c
+	}
+	return advance
 }
 
 // Hinting selects how to quantize a vector font's glyph nodes.

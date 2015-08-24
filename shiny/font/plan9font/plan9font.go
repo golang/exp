@@ -94,6 +94,31 @@ func (f *subface) Glyph(dot fixed.Point26_6, r rune) (
 	return newDot, dr, f.img, image.Point{int(i.x), int(i.top)}, true
 }
 
+func (f *subface) GlyphBounds(r rune) (bounds fixed.Rectangle26_6, advance fixed.Int26_6, ok bool) {
+	r -= f.firstRune
+	if r < 0 || f.n <= int(r) {
+		return fixed.Rectangle26_6{}, 0, false
+	}
+	i := &f.fontchars[r+0]
+	j := &f.fontchars[r+1]
+
+	bounds = fixed.R(
+		int(i.left),
+		int(i.top)-f.ascent,
+		int(i.left)+int(j.x-i.x),
+		int(i.bottom)-f.ascent,
+	)
+	return bounds, fixed.Int26_6(i.width) << 6, true
+}
+
+func (f *subface) GlyphAdvance(r rune) (advance fixed.Int26_6, ok bool) {
+	r -= f.firstRune
+	if r < 0 || f.n <= int(r) {
+		return 0, false
+	}
+	return fixed.Int26_6(f.fontchars[r].width) << 6, true
+}
+
 // runeRange maps a single rune range [lo, hi] to a lazily loaded subface. Both
 // ends of the range are inclusive.
 type runeRange struct {
@@ -121,6 +146,27 @@ func (f *face) Kern(r0, r1 rune) fixed.Int26_6 { return 0 }
 func (f *face) Glyph(dot fixed.Point26_6, r rune) (
 	newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool) {
 
+	if s, rr := f.subface(r); s != nil {
+		return s.Glyph(dot, rr)
+	}
+	return fixed.Point26_6{}, image.Rectangle{}, nil, image.Point{}, false
+}
+
+func (f *face) GlyphBounds(r rune) (bounds fixed.Rectangle26_6, advance fixed.Int26_6, ok bool) {
+	if s, rr := f.subface(r); s != nil {
+		return s.GlyphBounds(rr)
+	}
+	return fixed.Rectangle26_6{}, 0, false
+}
+
+func (f *face) GlyphAdvance(r rune) (advance fixed.Int26_6, ok bool) {
+	if s, rr := f.subface(r); s != nil {
+		return s.GlyphAdvance(rr)
+	}
+	return 0, false
+}
+
+func (f *face) subface(r rune) (*subface, rune) {
 	// Fall back on U+FFFD if we can't find r.
 	for _, rr := range [2]rune{r, '\ufffd'} {
 		// We have to do linear, not binary search. plan9port's
@@ -148,10 +194,10 @@ func (f *face) Glyph(dot fixed.Point26_6, r rune) (
 				}
 				x.subface = sub.(*subface)
 			}
-			return x.subface.Glyph(dot, rr)
+			return x.subface, rr
 		}
 	}
-	return fixed.Point26_6{}, image.Rectangle{}, nil, image.Point{}, false
+	return nil, 0
 }
 
 // ParseFont parses a Plan 9 font file. data is the contents of that font file,
