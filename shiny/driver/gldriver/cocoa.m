@@ -183,8 +183,9 @@ uint64 threadID() {
 @end
 
 uintptr_t doNewWindow(int width, int height) {
-	__block int w = width;
-	__block int h = height;
+	NSScreen *screen = [NSScreen mainScreen];
+	__block double w = (double)width / [screen backingScaleFactor];
+	__block double h = (double)height / [screen backingScaleFactor];
 	__block ScreenGLView* view = NULL;
 
 	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
