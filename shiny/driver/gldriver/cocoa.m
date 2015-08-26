@@ -66,9 +66,7 @@ uint64 threadID() {
 	glBindVertexArray(vba);
 }
 
-- (void)reshape {
-	[super reshape];
-
+- (void)callSetGeom {
 	// Calculate screen PPI.
 	//
 	// Note that the backingScaleFactor converts from logical
@@ -79,7 +77,7 @@ uint64 threadID() {
 	// 15" Retina Macbook Pro, 2880x1800, 220ppi, backingScaleFactor=2, scale=3.06
 	// 27" iMac,               2560x1440, 109ppi, backingScaleFactor=1, scale=1.51
 	// 27" Retina iMac,        5120x2880, 218ppi, backingScaleFactor=2, scale=3.03
-	NSScreen *screen = [NSScreen mainScreen];
+	NSScreen *screen = self.window.screen;
 	double screenPixW = [screen frame].size.width * [screen backingScaleFactor];
 
 	CGDirectDisplayID display = (CGDirectDisplayID)[[[screen deviceDescription] valueForKey:@"NSScreenNumber"] intValue];
@@ -99,6 +97,11 @@ uint64 threadID() {
 	setGeom((GoUintptr)self, pixelsPerPt, w, h);
 }
 
+- (void)reshape {
+	[super reshape];
+	[self callSetGeom];
+}
+
 - (void)drawRect:(NSRect)theRect {
 	// Called during resize. Do an extra draw if we are visible.
 	// This gets rid of flicker when resizing.
@@ -108,7 +111,7 @@ uint64 threadID() {
 }
 
 - (void)mouseEventNS:(NSEvent *)theEvent {
-	double scale = [[NSScreen mainScreen] backingScaleFactor];
+	double scale = [self.window.screen backingScaleFactor];
 	NSPoint p = [theEvent locationInWindow];
 	mouseEvent((GoUintptr)self, p.x * scale, p.y * scale, theEvent.type, theEvent.buttonNumber);
 }
@@ -122,6 +125,10 @@ uint64 threadID() {
 - (void)otherMouseDown:(NSEvent *)theEvent    { [self mouseEventNS:theEvent]; }
 - (void)otherMouseUp:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
 - (void)otherMouseDragged:(NSEvent *)theEvent { [self mouseEventNS:theEvent]; }
+
+- (void)windowDidChangeScreenProfile:(NSNotification *)notification {
+	[self callSetGeom];
+}
 
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	lifecycleFocused();
@@ -216,6 +223,7 @@ uintptr_t doNewWindow(int width, int height) {
 		window.styleMask |= NSMiniaturizableWindowMask ;
 		window.styleMask |= NSClosableWindowMask;
 		window.title = name;
+		window.displaysWhenScreenProfileChanges = YES;
 		[window cascadeTopLeftFromPoint:NSMakePoint(20,20)];
 
 		NSOpenGLPixelFormatAttribute attr[] = {
