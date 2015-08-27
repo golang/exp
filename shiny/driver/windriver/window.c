@@ -85,10 +85,6 @@ HRESULT initWindowClass(void) {
 }
 
 HRESULT createWindow(HWND *phwnd) {
-	return (HRESULT) SendMessageW(utilityWindow, msgCreateWindow, 0, (LPARAM) phwnd);
-}
-
-LRESULT utilCreateWindow(HWND *phwnd) {
 	*phwnd = CreateWindowExW(0,
 		windowClass, L"Shiny Window",
 		WS_OVERLAPPEDWINDOW,
@@ -104,17 +100,8 @@ LRESULT utilCreateWindow(HWND *phwnd) {
 	return lS_OK;
 }
 
-HRESULT destroyWindow(HWND hwnd) {
-	return (HRESULT) SendMessageW(utilityWindow, msgDestroyWindow, (WPARAM) hwnd, 0);
-}
-
-LRESULT utilDestroyWindow(HWND hwnd) {
-	if (DestroyWindow(hwnd) == 0) {
-		return lastErrorToLRESULT();
-	}
-	return lS_OK;
-}
-
 void sendFill(HWND hwnd, UINT uMsg, RECT r, COLORREF color) {
-	SendMessage(hwnd, uMsg, (WPARAM) color, (LPARAM) (&r));
+	// Note: this SendMessageW won't return until after the fill
+	// completes, so using &r is safe.
+	SendMessageW(hwnd, uMsg, (WPARAM) color, (LPARAM) (&r));
 }

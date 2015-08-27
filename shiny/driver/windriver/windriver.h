@@ -32,19 +32,6 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define firstClassMessage (WM_USER + 0x40)
 
-// messages sent to the utility window to do the various functions of the package on the UI thread
-// we start at WM_USER + 0x40 to make room for the DM_* messages
-enum {
-	// wParam - 0
-	// lParam - pointer to store HWND in
-	// return - error LRESULT
-	msgCreateWindow = firstClassMessage,
-	// wParam - hwnd
-	// lParam - 0
-	// return - error LRESULT
-	msgDestroyWindow,
-};
-
 // screen.Window private messages.
 // TODO elaborate
 enum {
@@ -60,16 +47,9 @@ extern HRESULT lastErrorToHRESULT(void);
 #define lS_OK ((LRESULT) S_OK)
 #define lastErrorToLRESULT() ((LRESULT) lastErrorToHRESULT())
 
-// utilwindow.c
-extern HWND utilityWindow;
-extern HRESULT initUtilityWindow(void);
-
 // window.c
 extern HRESULT initWindowClass(void);
 extern HRESULT createWindow(HWND *);
-extern LRESULT utilCreateWindow(HWND *);
-extern HRESULT destroyWindow(HWND);
-extern LRESULT utilDestroyWindow(HWND);
 extern void sendFill(HWND, UINT, RECT, COLORREF);
 
 // windraw.c

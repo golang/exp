@@ -14,6 +14,8 @@ import (
 	"image/color"
 	"image/draw"
 	"sync"
+	"syscall"
+	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
@@ -75,7 +77,8 @@ func (w *window) Release() {
 	windowsLock.Unlock()
 
 	// TODO(andlabs): check for errors from this?
-	C.destroyWindow(w.hwnd)
+	// TODO(andlabs): remove unsafe
+	_DestroyWindow(syscall.Handle(uintptr(unsafe.Pointer(w.hwnd))))
 	w.hwnd = nil
 	w.pump.Release()
 

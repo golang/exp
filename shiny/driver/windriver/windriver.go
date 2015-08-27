@@ -12,6 +12,7 @@ import "C"
 
 import (
 	"runtime"
+	"syscall"
 
 	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
@@ -38,18 +39,20 @@ func main(f func(screen.Screen)) (retErr error) {
 	// to the thread that created the respective window.
 	runtime.LockOSThread()
 
-	hr := C.initUtilityWindow()
-	if hr != C.S_OK {
-		return winerror("failed to create utility window", hr)
+	if err := initCommon(); err != nil {
+		return err
+	}
+
+	if err := initScreenWindow(); err != nil {
+		return err
 	}
 	defer func() {
 		// TODO(andlabs): log an error if this fails?
-		C.DestroyWindow(C.utilityWindow)
+		_DestroyWindow(screenHWND)
 		// TODO(andlabs): unregister window class
 	}()
 
-	hr = C.initWindowClass()
-	if hr != C.S_OK {
+	if hr := C.initWindowClass(); hr != C.S_OK {
 		return winerror("failed to create Window window class", hr)
 	}
 	// TODO(andlabs): uninit
@@ -61,16 +64,36 @@ func main(f func(screen.Screen)) (retErr error) {
 	return nil
 }
 
+var (
+	hDefaultIcon   syscall.Handle
+	hDefaultCursor syscall.Handle
+	hThisInstance  syscall.Handle
+)
+
+func initCommon() (err error) {
+	hDefaultIcon, err = _LoadIcon(0, _IDI_APPLICATION)
+	if err != nil {
+		return err
+	}
+	hDefaultCursor, err = _LoadCursor(0, _IDC_ARROW)
+	if err != nil {
+		return err
+	}
+	// TODO(andlabs) hThisInstance
+	return nil
+}
+
 func mainMessagePump() {
-	var m msg
+	var m _MSG
 	for {
-		// This GetMessage cannot fail: http://blogs.msdn.com/b/oldnewthing/archive/2013/03/22/10404367.aspx
-		// TODO(andlabs): besides, what should we do if a future Windows change makes it fail for some other reason? we can't return an error because it's too late to stop the main function
-		_, err := getMessage(&m, 0, 0, 0)
+		done, err := _GetMessage(&m, 0, 0, 0)
 		if err != nil {
+			// TODO
+		}
+		if done == 0 { // WM_QUIT
 			return
 		}
-		translateMessage(&m)
-		dispatchMessage(&m)
+		_TranslateMessage(&m)
+		_DispatchMessage(&m)
 	}
 }
