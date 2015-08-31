@@ -36,8 +36,8 @@ type Face interface {
 	io.Closer
 
 	// Glyph returns the draw.DrawMask parameters (dr, mask, maskp) to draw r's
-	// glyph at the sub-pixel destination location dot. It also returns the new
-	// dot after adding the glyph's advance width.
+	// glyph at the sub-pixel destination location dot, and that glyph's
+	// advance width.
 	//
 	// It returns !ok if the face does not contain a glyph for r.
 	//
@@ -45,7 +45,7 @@ type Face interface {
 	// after the next Glyph call. Callers that want to cache the mask must make
 	// a copy.
 	Glyph(dot fixed.Point26_6, r rune) (
-		newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool)
+		dr image.Rectangle, mask image.Image, maskp image.Point, advance fixed.Int26_6, ok bool)
 
 	// GlyphBounds returns the bounding box of r's glyph, drawn at a dot equal
 	// to the origin, and that glyph's advance width.
@@ -114,7 +114,7 @@ func (d *Drawer) DrawString(s string) {
 		if i != 0 {
 			d.Dot.X += d.Face.Kern(prevC, c)
 		}
-		newDot, dr, mask, maskp, ok := d.Face.Glyph(d.Dot, c)
+		dr, mask, maskp, advance, ok := d.Face.Glyph(d.Dot, c)
 		if !ok {
 			// TODO: is falling back on the U+FFFD glyph the responsibility of
 			// the Drawer or the Face?
@@ -122,7 +122,8 @@ func (d *Drawer) DrawString(s string) {
 			continue
 		}
 		draw.DrawMask(d.Dst, dr, d.Src, image.Point{}, mask, maskp, draw.Over)
-		d.Dot, prevC = newDot, c
+		d.Dot.X += advance
+		prevC = c
 	}
 }
 

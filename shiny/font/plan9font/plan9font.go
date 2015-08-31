@@ -66,19 +66,15 @@ func (f *subface) Close() error                   { return nil }
 func (f *subface) Kern(r0, r1 rune) fixed.Int26_6 { return 0 }
 
 func (f *subface) Glyph(dot fixed.Point26_6, r rune) (
-	newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool) {
+	dr image.Rectangle, mask image.Image, maskp image.Point, advance fixed.Int26_6, ok bool) {
 
 	r -= f.firstRune
 	if r < 0 || f.n <= int(r) {
-		return fixed.Point26_6{}, image.Rectangle{}, nil, image.Point{}, false
+		return image.Rectangle{}, nil, image.Point{}, 0, false
 	}
 	i := &f.fontchars[r+0]
 	j := &f.fontchars[r+1]
 
-	newDot = fixed.Point26_6{
-		X: dot.X + fixed.Int26_6(i.width)<<6,
-		Y: dot.Y,
-	}
 	minX := int(dot.X+32)>>6 + int(i.left)
 	minY := int(dot.Y+32)>>6 + int(i.top) - f.ascent
 	dr = image.Rectangle{
@@ -91,7 +87,7 @@ func (f *subface) Glyph(dot fixed.Point26_6, r rune) (
 			Y: minY + int(i.bottom) - int(i.top),
 		},
 	}
-	return newDot, dr, f.img, image.Point{int(i.x), int(i.top)}, true
+	return dr, f.img, image.Point{int(i.x), int(i.top)}, fixed.Int26_6(i.width) << 6, true
 }
 
 func (f *subface) GlyphBounds(r rune) (bounds fixed.Rectangle26_6, advance fixed.Int26_6, ok bool) {
@@ -144,12 +140,12 @@ func (f *face) Close() error                   { return nil }
 func (f *face) Kern(r0, r1 rune) fixed.Int26_6 { return 0 }
 
 func (f *face) Glyph(dot fixed.Point26_6, r rune) (
-	newDot fixed.Point26_6, dr image.Rectangle, mask image.Image, maskp image.Point, ok bool) {
+	dr image.Rectangle, mask image.Image, maskp image.Point, advance fixed.Int26_6, ok bool) {
 
 	if s, rr := f.subface(r); s != nil {
 		return s.Glyph(dot, rr)
 	}
-	return fixed.Point26_6{}, image.Rectangle{}, nil, image.Point{}, false
+	return image.Rectangle{}, nil, image.Point{}, 0, false
 }
 
 func (f *face) GlyphBounds(r rune) (bounds fixed.Rectangle26_6, advance fixed.Int26_6, ok bool) {
