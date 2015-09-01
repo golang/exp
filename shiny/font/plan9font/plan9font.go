@@ -5,7 +5,11 @@
 // Package plan9font implements font faces for the Plan 9 font and subfont file
 // formats. These formats are described at
 // http://plan9.bell-labs.com/magic/man2html/6/font
+//
+// Deprecated: use "golang.org/x/image/font/plan9font" instead.
 package plan9font
+
+// TODO: delete this package. It was deprecated on 2015-09-01.
 
 // TODO: have a subface use an *image.Alpha instead of plan9Image implementing
 // the image.Image interface? The image/draw code has a fast path for
@@ -24,6 +28,10 @@ import (
 	"golang.org/x/exp/shiny/font"
 	"golang.org/x/image/math/fixed"
 )
+
+func init() {
+	println(`"golang.org/x/exp/shiny/font/plan9font" is deprecated. Use "golang.org/x/image/font/plan9font" instead.`)
+}
 
 // fontchar describes one character glyph in a subfont.
 //
