@@ -113,7 +113,9 @@ uint64 threadID() {
 - (void)mouseEventNS:(NSEvent *)theEvent {
 	double scale = [self.window.screen backingScaleFactor];
 	NSPoint p = [theEvent locationInWindow];
-	mouseEvent((GoUintptr)self, p.x * scale, p.y * scale, theEvent.type, theEvent.buttonNumber);
+	double x = p.x * scale;
+	double y = p.y * scale;
+	mouseEvent((GoUintptr)self, x, y, theEvent.type, theEvent.buttonNumber, theEvent.modifierFlags);
 }
 
 - (void)mouseDown:(NSEvent *)theEvent         { [self mouseEventNS:theEvent]; }

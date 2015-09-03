@@ -11,6 +11,7 @@ package gldriver
 /*
 #cgo CFLAGS: -x objective-c
 #cgo LDFLAGS: -framework Cocoa -framework OpenGL -framework QuartzCore
+#import <Carbon/Carbon.h> // for HIToolbox/Events.h
 #import <Cocoa/Cocoa.h>
 #include <pthread.h>
 #include "cocoa.h"
@@ -22,6 +23,7 @@ import (
 	"runtime"
 
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
@@ -186,6 +188,32 @@ func sendWindowEvent(id uintptr, e interface{}) {
 	w.Send(e)
 }
 
+var mods = [...]struct {
+	flags uint32
+	code  uint16
+	mod   key.Modifiers
+}{
+	// Left and right variants of modifier keys have their own masks,
+	// but they are not documented. These were determined empirically.
+	{1<<17 | 0x102, C.kVK_Shift, key.ModShift},
+	{1<<17 | 0x104, C.kVK_RightShift, key.ModShift},
+	{1<<18 | 0x101, C.kVK_Control, key.ModControl},
+	// TODO key.ControlRight
+	{1<<19 | 0x120, C.kVK_Option, key.ModAlt},
+	{1<<19 | 0x140, C.kVK_RightOption, key.ModAlt},
+	{1<<20 | 0x108, C.kVK_Command, key.ModMeta},
+	{1<<20 | 0x110, C.kVK_Command, key.ModMeta}, // TODO: missing kVK_RightCommand
+}
+
+func cocoaMods(flags uint32) (m key.Modifiers) {
+	for _, mod := range mods {
+		if flags&mod.flags == mod.flags {
+			m |= mod.mod
+		}
+	}
+	return m
+}
+
 func cocoaMouseDir(ty int32) mouse.Direction {
 	switch ty {
 	case C.NSLeftMouseDown, C.NSRightMouseDown, C.NSOtherMouseDown:
@@ -211,13 +239,13 @@ func cocoaMouseButton(button int32) mouse.Button {
 }
 
 //export mouseEvent
-func mouseEvent(id uintptr, x, y float32, ty, button int32) {
+func mouseEvent(id uintptr, x, y float32, ty, button int32, flags uint32) {
 	sendWindowEvent(id, mouse.Event{
 		X:         x,
 		Y:         y,
 		Button:    cocoaMouseButton(button),
 		Direction: cocoaMouseDir(ty),
-		// TODO Modifiers
+		Modifiers: cocoaMods(flags),
 	})
 }
 
