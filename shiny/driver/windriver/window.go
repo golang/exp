@@ -6,6 +6,8 @@
 
 package windriver
 
+// TODO: implement a back buffer.
+
 import (
 	"image"
 	"image/color"
@@ -113,8 +115,9 @@ func (w *window) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, 
 	// TODO
 }
 
-func (w *window) EndPaint(p paint.Event) {
+func (w *window) Publish() screen.PublishResult {
 	// TODO
+	return screen.PublishResult{}
 }
 
 func handlePaint(hwnd syscall.Handle) {

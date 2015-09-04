@@ -4,6 +4,8 @@
 
 package x11driver
 
+// TODO: implement a back buffer.
+
 import (
 	"image"
 	"image/color"
@@ -72,8 +74,9 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	src.(*textureImpl).draw(w.xp, &src2dst, sr, op, opts)
 }
 
-func (w *windowImpl) EndPaint(e paint.Event) {
+func (w *windowImpl) Publish() screen.PublishResult {
 	// TODO.
+	return screen.PublishResult{}
 }
 
 func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {

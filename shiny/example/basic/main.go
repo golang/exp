@@ -69,7 +69,7 @@ func main() {
 					1, 0, 100,
 					0, 1, 200,
 				}, t, t.Bounds(), screen.Over, nil)
-				w.EndPaint(e)
+				w.Publish()
 
 			case screen.UploadedEvent:
 				// No-op.

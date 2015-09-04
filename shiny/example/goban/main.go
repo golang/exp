@@ -77,6 +77,10 @@ func main() {
 				}
 
 			case paint.Event:
+				// TODO: we shouldn't rely on the library sending us a constant
+				// stream of paint events. If we're dirty, we should just draw
+				// on the window and then call w.Publish.
+				//
 				// TODO: This check should save CPU time but causes flicker on Darwin.
 				//if dirty && !uploading {
 				w.Fill(sz.Bounds(), color.RGBA{0x00, 0x00, 0x3f, 0xff}, stdDraw.Src)
@@ -84,7 +88,7 @@ func main() {
 				dirty = false
 				uploading = true
 				//}
-				w.EndPaint(e)
+				w.Publish()
 
 			case screen.UploadedEvent:
 				// No-op.

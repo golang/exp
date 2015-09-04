@@ -135,13 +135,15 @@ func drawLoop(w *windowImpl, ctx uintptr) {
 		case <-gl.WorkAvailable:
 			gl.DoWork()
 		case <-w.draw:
+			// TODO(crawshaw): don't send a paint.Event unconditionally. Only
+			// send one if the window actually needs redrawing.
 			w.Send(paint.Event{})
 		loop:
 			for {
 				select {
 				case <-gl.WorkAvailable:
 					gl.DoWork()
-				case <-w.endPaint:
+				case <-w.publish:
 					C.CGLFlushDrawable(C.CGLGetCurrentContext())
 					break loop
 				}

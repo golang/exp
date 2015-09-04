@@ -39,7 +39,6 @@ import (
 	"image/draw"
 
 	"golang.org/x/image/math/f64"
-	"golang.org/x/mobile/event/paint"
 )
 
 // TODO: specify image format (Alpha or Gray, not just RGBA) for NewBuffer
@@ -56,6 +55,9 @@ type Screen interface {
 	// NewWindow returns a new Window for this screen.
 	NewWindow(opts *NewWindowOptions) (Window, error)
 }
+
+// TODO: rename Buffer to Image, to be less confusing with a Window's back and
+// front buffers.
 
 // Buffer is an in-memory pixel buffer. Its pixels can be modified by any Go
 // code that takes an *image.RGBA, such as the standard library's image/draw
@@ -110,7 +112,7 @@ type Texture interface {
 	// interfaces??
 }
 
-// Window is a top-level GUI window.
+// Window is a top-level, double-buffered GUI window.
 type Window interface {
 	// Release closes the window and its event channel.
 	Release()
@@ -127,9 +129,16 @@ type Window interface {
 
 	Drawer
 
-	// EndPaint flushes any pending Upload and Draw calls to the window.
-	// If EndPaint is called with an old generation number, it is ignored.
-	EndPaint(p paint.Event)
+	// Publish flushes any pending Upload and Draw calls to the window, and
+	// swaps the back buffer to the front.
+	Publish() PublishResult
+}
+
+// PublishResult is the result of an Window.Publish call.
+type PublishResult struct {
+	// BackBufferPreserved is whether the contents of the back buffer was
+	// preserved. If false, the contents are undefined.
+	BackBufferPreserved bool
 }
 
 // NewWindowOptions are optional arguments to NewWindow.
@@ -156,15 +165,15 @@ type Uploader interface {
 	// contents can be further modified, once all of its UploadedEvents have
 	// been received.
 	//
-	// When uploading to a Window, there might not be any visible effect until
-	// EndPaint is called.
+	// When uploading to a Window, there will not be any visible effect until
+	// Publish is called.
 	Upload(dp image.Point, src Buffer, sr image.Rectangle, sender Sender)
 
 	// Fill fills that part of the destination (the method receiver) defined by
 	// dr with the given color.
 	//
-	// When filling a Window, there might not be any visible effect until
-	// EndPaint is called.
+	// When filling a Window, there will not be any visible effect until
+	// Publish is called.
 	Fill(dr image.Rectangle, src color.Color, op draw.Op)
 }
 
@@ -191,16 +200,16 @@ type Drawer interface {
 	// then the src-space point (sx, sy) maps to the dst-space point
 	// (m00*sx + m01*sy + m02, m10*sx + m11*sy + m12).
 	//
-	// When drawing on a Window, there might not be any visible effect until
-	// EndPaint is called.
+	// When drawing on a Window, there will not be any visible effect until
+	// Publish is called.
 	Draw(src2dst f64.Aff3, src Texture, sr image.Rectangle, op draw.Op, opts *DrawOptions)
 }
 
 // Copy copies the sub-Texture defined by src and sr to dst, such that sr.Min
 // in src-space aligns with dp in dst-space.
 //
-// When drawing on a Window, there might not be any visible effect until
-// EndPaint is called.
+// When drawing on a Window, there will not be any visible effect until Publish
+// is called.
 func Copy(dst Drawer, dp image.Point, src Texture, sr image.Rectangle, op draw.Op, opts *DrawOptions) {
 	// TODO.
 }
@@ -208,8 +217,8 @@ func Copy(dst Drawer, dp image.Point, src Texture, sr image.Rectangle, op draw.O
 // Scale scales the sub-Texture defined by src and sr to dst, such that sr in
 // src-space is mapped to dr in dst-space.
 //
-// When drawing on a Window, there might not be any visible effect until
-// EndPaint is called.
+// When drawing on a Window, there will not be any visible effect until Publish
+// is called.
 func Scale(dst Drawer, dr image.Rectangle, src Texture, sr image.Rectangle, op draw.Op, opts *DrawOptions) {
 	// TODO.
 }

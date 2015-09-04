@@ -13,7 +13,6 @@ import (
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
-	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/gl"
 )
@@ -22,8 +21,8 @@ type windowImpl struct {
 	s  *screenImpl
 	id uintptr // *C.ScreenGLView
 
-	pump     pump.Pump
-	endPaint chan paint.Event
+	pump    pump.Pump
+	publish chan struct{}
 
 	draw     chan struct{}
 	drawDone chan struct{}
@@ -221,14 +220,16 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	gl.DisableVertexAttribArray(w.s.texture.inUV)
 }
 
-func (w *windowImpl) EndPaint(e paint.Event) {
+func (w *windowImpl) Publish() screen.PublishResult {
 	// gl.Flush is a lightweight (on modern GL drivers) blocking call
 	// that ensures all GL functions pending in the gl package have
 	// been passed onto the GL driver before the app package attempts
 	// to swap the screen buffer.
 	//
 	// This enforces that the final receive (for this paint cycle) on
-	// gl.WorkAvailable happens before the send on endPaint.
+	// gl.WorkAvailable happens before the send on publish.
 	gl.Flush()
-	w.endPaint <- e
+	w.publish <- struct{}{}
+	// TODO(crawshaw): wait for an ack before returning.
+	return screen.PublishResult{}
 }
