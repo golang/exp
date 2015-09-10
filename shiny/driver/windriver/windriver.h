@@ -32,28 +32,8 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define firstClassMessage (WM_USER + 0x40)
 
-// screen.Window private messages.
-// TODO elaborate
-enum {
-	// for both of these:
-	// wParam - COLORREF
-	// lParam - pointer to RECT
-	msgFillSrc = WM_USER + 0x20,
-	msgFillOver,
-};
-
-// windriver.c
-extern HRESULT lastErrorToHRESULT(void);
-#define lS_OK ((LRESULT) S_OK)
-#define lastErrorToLRESULT() ((LRESULT) lastErrorToHRESULT())
-
-// window.c
-extern HRESULT initWindowClass(void);
-extern HRESULT createWindow(HWND *);
-extern void sendFill(HWND, UINT, RECT, COLORREF);
-
 // windraw.c
-extern void fillSrc(HDC, RECT *, COLORREF);
-extern void fillOver(HDC, RECT *, COLORREF);
+extern void fillSrc(PVOID, RECT *, COLORREF);
+extern void fillOver(PVOID, RECT *, COLORREF);
 
 #endif

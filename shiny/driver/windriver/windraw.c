@@ -62,7 +62,7 @@ static void blend(HDC dc, HBITMAP bitmap, RECT *dr, LONG sdx, LONG sdy) {
 
 // TODO(andlabs): Upload
 
-void fillSrc(HDC dc, RECT *r, COLORREF color) {
+void fillSrc(PVOID dc, RECT *r, COLORREF color) {
 	HBRUSH brush;
 
 	// COLORREF is 0x00BBGGRR; color is 0xAARRGGBB
@@ -80,7 +80,7 @@ void fillSrc(HDC dc, RECT *r, COLORREF color) {
 	DeleteObject(brush);
 }
 
-void fillOver(HDC dc, RECT *r, COLORREF color) {
+void fillOver(PVOID dc, RECT *r, COLORREF color) {
 	HBITMAP bitmap;
 	VOID *ppvBits;
 	RECT oneByOne;

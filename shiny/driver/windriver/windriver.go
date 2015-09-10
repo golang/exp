@@ -52,8 +52,8 @@ func main(f func(screen.Screen)) (retErr error) {
 		// TODO(andlabs): unregister window class
 	}()
 
-	if hr := C.initWindowClass(); hr != C.S_OK {
-		return winerror("failed to create Window window class", hr)
+	if err := initWindowClass(); err != nil {
+		return err
 	}
 	// TODO(andlabs): uninit
 

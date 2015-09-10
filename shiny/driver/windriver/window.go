@@ -28,21 +28,19 @@ import (
 )
 
 var (
-	windows     = map[C.HWND]*window{}
+	windows     = map[syscall.Handle]*window{}
 	windowsLock sync.Mutex
 )
 
 type window struct {
-	hwnd C.HWND
+	hwnd syscall.Handle
 	pump pump.Pump
 }
 
 func newWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	var hwnd C.HWND
-
-	hr := C.createWindow(&hwnd)
-	if hr != C.S_OK {
-		return nil, winerror("error creating window", hr)
+	hwnd, err := createWindow()
+	if err != nil {
+		return nil, err
 	}
 
 	w := &window{
@@ -59,16 +57,16 @@ func newWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
 	// we trigger a resize on for the initial size, so we have to do
 	// it ourselves. The example/basic program assumes it will
 	// receive a size.Event for the initial window size that isn't 0x0.
-	var r C.RECT
+	var r _RECT
 	// TODO(andlabs) error check
-	C.GetClientRect(w.hwnd, &r)
+	_GetClientRect(w.hwnd, &r)
 	sendSizeEvent(w.hwnd, &r)
 
 	return w, nil
 }
 
 func (w *window) Release() {
-	if w.hwnd == nil { // already released?
+	if w.hwnd == 0 { // already released?
 		return
 	}
 
@@ -79,7 +77,7 @@ func (w *window) Release() {
 	// TODO(andlabs): check for errors from this?
 	// TODO(andlabs): remove unsafe
 	_DestroyWindow(syscall.Handle(uintptr(unsafe.Pointer(w.hwnd))))
-	w.hwnd = nil
+	w.hwnd = 0
 	w.pump.Release()
 
 	// TODO(andlabs): what happens if we're still painting?
@@ -93,11 +91,11 @@ func (w *window) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, s
 }
 
 func (w *window) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	rect := C.RECT{
-		left:   C.LONG(dr.Min.X),
-		top:    C.LONG(dr.Min.Y),
-		right:  C.LONG(dr.Max.X),
-		bottom: C.LONG(dr.Max.Y),
+	rect := _RECT{
+		Left:   int32(dr.Min.X),
+		Top:    int32(dr.Min.Y),
+		Right:  int32(dr.Max.X),
+		Bottom: int32(dr.Max.Y),
 	}
 	r, g, b, a := src.RGBA()
 	r >>= 8
@@ -105,11 +103,13 @@ func (w *window) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	b >>= 8
 	a >>= 8
 	color := (a << 24) | (r << 16) | (g << 8) | b
-	var msg C.UINT = C.msgFillOver
+	msg := uint32(msgFillOver)
 	if op == draw.Src {
-		msg = C.msgFillSrc
+		msg = msgFillSrc
 	}
-	C.sendFill(w.hwnd, msg, rect, C.COLORREF(color))
+	// Note: this SendMessage won't return until after the fill
+	// completes, so using &rect is safe.
+	_SendMessage(w.hwnd, msg, uintptr(color), uintptr(unsafe.Pointer(&rect)))
 }
 
 func (w *window) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
@@ -120,8 +120,7 @@ func (w *window) EndPaint(p paint.Event) {
 	// TODO
 }
 
-//export handlePaint
-func handlePaint(hwnd C.HWND) {
+func handlePaint(hwnd syscall.Handle) {
 	windowsLock.Lock()
 	w := windows[hwnd]
 	windowsLock.Unlock()
@@ -136,14 +135,13 @@ func handlePaint(hwnd C.HWND) {
 	w.Send(paint.Event{}) // TODO(andlabs): fill struct field
 }
 
-//export sendSizeEvent
-func sendSizeEvent(hwnd C.HWND, r *C.RECT) {
+func sendSizeEvent(hwnd syscall.Handle, r *_RECT) {
 	windowsLock.Lock()
 	w := windows[hwnd]
 	windowsLock.Unlock()
 
-	width := int(r.right - r.left)
-	height := int(r.bottom - r.top)
+	width := int(r.Right - r.Left)
+	height := int(r.Bottom - r.Top)
 	// TODO(andlabs): don't assume that PixelsPerPt == 1
 	w.Send(size.Event{
 		WidthPx:     width,
@@ -154,8 +152,7 @@ func sendSizeEvent(hwnd C.HWND, r *C.RECT) {
 	})
 }
 
-//export sendMouseEvent
-func sendMouseEvent(hwnd C.HWND, uMsg C.UINT, x C.int, y C.int) {
+func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, x int32, y int32) {
 	var dir mouse.Direction
 	var button mouse.Button
 
@@ -215,4 +212,108 @@ func keyModifiers() (m key.Modifiers) {
 		m |= key.ModMeta
 	}
 	return m
+}
+
+func windowWndProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
+	switch uMsg {
+	case _WM_PAINT:
+		handlePaint(hwnd)
+		// defer to DefWindowProc; it will handle validation for us
+		return _DefWindowProc(hwnd, uMsg, wParam, lParam)
+	case _WM_WINDOWPOSCHANGED:
+		wp := (*_WINDOWPOS)(unsafe.Pointer(lParam))
+		if wp.Flags&_SWP_NOSIZE != 0 {
+			break
+		}
+		var r _RECT
+		if _GetClientRect(hwnd, &r) != nil {
+			// TODO(andlabs)
+		}
+		sendSizeEvent(hwnd, &r)
+		return 0
+	case _WM_MOUSEMOVE, _WM_LBUTTONDOWN:
+		// TODO(andlabs): call SetFocus()?
+	case _WM_LBUTTONUP, _WM_MBUTTONDOWN, _WM_MBUTTONUP, _WM_RBUTTONDOWN, _WM_RBUTTONUP:
+		sendMouseEvent(hwnd, uMsg, _GET_X_LPARAM(lParam), _GET_Y_LPARAM(lParam))
+		return 0
+	case _WM_KEYDOWN, _WM_KEYUP, _WM_SYSKEYDOWN, _WM_SYSKEYUP:
+		// TODO
+	case msgFillSrc:
+		// TODO error checks
+		dc, err := _GetDC(hwnd)
+		if err != nil {
+			// TODO handle errors
+			break
+		}
+		r := (*_RECT)(unsafe.Pointer(lParam))
+		r2 := C.RECT{
+			left:   C.LONG(r.Left),
+			top:    C.LONG(r.Top),
+			right:  C.LONG(r.Right),
+			bottom: C.LONG(r.Bottom),
+		}
+		C.fillSrc(C.PVOID(dc), &r2, C.COLORREF(_COLORREF(wParam)))
+		_ReleaseDC(hwnd, dc)
+	case msgFillOver:
+		// TODO error checks
+		dc, err := _GetDC(hwnd)
+		if err != nil {
+			// TODO handle errors
+			break
+		}
+		r := (*_RECT)(unsafe.Pointer(lParam))
+		r2 := C.RECT{
+			left:   C.LONG(r.Left),
+			top:    C.LONG(r.Top),
+			right:  C.LONG(r.Right),
+			bottom: C.LONG(r.Bottom),
+		}
+		C.fillOver(C.PVOID(dc), &r2, C.COLORREF(_COLORREF(wParam)))
+		_ReleaseDC(hwnd, dc)
+	}
+	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
+}
+
+const windowClass = "shiny_Window"
+
+func initWindowClass() (err error) {
+	wcname, err := syscall.UTF16PtrFromString(windowClass)
+	if err != nil {
+		return err
+	}
+	_, err = _RegisterClass(&_WNDCLASS{
+		LpszClassName: wcname,
+		LpfnWndProc:   syscall.NewCallback(windowWndProc),
+		HIcon:         hDefaultIcon,
+		HCursor:       hDefaultCursor,
+		HInstance:     hThisInstance,
+		// TODO(andlabs): change this to something else? NULL? the hollow brush?
+		HbrBackground: syscall.Handle(_COLOR_BTNFACE + 1),
+	})
+	return err
+}
+
+func createWindow() (syscall.Handle, error) {
+	// TODO(brainman): convert windowClass to *uint16 once (in initWindowClass)
+	wcname, err := syscall.UTF16PtrFromString(windowClass)
+	if err != nil {
+		return 0, err
+	}
+	title, err := syscall.UTF16PtrFromString("Shiny Window")
+	if err != nil {
+		return 0, err
+	}
+	h, err := _CreateWindowEx(0,
+		wcname, title,
+		_WS_OVERLAPPEDWINDOW,
+		_CW_USEDEFAULT, _CW_USEDEFAULT,
+		_CW_USEDEFAULT, _CW_USEDEFAULT,
+		0, 0, hThisInstance, 0)
+	if err != nil {
+		return 0, err
+	}
+	// TODO(andlabs): use proper nCmdShow
+	_ShowWindow(h, _SW_SHOWDEFAULT)
+	// TODO(andlabs): call UpdateWindow()
+	return h, nil
 }

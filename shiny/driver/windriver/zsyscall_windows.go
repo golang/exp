@@ -20,6 +20,10 @@ var (
 	procSendMessageW     = moduser32.NewProc("SendMessageW")
 	procLoadIconW        = moduser32.NewProc("LoadIconW")
 	procLoadCursorW      = moduser32.NewProc("LoadCursorW")
+	procShowWindow       = moduser32.NewProc("ShowWindow")
+	procGetClientRect    = moduser32.NewProc("GetClientRect")
+	procGetDC            = moduser32.NewProc("GetDC")
+	procReleaseDC        = moduser32.NewProc("ReleaseDC")
 )
 
 func _GetMessage(msg *_MSG, hwnd syscall.Handle, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) {
@@ -114,6 +118,49 @@ func _LoadCursor(hInstance syscall.Handle, cursorName uintptr) (cursor syscall.H
 	r0, _, e1 := syscall.Syscall(procLoadCursorW.Addr(), 2, uintptr(hInstance), uintptr(cursorName), 0)
 	cursor = syscall.Handle(r0)
 	if cursor == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _ShowWindow(hwnd syscall.Handle, cmdshow int32) (wasvisible bool) {
+	r0, _, _ := syscall.Syscall(procShowWindow.Addr(), 2, uintptr(hwnd), uintptr(cmdshow), 0)
+	wasvisible = r0 != 0
+	return
+}
+
+func _GetClientRect(hwnd syscall.Handle, rect *_RECT) (err error) {
+	r1, _, e1 := syscall.Syscall(procGetClientRect.Addr(), 2, uintptr(hwnd), uintptr(unsafe.Pointer(rect)), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _GetDC(hwnd syscall.Handle) (dc syscall.Handle, err error) {
+	r0, _, e1 := syscall.Syscall(procGetDC.Addr(), 1, uintptr(hwnd), 0, 0)
+	dc = syscall.Handle(r0)
+	if dc == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _ReleaseDC(hwnd syscall.Handle, dc syscall.Handle) (err error) {
+	r1, _, e1 := syscall.Syscall(procReleaseDC.Addr(), 2, uintptr(hwnd), uintptr(dc), 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = error(e1)
 		} else {

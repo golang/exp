@@ -8,9 +8,18 @@ package windriver
 
 import "syscall"
 
+type _COLORREF uint32
+
 type _POINT struct {
 	X int32
 	Y int32
+}
+
+type _RECT struct {
+	Left   int32
+	Top    int32
+	Right  int32
+	Bottom int32
 }
 
 type _MSG struct {
@@ -35,8 +44,31 @@ type _WNDCLASS struct {
 	LpszClassName *uint16
 }
 
+type _WINDOWPOS struct {
+	Hwnd            syscall.Handle
+	HwndInsertAfter syscall.Handle
+	X               int32
+	Y               int32
+	Cx              int32
+	Cy              int32
+	Flags           uint32
+}
+
 const (
-	_WM_USER = 0x0400
+	_WM_PAINT            = 15
+	_WM_WINDOWPOSCHANGED = 71
+	_WM_KEYDOWN          = 256
+	_WM_KEYUP            = 257
+	_WM_SYSKEYDOWN       = 260
+	_WM_SYSKEYUP         = 261
+	_WM_MOUSEMOVE        = 512
+	_WM_LBUTTONDOWN      = 513
+	_WM_LBUTTONUP        = 514
+	_WM_RBUTTONDOWN      = 516
+	_WM_RBUTTONUP        = 517
+	_WM_MBUTTONDOWN      = 519
+	_WM_MBUTTONUP        = 520
+	_WM_USER             = 0x0400
 )
 
 const (
@@ -61,8 +93,28 @@ const (
 const (
 	_CW_USEDEFAULT = 0x80000000 - 0x100000000
 
+	_SW_SHOWDEFAULT = 10
+
 	_HWND_MESSAGE = syscall.Handle(^uintptr(2)) // -3
+
+	_SWP_NOSIZE = 0x0001
 )
+
+func _GET_X_LPARAM(lp uintptr) int32 {
+	return int32(_LOWORD(lp))
+}
+
+func _GET_Y_LPARAM(lp uintptr) int32 {
+	return int32(_HIWORD(lp))
+}
+
+func _LOWORD(l uintptr) uint16 {
+	return uint16(uint32(l))
+}
+
+func _HIWORD(l uintptr) uint16 {
+	return uint16(uint32(l >> 16))
+}
 
 // notes to self
 // UINT = uint32
@@ -79,3 +131,7 @@ const (
 //sys	_SendMessage(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) = user32.SendMessageW
 //sys	_LoadIcon(hInstance syscall.Handle, iconName uintptr) (icon syscall.Handle, err error) = user32.LoadIconW
 //sys	_LoadCursor(hInstance syscall.Handle, cursorName uintptr) (cursor syscall.Handle, err error) = user32.LoadCursorW
+//sys	_ShowWindow(hwnd syscall.Handle, cmdshow int32) (wasvisible bool) = user32.ShowWindow
+//sys	_GetClientRect(hwnd syscall.Handle, rect *_RECT) (err error) = user32.GetClientRect
+//sys	_GetDC(hwnd syscall.Handle) (dc syscall.Handle, err error) = user32.GetDC
+//sys	_ReleaseDC(hwnd syscall.Handle, dc syscall.Handle) (err error) = user32.ReleaseDC

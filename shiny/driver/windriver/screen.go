@@ -27,6 +27,8 @@ const (
 	// lParam - pointer to *screen.Window
 	// lResult - pointer to error
 	msgCreateWindow = _WM_USER + iota
+	msgFillSrc
+	msgFillOver
 )
 
 type screenimpl struct{}
