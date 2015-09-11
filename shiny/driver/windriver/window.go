@@ -246,13 +246,8 @@ func windowWndProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uint
 			break
 		}
 		r := (*_RECT)(unsafe.Pointer(lParam))
-		r2 := C.RECT{
-			left:   C.LONG(r.Left),
-			top:    C.LONG(r.Top),
-			right:  C.LONG(r.Right),
-			bottom: C.LONG(r.Bottom),
-		}
-		C.fillSrc(C.PVOID(dc), &r2, C.COLORREF(_COLORREF(wParam)))
+		// TODO handle errors
+		fillSrc(dc, r, _COLORREF(wParam))
 		_ReleaseDC(hwnd, dc)
 	case msgFillOver:
 		// TODO error checks
@@ -262,13 +257,8 @@ func windowWndProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uint
 			break
 		}
 		r := (*_RECT)(unsafe.Pointer(lParam))
-		r2 := C.RECT{
-			left:   C.LONG(r.Left),
-			top:    C.LONG(r.Top),
-			right:  C.LONG(r.Right),
-			bottom: C.LONG(r.Bottom),
-		}
-		C.fillOver(C.PVOID(dc), &r2, C.COLORREF(_COLORREF(wParam)))
+		// TODO handle errors
+		fillOver(dc, r, _COLORREF(wParam))
 		_ReleaseDC(hwnd, dc)
 	}
 	return _DefWindowProc(hwnd, uMsg, wParam, lParam)

@@ -6,9 +6,16 @@
 
 package windriver
 
-import "syscall"
+import (
+	"syscall"
+	"unsafe"
+)
 
 type _COLORREF uint32
+
+func _RGB(r, g, b byte) _COLORREF {
+	return _COLORREF(r) | _COLORREF(g)<<8 | _COLORREF(b)<<16
+}
 
 type _POINT struct {
 	X int32
@@ -52,6 +59,44 @@ type _WINDOWPOS struct {
 	Cx              int32
 	Cy              int32
 	Flags           uint32
+}
+
+type _BITMAPINFOHEADER struct {
+	Size          uint32
+	Width         int32
+	Height        int32
+	Planes        uint16
+	BitCount      uint16
+	Compression   uint32
+	SizeImage     uint32
+	XPelsPerMeter int32
+	YPelsPerMeter int32
+	ClrUsed       uint32
+	ClrImportant  uint32
+}
+
+type _RGBQUAD struct {
+	Blue     byte
+	Green    byte
+	Red      byte
+	Reserved byte
+}
+
+type _BITMAPINFO struct {
+	Header _BITMAPINFOHEADER
+	Colors [1]_RGBQUAD
+}
+
+type _BLENDFUNCTION struct {
+	BlendOp             byte
+	BlendFlags          byte
+	SourceConstantAlpha byte
+	AlphaFormat         byte
+}
+
+// ToUintptr helps to pass bf to syscall.Syscall.
+func (bf _BLENDFUNCTION) ToUintptr() uintptr {
+	return *((*uintptr)(unsafe.Pointer(&bf)))
 }
 
 const (
@@ -100,6 +145,14 @@ const (
 	_SWP_NOSIZE = 0x0001
 )
 
+const (
+	_BI_RGB         = 0
+	_DIB_RGB_COLORS = 0
+
+	_AC_SRC_OVER  = 0x00
+	_AC_SRC_ALPHA = 0x01
+)
+
 func _GET_X_LPARAM(lp uintptr) int32 {
 	return int32(_LOWORD(lp))
 }
@@ -135,3 +188,11 @@ func _HIWORD(l uintptr) uint16 {
 //sys	_GetClientRect(hwnd syscall.Handle, rect *_RECT) (err error) = user32.GetClientRect
 //sys	_GetDC(hwnd syscall.Handle) (dc syscall.Handle, err error) = user32.GetDC
 //sys	_ReleaseDC(hwnd syscall.Handle, dc syscall.Handle) (err error) = user32.ReleaseDC
+//sys	_DeleteDC(dc syscall.Handle) (err error) = user32.DeleteDC
+//sys	_CreateDIBSection(dc syscall.Handle, bmi *_BITMAPINFO, usage uint32, bits **byte, section syscall.Handle, offset uint32) (bitmap syscall.Handle, err error) = gdi32.CreateDIBSection
+//sys	_CreateCompatibleDC(dc syscall.Handle) (newdc syscall.Handle, err error) = gdi32.CreateCompatibleDC
+//sys	_SelectObject(dc syscall.Handle, gdiobj syscall.Handle) (newobj syscall.Handle, err error) = gdi32.SelectObject
+//sys	_AlphaBlend(dcdest syscall.Handle, xoriginDest int32, yoriginDest int32, wDest int32, hDest int32, dcsrc syscall.Handle, xoriginSrc int32, yoriginSrc int32, wsrc int32, hsrc int32, ftn uintptr) (err error) = msimg32.AlphaBlend
+//sys	_CreateSolidBrush(color _COLORREF) (brush syscall.Handle, err error) = gdi32.CreateSolidBrush
+//sys	_FillRect(dc syscall.Handle, rc *_RECT, brush syscall.Handle) (err error) = user32.FillRect
+//sys	_DeleteObject(object syscall.Handle) (err error) = gdi32.DeleteObject

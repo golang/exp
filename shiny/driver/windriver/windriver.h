@@ -32,8 +32,4 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define firstClassMessage (WM_USER + 0x40)
 
-// windraw.c
-extern void fillSrc(PVOID, RECT *, COLORREF);
-extern void fillOver(PVOID, RECT *, COLORREF);
-
 #endif
