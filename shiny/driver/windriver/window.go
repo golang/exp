@@ -6,9 +6,6 @@
 
 package windriver
 
-// #include "windriver.h"
-import "C"
-
 import (
 	"image"
 	"image/color"
@@ -161,24 +158,24 @@ func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, x int32, y int32) {
 	windowsLock.Unlock()
 
 	switch uMsg {
-	case C.WM_MOUSEMOVE:
+	case _WM_MOUSEMOVE:
 		dir = mouse.DirNone
-	case C.WM_LBUTTONDOWN, C.WM_MBUTTONDOWN, C.WM_RBUTTONDOWN:
+	case _WM_LBUTTONDOWN, _WM_MBUTTONDOWN, _WM_RBUTTONDOWN:
 		dir = mouse.DirPress
-	case C.WM_LBUTTONUP, C.WM_MBUTTONUP, C.WM_RBUTTONUP:
+	case _WM_LBUTTONUP, _WM_MBUTTONUP, _WM_RBUTTONUP:
 		dir = mouse.DirRelease
 	default:
 		panic("sendMouseEvent() called on non-mouse message")
 	}
 
 	switch uMsg {
-	case C.WM_MOUSEMOVE:
+	case _WM_MOUSEMOVE:
 		button = mouse.ButtonNone
-	case C.WM_LBUTTONDOWN, C.WM_LBUTTONUP:
+	case _WM_LBUTTONDOWN, _WM_LBUTTONUP:
 		button = mouse.ButtonLeft
-	case C.WM_MBUTTONDOWN, C.WM_MBUTTONUP:
+	case _WM_MBUTTONDOWN, _WM_MBUTTONUP:
 		button = mouse.ButtonMiddle
-	case C.WM_RBUTTONDOWN, C.WM_RBUTTONUP:
+	case _WM_RBUTTONDOWN, _WM_RBUTTONUP:
 		button = mouse.ButtonRight
 	}
 	// TODO(andlabs): mouse wheel
@@ -194,21 +191,21 @@ func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, x int32, y int32) {
 
 // Precondition: this is called in immediate response to the message that triggered the event (so not after w.Send).
 func keyModifiers() (m key.Modifiers) {
-	down := func(x C.int) bool {
+	down := func(x int32) bool {
 		// GetKeyState gets the key state at the time of the message, so this is what we want.
-		return C.GetKeyState(x)&0x80 != 0
+		return _GetKeyState(x)&0x80 != 0
 	}
 
-	if down(C.VK_CONTROL) {
+	if down(_VK_CONTROL) {
 		m |= key.ModControl
 	}
-	if down(C.VK_MENU) {
+	if down(_VK_MENU) {
 		m |= key.ModAlt
 	}
-	if down(C.VK_SHIFT) {
+	if down(_VK_SHIFT) {
 		m |= key.ModShift
 	}
-	if down(C.VK_LWIN) || down(C.VK_RWIN) {
+	if down(_VK_LWIN) || down(_VK_RWIN) {
 		m |= key.ModMeta
 	}
 	return m

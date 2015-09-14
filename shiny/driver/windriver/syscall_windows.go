@@ -127,6 +127,14 @@ const (
 )
 
 const (
+	_VK_SHIFT   = 16
+	_VK_CONTROL = 17
+	_VK_MENU    = 18
+	_VK_LWIN    = 0x5B
+	_VK_RWIN    = 0x5C
+)
+
+const (
 	_COLOR_BTNFACE = 15
 )
 
@@ -196,3 +204,4 @@ func _HIWORD(l uintptr) uint16 {
 //sys	_CreateSolidBrush(color _COLORREF) (brush syscall.Handle, err error) = gdi32.CreateSolidBrush
 //sys	_FillRect(dc syscall.Handle, rc *_RECT, brush syscall.Handle) (err error) = user32.FillRect
 //sys	_DeleteObject(object syscall.Handle) (err error) = gdi32.DeleteObject
+//sys	_GetKeyState(virtkey int32) (keystatus int16) = user32.GetKeyState

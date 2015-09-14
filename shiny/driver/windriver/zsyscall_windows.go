@@ -34,6 +34,7 @@ var (
 	procCreateSolidBrush   = modgdi32.NewProc("CreateSolidBrush")
 	procFillRect           = moduser32.NewProc("FillRect")
 	procDeleteObject       = modgdi32.NewProc("DeleteObject")
+	procGetKeyState        = moduser32.NewProc("GetKeyState")
 )
 
 func _GetMessage(msg *_MSG, hwnd syscall.Handle, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) {
@@ -277,5 +278,11 @@ func _DeleteObject(object syscall.Handle) (err error) {
 			err = syscall.EINVAL
 		}
 	}
+	return
+}
+
+func _GetKeyState(virtkey int32) (keystatus int16) {
+	r0, _, _ := syscall.Syscall(procGetKeyState.Addr(), 1, uintptr(virtkey), 0, 0)
+	keystatus = int16(r0)
 	return
 }
