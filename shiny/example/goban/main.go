@@ -16,8 +16,6 @@ package main
 import (
 	"flag"
 	"image"
-	"image/color"
-	stdDraw "image/draw"
 	"log"
 	"math/rand"
 	"time"
@@ -48,8 +46,6 @@ func main() {
 		}
 		defer w.Release()
 
-		r := board.image.Bounds()
-		winSize := r.Size()
 		var b screen.Buffer
 		defer func() {
 			if b != nil {
@@ -57,17 +53,11 @@ func main() {
 			}
 		}()
 
-		var sz size.Event
-
 		for e := range w.Events() {
 			switch e := e.(type) {
-			default:
-
 			case mouse.Event:
 				if e.Direction == mouse.DirRelease && e.Button != 0 {
-					// Invert y. TODO: for Darwin gldriver bug that will be fixed by https://go-review.googlesource.com/#/c/13917/
-					y := b.RGBA().Bounds().Dy() - int(e.Y)
-					board.click(b.RGBA(), int(e.X), y, int(e.Button))
+					board.click(b.RGBA(), int(e.X), int(e.Y), int(e.Button))
 					dirty = true
 				}
 
@@ -83,8 +73,7 @@ func main() {
 				//
 				// TODO: This check should save CPU time but causes flicker on Darwin.
 				//if dirty && !uploading {
-				w.Fill(sz.Bounds(), color.RGBA{0x00, 0x00, 0x3f, 0xff}, stdDraw.Src)
-				w.Upload(image.Point{0, 0}, b, b.Bounds(), w) // TODO: On Darwin always writes to 0,0, ignoring first arg.
+				w.Upload(image.Point{}, b, b.Bounds(), w) // TODO: On Darwin always writes to 0,0, ignoring first arg.
 				dirty = false
 				uploading = true
 				//}
@@ -96,12 +85,10 @@ func main() {
 
 			case size.Event:
 				// TODO: Set board size.
-				sz = e
 				if b != nil {
 					b.Release()
 				}
-				winSize = image.Point{sz.WidthPx, sz.HeightPx}
-				b, err = s.NewBuffer(winSize)
+				b, err = s.NewBuffer(e.Size())
 				if err != nil {
 					log.Fatal(err)
 				}
