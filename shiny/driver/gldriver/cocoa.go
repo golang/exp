@@ -66,12 +66,7 @@ func closeWindow(id uintptr) {
 	C.doCloseWindow(C.uintptr_t(id))
 }
 
-var (
-	theScreen = &screenImpl{
-		windows: make(map[uintptr]*windowImpl),
-	}
-	mainCallback func(screen.Screen)
-)
+var mainCallback func(screen.Screen)
 
 func main(f func(screen.Screen)) error {
 	if tid := C.threadID(); tid != initThreadID {
@@ -114,7 +109,7 @@ func drawgl(id uintptr) {
 // source of draw events is the CVDisplayLink timer, which is tied to
 // the display vsync. Secondary draw events come from [NSView drawRect:]
 // when the window is resized.
-func drawLoop(w *windowImpl, ctx uintptr) {
+func drawLoop(w *windowImpl) {
 	runtime.LockOSThread()
 	// TODO(crawshaw): there are several problematic issues around having
 	// a draw loop per window, but resolving them requires some thought.
@@ -127,7 +122,10 @@ func drawLoop(w *windowImpl, ctx uintptr) {
 	// example, gl.CreateTexture. It doesn't matter which GL ctx we use
 	// for that, but we have to use a valid one. So if a window gets
 	// closed, it's important we swap the default ctx. More work needed.
-	C.makeCurrentContext(C.uintptr_t(ctx))
+	//
+	// Similarly, should each window have its own endPaint channel, or should
+	// the single dedicated draw loop have a single dedicated channel?
+	C.makeCurrentContext(C.uintptr_t(w.ctx))
 
 	// TODO(crawshaw): exit this goroutine on Release.
 	for {

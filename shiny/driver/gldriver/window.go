@@ -18,8 +18,17 @@ import (
 )
 
 type windowImpl struct {
-	s  *screenImpl
-	id uintptr // *C.ScreenGLView
+	s *screenImpl
+
+	// id is a C data structure for the window.
+	// 	- For Cocoa, it's a ScreenGLView*.
+	//	- For X11, it's a Window.
+	id uintptr
+
+	// ctx is a C data structure for the GL context.
+	//	- For Cocoa, it's a NSOpenGLContext*.
+	//	- For X11, it's an EGLSurface.
+	ctx uintptr
 
 	pump    pump.Pump
 	publish chan struct{}
