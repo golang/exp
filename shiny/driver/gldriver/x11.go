@@ -65,15 +65,15 @@ func closeWindow(id uintptr) {
 func drawLoop(w *windowImpl) {
 	glcontextc <- w.ctx
 	go func() {
-		for range w.endPaint {
-			paintc <- w
+		for range w.publish {
+			publishc <- w
 		}
 	}()
 }
 
 var (
 	glcontextc = make(chan uintptr)
-	paintc     = make(chan *windowImpl)
+	publishc   = make(chan *windowImpl)
 	uic        = make(chan uiClosure)
 )
 
@@ -124,7 +124,7 @@ func main(f func(screen.Screen)) error {
 			// the window width and height to something other than that
 			// requested by XCreateWindow, but it's not easily reproducible.
 			C.makeCurrent(C.uintptr_t(ctx))
-		case w := <-paintc:
+		case w := <-publishc:
 			C.swapBuffers(C.uintptr_t(w.ctx))
 		case req := <-uic:
 			req.retc <- req.f()
