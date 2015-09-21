@@ -16,6 +16,7 @@ import (
 	"image/color"
 	"image/draw"
 	"log"
+	"math"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
@@ -23,6 +24,11 @@ import (
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
+)
+
+var (
+	blue0 = color.RGBA{0x00, 0x00, 0x1f, 0xff}
+	blue1 = color.RGBA{0x00, 0x00, 0x3f, 0xff}
 )
 
 func main() {
@@ -62,12 +68,14 @@ func main() {
 				}
 
 			case paint.Event:
-				wBounds := image.Rectangle{Max: image.Point{sz.WidthPx, sz.HeightPx}}
-				w.Fill(wBounds, color.RGBA{0x00, 0x00, 0x3f, 0xff}, draw.Src)
+				w.Fill(sz.Bounds(), blue0, draw.Src)
+				w.Fill(sz.Bounds().Inset(10), blue1, draw.Src)
 				w.Upload(image.Point{}, b, b.Bounds(), w)
+				c := math.Cos(math.Pi / 6)
+				s := math.Sin(math.Pi / 6)
 				w.Draw(f64.Aff3{
-					1, 0, 100,
-					0, 1, 200,
+					+c, -s, 100,
+					+s, +c, 200,
 				}, t, t.Bounds(), screen.Over, nil)
 				w.Publish()
 
@@ -88,7 +96,13 @@ func drawGradient(m *image.RGBA) {
 	b := m.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
-			m.SetRGBA(x, y, color.RGBA{uint8(x), uint8(y), 0x00, 0xff})
+			if x%64 == 0 || y%64 == 0 {
+				m.SetRGBA(x, y, color.RGBA{0xff, 0xff, 0xff, 0xff})
+			} else if x%64 == 63 || y%64 == 63 {
+				m.SetRGBA(x, y, color.RGBA{0x00, 0x00, 0xff, 0xff})
+			} else {
+				m.SetRGBA(x, y, color.RGBA{uint8(x), uint8(y), 0x00, 0xff})
+			}
 		}
 	}
 }

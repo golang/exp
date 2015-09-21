@@ -21,7 +21,7 @@ type windowImpl struct {
 	s *screenImpl
 
 	// id is a C data structure for the window.
-	// 	- For Cocoa, it's a ScreenGLView*.
+	//	- For Cocoa, it's a ScreenGLView*.
 	//	- For X11, it's a Window.
 	id uintptr
 
@@ -72,7 +72,10 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 		panic(err)
 	}
 	t.(*textureImpl).upload(dp, src, sr, sender, w)
-	w.Draw(f64.Aff3{1, 0, 0, 0, 1, 0}, t, sr, draw.Src, nil)
+	w.Draw(f64.Aff3{
+		1, 0, float64(dp.X),
+		0, 1, float64(dp.Y),
+	}, t, sr, draw.Src, nil)
 	t.Release()
 }
 
@@ -87,14 +90,22 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 		w.s.fill.pos = gl.GetAttribLocation(p, "pos")
 		w.s.fill.mvp = gl.GetUniformLocation(p, "mvp")
 		w.s.fill.color = gl.GetUniformLocation(p, "color")
-		w.s.fill.quadXY = gl.CreateBuffer()
+		w.s.fill.quad = gl.CreateBuffer()
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quadXY)
-		gl.BufferData(gl.ARRAY_BUFFER, quadXYCoords, gl.STATIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quad)
+		gl.BufferData(gl.ARRAY_BUFFER, quadCoords, gl.STATIC_DRAW)
 	}
-
 	gl.UseProgram(w.s.fill.program)
-	writeAff3(w.s.fill.mvp, w.vertexAff3(dr))
+
+	dstL := float64(dr.Min.X)
+	dstT := float64(dr.Min.Y)
+	dstR := float64(dr.Max.X)
+	dstB := float64(dr.Max.Y)
+	writeAff3(w.s.fill.mvp, w.mvp(
+		dstL, dstT,
+		dstR, dstT,
+		dstL, dstB,
+	))
 
 	r, g, b, a := src.RGBA()
 	gl.Uniform4f(
@@ -105,7 +116,7 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 		float32(a)/65535,
 	)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quadXY)
+	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quad)
 	gl.EnableVertexAttribArray(w.s.fill.pos)
 	gl.VertexAttribPointer(w.s.fill.pos, 2, gl.FLOAT, false, 0, 0)
 
@@ -114,67 +125,23 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	gl.DisableVertexAttribArray(w.s.fill.pos)
 }
 
-func (w *windowImpl) vertexAff3(r image.Rectangle) f64.Aff3 {
-	w.mu.Lock()
-	sz := w.sz
-	w.mu.Unlock()
-
-	size := r.Size()
-	tx, ty := float64(size.X), float64(size.Y)
-	wx, wy := float64(sz.WidthPx), float64(sz.HeightPx)
-	rx, ry := tx/wx, ty/wy
-
-	// We are drawing the texture src onto the window's framebuffer.
-	// The texture is (0,0)-(tx,ty). The window is (0,0)-(wx,wy), which
-	// in vertex shader space is
-	//
-	//	(-1, +1) (+1, +1)
-	//	(-1, -1) (+1, -1)
-	//
-	// A src2dst unit affine transform
-	//
-	// 	1 0 0
-	// 	0 1 0
-	// 	0 0 1
-	//
-	// should result in a (tx,ty) texture appearing in the upper-left
-	// (tx, ty) pixels of the window.
-	//
-	// Setting w.s.texture.mvp to a unit affine transform results in
-	// mapping the 2-unit square (-1,+1)-(+1,-1) given by quadXYCoords
-	// in texture.go to the same coordinates in vertex shader space.
-	// Thus, it results in the whole texture ((tx, ty) in texture
-	// space) occupying the whole window ((wx, wy) in window space).
-	//
-	// A scaling affine transform
-	//
-	//	rx  0  0
-	//	 0 ry  0
-	//	 0  0  1
-	//
-	// results in a (tx, ty) texture occupying (tx, ty) pixels in the
-	// center of the window.
-	//
-	// For upper-left alignment, we want to translate by
-	// (-(1-rx), 1-ry), which is the affine transform
-	//
-	//	1    0   -1+rx
-	//	0    1   +1-ry
-	//	0    0       1
-	//
-	// These multiply to give:
-	return f64.Aff3{
-		rx, 0, -1 + rx,
-		0, ry, +1 - ry,
-	}
-}
-
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	t := src.(*textureImpl)
-	a := w.vertexAff3(sr)
-
 	gl.UseProgram(w.s.texture.program)
-	writeAff3(w.s.texture.mvp, mul(a, src2dst))
+
+	// Start with src-space left, top, right and bottom.
+	srcL := float64(sr.Min.X)
+	srcT := float64(sr.Min.Y)
+	srcR := float64(sr.Max.X)
+	srcB := float64(sr.Max.Y)
+	// Transform to dst-space via the src2dst matrix, then to a MVP matrix.
+	writeAff3(w.s.texture.mvp, w.mvp(
+		src2dst[0]*srcL+src2dst[1]*srcT+src2dst[2],
+		src2dst[3]*srcL+src2dst[4]*srcT+src2dst[5],
+		src2dst[0]*srcR+src2dst[1]*srcT+src2dst[2],
+		src2dst[3]*srcR+src2dst[4]*srcT+src2dst[5],
+		src2dst[0]*srcL+src2dst[1]*srcB+src2dst[2],
+		src2dst[3]*srcL+src2dst[4]*srcB+src2dst[5],
+	))
 
 	// OpenGL's fragment shaders' UV coordinates run from (0,0)-(1,1),
 	// unlike vertex shaders' XY coordinates running from (-1,+1)-(+1,-1).
@@ -191,6 +158,7 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	//
 	// The PQRS quad is always axis-aligned. First of all, convert
 	// from pixel space to texture space.
+	t := src.(*textureImpl)
 	tw := float64(t.size.X)
 	th := float64(t.size.Y)
 	px := float64(sr.Min.X-0) / tw
@@ -215,11 +183,11 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	gl.BindTexture(gl.TEXTURE_2D, t.id)
 	gl.Uniform1i(w.s.texture.sample, 0)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quadXY)
+	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quad)
 	gl.EnableVertexAttribArray(w.s.texture.pos)
 	gl.VertexAttribPointer(w.s.texture.pos, 2, gl.FLOAT, false, 0, 0)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quadUV)
+	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quad)
 	gl.EnableVertexAttribArray(w.s.texture.inUV)
 	gl.VertexAttribPointer(w.s.texture.inUV, 2, gl.FLOAT, false, 0, 0)
 
@@ -227,6 +195,43 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 
 	gl.DisableVertexAttribArray(w.s.texture.pos)
 	gl.DisableVertexAttribArray(w.s.texture.inUV)
+}
+
+// mvp returns the Model View Projection matrix that maps the quadCoords unit
+// square, (0, 0) to (1, 1), to a quad QV, such that QV in vertex shader space
+// corresponds to the quad QP in pixel space, where QP is defined by three of
+// its four corners - the arguments to this function. The three corners are
+// nominally the top-left, top-right and bottom-left, but there is no
+// constraint that e.g. tlx < trx.
+//
+// In pixel space, the window ranges from (0, 0) to (sz.WidthPx, sz.HeightPx).
+// The Y-axis points downwards.
+//
+// In vertex shader space, the window ranges from (-1, +1) to (+1, -1), which
+// is a 2-unit by 2-unit square. The Y-axis points upwards.
+func (w *windowImpl) mvp(tlx, tly, trx, try, blx, bly float64) f64.Aff3 {
+	w.mu.Lock()
+	sz := w.sz
+	w.mu.Unlock()
+
+	// Convert from pixel coords to vertex shader coords.
+	invHalfWidth := +2 / float64(sz.WidthPx)
+	invHalfHeight := -2 / float64(sz.HeightPx)
+	tlx = tlx*invHalfWidth - 1
+	tly = tly*invHalfHeight + 1
+	trx = trx*invHalfWidth - 1
+	try = try*invHalfHeight + 1
+	blx = blx*invHalfWidth - 1
+	bly = bly*invHalfHeight + 1
+
+	// The resultant affine matrix:
+	//	- maps (0, 0) to (tlx, tly).
+	//	- maps (1, 0) to (trx, try).
+	//	- maps (0, 1) to (blx, bly).
+	return f64.Aff3{
+		trx - tlx, blx - tlx, tlx,
+		try - tly, bly - tly, tly,
+	}
 }
 
 func (w *windowImpl) Publish() screen.PublishResult {

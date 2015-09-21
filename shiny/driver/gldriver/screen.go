@@ -27,15 +27,14 @@ type screenImpl struct {
 		uvp     gl.Uniform
 		inUV    gl.Attrib
 		sample  gl.Uniform
-		quadXY  gl.Buffer
-		quadUV  gl.Buffer
+		quad    gl.Buffer
 	}
 	fill struct {
 		program gl.Program
 		pos     gl.Attrib
 		mvp     gl.Uniform
 		color   gl.Uniform
-		quadXY  gl.Buffer
+		quad    gl.Buffer
 	}
 }
 
@@ -61,13 +60,10 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 		s.texture.uvp = gl.GetUniformLocation(p, "uvp")
 		s.texture.inUV = gl.GetAttribLocation(p, "inUV")
 		s.texture.sample = gl.GetUniformLocation(p, "sample")
-		s.texture.quadXY = gl.CreateBuffer()
-		s.texture.quadUV = gl.CreateBuffer()
+		s.texture.quad = gl.CreateBuffer()
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, s.texture.quadXY)
-		gl.BufferData(gl.ARRAY_BUFFER, quadXYCoords, gl.STATIC_DRAW)
-		gl.BindBuffer(gl.ARRAY_BUFFER, s.texture.quadUV)
-		gl.BufferData(gl.ARRAY_BUFFER, quadUVCoords, gl.STATIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, s.texture.quad)
+		gl.BufferData(gl.ARRAY_BUFFER, quadCoords, gl.STATIC_DRAW)
 	}
 
 	t := &textureImpl{

@@ -45,14 +45,7 @@ func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	// TODO.
 }
 
-var quadXYCoords = f32Bytes(binary.LittleEndian,
-	-1, +1, // top left
-	+1, +1, // top right
-	-1, -1, // bottom left
-	+1, -1, // bottom right
-)
-
-var quadUVCoords = f32Bytes(binary.LittleEndian,
+var quadCoords = f32Bytes(binary.LittleEndian,
 	0, 0, // top left
 	1, 0, // top right
 	0, 1, // bottom left
