@@ -89,12 +89,10 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	// TODO: look at opts.
 	const width, height = 1024, 768
 
-	// TODO: merge the newWindow, showWindow (and drawLoop?) functions.
 	id := newWindow(width, height)
 	w := &windowImpl{
 		s:        s,
 		id:       id,
-		ctx:      showWindow(id),
 		pump:     pump.Make(),
 		publish:  make(chan struct{}, 1),
 		draw:     make(chan struct{}),
@@ -104,6 +102,8 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	s.mu.Lock()
 	s.windows[id] = w
 	s.mu.Unlock()
+
+	w.ctx = showWindow(id)
 
 	go drawLoop(w)
 
