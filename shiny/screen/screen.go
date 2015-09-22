@@ -211,7 +211,10 @@ type Drawer interface {
 // When drawing on a Window, there will not be any visible effect until Publish
 // is called.
 func Copy(dst Drawer, dp image.Point, src Texture, sr image.Rectangle, op draw.Op, opts *DrawOptions) {
-	// TODO.
+	dst.Draw(f64.Aff3{
+		1, 0, float64(dp.X - sr.Min.X),
+		0, 1, float64(dp.Y - sr.Min.Y),
+	}, src, sr, op, opts)
 }
 
 // Scale scales the sub-Texture defined by src and sr to dst, such that sr in
@@ -220,7 +223,12 @@ func Copy(dst Drawer, dp image.Point, src Texture, sr image.Rectangle, op draw.O
 // When drawing on a Window, there will not be any visible effect until Publish
 // is called.
 func Scale(dst Drawer, dr image.Rectangle, src Texture, sr image.Rectangle, op draw.Op, opts *DrawOptions) {
-	// TODO.
+	rx := float64(dr.Dx()) / float64(sr.Dx())
+	ry := float64(dr.Dy()) / float64(sr.Dy())
+	dst.Draw(f64.Aff3{
+		rx, 0, float64(dr.Min.X) - rx*float64(sr.Min.X),
+		0, ry, float64(dr.Min.Y) - ry*float64(sr.Min.Y),
+	}, src, sr, op, opts)
 }
 
 // These draw.Op constants are provided so that users of this package don't
