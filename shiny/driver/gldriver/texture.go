@@ -38,7 +38,9 @@ func (t *textureImpl) upload(dp image.Point, src screen.Buffer, sr image.Rectang
 	b := m.Bounds()
 	// TODO check m bounds smaller than t.size
 	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
-	sender.Send(screen.UploadedEvent{Buffer: src, Uploader: u})
+	if sender != nil {
+		sender.Send(screen.UploadedEvent{Buffer: src, Uploader: u})
+	}
 }
 
 func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
