@@ -48,10 +48,12 @@ type screenImpl struct {
 	gcontext32 xproto.Gcontext
 	window32   xproto.Window
 
-	mu      sync.Mutex
-	buffers map[shm.Seg]*bufferImpl
-	uploads map[uint16]completion
-	windows map[xproto.Window]*windowImpl
+	mu              sync.Mutex
+	buffers         map[shm.Seg]*bufferImpl
+	uploads         map[uint16]completion
+	windows         map[xproto.Window]*windowImpl
+	nPendingUploads int
+	completionKeys  []uint16
 }
 
 func newScreenImpl(xc *xgb.Conn) (*screenImpl, error) {
@@ -94,7 +96,10 @@ func (s *screenImpl) run() {
 			s.mu.Unlock()
 
 		case shm.CompletionEvent:
-			s.handleCompletion(ev)
+			s.mu.Lock()
+			s.completionKeys = append(s.completionKeys, ev.Sequence)
+			s.handleCompletions()
+			s.mu.Unlock()
 
 		case xproto.ClientMessageEvent:
 			if ev.Type != s.atomWMProtocols || ev.Format != 32 {
@@ -179,21 +184,28 @@ func (s *screenImpl) findWindow(key xproto.Window) *windowImpl {
 	return w
 }
 
-func (s *screenImpl) handleCompletion(ev shm.CompletionEvent) {
-	s.mu.Lock()
-	completion, ok := s.uploads[ev.Sequence]
-	s.mu.Unlock()
-
-	if !ok {
-		log.Printf("x11driver: no matching upload for a SHM completion event")
+// handleCompletions must only be called while holding s.mu.
+func (s *screenImpl) handleCompletions() {
+	if s.nPendingUploads != 0 {
 		return
 	}
-	completion.event.Buffer.(*bufferImpl).postUpload()
-	if completion.sender != nil {
-		// Call Send in a separate goroutine, so that this event-handling
-		// goroutine doesn't block.
-		go completion.sender.Send(completion.event)
+	for _, ck := range s.completionKeys {
+		completion, ok := s.uploads[ck]
+		if !ok {
+			log.Printf("x11driver: no matching upload for a SHM completion event")
+			continue
+		}
+		// Spawn a separate goroutine, so that this event-handling goroutine
+		// doesn't block on completion.sender.Send. Also, bufferImpl.postUpload
+		// may call bufferImpl.cleanUp which may acquire s.mu.
+		go func() {
+			completion.event.Buffer.(*bufferImpl).postUpload()
+			if completion.sender != nil {
+				completion.sender.Send(completion.event)
+			}
+		}()
 	}
+	s.completionKeys = s.completionKeys[:0]
 }
 
 const (

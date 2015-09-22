@@ -111,6 +111,10 @@ func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gco
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	dr := sr.Sub(sr.Min).Add(dp)
 
+	b.s.mu.Lock()
+	b.s.nPendingUploads++
+	b.s.mu.Unlock()
+
 	cookie := shm.PutImage(
 		b.s.xc, xd, xg,
 		uint16(b.size.X), uint16(b.size.Y), // TotalWidth, TotalHeight,
@@ -129,6 +133,8 @@ func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gco
 			Uploader: u,
 		},
 	}
+	b.s.nPendingUploads--
+	b.s.handleCompletions()
 	b.s.mu.Unlock()
 }
 
