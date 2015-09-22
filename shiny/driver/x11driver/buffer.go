@@ -42,31 +42,28 @@ func (b *bufferImpl) RGBA() *image.RGBA       { return &b.rgba }
 
 func (b *bufferImpl) preUpload() {
 	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.released {
-		b.mu.Unlock()
 		panic("x11driver: Buffer.Upload called after Buffer.Release")
 	}
-	needsSwizzle := b.nUpload == 0
-	b.nUpload++
-	b.mu.Unlock()
-
-	if needsSwizzle {
+	if b.nUpload == 0 {
 		swizzle.BGRA(b.buf)
 	}
+	b.nUpload++
 }
 
 func (b *bufferImpl) postUpload() {
 	b.mu.Lock()
-	b.nUpload--
-	more := b.nUpload != 0
-	released := b.released
-	b.mu.Unlock()
+	defer b.mu.Unlock()
 
-	if more {
+	b.nUpload--
+	if b.nUpload != 0 {
 		return
 	}
-	if released {
-		b.cleanUp()
+
+	if b.released {
+		go b.cleanUp()
 	} else {
 		swizzle.BGRA(b.buf)
 	}
@@ -74,24 +71,22 @@ func (b *bufferImpl) postUpload() {
 
 func (b *bufferImpl) Release() {
 	b.mu.Lock()
-	cleanUp := !b.released && b.nUpload == 0
-	b.released = true
-	b.mu.Unlock()
+	defer b.mu.Unlock()
 
-	if cleanUp {
-		b.cleanUp()
+	if !b.released && b.nUpload == 0 {
+		go b.cleanUp()
 	}
+	b.released = true
 }
 
 func (b *bufferImpl) cleanUp() {
 	b.mu.Lock()
-	alreadyCleanedUp := b.cleanedUp
-	b.cleanedUp = true
-	b.mu.Unlock()
-
-	if alreadyCleanedUp {
+	if b.cleanedUp {
+		b.mu.Unlock()
 		panic("x11driver: Buffer clean-up occurred twice")
 	}
+	b.cleanedUp = true
+	b.mu.Unlock()
 
 	b.s.mu.Lock()
 	delete(b.s.buffers, b.xs)
