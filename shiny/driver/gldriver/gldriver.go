@@ -41,7 +41,7 @@ func mul(a, b f64.Aff3) f64.Aff3 {
 }
 
 // writeAff3 must only be called while holding glMu.
-func writeAff3(u gl.Uniform, a f64.Aff3) {
+func writeAff3(glctx gl.Context, u gl.Uniform, a f64.Aff3) {
 	var m [9]float32
 	m[0*3+0] = float32(a[0*3+0])
 	m[0*3+1] = float32(a[1*3+0])
@@ -52,7 +52,7 @@ func writeAff3(u gl.Uniform, a f64.Aff3) {
 	m[2*3+0] = float32(a[0*3+2])
 	m[2*3+1] = float32(a[1*3+2])
 	m[2*3+2] = 1
-	gl.UniformMatrix3fv(u, m[:])
+	glctx.UniformMatrix3fv(u, m[:])
 }
 
 // f32Bytes returns the byte representation of float32 values in the given byte
@@ -86,48 +86,48 @@ func f32Bytes(byteOrder binary.ByteOrder, values ...float32) []byte {
 }
 
 // compileProgram must only be called while holding glMu.
-func compileProgram(vSrc, fSrc string) (gl.Program, error) {
-	program := gl.CreateProgram()
+func compileProgram(glctx gl.Context, vSrc, fSrc string) (gl.Program, error) {
+	program := glctx.CreateProgram()
 	if program.Value == 0 {
 		return gl.Program{}, fmt.Errorf("gldriver: no programs available")
 	}
 
-	vertexShader, err := compileShader(gl.VERTEX_SHADER, vSrc)
+	vertexShader, err := compileShader(glctx, gl.VERTEX_SHADER, vSrc)
 	if err != nil {
 		return gl.Program{}, err
 	}
-	fragmentShader, err := compileShader(gl.FRAGMENT_SHADER, fSrc)
+	fragmentShader, err := compileShader(glctx, gl.FRAGMENT_SHADER, fSrc)
 	if err != nil {
-		gl.DeleteShader(vertexShader)
+		glctx.DeleteShader(vertexShader)
 		return gl.Program{}, err
 	}
 
-	gl.AttachShader(program, vertexShader)
-	gl.AttachShader(program, fragmentShader)
-	gl.LinkProgram(program)
+	glctx.AttachShader(program, vertexShader)
+	glctx.AttachShader(program, fragmentShader)
+	glctx.LinkProgram(program)
 
 	// Flag shaders for deletion when program is unlinked.
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
+	glctx.DeleteShader(vertexShader)
+	glctx.DeleteShader(fragmentShader)
 
-	if gl.GetProgrami(program, gl.LINK_STATUS) == 0 {
-		defer gl.DeleteProgram(program)
-		return gl.Program{}, fmt.Errorf("gldriver: program compile: %s", gl.GetProgramInfoLog(program))
+	if glctx.GetProgrami(program, gl.LINK_STATUS) == 0 {
+		defer glctx.DeleteProgram(program)
+		return gl.Program{}, fmt.Errorf("gldriver: program compile: %s", glctx.GetProgramInfoLog(program))
 	}
 	return program, nil
 }
 
 // compileShader must only be called while holding glMu.
-func compileShader(shaderType gl.Enum, src string) (gl.Shader, error) {
-	shader := gl.CreateShader(shaderType)
+func compileShader(glctx gl.Context, shaderType gl.Enum, src string) (gl.Shader, error) {
+	shader := glctx.CreateShader(shaderType)
 	if shader.Value == 0 {
 		return gl.Shader{}, fmt.Errorf("gldriver: could not create shader (type %v)", shaderType)
 	}
-	gl.ShaderSource(shader, src)
-	gl.CompileShader(shader)
-	if gl.GetShaderi(shader, gl.COMPILE_STATUS) == 0 {
-		defer gl.DeleteShader(shader)
-		return gl.Shader{}, fmt.Errorf("gldriver: shader compile: %s", gl.GetShaderInfoLog(shader))
+	glctx.ShaderSource(shader, src)
+	glctx.CompileShader(shader)
+	if glctx.GetShaderi(shader, gl.COMPILE_STATUS) == 0 {
+		defer glctx.DeleteShader(shader)
+		return gl.Shader{}, fmt.Errorf("gldriver: shader compile: %s", glctx.GetShaderInfoLog(shader))
 	}
 	return shader, nil
 }

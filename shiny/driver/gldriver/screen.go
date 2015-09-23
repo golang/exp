@@ -5,6 +5,7 @@
 package gldriver
 
 import (
+	"fmt"
 	"image"
 	"sync"
 
@@ -62,34 +63,49 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	defer glMu.Unlock()
 
 	// TODO: can we compile these programs eagerly instead of lazily?
-	if !gl.IsProgram(s.texture.program) {
-		p, err := compileProgram(textureVertexSrc, textureFragmentSrc)
+
+	// Find a GL context for this texture.
+	// TODO: this might be correct. Some GL objects can be shared
+	// across contexts. But this needs a review of the spec to make
+	// sure it's correct, and some testing would be nice.
+	var glctx gl.Context
+	for _, w := range s.windows {
+		glctx = w.glctx
+		break
+	}
+	if glctx == nil {
+		return nil, fmt.Errorf("gldriver: no GL context available")
+	}
+
+	if !glctx.IsProgram(s.texture.program) {
+		p, err := compileProgram(glctx, textureVertexSrc, textureFragmentSrc)
 		if err != nil {
 			return nil, err
 		}
 		s.texture.program = p
-		s.texture.pos = gl.GetAttribLocation(p, "pos")
-		s.texture.mvp = gl.GetUniformLocation(p, "mvp")
-		s.texture.uvp = gl.GetUniformLocation(p, "uvp")
-		s.texture.inUV = gl.GetAttribLocation(p, "inUV")
-		s.texture.sample = gl.GetUniformLocation(p, "sample")
-		s.texture.quad = gl.CreateBuffer()
+		s.texture.pos = glctx.GetAttribLocation(p, "pos")
+		s.texture.mvp = glctx.GetUniformLocation(p, "mvp")
+		s.texture.uvp = glctx.GetUniformLocation(p, "uvp")
+		s.texture.inUV = glctx.GetAttribLocation(p, "inUV")
+		s.texture.sample = glctx.GetUniformLocation(p, "sample")
+		s.texture.quad = glctx.CreateBuffer()
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, s.texture.quad)
-		gl.BufferData(gl.ARRAY_BUFFER, quadCoords, gl.STATIC_DRAW)
+		glctx.BindBuffer(gl.ARRAY_BUFFER, s.texture.quad)
+		glctx.BufferData(gl.ARRAY_BUFFER, quadCoords, gl.STATIC_DRAW)
 	}
 
 	t := &textureImpl{
-		id:   gl.CreateTexture(),
-		size: size,
+		glctx: glctx,
+		id:    glctx.CreateTexture(),
+		size:  size,
 	}
 
-	gl.BindTexture(gl.TEXTURE_2D, t.id)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, size.X, size.Y, gl.RGBA, gl.UNSIGNED_BYTE, nil)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	glctx.BindTexture(gl.TEXTURE_2D, t.id)
+	glctx.TexImage2D(gl.TEXTURE_2D, 0, size.X, size.Y, gl.RGBA, gl.UNSIGNED_BYTE, nil)
+	glctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	glctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	glctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	glctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 
 	return t, nil
 }

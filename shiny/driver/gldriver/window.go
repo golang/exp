@@ -30,6 +30,8 @@ type windowImpl struct {
 	//	- For X11, it's an EGLSurface.
 	ctx uintptr
 
+	glctx gl.Context
+
 	pump    pump.Pump
 	publish chan struct{}
 
@@ -86,35 +88,35 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	glMu.Lock()
 	defer glMu.Unlock()
 
-	if !gl.IsProgram(w.s.fill.program) {
-		p, err := compileProgram(fillVertexSrc, fillFragmentSrc)
+	if !w.glctx.IsProgram(w.s.fill.program) {
+		p, err := compileProgram(w.glctx, fillVertexSrc, fillFragmentSrc)
 		if err != nil {
 			// TODO: initialize this somewhere else we can better handle the error.
 			panic(err.Error())
 		}
 		w.s.fill.program = p
-		w.s.fill.pos = gl.GetAttribLocation(p, "pos")
-		w.s.fill.mvp = gl.GetUniformLocation(p, "mvp")
-		w.s.fill.color = gl.GetUniformLocation(p, "color")
-		w.s.fill.quad = gl.CreateBuffer()
+		w.s.fill.pos = w.glctx.GetAttribLocation(p, "pos")
+		w.s.fill.mvp = w.glctx.GetUniformLocation(p, "mvp")
+		w.s.fill.color = w.glctx.GetUniformLocation(p, "color")
+		w.s.fill.quad = w.glctx.CreateBuffer()
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quad)
-		gl.BufferData(gl.ARRAY_BUFFER, quadCoords, gl.STATIC_DRAW)
+		w.glctx.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quad)
+		w.glctx.BufferData(gl.ARRAY_BUFFER, quadCoords, gl.STATIC_DRAW)
 	}
-	gl.UseProgram(w.s.fill.program)
+	w.glctx.UseProgram(w.s.fill.program)
 
 	dstL := float64(dr.Min.X)
 	dstT := float64(dr.Min.Y)
 	dstR := float64(dr.Max.X)
 	dstB := float64(dr.Max.Y)
-	writeAff3(w.s.fill.mvp, w.mvp(
+	writeAff3(w.glctx, w.s.fill.mvp, w.mvp(
 		dstL, dstT,
 		dstR, dstT,
 		dstL, dstB,
 	))
 
 	r, g, b, a := src.RGBA()
-	gl.Uniform4f(
+	w.glctx.Uniform4f(
 		w.s.fill.color,
 		float32(r)/65535,
 		float32(g)/65535,
@@ -122,20 +124,20 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 		float32(a)/65535,
 	)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quad)
-	gl.EnableVertexAttribArray(w.s.fill.pos)
-	gl.VertexAttribPointer(w.s.fill.pos, 2, gl.FLOAT, false, 0, 0)
+	w.glctx.BindBuffer(gl.ARRAY_BUFFER, w.s.fill.quad)
+	w.glctx.EnableVertexAttribArray(w.s.fill.pos)
+	w.glctx.VertexAttribPointer(w.s.fill.pos, 2, gl.FLOAT, false, 0, 0)
 
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	w.glctx.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-	gl.DisableVertexAttribArray(w.s.fill.pos)
+	w.glctx.DisableVertexAttribArray(w.s.fill.pos)
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	glMu.Lock()
 	defer glMu.Unlock()
 
-	gl.UseProgram(w.s.texture.program)
+	w.glctx.UseProgram(w.s.texture.program)
 
 	// Start with src-space left, top, right and bottom.
 	srcL := float64(sr.Min.X)
@@ -143,7 +145,7 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	srcR := float64(sr.Max.X)
 	srcB := float64(sr.Max.Y)
 	// Transform to dst-space via the src2dst matrix, then to a MVP matrix.
-	writeAff3(w.s.texture.mvp, w.mvp(
+	writeAff3(w.glctx, w.s.texture.mvp, w.mvp(
 		src2dst[0]*srcL+src2dst[1]*srcT+src2dst[2],
 		src2dst[3]*srcL+src2dst[4]*srcT+src2dst[5],
 		src2dst[0]*srcR+src2dst[1]*srcT+src2dst[2],
@@ -183,27 +185,27 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	//	a10 +   0 + a12 = qy = py
 	//	  0 + a01 + a02 = sx = px
 	//	  0 + a11 + a12 = sy
-	writeAff3(w.s.texture.uvp, f64.Aff3{
+	writeAff3(w.glctx, w.s.texture.uvp, f64.Aff3{
 		qx - px, 0, px,
 		0, sy - py, py,
 	})
 
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, t.id)
-	gl.Uniform1i(w.s.texture.sample, 0)
+	w.glctx.ActiveTexture(gl.TEXTURE0)
+	w.glctx.BindTexture(gl.TEXTURE_2D, t.id)
+	w.glctx.Uniform1i(w.s.texture.sample, 0)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quad)
-	gl.EnableVertexAttribArray(w.s.texture.pos)
-	gl.VertexAttribPointer(w.s.texture.pos, 2, gl.FLOAT, false, 0, 0)
+	w.glctx.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quad)
+	w.glctx.EnableVertexAttribArray(w.s.texture.pos)
+	w.glctx.VertexAttribPointer(w.s.texture.pos, 2, gl.FLOAT, false, 0, 0)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quad)
-	gl.EnableVertexAttribArray(w.s.texture.inUV)
-	gl.VertexAttribPointer(w.s.texture.inUV, 2, gl.FLOAT, false, 0, 0)
+	w.glctx.BindBuffer(gl.ARRAY_BUFFER, w.s.texture.quad)
+	w.glctx.EnableVertexAttribArray(w.s.texture.inUV)
+	w.glctx.VertexAttribPointer(w.s.texture.inUV, 2, gl.FLOAT, false, 0, 0)
 
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	w.glctx.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-	gl.DisableVertexAttribArray(w.s.texture.pos)
-	gl.DisableVertexAttribArray(w.s.texture.inUV)
+	w.glctx.DisableVertexAttribArray(w.s.texture.pos)
+	w.glctx.DisableVertexAttribArray(w.s.texture.inUV)
 }
 
 // mvp returns the Model View Projection matrix that maps the quadCoords unit
@@ -252,7 +254,7 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	// This enforces that the final receive (for this paint cycle) on
 	// gl.WorkAvailable happens before the send on publish.
 	glMu.Lock()
-	gl.Flush()
+	w.glctx.Flush()
 	glMu.Unlock()
 
 	w.publish <- struct{}{}
