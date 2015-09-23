@@ -17,6 +17,7 @@ import (
 	"github.com/BurntSushi/xgb/xproto"
 
 	"golang.org/x/exp/shiny/driver/internal/pump"
+	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/key"
@@ -105,7 +106,7 @@ func (w *windowImpl) handleKey(detail xproto.Keycode, state uint16, dir key.Dire
 	// The key event's rune depends on whether the shift key is down.
 	unshifted := rune(w.s.keysyms[detail][0])
 	r := unshifted
-	if state&xShiftMask != 0 {
+	if state&x11key.ShiftMask != 0 {
 		r = rune(w.s.keysyms[detail][1])
 		// In X11, a zero xproto.Keysym when shift is down means to use what
 		// the xproto.Keysym is when shift is up.
@@ -119,9 +120,9 @@ func (w *windowImpl) handleKey(detail xproto.Keycode, state uint16, dir key.Dire
 	if 0 <= unshifted && unshifted < 0x80 {
 		// TODO: distinguish the regular '2' key and number-pad '2' key (with
 		// Num-Lock).
-		c = asciiKeycodes[unshifted]
+		c = x11key.ASCIIKeycodes[unshifted]
 	} else {
-		r, c = -1, nonUnicodeKeycodes[unshifted]
+		r, c = -1, x11key.NonUnicodeKeycodes[unshifted]
 	}
 
 	// TODO: Unicode-but-not-ASCII keysyms like the Swiss keyboard's 'ö'.
@@ -129,7 +130,7 @@ func (w *windowImpl) handleKey(detail xproto.Keycode, state uint16, dir key.Dire
 	w.Send(key.Event{
 		Rune:      r,
 		Code:      c,
-		Modifiers: keyModifiers(state),
+		Modifiers: x11key.KeyModifiers(state),
 		Direction: dir,
 	})
 }
@@ -141,7 +142,7 @@ func (w *windowImpl) handleMouse(x, y int16, b xproto.Button, state uint16, dir 
 		X:         float32(x),
 		Y:         float32(y),
 		Button:    mouse.Button(b),
-		Modifiers: keyModifiers(state),
+		Modifiers: x11key.KeyModifiers(state),
 		Direction: dir,
 	})
 }

@@ -130,6 +130,14 @@ processEvents() {
 		XEvent ev;
 		XNextEvent(x_dpy, &ev);
 		switch (ev.type) {
+		case ButtonPress:
+		case ButtonRelease:
+			onMouse(ev.xbutton.window, ev.xbutton.x, ev.xbutton.y, ev.xbutton.state, ev.xbutton.button,
+				ev.type == ButtonPress ? 1 : 2);
+			break;
+		case MotionNotify:
+			onMouse(ev.xmotion.window, ev.xmotion.x, ev.xmotion.y, ev.xmotion.state, 0, 0);
+			break;
 		case ConfigureNotify:
 			onResize(ev.xconfigure.window, ev.xconfigure.width, ev.xconfigure.height);
 			break;
@@ -159,8 +167,13 @@ uintptr_t
 doNewWindow(int width, int height) {
 	XSetWindowAttributes attr;
 	attr.colormap = x_colormap;
-	attr.event_mask = StructureNotifyMask | ExposureMask |
-		ButtonPressMask | ButtonReleaseMask | ButtonMotionMask;
+	attr.event_mask =
+		ButtonPressMask |
+		ButtonReleaseMask |
+		PointerMotionMask |
+		ButtonMotionMask |
+		ExposureMask |
+		StructureNotifyMask;
 	Window win = XCreateWindow(
 		x_dpy, x_root, 0, 0, width, height, 0, x_visual_info->depth, InputOutput,
 		x_visual_info->visual, CWColormap | CWEventMask, &attr);

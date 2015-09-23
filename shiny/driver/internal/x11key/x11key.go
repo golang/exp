@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package x11driver
+// x11key contains X11 numeric codes for the keyboard and mouse.
+package x11key
 
 import (
 	"golang.org/x/mobile/event/key"
@@ -10,32 +11,32 @@ import (
 
 // These constants come from /usr/include/X11/X.h
 const (
-	xShiftMask   = 1 << 0
-	xLockMask    = 1 << 1
-	xControlMask = 1 << 2
-	xMod1Mask    = 1 << 3
-	xMod2Mask    = 1 << 4
-	xMod3Mask    = 1 << 5
-	xMod4Mask    = 1 << 6
-	xMod5Mask    = 1 << 7
-	xButton1Mask = 1 << 8
-	xButton2Mask = 1 << 9
-	xButton3Mask = 1 << 10
-	xButton4Mask = 1 << 11
-	xButton5Mask = 1 << 12
+	ShiftMask   = 1 << 0
+	LockMask    = 1 << 1
+	ControlMask = 1 << 2
+	Mod1Mask    = 1 << 3
+	Mod2Mask    = 1 << 4
+	Mod3Mask    = 1 << 5
+	Mod4Mask    = 1 << 6
+	Mod5Mask    = 1 << 7
+	Button1Mask = 1 << 8
+	Button2Mask = 1 << 9
+	Button3Mask = 1 << 10
+	Button4Mask = 1 << 11
+	Button5Mask = 1 << 12
 )
 
-func keyModifiers(state uint16) (m key.Modifiers) {
-	if state&xShiftMask != 0 {
+func KeyModifiers(state uint16) (m key.Modifiers) {
+	if state&ShiftMask != 0 {
 		m |= key.ModShift
 	}
-	if state&xControlMask != 0 {
+	if state&ControlMask != 0 {
 		m |= key.ModControl
 	}
-	if state&xMod1Mask != 0 {
+	if state&Mod1Mask != 0 {
 		m |= key.ModAlt
 	}
-	if state&xMod4Mask != 0 {
+	if state&Mod4Mask != 0 {
 		m |= key.ModMeta
 	}
 	return m
@@ -88,7 +89,7 @@ const (
 // nonUnicodeKeycodes maps from those xproto.Keysym values (converted to runes)
 // that do not correspond to a Unicode code point, such as "Page Up", "F1" or
 // "Left Shift", to key.Code values.
-var nonUnicodeKeycodes = map[rune]key.Code{
+var NonUnicodeKeycodes = map[rune]key.Code{
 	xkISOLeftTab: key.CodeTab,
 	xkBackSpace:  key.CodeDeleteBackspace,
 	xkTab:        key.CodeTab,
@@ -134,8 +135,8 @@ var nonUnicodeKeycodes = map[rune]key.Code{
 	xf86xkAudioMute:        key.CodeMute,
 }
 
-// asciiKeycodes maps lower-case ASCII runes to key.Code values.
-var asciiKeycodes = [0x80]key.Code{
+// ASCIIKeycodes maps lower-case ASCII runes to key.Code values.
+var ASCIIKeycodes = [0x80]key.Code{
 	'a': key.CodeA,
 	'b': key.CodeB,
 	'c': key.CodeC,

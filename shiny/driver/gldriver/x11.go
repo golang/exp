@@ -23,7 +23,9 @@ import (
 	"runtime"
 	"time"
 
+	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/geom"
@@ -134,6 +136,27 @@ func main(f func(screen.Screen)) error {
 			gl.DoWork()
 		}
 	}
+}
+
+//export onMouse
+func onMouse(id uintptr, x, y, state, button, dir int32) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	if w == nil {
+		return
+	}
+
+	// TODO: should a mouse.Event have a separate MouseModifiers field, for
+	// which buttons are pressed during a mouse move?
+	w.Send(mouse.Event{
+		X:         float32(x),
+		Y:         float32(y),
+		Button:    mouse.Button(button),
+		Modifiers: x11key.KeyModifiers(uint16(state)),
+		Direction: mouse.Direction(dir),
+	})
 }
 
 //export onResize
