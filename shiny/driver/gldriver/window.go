@@ -71,7 +71,10 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 	if err != nil {
 		panic(err)
 	}
-	t.(*textureImpl).upload(dp, src, sr, sender, w)
+	t.(*textureImpl).upload(dp, src, sr)
+	if sender != nil {
+		sender.Send(screen.UploadedEvent{Buffer: src, Uploader: w})
+	}
 	w.Draw(f64.Aff3{
 		1, 0, float64(dp.X),
 		0, 1, float64(dp.Y),
@@ -80,6 +83,9 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 }
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	glMu.Lock()
+	defer glMu.Unlock()
+
 	if !gl.IsProgram(w.s.fill.program) {
 		p, err := compileProgram(fillVertexSrc, fillFragmentSrc)
 		if err != nil {
@@ -126,6 +132,9 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	glMu.Lock()
+	defer glMu.Unlock()
+
 	gl.UseProgram(w.s.texture.program)
 
 	// Start with src-space left, top, right and bottom.
@@ -242,7 +251,10 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	//
 	// This enforces that the final receive (for this paint cycle) on
 	// gl.WorkAvailable happens before the send on publish.
+	glMu.Lock()
 	gl.Flush()
+	glMu.Unlock()
+
 	w.publish <- struct{}{}
 	// TODO(crawshaw): wait for an ack before returning.
 	return screen.PublishResult{}

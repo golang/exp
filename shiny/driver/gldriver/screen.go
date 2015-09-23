@@ -13,13 +13,22 @@ import (
 	"golang.org/x/mobile/gl"
 )
 
+// glMu is a mutex that enforces the atomicity of methods like Texture.Upload
+// or Window.Draw that are conceptually one operation but are implemented by
+// multiple OpenGL calls. OpenGL is a stateful API, so interleaving OpenGL
+// calls from separate higher-level operations causes inconsistencies.
+//
+// glMu does not need to be held when accessing gl.WorkAvailable or gl.DoWork.
+//
+// TODO: is this affected by changing the x/mobile/gl package from an
+// (implicit) global context to a per-window context?
+var glMu sync.Mutex
+
 var theScreen = &screenImpl{
 	windows: make(map[uintptr]*windowImpl),
 }
 
 type screenImpl struct {
-	mu      sync.Mutex
-	windows map[uintptr]*windowImpl
 	texture struct {
 		program gl.Program
 		pos     gl.Attrib
@@ -36,6 +45,9 @@ type screenImpl struct {
 		color   gl.Uniform
 		quad    gl.Buffer
 	}
+
+	mu      sync.Mutex
+	windows map[uintptr]*windowImpl
 }
 
 func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr error) {
@@ -46,9 +58,10 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 }
 
 func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	glMu.Lock()
+	defer glMu.Unlock()
 
+	// TODO: can we compile these programs eagerly instead of lazily?
 	if !gl.IsProgram(s.texture.program) {
 		p, err := compileProgram(textureVertexSrc, textureFragmentSrc)
 		if err != nil {

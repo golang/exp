@@ -172,7 +172,11 @@ func onResize(id uintptr, width, height int32) {
 	// TODO: should this really be done on the receiving end of the w.Events()
 	// channel, in the same goroutine as other GL calls in the app's 'business
 	// logic'?
-	go gl.Viewport(0, 0, int(width), int(height))
+	go func() {
+		glMu.Lock()
+		gl.Viewport(0, 0, int(width), int(height))
+		glMu.Unlock()
+	}()
 
 	sz := size.Event{
 		WidthPx:  int(width),

@@ -23,27 +23,36 @@ func (t *textureImpl) Size() image.Point       { return t.size }
 func (t *textureImpl) Bounds() image.Rectangle { return image.Rectangle{Max: t.size} }
 
 func (t *textureImpl) Release() {
+	glMu.Lock()
+	defer glMu.Unlock()
+
 	gl.DeleteTexture(t.id)
 	t.id = gl.Texture{}
 }
 
 func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
-	t.upload(dp, src, sr, sender, t)
+	t.upload(dp, src, sr)
+	if sender != nil {
+		sender.Send(screen.UploadedEvent{Buffer: src, Uploader: t})
+	}
 }
 
-func (t *textureImpl) upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender, u screen.Uploader) {
+func (t *textureImpl) upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+	glMu.Lock()
+	defer glMu.Unlock()
+
 	// TODO: adjust if dp is outside dst bounds, or r is outside src bounds.
 	gl.BindTexture(gl.TEXTURE_2D, t.id)
 	m := src.RGBA().SubImage(sr).(*image.RGBA)
 	b := m.Bounds()
 	// TODO check m bounds smaller than t.size
 	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
-	if sender != nil {
-		sender.Send(screen.UploadedEvent{Buffer: src, Uploader: u})
-	}
 }
 
 func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	glMu.Lock()
+	defer glMu.Unlock()
+
 	// TODO.
 }
 
