@@ -96,9 +96,9 @@ func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
 		HeightPt:    geom.Pt(newHeight),
 		PixelsPerPt: 1,
 	})
+}
 
-	// TODO: translate X11 expose events to shiny paint events, instead of
-	// sending this synthetic paint event as a hack.
+func (w *windowImpl) handleExpose() {
 	w.Send(paint.Event{})
 }
 

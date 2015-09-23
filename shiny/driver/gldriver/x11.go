@@ -138,6 +138,19 @@ func main(f func(screen.Screen)) error {
 	}
 }
 
+//export onExpose
+func onExpose(id uintptr) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	if w == nil {
+		return
+	}
+
+	w.Send(paint.Event{})
+}
+
 //export onMouse
 func onMouse(id uintptr, x, y, state, button, dir int32) {
 	theScreen.mu.Lock()
@@ -194,7 +207,5 @@ func onResize(id uintptr, width, height int32) {
 
 	w.Send(sz)
 
-	// TODO: convert X11 expose events to shiny paint events, instead of this
-	// one-off hack.
-	w.Send(paint.Event{})
+	// TODO: lifecycle events?
 }

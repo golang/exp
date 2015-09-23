@@ -138,6 +138,16 @@ processEvents() {
 		case MotionNotify:
 			onMouse(ev.xmotion.window, ev.xmotion.x, ev.xmotion.y, ev.xmotion.state, 0, 0);
 			break;
+		case Expose:
+			// A non-zero Count means that there are more expose events coming. For
+			// example, a non-rectangular exposure (e.g. from a partially overlapped
+			// window) will result in multiple expose events whose dirty rectangles
+			// combine to define the dirty region. Go's paint events do not provide
+			// dirty regions, so we only pass on the final X11 expose event.
+			if (ev.xexpose.count == 0) {
+				onExpose(ev.xexpose.window);
+			}
+			break;
 		case ConfigureNotify:
 			onResize(ev.xconfigure.window, ev.xconfigure.width, ev.xconfigure.height);
 			break;

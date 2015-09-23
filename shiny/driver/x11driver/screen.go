@@ -120,7 +120,20 @@ func (s *screenImpl) run() {
 			}
 
 		case xproto.ExposeEvent:
-			// TODO: xw = ev.Window
+			if w := s.findWindow(ev.Window); w != nil {
+				// A non-zero Count means that there are more expose events
+				// coming. For example, a non-rectangular exposure (e.g. from a
+				// partially overlapped window) will result in multiple expose
+				// events whose dirty rectangles combine to define the dirty
+				// region. Go's paint events do not provide dirty regions, so
+				// we only pass on the final X11 expose event.
+				if ev.Count == 0 {
+					w.handleExpose()
+				}
+			} else {
+				noWindowFound = true
+			}
+
 		case xproto.FocusInEvent:
 			// TODO: xw = ev.Event
 		case xproto.FocusOutEvent:
