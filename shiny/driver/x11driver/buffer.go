@@ -32,6 +32,7 @@ type bufferImpl struct {
 
 	mu        sync.Mutex
 	nUpload   uint32
+	reusable  bool
 	released  bool
 	cleanedUp bool
 }
@@ -40,7 +41,7 @@ func (b *bufferImpl) Size() image.Point       { return b.size }
 func (b *bufferImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
 func (b *bufferImpl) RGBA() *image.RGBA       { return &b.rgba }
 
-func (b *bufferImpl) preUpload() {
+func (b *bufferImpl) preUpload(reusable bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -51,6 +52,7 @@ func (b *bufferImpl) preUpload() {
 		swizzle.BGRA(b.buf)
 	}
 	b.nUpload++
+	b.reusable = b.reusable && reusable
 }
 
 func (b *bufferImpl) postUpload() {
@@ -64,7 +66,7 @@ func (b *bufferImpl) postUpload() {
 
 	if b.released {
 		go b.cleanUp()
-	} else {
+	} else if b.reusable {
 		swizzle.BGRA(b.buf)
 	}
 }
@@ -101,7 +103,7 @@ func (b *bufferImpl) cleanUp() {
 func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gcontext, depth uint8,
 	dp image.Point, sr image.Rectangle, sender screen.Sender) {
 
-	b.preUpload()
+	b.preUpload(sender != nil)
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	dr := sr.Sub(sr.Min).Add(dp)
