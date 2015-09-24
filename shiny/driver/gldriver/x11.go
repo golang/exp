@@ -49,15 +49,18 @@ func newWindow(width, height int32) uintptr {
 	return <-retc
 }
 
-func showWindow(id uintptr) uintptr {
+func showWindow(w *windowImpl) {
 	retc := make(chan uintptr)
 	uic <- uiClosure{
 		f: func() uintptr {
-			return uintptr(C.doShowWindow(C.uintptr_t(id)))
+			return uintptr(C.doShowWindow(C.uintptr_t(w.id)))
 		},
 		retc: retc,
 	}
-	return <-retc
+	w.ctx = <-retc
+	w.glctxMu.Lock()
+	w.glctx, w.worker = glctx, worker
+	w.glctxMu.Unlock()
 }
 
 func closeWindow(id uintptr) {
@@ -77,6 +80,16 @@ var (
 	glcontextc = make(chan uintptr)
 	publishc   = make(chan *windowImpl)
 	uic        = make(chan uiClosure)
+
+	// TODO: don't assume that there is only one window, and hence only
+	// one (global) GL context.
+	//
+	// TODO: should we be able to make a shiny.Texture before having a
+	// shiny.Window's GL context? Should something like gl.IsProgram be a
+	// method instead of a function, and have each shiny.Window have its own
+	// gl.Context?
+	glctx  gl.Context
+	worker gl.Worker
 )
 
 // uiClosure is a closure to be run on C's UI thread.
@@ -87,6 +100,7 @@ type uiClosure struct {
 
 func main(f func(screen.Screen)) error {
 	C.startDriver()
+	glctx, worker = gl.NewContext()
 
 	closec := make(chan struct{})
 	go func() {
@@ -102,23 +116,13 @@ func main(f func(screen.Screen)) error {
 	// C.processEvents needs to select on a file descriptor, and the other
 	// cases below select on Go channels.
 	heartbeat := time.NewTicker(time.Second / 60)
-
-	// glWorkAvailable is set to gl.WorkAvailable after we have a GL context.
-	// TODO: should we be able to make a shiny.Texture before having a
-	// shiny.Window's GL context? Should something like gl.IsProgram be a
-	// method instead of a function, and have each shiny.Window have its own
-	// gl.Context?
-	var glWorkAvailable <-chan struct{}
+	workAvailable := worker.WorkAvailable()
 
 	for {
 		select {
 		case <-closec:
 			return nil
 		case ctx := <-glcontextc:
-			glWorkAvailable = gl.WorkAvailable
-			// TODO: don't assume that there is only one window, and hence only
-			// one (global) GL context.
-			//
 			// TODO: do we need to synchronize with seeing a size event for
 			// this window's context before or after calling makeCurrent?
 			// Otherwise, are we racing with the gl.Viewport call? I've
@@ -132,8 +136,8 @@ func main(f func(screen.Screen)) error {
 			req.retc <- req.f()
 		case <-heartbeat.C:
 			C.processEvents()
-		case <-glWorkAvailable:
-			gl.DoWork()
+		case <-workAvailable:
+			worker.DoWork()
 		}
 	}
 }
@@ -186,9 +190,9 @@ func onResize(id uintptr, width, height int32) {
 	// channel, in the same goroutine as other GL calls in the app's 'business
 	// logic'?
 	go func() {
-		glMu.Lock()
-		gl.Viewport(0, 0, int(width), int(height))
-		glMu.Unlock()
+		w.glctxMu.Lock()
+		w.glctx.Viewport(0, 0, int(width), int(height))
+		w.glctxMu.Unlock()
 	}()
 
 	sz := size.Event{
@@ -201,9 +205,9 @@ func onResize(id uintptr, width, height int32) {
 		PixelsPerPt: 1,
 	}
 
-	w.mu.Lock()
+	w.szMu.Lock()
 	w.sz = sz
-	w.mu.Unlock()
+	w.szMu.Unlock()
 
 	w.Send(sz)
 

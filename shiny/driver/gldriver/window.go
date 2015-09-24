@@ -30,16 +30,23 @@ type windowImpl struct {
 	//	- For X11, it's an EGLSurface.
 	ctx uintptr
 
-	glctx gl.Context
-
 	pump    pump.Pump
 	publish chan struct{}
 
 	draw     chan struct{}
 	drawDone chan struct{}
 
-	mu sync.Mutex
-	sz size.Event
+	// glctxMu is a mutex that enforces the atomicity of methods like
+	// Texture.Upload or Window.Draw that are conceptually one operation
+	// but are implemented by multiple OpenGL calls. OpenGL is a stateful
+	// API, so interleaving OpenGL calls from separate higher-level
+	// operations causes inconsistencies.
+	glctxMu sync.Mutex
+	glctx   gl.Context
+	worker  gl.Worker
+
+	szMu sync.Mutex
+	sz   size.Event
 }
 
 func (w *windowImpl) Release() {
@@ -85,8 +92,8 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 }
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	glMu.Lock()
-	defer glMu.Unlock()
+	w.glctxMu.Lock()
+	defer w.glctxMu.Unlock()
 
 	if !w.glctx.IsProgram(w.s.fill.program) {
 		p, err := compileProgram(w.glctx, fillVertexSrc, fillFragmentSrc)
@@ -134,8 +141,8 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	glMu.Lock()
-	defer glMu.Unlock()
+	w.glctxMu.Lock()
+	defer w.glctxMu.Unlock()
 
 	w.glctx.UseProgram(w.s.texture.program)
 
@@ -221,9 +228,9 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 // In vertex shader space, the window ranges from (-1, +1) to (+1, -1), which
 // is a 2-unit by 2-unit square. The Y-axis points upwards.
 func (w *windowImpl) mvp(tlx, tly, trx, try, blx, bly float64) f64.Aff3 {
-	w.mu.Lock()
+	w.szMu.Lock()
 	sz := w.sz
-	w.mu.Unlock()
+	w.szMu.Unlock()
 
 	// Convert from pixel coords to vertex shader coords.
 	invHalfWidth := +2 / float64(sz.WidthPx)
@@ -253,9 +260,9 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	//
 	// This enforces that the final receive (for this paint cycle) on
 	// gl.WorkAvailable happens before the send on publish.
-	glMu.Lock()
+	w.glctxMu.Lock()
 	w.glctx.Flush()
-	glMu.Unlock()
+	w.glctxMu.Unlock()
 
 	w.publish <- struct{}{}
 	// TODO(crawshaw): wait for an ack before returning.

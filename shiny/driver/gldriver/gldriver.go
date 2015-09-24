@@ -40,7 +40,7 @@ func mul(a, b f64.Aff3) f64.Aff3 {
 	}
 }
 
-// writeAff3 must only be called while holding glMu.
+// writeAff3 must only be called while holding windowImpl.glctxMu.
 func writeAff3(glctx gl.Context, u gl.Uniform, a f64.Aff3) {
 	var m [9]float32
 	m[0*3+0] = float32(a[0*3+0])
@@ -85,7 +85,7 @@ func f32Bytes(byteOrder binary.ByteOrder, values ...float32) []byte {
 	return b
 }
 
-// compileProgram must only be called while holding glMu.
+// compileProgram must only be called while holding windowImpl.glctxMu.
 func compileProgram(glctx gl.Context, vSrc, fSrc string) (gl.Program, error) {
 	program := glctx.CreateProgram()
 	if program.Value == 0 {
@@ -117,7 +117,7 @@ func compileProgram(glctx gl.Context, vSrc, fSrc string) (gl.Program, error) {
 	return program, nil
 }
 
-// compileShader must only be called while holding glMu.
+// compileShader must only be called while holding windowImpl.glctxMu.
 func compileShader(glctx gl.Context, shaderType gl.Enum, src string) (gl.Shader, error) {
 	shader := glctx.CreateShader(shaderType)
 	if shader.Value == 0 {

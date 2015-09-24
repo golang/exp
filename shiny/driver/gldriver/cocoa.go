@@ -58,8 +58,12 @@ func newWindow(width, height int32) uintptr {
 	return uintptr(C.doNewWindow(C.int(width), C.int(height)))
 }
 
-func showWindow(id uintptr) uintptr {
-	return uintptr(C.doShowWindow(C.uintptr_t(id)))
+func showWindow(w *windowImpl) {
+	w.glctxMu.Lock()
+	w.glctx, w.worker = gl.NewContext()
+	w.glctxMu.Unlock()
+
+	w.ctx = uintptr(C.doShowWindow(C.uintptr_t(w.id)))
 }
 
 func closeWindow(id uintptr) {
@@ -127,17 +131,13 @@ func drawLoop(w *windowImpl) {
 	// the single dedicated draw loop have a single dedicated channel?
 	C.makeCurrentContext(C.uintptr_t(w.ctx))
 
-	glMu.Lock()
-	var worker gl.Worker
-	w.glctx, worker = gl.NewContext()
-	workAvailable := worker.WorkAvailable()
-	glMu.Unlock()
+	workAvailable := w.worker.WorkAvailable()
 
 	// TODO(crawshaw): exit this goroutine on Release.
 	for {
 		select {
 		case <-workAvailable:
-			worker.DoWork()
+			w.worker.DoWork()
 		case <-w.draw:
 			// TODO(crawshaw): don't send a paint.Event unconditionally. Only
 			// send one if the window actually needs redrawing.
@@ -146,7 +146,7 @@ func drawLoop(w *windowImpl) {
 			for {
 				select {
 				case <-workAvailable:
-					worker.DoWork()
+					w.worker.DoWork()
 				case <-w.publish:
 					C.CGLFlushDrawable(C.CGLGetCurrentContext())
 					break loop
@@ -175,9 +175,9 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 		PixelsPerPt: ppp,
 	}
 
-	w.mu.Lock()
+	w.szMu.Lock()
 	w.sz = sz
-	w.mu.Unlock()
+	w.szMu.Unlock()
 
 	w.Send(sz)
 }

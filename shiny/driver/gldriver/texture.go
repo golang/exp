@@ -15,19 +15,19 @@ import (
 )
 
 type textureImpl struct {
-	glctx gl.Context
-	id    gl.Texture
-	size  image.Point
+	w    *windowImpl
+	id   gl.Texture
+	size image.Point
 }
 
 func (t *textureImpl) Size() image.Point       { return t.size }
 func (t *textureImpl) Bounds() image.Rectangle { return image.Rectangle{Max: t.size} }
 
 func (t *textureImpl) Release() {
-	glMu.Lock()
-	defer glMu.Unlock()
+	t.w.glctxMu.Lock()
+	defer t.w.glctxMu.Unlock()
 
-	t.glctx.DeleteTexture(t.id)
+	t.w.glctx.DeleteTexture(t.id)
 	t.id = gl.Texture{}
 }
 
@@ -39,20 +39,20 @@ func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectang
 }
 
 func (t *textureImpl) upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	glMu.Lock()
-	defer glMu.Unlock()
+	t.w.glctxMu.Lock()
+	defer t.w.glctxMu.Unlock()
 
 	// TODO: adjust if dp is outside dst bounds, or r is outside src bounds.
-	t.glctx.BindTexture(gl.TEXTURE_2D, t.id)
+	t.w.glctx.BindTexture(gl.TEXTURE_2D, t.id)
 	m := src.RGBA().SubImage(sr).(*image.RGBA)
 	b := m.Bounds()
 	// TODO check m bounds smaller than t.size
-	t.glctx.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
+	t.w.glctx.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
 }
 
 func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	glMu.Lock()
-	defer glMu.Unlock()
+	t.w.glctxMu.Lock()
+	defer t.w.glctxMu.Unlock()
 
 	// TODO.
 }
