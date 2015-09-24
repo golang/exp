@@ -4,8 +4,14 @@
 
 package swizzle
 
-const (
-	haveSIMD16 = true
-)
+// haveSSSE3 returns whether the CPU supports SSSE3 instructions (i.e. PSHUFB).
+//
+// Note that this is SSSE3, not SSE3.
+func haveSSSE3() bool
+
+var useBGRA16 = haveSSSE3()
+
+const useBGRA4 = true
 
 func bgra16(p []byte)
+func bgra4(p []byte)

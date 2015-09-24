@@ -7,7 +7,9 @@
 package swizzle
 
 const (
-	haveSIMD16 = false
+	useBGRA16 = false
+	useBGRA4  = false
 )
 
 func bgra16(p []byte) { panic("unreachable") }
+func bgra4(p []byte)  { panic("unreachable") }

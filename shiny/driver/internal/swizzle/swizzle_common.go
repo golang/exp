@@ -15,11 +15,14 @@ func BGRA(p []byte) {
 		panic("input slice length is not a multiple of 4")
 	}
 
-	// Use SIMD code for 16-byte chunks, if supported.
-	if haveSIMD16 {
+	// Use asm code for 16- or 4-byte chunks, if supported.
+	if useBGRA16 {
 		n := len(p) &^ (16 - 1)
 		bgra16(p[:n])
 		p = p[n:]
+	} else if useBGRA4 {
+		bgra4(p)
+		return
 	}
 
 	for i := 0; i < len(p); i += 4 {

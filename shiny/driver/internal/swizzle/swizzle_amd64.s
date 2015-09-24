@@ -4,6 +4,16 @@
 
 #include "textflag.h"
 
+// func haveSSSE3() bool
+TEXT ·haveSSSE3(SB),NOSPLIT,$0
+	MOVQ	$1, AX
+	CPUID
+	SHRQ	$9, CX
+	ANDQ	$1, CX
+	MOVB	CX, ret+0(FP)
+	RET
+
+// func bgra16(p []byte)
 TEXT ·bgra16(SB),NOSPLIT,$0-24
 	MOVQ	p+0(FP), SI
 	MOVQ	len+8(FP), DI
@@ -11,8 +21,7 @@ TEXT ·bgra16(SB),NOSPLIT,$0-24
 	// Sanity check that len is a multiple of 16.
 	MOVQ	DI, AX
 	ANDQ	$15, AX
-	CMPQ	AX, $0
-	JNE	done
+	JNZ	done
 
 	// Make the shuffle control mask (16-byte register X0) look like this,
 	// where the low order byte comes first:
@@ -37,6 +46,31 @@ loop:
 	MOVOU	X1, (SI)
 
 	ADDQ	$16, SI
+	JMP	loop
+done:
+	RET
+
+// func bgra4(p []byte)
+TEXT ·bgra4(SB),NOSPLIT,$0-24
+	MOVQ	p+0(FP), SI
+	MOVQ	len+8(FP), DI
+
+	// Sanity check that len is a multiple of 4.
+	MOVQ	DI, AX
+	ANDQ	$3, AX
+	JNZ	done
+
+	ADDQ	SI, DI
+loop:
+	CMPQ	SI, DI
+	JEQ	done
+
+	MOVB	0(SI), AX
+	MOVB	2(SI), BX
+	MOVB	BX, 0(SI)
+	MOVB	AX, 2(SI)
+
+	ADDQ	$4, SI
 	JMP	loop
 done:
 	RET
