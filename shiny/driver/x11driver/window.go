@@ -72,7 +72,7 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	src.(*textureImpl).draw(w.xp, &src2dst, sr, op, opts)
+	src.(*textureImpl).draw(w.xp, &src2dst, sr, op, w.width, w.height, opts)
 }
 
 func (w *windowImpl) Publish() screen.PublishResult {

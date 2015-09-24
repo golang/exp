@@ -5,6 +5,7 @@
 package x11driver
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -54,16 +55,46 @@ func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	fill(t.s.xc, t.xp, dr, src, op)
 }
 
-func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	// TODO: honor all of src2dst, not just the translation.
-	dstX := int(src2dst[2]) - sr.Min.X
-	dstY := int(src2dst[5]) - sr.Min.Y
+func f64ToFixed(x float64) render.Fixed {
+	return render.Fixed(x * 65536)
+}
+
+func inv(x *f64.Aff3) *f64.Aff3 {
+	return &f64.Aff3{
+		x[4] / (x[0]*x[4] - x[1]*x[3]),
+		x[1] / (x[1]*x[3] - x[0]*x[4]),
+		(x[2]*x[4] - x[1]*x[5]) / (x[1]*x[3] - x[0]*x[4]),
+		x[3] / (x[1]*x[3] - x[0]*x[4]),
+		x[0] / (x[0]*x[4] - x[1]*x[3]),
+		(x[2]*x[3] - x[0]*x[5]) / (x[0]*x[4] - x[1]*x[3]),
+	}
+}
+
+func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, w, h int, opts *screen.DrawOptions) {
+	// TODO: honor sr.Max
+
+	// The XTransform matrix maps from destination pixels to source
+	// pixels, so we invert src2dst.
+	dst2src := inv(src2dst)
+	err := render.SetPictureTransformChecked(t.s.xc, t.xp, render.Transform{
+		f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), f64ToFixed(dst2src[2]),
+		f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), f64ToFixed(dst2src[5]),
+		f64ToFixed(0), f64ToFixed(0), f64ToFixed(1),
+	}).Check()
+
+	if err != nil {
+		panic(fmt.Errorf("x11driver: cannot transform picture: %v", err))
+	}
+	err = render.SetPictureFilterChecked(t.s.xc, t.xp, uint16(len("bilinear")), "bilinear", nil).Check()
+	if err != nil {
+		panic(fmt.Errorf("x11driver: cannot filter picture: %v", err))
+	}
 
 	render.Composite(t.s.xc, renderOp(op), t.xp, 0, xp,
 		int16(sr.Min.X), int16(sr.Min.Y), // SrcX, SrcY,
 		0, 0, // MaskX, MaskY,
-		int16(dstX), int16(dstY), // DstX, DstY,
-		uint16(sr.Dx()), uint16(sr.Dy()), // Width, Height,
+		0, 0, // DstX, DstY,
+		uint16(w), uint16(h), // Width, Height,
 	)
 }
 
