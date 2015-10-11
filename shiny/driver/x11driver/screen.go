@@ -302,6 +302,7 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 
 	xproto.CreatePixmap(s.xc, textureDepth, xm, xproto.Drawable(s.window32), uint16(w), uint16(h))
 	render.CreatePicture(s.xc, xp, xproto.Drawable(xm), s.pictformat32, 0, nil)
+	render.SetPictureFilter(s.xc, xp, uint16(len("bilinear")), "bilinear", nil)
 	return t, nil
 }
 
