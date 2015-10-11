@@ -27,11 +27,11 @@ import (
 )
 
 var (
-	windows     = map[syscall.Handle]*window{}
+	windows     = map[syscall.Handle]*windowImpl{}
 	windowsLock sync.Mutex
 )
 
-type window struct {
+type windowImpl struct {
 	hwnd syscall.Handle
 	pump pump.Pump
 }
@@ -42,7 +42,7 @@ func newWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
 		return nil, err
 	}
 
-	w := &window{
+	w := &windowImpl{
 		hwnd: hwnd,
 		pump: pump.Make(),
 	}
@@ -64,7 +64,7 @@ func newWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
 	return w, nil
 }
 
-func (w *window) Release() {
+func (w *windowImpl) Release() {
 	if w.hwnd == 0 { // already released?
 		return
 	}
@@ -82,14 +82,14 @@ func (w *window) Release() {
 	// TODO(andlabs): what happens if we're still painting?
 }
 
-func (w *window) Events() <-chan interface{} { return w.pump.Events() }
-func (w *window) Send(event interface{})     { w.pump.Send(event) }
+func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
+func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
-func (w *window) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
+func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
 	// TODO
 }
 
-func (w *window) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	rect := _RECT{
 		Left:   int32(dr.Min.X),
 		Top:    int32(dr.Min.Y),
@@ -111,11 +111,11 @@ func (w *window) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	_SendMessage(w.hwnd, msg, uintptr(color), uintptr(unsafe.Pointer(&rect)))
 }
 
-func (w *window) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	// TODO
 }
 
-func (w *window) Publish() screen.PublishResult {
+func (w *windowImpl) Publish() screen.PublishResult {
 	// TODO
 	return screen.PublishResult{}
 }
