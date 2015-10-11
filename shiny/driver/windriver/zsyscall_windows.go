@@ -26,11 +26,12 @@ var (
 	procGetClientRect      = moduser32.NewProc("GetClientRect")
 	procGetDC              = moduser32.NewProc("GetDC")
 	procReleaseDC          = moduser32.NewProc("ReleaseDC")
-	procDeleteDC           = moduser32.NewProc("DeleteDC")
+	procDeleteDC           = modgdi32.NewProc("DeleteDC")
 	procCreateDIBSection   = modgdi32.NewProc("CreateDIBSection")
 	procCreateCompatibleDC = modgdi32.NewProc("CreateCompatibleDC")
 	procSelectObject       = modgdi32.NewProc("SelectObject")
 	procAlphaBlend         = modmsimg32.NewProc("AlphaBlend")
+	procBitBlt             = modgdi32.NewProc("BitBlt")
 	procCreateSolidBrush   = modgdi32.NewProc("CreateSolidBrush")
 	procFillRect           = moduser32.NewProc("FillRect")
 	procDeleteObject       = modgdi32.NewProc("DeleteObject")
@@ -235,6 +236,19 @@ func _SelectObject(dc syscall.Handle, gdiobj syscall.Handle) (newobj syscall.Han
 func _AlphaBlend(dcdest syscall.Handle, xoriginDest int32, yoriginDest int32, wDest int32, hDest int32, dcsrc syscall.Handle, xoriginSrc int32, yoriginSrc int32, wsrc int32, hsrc int32, ftn uintptr) (err error) {
 	r1, _, e1 := syscall.Syscall12(procAlphaBlend.Addr(), 11, uintptr(dcdest), uintptr(xoriginDest), uintptr(yoriginDest), uintptr(wDest), uintptr(hDest), uintptr(dcsrc), uintptr(xoriginSrc), uintptr(yoriginSrc), uintptr(wsrc), uintptr(hsrc), uintptr(ftn), 0)
 	if r1 == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _BitBlt(dcdest syscall.Handle, xdest int32, ydest int32, width int32, height int32, dcsrc syscall.Handle, xsrc int32, ysrc int32, rop int32) (ok int32, err error) {
+	r0, _, e1 := syscall.Syscall9(procBitBlt.Addr(), 9, uintptr(dcdest), uintptr(xdest), uintptr(ydest), uintptr(width), uintptr(height), uintptr(dcsrc), uintptr(xsrc), uintptr(ysrc), uintptr(rop))
+	ok = int32(r0)
+	if ok == 0 {
 		if e1 != 0 {
 			err = error(e1)
 		} else {
