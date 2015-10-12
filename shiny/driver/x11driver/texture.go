@@ -58,14 +58,15 @@ func f64ToFixed(x float64) render.Fixed {
 	return render.Fixed(x * 65536)
 }
 
-func inv(x *f64.Aff3) *f64.Aff3 {
-	return &f64.Aff3{
-		x[4] / (x[0]*x[4] - x[1]*x[3]),
-		x[1] / (x[1]*x[3] - x[0]*x[4]),
-		(x[2]*x[4] - x[1]*x[5]) / (x[1]*x[3] - x[0]*x[4]),
-		x[3] / (x[1]*x[3] - x[0]*x[4]),
-		x[0] / (x[0]*x[4] - x[1]*x[3]),
-		(x[2]*x[3] - x[0]*x[5]) / (x[0]*x[4] - x[1]*x[3]),
+func inv(x *f64.Aff3) f64.Aff3 {
+	invDet := 1 / (x[0]*x[4] - x[1]*x[3])
+	return f64.Aff3{
+		+x[4] * invDet,
+		-x[1] * invDet,
+		(x[1]*x[5] - x[2]*x[4]) * invDet,
+		-x[3] * invDet,
+		+x[0] * invDet,
+		(x[2]*x[3] - x[0]*x[5]) * invDet,
 	}
 }
 
