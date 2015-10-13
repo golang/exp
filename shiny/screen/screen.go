@@ -156,8 +156,9 @@ type Sender interface {
 type Uploader interface {
 	// Upload uploads the sub-Buffer defined by src and sr to the destination
 	// (the method receiver), such that sr.Min in src-space aligns with dp in
-	// dst-space. If sender is not nil, an UploadedEvent will be sent to sender
-	// after the upload is complete.
+	// dst-space. The destination's contents are overwritten; the draw operator
+	// is implicitly draw.Src. If sender is not nil, an UploadedEvent will be
+	// sent to sender after the upload is complete.
 	//
 	// It is valid to upload a Buffer while another upload of the same Buffer
 	// is in progress, but a Buffer's image.RGBA pixel contents should not be
