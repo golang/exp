@@ -143,7 +143,12 @@ type PublishResult struct {
 
 // NewWindowOptions are optional arguments to NewWindow.
 type NewWindowOptions struct {
-	// TODO: size, fullscreen, title, icon, cursorHidden?
+	// Width and Height specify the dimensions of the new window. If Width
+	// or Height are zero, a driver-dependent default will be used for each
+	// zero value dimension.
+	Width, Height int
+
+	// TODO: fullscreen, title, icon, cursorHidden?
 }
 
 // Sender is something you can send events to.
