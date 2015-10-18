@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"sync"
 
 	"github.com/BurntSushi/xgb/render"
@@ -61,6 +62,7 @@ func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	fill(t.s.xc, t.xp, dr, src, op)
 }
 
+// f64ToFixed converts from float64 to X11/Render's 16.16 fixed point.
 func f64ToFixed(x float64) render.Fixed {
 	return render.Fixed(x * 65536)
 }
@@ -83,18 +85,50 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 	t.renderMu.Lock()
 	defer t.renderMu.Unlock()
 
-	// TODO: recognize simple copies or scales, which do not need the "Src
-	// becomes OutReverse plus Over" dance and can be one simple
-	// render.Composite(etc, renderOp(op), etc) call, regardless of whether or
-	// not op is Src.
+	// For simple copies and scales, the inverse matrix is trivial to compute,
+	// and we do not need the "Src becomes OutReverse plus Over" dance (see
+	// below). Thus, draw can be one render.SetPictureTransform call and then
+	// one render.Composite call, regardless of whether or not op is Src.
+	if src2dst[1] == 0 && src2dst[3] == 0 {
+		dstXMin := float64(sr.Min.X)*src2dst[0] + src2dst[2]
+		dstXMax := float64(sr.Max.X)*src2dst[0] + src2dst[2]
+		if dstXMin > dstXMax {
+			// TODO: check if this (and below) works when src2dst[0] < 0.
+			dstXMin, dstXMax = dstXMax, dstXMin
+		}
+		dXMin := int(math.Floor(dstXMin))
+		dXMax := int(math.Ceil(dstXMax))
 
-	// The XTransform matrix maps from destination pixels to source
+		dstYMin := float64(sr.Min.Y)*src2dst[4] + src2dst[5]
+		dstYMax := float64(sr.Max.Y)*src2dst[4] + src2dst[5]
+		if dstYMin > dstYMax {
+			// TODO: check if this (and below) works when src2dst[4] < 0.
+			dstYMin, dstYMax = dstYMax, dstYMin
+		}
+		dYMin := int(math.Floor(dstYMin))
+		dYMax := int(math.Ceil(dstYMax))
+
+		render.SetPictureTransform(t.s.xc, t.xp, render.Transform{
+			f64ToFixed(1 / src2dst[0]), 0, 0,
+			0, f64ToFixed(1 / src2dst[4]), 0,
+			0, 0, 1 << 16,
+		})
+		render.Composite(t.s.xc, renderOp(op), t.xp, 0, xp,
+			int16(sr.Min.X), int16(sr.Min.Y), // SrcX, SrcY,
+			0, 0, // MaskX, MaskY,
+			int16(dXMin), int16(dYMin), // DstX, DstY,
+			uint16(dXMax-dXMin), uint16(dYMax-dYMin), // Width, Height,
+		)
+		return
+	}
+
+	// The X11/Render transform matrix maps from destination pixels to source
 	// pixels, so we invert src2dst.
 	dst2src := inv(src2dst)
 	render.SetPictureTransform(t.s.xc, t.xp, render.Transform{
 		f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), f64ToFixed(dst2src[2]),
 		f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), f64ToFixed(dst2src[5]),
-		f64ToFixed(0), f64ToFixed(0), f64ToFixed(1),
+		0, 0, 1 << 16,
 	})
 
 	if op == draw.Src {
