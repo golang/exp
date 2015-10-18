@@ -26,18 +26,25 @@ type textureImpl struct {
 	xm   xproto.Pixmap
 	xp   render.Picture
 
-	mu       sync.Mutex
-	released bool
+	// renderMu is a mutex that enforces the atomicity of methods like
+	// Window.Draw that are conceptually one operation but are implemented by
+	// multiple X11/Render calls. X11/Render is a stateful API, so interleaving
+	// X11/Render calls from separate higher-level operations causes
+	// inconsistencies.
+	renderMu sync.Mutex
+
+	releasedMu sync.Mutex
+	released   bool
 }
 
 func (t *textureImpl) Size() image.Point       { return t.size }
 func (t *textureImpl) Bounds() image.Rectangle { return image.Rectangle{Max: t.size} }
 
 func (t *textureImpl) Release() {
-	t.mu.Lock()
+	t.releasedMu.Lock()
 	released := t.released
 	t.released = true
-	t.mu.Unlock()
+	t.releasedMu.Unlock()
 
 	if released {
 		return
@@ -73,9 +80,8 @@ func inv(x *f64.Aff3) f64.Aff3 {
 func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, w, h int, opts *screen.DrawOptions) {
 	// TODO: honor sr.Max
 
-	// TODO: use a mutex a la https://go-review.googlesource.com/14861, so that
-	// the render.Xxx calls in this method are effectively one atomic
-	// operation, in case multiple concurrent Draw(etc, t, etc) calls occur.
+	t.renderMu.Lock()
+	defer t.renderMu.Unlock()
 
 	// TODO: recognize simple copies or scales, which do not need the "Src
 	// becomes OutReverse plus Over" dance and can be one simple
