@@ -353,7 +353,7 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	s.mu.Unlock()
 
 	xproto.CreateWindow(s.xc, s.xsi.RootDepth, xw, s.xsi.Root,
-		0, 0, int32(width), int32(height), 0,
+		0, 0, uint16(width), uint16(height), 0,
 		xproto.WindowClassInputOutput, s.xsi.RootVisual,
 		xproto.CwEventMask,
 		[]uint32{0 |
