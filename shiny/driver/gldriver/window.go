@@ -13,6 +13,7 @@ import (
 	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/gl"
 )
@@ -29,6 +30,8 @@ type windowImpl struct {
 	//	- For Cocoa, it's a NSOpenGLContext*.
 	//	- For X11, it's an EGLSurface.
 	ctx uintptr
+
+	lifecycleStage lifecycle.Stage // current stage
 
 	pump    pump.Pump
 	publish chan struct{}

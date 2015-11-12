@@ -138,13 +138,17 @@ uint64 threadID() {
 	[self callSetGeom];
 }
 
+- (void)windowDidExpose:(NSNotification *)notification {
+	lifecycleVisible((GoUintptr)self);
+}
+
 - (void)windowDidBecomeKey:(NSNotification *)notification {
-	lifecycleFocused();
+	lifecycleFocused((GoUintptr)self);
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification {
 	if (![NSApp isHidden]) {
-		lifecycleVisible();
+		lifecycleVisible((GoUintptr)self);
 	}
 }
 
@@ -152,8 +156,6 @@ uint64 threadID() {
 	if (self.window.nextResponder == NULL) {
 		return; // already called close
 	}
-	CVDisplayLinkStop(displayLink);
-	lifecycleAlive();
 	windowClosing((GoUintptr)self);
 	[self.window.nextResponder release];
 	self.window.nextResponder = NULL;
@@ -177,23 +179,15 @@ uint64 threadID() {
 @implementation AppDelegate
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
 	driverStarted();
-	lifecycleAlive();
 	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
-	lifecycleVisible();
 }
 
 - (void)applicationWillTerminate:(NSNotification *)aNotification {
-	lifecycleDead();
+	lifecycleDeadAll();
 }
 
-- (void)applicationDidHide:(NSNotification *)aNotification {
-	// TODO stop all window display links
-	lifecycleAlive();
-}
-
-- (void)applicationWillUnhide:(NSNotification *)notification {
-	// TODO start all window display links
-	lifecycleVisible();
+- (void)applicationWillHide:(NSNotification *)aNotification {
+	lifecycleAliveAll();
 }
 @end
 

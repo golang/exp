@@ -170,6 +170,7 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 
 //export windowClosing
 func windowClosing(id uintptr) {
+	sendLifecycle(id, lifecycle.StageDead)
 	theScreen.mu.Lock()
 	w := theScreen.windows[id]
 	delete(theScreen.windows, id)
@@ -249,18 +250,46 @@ func mouseEvent(id uintptr, x, y float32, ty, button int32, flags uint32) {
 	})
 }
 
-func sendLifecycle(to lifecycle.Stage) {
-	log.Printf("sendLifecycle: %v", to) // TODO
+func sendLifecycle(id uintptr, to lifecycle.Stage) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	if w.lifecycleStage == to {
+		return
+	}
+	w.Send(lifecycle.Event{
+		From:        w.lifecycleStage,
+		To:          to,
+		DrawContext: w.glctx,
+	})
+	w.lifecycleStage = to
 }
 
-//export lifecycleDead
-func lifecycleDead() { sendLifecycle(lifecycle.StageDead) }
+func sendLifecycleAll(to lifecycle.Stage) {
+	theScreen.mu.Lock()
+	defer theScreen.mu.Unlock()
+	for _, w := range theScreen.windows {
+		if w.lifecycleStage == to {
+			continue
+		}
+		w.Send(lifecycle.Event{
+			From:        w.lifecycleStage,
+			To:          to,
+			DrawContext: w.glctx,
+		})
+		w.lifecycleStage = to
+	}
+}
 
-//export lifecycleAlive
-func lifecycleAlive() { sendLifecycle(lifecycle.StageAlive) }
+//export lifecycleDeadAll
+func lifecycleDeadAll() { sendLifecycleAll(lifecycle.StageDead) }
+
+//export lifecycleAliveAll
+func lifecycleAliveAll() { sendLifecycleAll(lifecycle.StageAlive) }
 
 //export lifecycleVisible
-func lifecycleVisible() { sendLifecycle(lifecycle.StageVisible) }
+func lifecycleVisible(id uintptr) { sendLifecycle(id, lifecycle.StageVisible) }
 
 //export lifecycleFocused
-func lifecycleFocused() { sendLifecycle(lifecycle.StageFocused) }
+func lifecycleFocused(id uintptr) { sendLifecycle(id, lifecycle.StageFocused) }
