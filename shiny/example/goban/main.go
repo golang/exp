@@ -28,9 +28,6 @@ import (
 	"golang.org/x/mobile/event/size"
 )
 
-var dirty bool
-var uploading bool
-
 var scale = flag.Int("scale", 35, "`percent` to scale images (TODO: a poor design)")
 
 func main() {
@@ -58,7 +55,7 @@ func main() {
 			case mouse.Event:
 				if e.Direction == mouse.DirRelease && e.Button != 0 {
 					board.click(b.RGBA(), int(e.X), int(e.Y), int(e.Button))
-					dirty = true
+					w.Send(paint.Event{})
 				}
 
 			case key.Event:
@@ -67,21 +64,8 @@ func main() {
 				}
 
 			case paint.Event:
-				// TODO: we shouldn't rely on the library sending us a constant
-				// stream of paint events. If we're dirty, we should just draw
-				// on the window and then call w.Publish.
-				//
-				// TODO: This check should save CPU time but causes flicker on Darwin.
-				//if dirty && !uploading {
-				w.Upload(image.Point{}, b, b.Bounds(), w) // TODO: On Darwin always writes to 0,0, ignoring first arg.
-				dirty = false
-				uploading = true
-				//}
+				w.Upload(image.Point{}, b, b.Bounds(), w)
 				w.Publish()
-
-			case screen.UploadedEvent:
-				// No-op.
-				uploading = false
 
 			case size.Event:
 				// TODO: Set board size.
@@ -103,5 +87,4 @@ func main() {
 
 func render(m *image.RGBA, board *Board) {
 	board.Draw(m)
-	dirty = true
 }
