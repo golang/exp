@@ -124,7 +124,6 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 		id:       id,
 		pump:     pump.Make(),
 		publish:  make(chan struct{}, 1),
-		draw:     make(chan struct{}),
 		drawDone: make(chan struct{}),
 	}
 

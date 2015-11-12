@@ -13,14 +13,6 @@
 #import <Cocoa/Cocoa.h>
 #import <Foundation/Foundation.h>
 #import <OpenGL/gl3.h>
-#import <QuartzCore/CVReturn.h>
-#import <QuartzCore/CVBase.h>
-
-static CVReturn displayLinkDraw(CVDisplayLinkRef displayLink, const CVTimeStamp* now, const CVTimeStamp* outputTime, CVOptionFlags flagsIn, CVOptionFlags* flagsOut, void* displayLinkContext)
-{
-	drawgl((GoUintptr)displayLinkContext);
-	return kCVReturnSuccess;
-}
 
 void makeCurrentContext(uintptr_t context) {
 	NSOpenGLContext* ctx = (NSOpenGLContext*)context;
@@ -37,12 +29,6 @@ uint64 threadID() {
 
 @interface ScreenGLView : NSOpenGLView<NSWindowDelegate>
 {
-	// Each window maintains its own display link, so that windows on
-	// different displays honor their current display.
-	//
-	// TODO(crawshaw): test that display links transfer properly, if I
-	// ever find a machine with more than one display.
-	@public CVDisplayLinkRef displayLink;
 }
 @end
 
@@ -51,13 +37,6 @@ uint64 threadID() {
 	[self setWantsBestResolutionOpenGLSurface:YES];
 	GLint swapInt = 1;
 	[[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
-
-	CVDisplayLinkCreateWithActiveCGDisplays(&displayLink);
-	CVDisplayLinkSetOutputCallback(displayLink, &displayLinkDraw, self);
-
-	CGLContextObj cglContext = [[self openGLContext] CGLContextObj];
-	CGLPixelFormatObj cglPixelFormat = [[self pixelFormat] CGLPixelFormatObj];
-	CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(displayLink, cglContext, cglPixelFormat);
 
 	// Using attribute arrays in OpenGL 3.3 requires the use of a VBA.
 	// But VBAs don't exist in ES 2. So we bind a default one.
@@ -105,9 +84,7 @@ uint64 threadID() {
 - (void)drawRect:(NSRect)theRect {
 	// Called during resize. Do an extra draw if we are visible.
 	// This gets rid of flicker when resizing.
-	if (CVDisplayLinkIsRunning(displayLink)) {
-		drawgl((GoUintptr)self);
-	}
+	drawgl((GoUintptr)self);
 }
 
 - (void)mouseEventNS:(NSEvent *)theEvent {
@@ -254,7 +231,6 @@ uintptr_t doShowWindow(uintptr_t viewID) {
 	__block uintptr_t ret = 0;
 	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
 		[view.window makeKeyAndOrderFront:view.window];
-		CVDisplayLinkStart(view->displayLink);
 		ret = (uintptr_t)[view openGLContext];
 	});
 	return ret;

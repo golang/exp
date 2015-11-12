@@ -10,7 +10,7 @@ package gldriver
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework Cocoa -framework OpenGL -framework QuartzCore
+#cgo LDFLAGS: -framework Cocoa -framework OpenGL
 #import <Carbon/Carbon.h> // for HIToolbox/Events.h
 #import <Cocoa/Cocoa.h>
 #include <pthread.h>
@@ -99,8 +99,11 @@ func drawgl(id uintptr) {
 	if w == nil {
 		return // closing window
 	}
-	w.draw <- struct{}{}
-	<-w.drawDone
+	switch w.lifecycleStage {
+	case lifecycle.StageFocused, lifecycle.StageVisible:
+		w.Send(paint.Event{})
+		<-w.drawDone
+	}
 }
 
 // drawLoop is the primary drawing loop.
@@ -109,10 +112,9 @@ func drawgl(id uintptr) {
 // processing Cocoa events in doNewWindow, it starts drawLoop on another
 // goroutine. It is locked to an OS thread for its OpenGL context.
 //
-// Two Cocoa threads deliver draw signals to drawLoop. The primary
-// source of draw events is the CVDisplayLink timer, which is tied to
-// the display vsync. Secondary draw events come from [NSView drawRect:]
-// when the window is resized.
+// The screen is drawn every time a paint.Event is received, which can be
+// triggered either by the user or by Cocoa via drawgl (for example, when
+// the window is resized).
 func drawLoop(w *windowImpl) {
 	runtime.LockOSThread()
 	C.makeCurrentContext(C.uintptr_t(w.ctx))
@@ -124,21 +126,21 @@ func drawLoop(w *windowImpl) {
 		select {
 		case <-workAvailable:
 			w.worker.DoWork()
-		case <-w.draw:
-			// TODO(crawshaw): don't send a paint.Event unconditionally. Only
-			// send one if the window actually needs redrawing.
-			w.Send(paint.Event{})
+		case <-w.publish:
 		loop:
 			for {
 				select {
 				case <-workAvailable:
 					w.worker.DoWork()
-				case <-w.publish:
-					C.CGLFlushDrawable(C.CGLGetCurrentContext())
+				default:
 					break loop
 				}
 			}
-			w.drawDone <- struct{}{}
+			C.CGLFlushDrawable(C.CGLGetCurrentContext())
+			select {
+			case w.drawDone <- struct{}{}:
+			default:
+			}
 		}
 	}
 }

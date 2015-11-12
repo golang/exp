@@ -36,7 +36,6 @@ type windowImpl struct {
 	pump    pump.Pump
 	publish chan struct{}
 
-	draw     chan struct{}
 	drawDone chan struct{}
 
 	// glctxMu is a mutex that enforces the atomicity of methods like
