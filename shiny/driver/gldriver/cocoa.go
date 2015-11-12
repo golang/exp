@@ -115,20 +115,6 @@ func drawgl(id uintptr) {
 // when the window is resized.
 func drawLoop(w *windowImpl) {
 	runtime.LockOSThread()
-	// TODO(crawshaw): there are several problematic issues around having
-	// a draw loop per window, but resolving them requires some thought.
-	// Firstly, nothing should race on gl.DoWork, so only one person can
-	// do that at a time. Secondly, which GL ctx we use matters. A ctx
-	// carries window-specific state (for example, the current glViewport
-	// value), so we only want to run GL commands on the right context
-	// between a <-w.draw and a <-w.drawDone. Thirdly, some GL functions
-	// can be legitimately called outside of a window draw cycle, for
-	// example, gl.CreateTexture. It doesn't matter which GL ctx we use
-	// for that, but we have to use a valid one. So if a window gets
-	// closed, it's important we swap the default ctx. More work needed.
-	//
-	// Similarly, should each window have its own endPaint channel, or should
-	// the single dedicated draw loop have a single dedicated channel?
 	C.makeCurrentContext(C.uintptr_t(w.ctx))
 
 	workAvailable := w.worker.WorkAvailable()
