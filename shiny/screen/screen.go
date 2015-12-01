@@ -123,7 +123,8 @@ type Window interface {
 	// TODO: define and describe these events.
 	Events() <-chan interface{}
 
-	Sender
+	// Send sends an event to the window.
+	Send(event interface{})
 
 	Uploader
 
@@ -151,29 +152,22 @@ type NewWindowOptions struct {
 	// TODO: fullscreen, title, icon, cursorHidden?
 }
 
-// Sender is something you can send events to.
-type Sender interface {
-	// Send sends an event.
-	Send(event interface{})
-}
-
 // Uploader is something you can upload a Buffer to.
 type Uploader interface {
 	// Upload uploads the sub-Buffer defined by src and sr to the destination
 	// (the method receiver), such that sr.Min in src-space aligns with dp in
 	// dst-space. The destination's contents are overwritten; the draw operator
-	// is implicitly draw.Src. If sender is not nil, an UploadedEvent will be
-	// sent to sender after the upload is complete.
+	// is implicitly draw.Src.
 	//
 	// It is valid to upload a Buffer while another upload of the same Buffer
 	// is in progress, but a Buffer's image.RGBA pixel contents should not be
 	// accessed while it is uploading. A Buffer is re-usable, in that its pixel
-	// contents can be further modified, once all of its UploadedEvents have
-	// been received.
+	// contents can be further modified, once all outstanding calls to Upload
+	// have returned.
 	//
 	// When uploading to a Window, there will not be any visible effect until
 	// Publish is called.
-	Upload(dp image.Point, src Buffer, sr image.Rectangle, sender Sender)
+	Upload(dp image.Point, src Buffer, sr image.Rectangle)
 
 	// Fill fills that part of the destination (the method receiver) defined by
 	// dr with the given color.
@@ -181,12 +175,6 @@ type Uploader interface {
 	// When filling a Window, there will not be any visible effect until
 	// Publish is called.
 	Fill(dr image.Rectangle, src color.Color, op draw.Op)
-}
-
-// UploadedEvent records that a Buffer was uploaded.
-type UploadedEvent struct {
-	Buffer   Buffer
-	Uploader Uploader
 }
 
 // TODO: have a Downloader interface? Not every graphical app needs to be

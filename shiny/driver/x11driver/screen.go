@@ -25,11 +25,6 @@ import (
 // For example, its Conn.WaitForEvent concept is a method, not a channel, so
 // it's not obvious how to interrupt it to service a NewWindow request.
 
-type completion struct {
-	sender screen.Sender
-	event  screen.UploadedEvent
-}
-
 type screenImpl struct {
 	xc      *xgb.Conn
 	xsi     *xproto.ScreenInfo
@@ -50,7 +45,7 @@ type screenImpl struct {
 
 	mu              sync.Mutex
 	buffers         map[shm.Seg]*bufferImpl
-	uploads         map[uint16]completion
+	uploads         map[uint16]chan struct{}
 	windows         map[xproto.Window]*windowImpl
 	nPendingUploads int
 	completionKeys  []uint16
@@ -61,7 +56,7 @@ func newScreenImpl(xc *xgb.Conn) (*screenImpl, error) {
 		xc:      xc,
 		xsi:     xproto.Setup(xc).DefaultScreen(xc),
 		buffers: map[shm.Seg]*bufferImpl{},
-		uploads: map[uint16]completion{},
+		uploads: map[uint16]chan struct{}{},
 		windows: map[xproto.Window]*windowImpl{},
 	}
 	if err := s.initAtoms(); err != nil {
@@ -208,15 +203,8 @@ func (s *screenImpl) handleCompletions() {
 			log.Printf("x11driver: no matching upload for a SHM completion event")
 			continue
 		}
-		// Spawn a separate goroutine, so that this event-handling goroutine
-		// doesn't block on completion.sender.Send. Also, bufferImpl.postUpload
-		// may call bufferImpl.cleanUp which may acquire s.mu.
-		go func() {
-			completion.event.Buffer.(*bufferImpl).postUpload()
-			if completion.sender != nil {
-				completion.sender.Send(completion.event)
-			}
-		}()
+		delete(s.uploads, ok)
+		close(completion)
 	}
 	s.completionKeys = s.completionKeys[:0]
 }

@@ -52,7 +52,7 @@ func main() {
 			log.Fatal(err)
 		}
 		defer t.Release()
-		t.Upload(image.Point{}, b, b.Bounds(), w)
+		t.Upload(image.Point{}, b, b.Bounds())
 
 		var sz size.Event
 		for e := range w.Events() {
@@ -70,7 +70,7 @@ func main() {
 			case paint.Event:
 				w.Fill(sz.Bounds(), blue0, draw.Src)
 				w.Fill(sz.Bounds().Inset(10), blue1, draw.Src)
-				w.Upload(image.Point{}, b, b.Bounds(), w)
+				w.Upload(image.Point{}, b, b.Bounds())
 				c := math.Cos(math.Pi / 6)
 				s := math.Sin(math.Pi / 6)
 				w.Draw(f64.Aff3{
@@ -78,9 +78,6 @@ func main() {
 					+s, +c, 200,
 				}, t, t.Bounds(), screen.Over, nil)
 				w.Publish()
-
-			case screen.UploadedEvent:
-				// No-op.
 
 			case size.Event:
 				sz = e

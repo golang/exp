@@ -63,8 +63,8 @@ func (w *windowImpl) Release() {
 	w.pump.Release()
 }
 
-func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
-	src.(*bufferImpl).upload(w, xproto.Drawable(w.xw), w.xg, w.s.xsi.RootDepth, dp, sr, sender)
+func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+	src.(*bufferImpl).upload(w, xproto.Drawable(w.xw), w.xg, w.s.xsi.RootDepth, dp, sr)
 }
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {

@@ -75,17 +75,14 @@ func (w *windowImpl) releaseCleanup() {
 func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
 func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
-func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
+func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	// TODO: keep a texture around for this purpose?
 	t, err := w.s.NewTexture(sr.Size())
 	if err != nil {
 		panic(err)
 	}
-	t.(*textureImpl).upload(dp, src, sr)
-	if sender != nil {
-		sender.Send(screen.UploadedEvent{Buffer: src, Uploader: w})
-	}
+	t.Upload(dp, src, sr)
 	w.Draw(f64.Aff3{
 		1, 0, float64(dp.X),
 		0, 1, float64(dp.Y),

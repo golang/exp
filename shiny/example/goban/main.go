@@ -64,7 +64,7 @@ func main() {
 				}
 
 			case paint.Event:
-				w.Upload(image.Point{}, b, b.Bounds(), w)
+				w.Upload(image.Point{}, b, b.Bounds())
 				w.Publish()
 
 			case size.Event:

@@ -48,29 +48,31 @@ func (w *windowImpl) Release() {
 func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
 func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
-func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
+func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+	completion := make(chan struct{})
+
 	// Protect struct contents from being GCed
 	uploadsMu.Lock()
 	uploadID++
 	id := uploadID
 	uploads[id] = upload{
-		dp:       dp,
-		src:      src.(*bufferImpl),
-		sr:       sr,
-		sender:   sender,
-		uploader: w,
+		dp:         dp,
+		src:        src.(*bufferImpl),
+		sr:         sr,
+		completion: completion,
 	}
 	uploadsMu.Unlock()
 
 	win32.SendMessage(w.hwnd, msgUpload, id, 0)
+
+	<-completion
 }
 
 type upload struct {
-	dp       image.Point
-	src      *bufferImpl
-	sr       image.Rectangle
-	sender   screen.Sender
-	uploader screen.Uploader
+	dp         image.Point
+	src        *bufferImpl
+	sr         image.Rectangle
+	completion chan struct{}
 }
 
 func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
@@ -86,7 +88,7 @@ func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
 	}
 	defer win32.ReleaseDC(hwnd, dc)
 
-	u.src.preUpload(u.sender != nil)
+	u.src.preUpload(true)
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	err = blit(dc, _POINT{int32(u.dp.X), int32(u.dp.Y)}, u.src.hbitmap, &_RECT{
@@ -97,12 +99,7 @@ func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
 	})
 	go func() {
 		u.src.postUpload()
-		if u.sender != nil {
-			u.sender.Send(screen.UploadedEvent{
-				Buffer:   u.src,
-				Uploader: u.uploader,
-			})
-		}
+		close(u.completion)
 	}()
 	if err != nil {
 		panic(err) // TODO handle errors

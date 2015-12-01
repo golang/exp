@@ -101,9 +101,9 @@ func (b *bufferImpl) cleanUp() {
 }
 
 func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gcontext, depth uint8,
-	dp image.Point, sr image.Rectangle, sender screen.Sender) {
+	dp image.Point, sr image.Rectangle) {
 
-	b.preUpload(sender != nil)
+	b.preUpload(true)
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	dr := sr.Sub(sr.Min).Add(dp)
@@ -122,17 +122,17 @@ func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gco
 		1, b.xs, 0, // 1 means send a completion event, 0 means a zero offset.
 	)
 
+	completion := make(chan struct{})
+
 	b.s.mu.Lock()
-	b.s.uploads[cookie.Sequence] = completion{
-		sender: sender,
-		event: screen.UploadedEvent{
-			Buffer:   b,
-			Uploader: u,
-		},
-	}
+	b.s.uploads[cookie.Sequence] = completion
 	b.s.nPendingUploads--
 	b.s.handleCompletions()
 	b.s.mu.Unlock()
+
+	<-completion
+
+	b.postUpload()
 }
 
 func fill(xc *xgb.Conn, xp render.Picture, dr image.Rectangle, src color.Color, op draw.Op) {

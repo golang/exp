@@ -194,7 +194,7 @@ func (p *tilePool) get(tp image.Point) (screen.Texture, error) {
 		return nil, err
 	}
 	p.drawRGBA(buf.RGBA(), tp)
-	tex.Upload(image.Point{}, buf, tileBounds, nil)
+	tex.Upload(image.Point{}, buf, tileBounds)
 	buf.Release()
 
 	p.mu.Lock()

@@ -33,6 +33,6 @@ func (t *textureImpl) Size() image.Point {
 	return image.Point{}
 }
 
-func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle, sender screen.Sender) {
+func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
 	// TODO
 }
