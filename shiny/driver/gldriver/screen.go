@@ -107,8 +107,8 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	return t, nil
 }
 
-func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	width, height := 1024, 768
+func optsSize(opts *screen.NewWindowOptions) (width, height int) {
+	width, height = 1024, 768
 	if opts != nil {
 		if opts.Width > 0 {
 			width = opts.Width
@@ -117,8 +117,14 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 			height = opts.Height
 		}
 	}
+	return width, height
+}
 
-	id := newWindow(int32(width), int32(height))
+func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
+	id, err := newWindow(opts)
+	if err != nil {
+		return nil, err
+	}
 	w := &windowImpl{
 		s:           s,
 		id:          id,

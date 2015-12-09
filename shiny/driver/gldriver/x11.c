@@ -17,6 +17,7 @@ Display *x_dpy;
 XVisualInfo *x_visual_info;
 Window x_root;
 
+// TODO: share code with eglErrString
 char *
 eglGetErrorStr() {
 	switch (eglGetError()) {

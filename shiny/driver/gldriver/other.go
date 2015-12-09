@@ -4,6 +4,7 @@
 
 // +build !darwin !386,!amd64 ios
 // +build !linux android
+// +build !windows
 
 package gldriver
 
@@ -14,10 +15,11 @@ import (
 	"golang.org/x/exp/shiny/screen"
 )
 
-func newWindow(width, height int32) uintptr { return 0 }
-func showWindow(id uintptr) uintptr         { return 0 }
-func closeWindow(id uintptr)                {}
-func drawLoop(w *windowImpl)                {}
+func newWindow(opts *screen.NewWindowOptions) (uintptr, error) { return 0, nil }
+
+func showWindow(id *windowImpl) {}
+func closeWindow(id uintptr)    {}
+func drawLoop(w *windowImpl)    {}
 
 func main(f func(screen.Screen)) error {
 	return fmt.Errorf("gldriver: unsupported GOOS/GOARCH %s/%s", runtime.GOOS, runtime.GOARCH)

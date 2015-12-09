@@ -38,7 +38,8 @@ func init() {
 	runtime.LockOSThread()
 }
 
-func newWindow(width, height int32) uintptr {
+func newWindow(opts *screen.NewWindowOptions) (uintptr, error) {
+	width, height := optsSize(opts)
 	retc := make(chan uintptr)
 	uic <- uiClosure{
 		f: func() uintptr {
@@ -46,7 +47,7 @@ func newWindow(width, height int32) uintptr {
 		},
 		retc: retc,
 	}
-	return <-retc
+	return <-retc, nil
 }
 
 func showWindow(w *windowImpl) {
@@ -69,7 +70,7 @@ func closeWindow(id uintptr) {
 }
 
 func drawLoop(w *windowImpl) {
-	glcontextc <- w.ctx
+	glcontextc <- w.ctx.(uintptr)
 	go func() {
 		for range w.publish {
 			publishc <- w
@@ -132,7 +133,7 @@ func main(f func(screen.Screen)) error {
 			// requested by XCreateWindow, but it's not easily reproducible.
 			C.makeCurrent(C.uintptr_t(ctx))
 		case w := <-publishc:
-			C.swapBuffers(C.uintptr_t(w.ctx))
+			C.swapBuffers(C.uintptr_t(w.ctx.(uintptr)))
 			w.publishDone <- screen.PublishResult{}
 		case req := <-uic:
 			req.retc <- req.f()

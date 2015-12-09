@@ -21,15 +21,17 @@ import (
 type windowImpl struct {
 	s *screenImpl
 
-	// id is a C data structure for the window.
-	//	- For Cocoa, it's a ScreenGLView*.
-	//	- For X11, it's a Window.
+	// id is an OS-specific data structure for the window.
+	//	- Cocoa:   ScreenGLView*
+	//	- X11:     Window
+	//	- Windows: win32.HWND
 	id uintptr
 
 	// ctx is a C data structure for the GL context.
-	//	- For Cocoa, it's a NSOpenGLContext*.
-	//	- For X11, it's an EGLSurface.
-	ctx uintptr
+	//	- Cocoa:   uintptr holding a NSOpenGLContext*.
+	//	- X11:     uintptr holding an EGLSurface.
+	//	- Windows: ctxWin32
+	ctx interface{}
 
 	lifecycleStage lifecycle.Stage // current stage
 
