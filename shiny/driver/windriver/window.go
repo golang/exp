@@ -13,77 +13,35 @@ import (
 	"image/color"
 	"image/draw"
 	"sync"
-	"syscall"
 	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/pump"
+	"golang.org/x/exp/shiny/driver/internal/win32"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
-	"golang.org/x/mobile/event/key"
+	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
-	"golang.org/x/mobile/geom"
 )
 
 var (
-	windowsMu sync.Mutex
-	windows   = map[syscall.Handle]*windowImpl{}
-
 	uploadsMu sync.Mutex
 	uploads   = map[uintptr]upload{}
 	uploadID  uintptr
 )
 
 type windowImpl struct {
-	hwnd syscall.Handle
+	hwnd win32.HWND
 	pump pump.Pump
-}
 
-func newWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	hwnd, err := createWindow()
-	if err != nil {
-		return nil, err
-	}
-
-	w := &windowImpl{
-		hwnd: hwnd,
-		pump: pump.Make(),
-	}
-
-	windowsMu.Lock()
-	windows[hwnd] = w
-	windowsMu.Unlock()
-
-	// Send a fake size event.
-	// Windows won't generate the WM_WINDOWPOSCHANGED
-	// we trigger a resize on for the initial size, so we have to do
-	// it ourselves. The example/basic program assumes it will
-	// receive a size.Event for the initial window size that isn't 0x0.
-	var r _RECT
-	// TODO(andlabs) error check
-	_GetClientRect(w.hwnd, &r)
-	sendSizeEvent(w.hwnd, &r)
-
-	return w, nil
+	sz             size.Event
+	lifecycleStage lifecycle.Stage
 }
 
 func (w *windowImpl) Release() {
-	if w.hwnd == 0 { // already released?
-		return
-	}
-
-	windowsMu.Lock()
-	delete(windows, w.hwnd)
-	windowsMu.Unlock()
-
-	// TODO(andlabs): check for errors from this?
-	// TODO(andlabs): remove unsafe
-	_DestroyWindow(syscall.Handle(uintptr(unsafe.Pointer(w.hwnd))))
-	w.hwnd = 0
+	win32.Release(w.hwnd)
 	w.pump.Release()
-
-	// TODO(andlabs): what happens if we're still painting?
 }
 
 func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
@@ -103,7 +61,7 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 	}
 	uploadsMu.Unlock()
 
-	_SendMessage(w.hwnd, msgUpload, id, 0)
+	win32.SendMessage(w.hwnd, msgUpload, id, 0)
 }
 
 type upload struct {
@@ -114,17 +72,18 @@ type upload struct {
 	uploader screen.Uploader
 }
 
-func handleUpload(hwnd syscall.Handle, id uintptr) error {
+func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
+	id := wParam
 	uploadsMu.Lock()
 	u := uploads[id]
 	delete(uploads, id)
 	uploadsMu.Unlock()
 
-	dc, err := _GetDC(hwnd)
+	dc, err := win32.GetDC(hwnd)
 	if err != nil {
-		return err
+		panic(err) // TODO handle errors
 	}
-	defer _ReleaseDC(hwnd, dc)
+	defer win32.ReleaseDC(hwnd, dc)
 
 	u.src.preUpload(u.sender != nil)
 
@@ -144,7 +103,9 @@ func handleUpload(hwnd syscall.Handle, id uintptr) error {
 			})
 		}
 	}()
-	return err
+	if err != nil {
+		panic(err) // TODO handle errors
+	}
 }
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
@@ -166,7 +127,7 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	}
 	// Note: this SendMessage won't return until after the fill
 	// completes, so using &rect is safe.
-	_SendMessage(w.hwnd, msg, uintptr(color), uintptr(unsafe.Pointer(&rect)))
+	win32.SendMessage(w.hwnd, msg, uintptr(color), uintptr(unsafe.Pointer(&rect)))
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
@@ -178,196 +139,44 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	return screen.PublishResult{}
 }
 
-func handlePaint(hwnd syscall.Handle) {
-	windowsMu.Lock()
-	w := windows[hwnd]
-	windowsMu.Unlock()
+func init() {
+	send := func(hwnd win32.HWND, e interface{}) {
+		theScreen.mu.Lock()
+		w := theScreen.windows[hwnd]
+		theScreen.mu.Unlock()
 
-	// TODO(andlabs) - this won't be necessary after the Go rewrite
-	// Windows sends spurious WM_PAINT messages at window
-	// creation.
-	if w == nil {
+		w.Send(e)
+	}
+	win32.MouseEvent = func(hwnd win32.HWND, e mouse.Event) { send(hwnd, e) }
+	win32.PaintEvent = func(hwnd win32.HWND, e paint.Event) { send(hwnd, e) }
+	win32.LifecycleEvent = lifecycleEvent
+	win32.SizeEvent = sizeEvent
+}
+
+func lifecycleEvent(hwnd win32.HWND, to lifecycle.Stage) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[hwnd]
+	theScreen.mu.Unlock()
+
+	if w.lifecycleStage == to {
 		return
 	}
-
-	w.Send(paint.Event{}) // TODO(andlabs): fill struct field
-}
-
-func sendSizeEvent(hwnd syscall.Handle, r *_RECT) {
-	windowsMu.Lock()
-	w := windows[hwnd]
-	windowsMu.Unlock()
-
-	width := int(r.Right - r.Left)
-	height := int(r.Bottom - r.Top)
-	// TODO(andlabs): don't assume that PixelsPerPt == 1
-	w.Send(size.Event{
-		WidthPx:     width,
-		HeightPx:    height,
-		WidthPt:     geom.Pt(width),
-		HeightPt:    geom.Pt(height),
-		PixelsPerPt: 1,
+	w.Send(lifecycle.Event{
+		From: w.lifecycleStage,
+		To:   to,
 	})
+	w.lifecycleStage = to
 }
 
-func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, x int32, y int32) {
-	var dir mouse.Direction
-	var button mouse.Button
+func sizeEvent(hwnd win32.HWND, e size.Event) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[hwnd]
+	theScreen.mu.Unlock()
 
-	windowsMu.Lock()
-	w := windows[hwnd]
-	windowsMu.Unlock()
+	w.Send(e)
 
-	switch uMsg {
-	case _WM_MOUSEMOVE:
-		dir = mouse.DirNone
-	case _WM_LBUTTONDOWN, _WM_MBUTTONDOWN, _WM_RBUTTONDOWN:
-		dir = mouse.DirPress
-	case _WM_LBUTTONUP, _WM_MBUTTONUP, _WM_RBUTTONUP:
-		dir = mouse.DirRelease
-	default:
-		panic("sendMouseEvent() called on non-mouse message")
+	if e != w.sz {
+		w.sz = e
+		w.Send(paint.Event{})
 	}
-
-	switch uMsg {
-	case _WM_MOUSEMOVE:
-		button = mouse.ButtonNone
-	case _WM_LBUTTONDOWN, _WM_LBUTTONUP:
-		button = mouse.ButtonLeft
-	case _WM_MBUTTONDOWN, _WM_MBUTTONUP:
-		button = mouse.ButtonMiddle
-	case _WM_RBUTTONDOWN, _WM_RBUTTONUP:
-		button = mouse.ButtonRight
-	}
-	// TODO(andlabs): mouse wheel
-
-	w.Send(mouse.Event{
-		X:         float32(x),
-		Y:         float32(y),
-		Button:    button,
-		Modifiers: keyModifiers(),
-		Direction: dir,
-	})
-}
-
-// Precondition: this is called in immediate response to the message that triggered the event (so not after w.Send).
-func keyModifiers() (m key.Modifiers) {
-	down := func(x int32) bool {
-		// GetKeyState gets the key state at the time of the message, so this is what we want.
-		return _GetKeyState(x)&0x80 != 0
-	}
-
-	if down(_VK_CONTROL) {
-		m |= key.ModControl
-	}
-	if down(_VK_MENU) {
-		m |= key.ModAlt
-	}
-	if down(_VK_SHIFT) {
-		m |= key.ModShift
-	}
-	if down(_VK_LWIN) || down(_VK_RWIN) {
-		m |= key.ModMeta
-	}
-	return m
-}
-
-func windowWndProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
-	switch uMsg {
-	case _WM_PAINT:
-		handlePaint(hwnd)
-		// defer to DefWindowProc; it will handle validation for us
-		return _DefWindowProc(hwnd, uMsg, wParam, lParam)
-	case _WM_WINDOWPOSCHANGED:
-		wp := (*_WINDOWPOS)(unsafe.Pointer(lParam))
-		if wp.Flags&_SWP_NOSIZE != 0 {
-			break
-		}
-		var r _RECT
-		if _GetClientRect(hwnd, &r) != nil {
-			// TODO(andlabs)
-		}
-		sendSizeEvent(hwnd, &r)
-		return 0
-	case _WM_MOUSEMOVE, _WM_LBUTTONDOWN:
-		// TODO(andlabs): call SetFocus()?
-	case _WM_LBUTTONUP, _WM_MBUTTONDOWN, _WM_MBUTTONUP, _WM_RBUTTONDOWN, _WM_RBUTTONUP:
-		sendMouseEvent(hwnd, uMsg, _GET_X_LPARAM(lParam), _GET_Y_LPARAM(lParam))
-		return 0
-	case _WM_KEYDOWN, _WM_KEYUP, _WM_SYSKEYDOWN, _WM_SYSKEYUP:
-		// TODO
-	case msgFillSrc:
-		// TODO error checks
-		dc, err := _GetDC(hwnd)
-		if err != nil {
-			// TODO handle errors
-			break
-		}
-		r := (*_RECT)(unsafe.Pointer(lParam))
-		// TODO handle errors
-		fillSrc(dc, r, _COLORREF(wParam))
-		_ReleaseDC(hwnd, dc)
-	case msgFillOver:
-		// TODO error checks
-		dc, err := _GetDC(hwnd)
-		if err != nil {
-			// TODO handle errors
-			break
-		}
-		r := (*_RECT)(unsafe.Pointer(lParam))
-		// TODO handle errors
-		fillOver(dc, r, _COLORREF(wParam))
-		_ReleaseDC(hwnd, dc)
-	case msgUpload:
-		err := handleUpload(hwnd, wParam)
-		if err != nil {
-			// TODO handle errors
-			break
-		}
-	}
-	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
-}
-
-const windowClass = "shiny_Window"
-
-func initWindowClass() (err error) {
-	wcname, err := syscall.UTF16PtrFromString(windowClass)
-	if err != nil {
-		return err
-	}
-	_, err = _RegisterClass(&_WNDCLASS{
-		LpszClassName: wcname,
-		LpfnWndProc:   syscall.NewCallback(windowWndProc),
-		HIcon:         hDefaultIcon,
-		HCursor:       hDefaultCursor,
-		HInstance:     hThisInstance,
-		// TODO(andlabs): change this to something else? NULL? the hollow brush?
-		HbrBackground: syscall.Handle(_COLOR_BTNFACE + 1),
-	})
-	return err
-}
-
-func createWindow() (syscall.Handle, error) {
-	// TODO(brainman): convert windowClass to *uint16 once (in initWindowClass)
-	wcname, err := syscall.UTF16PtrFromString(windowClass)
-	if err != nil {
-		return 0, err
-	}
-	title, err := syscall.UTF16PtrFromString("Shiny Window")
-	if err != nil {
-		return 0, err
-	}
-	h, err := _CreateWindowEx(0,
-		wcname, title,
-		_WS_OVERLAPPEDWINDOW,
-		_CW_USEDEFAULT, _CW_USEDEFAULT,
-		_CW_USEDEFAULT, _CW_USEDEFAULT,
-		0, 0, hThisInstance, 0)
-	if err != nil {
-		return 0, err
-	}
-	// TODO(andlabs): use proper nCmdShow
-	_ShowWindow(h, _SW_SHOWDEFAULT)
-	// TODO(andlabs): call UpdateWindow()
-	return h, nil
 }
