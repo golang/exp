@@ -10,23 +10,26 @@ var _ unsafe.Pointer
 var (
 	moduser32 = syscall.NewLazyDLL("user32.dll")
 
-	procGetDC            = moduser32.NewProc("GetDC")
-	procReleaseDC        = moduser32.NewProc("ReleaseDC")
-	procSendMessageW     = moduser32.NewProc("SendMessageW")
-	procPostMessageW     = moduser32.NewProc("PostMessageW")
-	procGetMessageW      = moduser32.NewProc("GetMessageW")
-	procTranslateMessage = moduser32.NewProc("TranslateMessage")
-	procDispatchMessageW = moduser32.NewProc("DispatchMessageW")
-	procDefWindowProcW   = moduser32.NewProc("DefWindowProcW")
-	procRegisterClassW   = moduser32.NewProc("RegisterClassW")
-	procCreateWindowExW  = moduser32.NewProc("CreateWindowExW")
-	procDestroyWindow    = moduser32.NewProc("DestroyWindow")
-	procLoadIconW        = moduser32.NewProc("LoadIconW")
-	procLoadCursorW      = moduser32.NewProc("LoadCursorW")
-	procShowWindow       = moduser32.NewProc("ShowWindow")
-	procGetClientRect    = moduser32.NewProc("GetClientRect")
-	procGetKeyState      = moduser32.NewProc("GetKeyState")
-	procPostQuitMessage  = moduser32.NewProc("PostQuitMessage")
+	procGetDC             = moduser32.NewProc("GetDC")
+	procReleaseDC         = moduser32.NewProc("ReleaseDC")
+	procSendMessageW      = moduser32.NewProc("SendMessageW")
+	procPostMessageW      = moduser32.NewProc("PostMessageW")
+	procGetMessageW       = moduser32.NewProc("GetMessageW")
+	procTranslateMessage  = moduser32.NewProc("TranslateMessage")
+	procDispatchMessageW  = moduser32.NewProc("DispatchMessageW")
+	procDefWindowProcW    = moduser32.NewProc("DefWindowProcW")
+	procRegisterClassW    = moduser32.NewProc("RegisterClassW")
+	procCreateWindowExW   = moduser32.NewProc("CreateWindowExW")
+	procDestroyWindow     = moduser32.NewProc("DestroyWindow")
+	procLoadIconW         = moduser32.NewProc("LoadIconW")
+	procLoadCursorW       = moduser32.NewProc("LoadCursorW")
+	procShowWindow        = moduser32.NewProc("ShowWindow")
+	procGetClientRect     = moduser32.NewProc("GetClientRect")
+	procGetKeyState       = moduser32.NewProc("GetKeyState")
+	procPostQuitMessage   = moduser32.NewProc("PostQuitMessage")
+	procGetKeyboardLayout = moduser32.NewProc("GetKeyboardLayout")
+	procGetKeyboardState  = moduser32.NewProc("GetKeyboardState")
+	procToUnicodeEx       = moduser32.NewProc("ToUnicodeEx")
 )
 
 func GetDC(hwnd HWND) (dc HDC, err error) {
@@ -187,5 +190,29 @@ func _GetKeyState(virtkey int32) (keystatus int16) {
 
 func _PostQuitMessage(exitCode int32) {
 	syscall.Syscall(procPostQuitMessage.Addr(), 1, uintptr(exitCode), 0, 0)
+	return
+}
+
+func _GetKeyboardLayout(threadID uint32) (locale syscall.Handle) {
+	r0, _, _ := syscall.Syscall(procGetKeyboardLayout.Addr(), 1, uintptr(threadID), 0, 0)
+	locale = syscall.Handle(r0)
+	return
+}
+
+func _GetKeyboardState(lpKeyState *byte) (err error) {
+	r1, _, e1 := syscall.Syscall(procGetKeyboardState.Addr(), 1, uintptr(unsafe.Pointer(lpKeyState)), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _ToUnicodeEx(wVirtKey uint32, wScanCode uint32, lpKeyState *byte, pwszBuff *uint16, cchBuff int32, wFlags uint32, dwhkl syscall.Handle) (ret int32) {
+	r0, _, _ := syscall.Syscall9(procToUnicodeEx.Addr(), 7, uintptr(wVirtKey), uintptr(wScanCode), uintptr(unsafe.Pointer(lpKeyState)), uintptr(unsafe.Pointer(pwszBuff)), uintptr(cchBuff), uintptr(wFlags), uintptr(dwhkl), 0, 0)
+	ret = int32(r0)
 	return
 }

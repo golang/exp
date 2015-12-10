@@ -19,6 +19,7 @@ import (
 	"golang.org/x/exp/shiny/driver/internal/win32"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
@@ -149,6 +150,7 @@ func init() {
 	}
 	win32.MouseEvent = func(hwnd win32.HWND, e mouse.Event) { send(hwnd, e) }
 	win32.PaintEvent = func(hwnd win32.HWND, e paint.Event) { send(hwnd, e) }
+	win32.KeyEvent = func(hwnd win32.HWND, e key.Event) { send(hwnd, e) }
 	win32.LifecycleEvent = lifecycleEvent
 	win32.SizeEvent = sizeEvent
 }
