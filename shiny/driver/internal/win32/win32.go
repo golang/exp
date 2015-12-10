@@ -132,41 +132,61 @@ func sendSize(hwnd HWND) {
 }
 
 func sendMouseEvent(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
-	x := _GET_X_LPARAM(lParam)
-	y := _GET_Y_LPARAM(lParam)
-	var dir mouse.Direction
-	var button mouse.Button
+	e := mouse.Event{
+		X:         float32(_GET_X_LPARAM(lParam)),
+		Y:         float32(_GET_Y_LPARAM(lParam)),
+		Modifiers: keyModifiers(),
+	}
 
 	switch uMsg {
-	case _WM_MOUSEMOVE:
-		dir = mouse.DirNone
+	case _WM_MOUSEMOVE, _WM_MOUSEWHEEL:
+		e.Direction = mouse.DirNone
 	case _WM_LBUTTONDOWN, _WM_MBUTTONDOWN, _WM_RBUTTONDOWN:
-		dir = mouse.DirPress
+		e.Direction = mouse.DirPress
 	case _WM_LBUTTONUP, _WM_MBUTTONUP, _WM_RBUTTONUP:
-		dir = mouse.DirRelease
+		e.Direction = mouse.DirRelease
 	default:
 		panic("sendMouseEvent() called on non-mouse message")
 	}
 
 	switch uMsg {
 	case _WM_MOUSEMOVE:
-		button = mouse.ButtonNone
+		switch {
+		case wParam&_MK_LBUTTON == _MK_LBUTTON:
+			e.Button = mouse.ButtonLeft
+		case wParam&_MK_MBUTTON == _MK_MBUTTON:
+			e.Button = mouse.ButtonMiddle
+		case wParam&_MK_RBUTTON == _MK_RBUTTON:
+			e.Button = mouse.ButtonRight
+		default:
+			// TODO: send move events when no buttons are held down?
+			return 0
+		}
 	case _WM_LBUTTONDOWN, _WM_LBUTTONUP:
-		button = mouse.ButtonLeft
+		e.Button = mouse.ButtonLeft
 	case _WM_MBUTTONDOWN, _WM_MBUTTONUP:
-		button = mouse.ButtonMiddle
+		e.Button = mouse.ButtonMiddle
 	case _WM_RBUTTONDOWN, _WM_RBUTTONUP:
-		button = mouse.ButtonRight
+		e.Button = mouse.ButtonRight
+	case _WM_MOUSEWHEEL:
+		delta := _GET_WHEEL_DELTA_WPARAM(wParam) / _WHEEL_DELTA
+		switch {
+		case delta > 0:
+			e.Button = mouse.ButtonWheelUp
+		case delta < 0:
+			e.Button = mouse.ButtonWheelDown
+			delta = -delta
+		default:
+			return
+		}
+		for delta > 0 {
+			MouseEvent(hwnd, e)
+			delta--
+		}
+		return
 	}
-	// TODO(andlabs): mouse wheel
 
-	MouseEvent(hwnd, mouse.Event{
-		X:         float32(x),
-		Y:         float32(y),
-		Button:    button,
-		Modifiers: keyModifiers(),
-		Direction: dir,
-	})
+	MouseEvent(hwnd, e)
 
 	return 0
 }
@@ -229,12 +249,15 @@ var windowMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)
 	_WM_PAINT:            sendPaint,
 	msgShow:              sendShow,
 	_WM_WINDOWPOSCHANGED: sendSizeEvent,
-	_WM_LBUTTONUP:        sendMouseEvent,
-	_WM_MBUTTONDOWN:      sendMouseEvent,
-	_WM_MBUTTONUP:        sendMouseEvent,
-	_WM_RBUTTONDOWN:      sendMouseEvent,
-	_WM_RBUTTONUP:        sendMouseEvent,
-	// TODO case _WM_MOUSEMOVE, _WM_LBUTTONDOWN: call SetFocus()?
+
+	_WM_LBUTTONDOWN: sendMouseEvent,
+	_WM_LBUTTONUP:   sendMouseEvent,
+	_WM_MBUTTONDOWN: sendMouseEvent,
+	_WM_MBUTTONUP:   sendMouseEvent,
+	_WM_RBUTTONDOWN: sendMouseEvent,
+	_WM_RBUTTONUP:   sendMouseEvent,
+	_WM_MOUSEMOVE:   sendMouseEvent,
+	_WM_MOUSEWHEEL:  sendMouseEvent,
 	// TODO case _WM_KEYDOWN, _WM_KEYUP, _WM_SYSKEYDOWN, _WM_SYSKEYUP:
 }
 
