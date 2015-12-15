@@ -99,11 +99,10 @@ func drawgl(id uintptr) {
 	if w == nil {
 		return // closing window
 	}
-	switch w.lifecycleStage {
-	case lifecycle.StageFocused, lifecycle.StageVisible:
-		w.Send(paint.Event{})
-		<-w.drawDone
-	}
+
+	sendLifecycle(id, lifecycle.StageVisible)
+	w.Send(paint.Event{External: true})
+	<-w.drawDone
 }
 
 // drawLoop is the primary drawing loop.
@@ -137,10 +136,7 @@ func drawLoop(w *windowImpl) {
 				}
 			}
 			C.CGLFlushDrawable(C.CGLGetCurrentContext())
-			select {
-			case w.drawDone <- struct{}{}:
-			default:
-			}
+			w.publishDone <- screen.PublishResult{}
 		}
 	}
 }
@@ -282,6 +278,9 @@ func sendLifecycle(id uintptr, to lifecycle.Stage) {
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
 
+	if w == nil {
+		return // window closing
+	}
 	if w.lifecycleStage == to {
 		return
 	}

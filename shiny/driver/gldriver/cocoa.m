@@ -215,11 +215,11 @@ uint64 threadID() {
 
 uintptr_t doNewWindow(int width, int height) {
 	NSScreen *screen = [NSScreen mainScreen];
-	__block double w = (double)width / [screen backingScaleFactor];
-	__block double h = (double)height / [screen backingScaleFactor];
+	double w = (double)width / [screen backingScaleFactor];
+	double h = (double)height / [screen backingScaleFactor];
 	__block ScreenGLView* view = NULL;
 
-	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
+	dispatch_sync(dispatch_get_main_queue(), ^{
 		id menuBar = [NSMenu new];
 		id menuItem = [NSMenuItem new];
 		[menuBar addItem:menuItem];
@@ -273,10 +273,9 @@ uintptr_t doNewWindow(int width, int height) {
 
 uintptr_t doShowWindow(uintptr_t viewID) {
 	ScreenGLView* view = (ScreenGLView*)viewID;
-	__block uintptr_t ret = 0;
-	dispatch_barrier_sync(dispatch_get_main_queue(), ^{
+	uintptr_t ret = (uintptr_t)[view openGLContext];
+	dispatch_async(dispatch_get_main_queue(), ^{
 		[view.window makeKeyAndOrderFront:view.window];
-		ret = (uintptr_t)[view openGLContext];
 	});
 	return ret;
 }

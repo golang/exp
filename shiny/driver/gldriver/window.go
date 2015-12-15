@@ -33,10 +33,10 @@ type windowImpl struct {
 
 	lifecycleStage lifecycle.Stage // current stage
 
-	pump    pump.Pump
-	publish chan struct{}
-
-	drawDone chan struct{}
+	pump        pump.Pump
+	publish     chan struct{}
+	publishDone chan screen.PublishResult
+	drawDone    chan struct{}
 
 	// glctxMu is a mutex that enforces the atomicity of methods like
 	// Texture.Upload or Window.Draw that are conceptually one operation
@@ -264,6 +264,12 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	w.glctxMu.Unlock()
 
 	w.publish <- struct{}{}
-	// TODO(crawshaw): wait for an ack before returning.
-	return screen.PublishResult{}
+	res := <-w.publishDone
+
+	select {
+	case w.drawDone <- struct{}{}:
+	default:
+	}
+
+	return res
 }

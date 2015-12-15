@@ -120,11 +120,12 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 
 	id := newWindow(int32(width), int32(height))
 	w := &windowImpl{
-		s:        s,
-		id:       id,
-		pump:     pump.Make(),
-		publish:  make(chan struct{}, 1),
-		drawDone: make(chan struct{}),
+		s:           s,
+		id:          id,
+		pump:        pump.Make(),
+		publish:     make(chan struct{}),
+		publishDone: make(chan screen.PublishResult),
+		drawDone:    make(chan struct{}),
 	}
 
 	s.mu.Lock()

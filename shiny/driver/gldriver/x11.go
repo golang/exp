@@ -132,6 +132,7 @@ func main(f func(screen.Screen)) error {
 			C.makeCurrent(C.uintptr_t(ctx))
 		case w := <-publishc:
 			C.swapBuffers(C.uintptr_t(w.ctx))
+			w.publishDone <- screen.PublishResult{}
 		case req := <-uic:
 			req.retc <- req.f()
 		case <-heartbeat.C:
@@ -152,7 +153,7 @@ func onExpose(id uintptr) {
 		return
 	}
 
-	w.Send(paint.Event{})
+	w.Send(paint.Event{External: true})
 }
 
 //export onMouse
