@@ -11,6 +11,7 @@ package gldriver
 /*
 #cgo CFLAGS: -x objective-c
 #cgo LDFLAGS: -framework Cocoa -framework OpenGL
+#include <OpenGL/gl3.h>
 #import <Carbon/Carbon.h> // for HIToolbox/Events.h
 #import <Cocoa/Cocoa.h>
 #include <pthread.h>
@@ -19,14 +20,16 @@ package gldriver
 void startDriver();
 void stopDriver();
 void makeCurrentContext(uintptr_t ctx);
+void flushContext(uintptr_t ctx);
 uintptr_t doNewWindow(int width, int height);
-uintptr_t doShowWindow(uintptr_t id);
+void doShowWindow(uintptr_t id);
 void doCloseWindow(uintptr_t id);
 uint64_t threadID();
 */
 import "C"
 
 import (
+	"fmt"
 	"log"
 	"runtime"
 
@@ -63,7 +66,17 @@ func showWindow(w *windowImpl) {
 	w.glctx, w.worker = gl.NewContext()
 	w.glctxMu.Unlock()
 
-	w.ctx = uintptr(C.doShowWindow(C.uintptr_t(w.id)))
+	C.doShowWindow(C.uintptr_t(w.id))
+}
+
+//export preparedOpenGL
+func preparedOpenGL(id, ctx, vba uintptr) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	w.ctx = ctx
+	go drawLoop(w, vba)
 }
 
 func closeWindow(id uintptr) {
@@ -107,16 +120,24 @@ func drawgl(id uintptr) {
 
 // drawLoop is the primary drawing loop.
 //
-// After Cocoa has created an NSWindow on the initial OS thread for
-// processing Cocoa events in doNewWindow, it starts drawLoop on another
-// goroutine. It is locked to an OS thread for its OpenGL context.
+// After Cocoa has created an NSWindow and called prepareOpenGL,
+// it starts drawLoop on a locked goroutine to handle OpenGL calls.
 //
 // The screen is drawn every time a paint.Event is received, which can be
 // triggered either by the user or by Cocoa via drawgl (for example, when
 // the window is resized).
-func drawLoop(w *windowImpl) {
+func drawLoop(w *windowImpl, vba uintptr) {
 	runtime.LockOSThread()
 	C.makeCurrentContext(C.uintptr_t(w.ctx))
+
+	// Starting in OS X 10.11 (El Capitan), the vertex array is
+	// occasionally getting unbound when the context changes threads.
+	//
+	// Avoid this by binding it again.
+	C.glBindVertexArray(C.GLuint(vba))
+	if errno := C.glGetError(); errno != 0 {
+		panic(fmt.Sprintf("gldriver: glBindVertexArray failed: %d", errno))
+	}
 
 	workAvailable := w.worker.WorkAvailable()
 
@@ -135,7 +156,7 @@ func drawLoop(w *windowImpl) {
 					break loop
 				}
 			}
-			C.CGLFlushDrawable(C.CGLGetCurrentContext())
+			C.flushContext(C.uintptr_t(w.ctx))
 			w.publishDone <- screen.PublishResult{}
 		}
 	}

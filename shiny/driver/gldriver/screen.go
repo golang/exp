@@ -133,7 +133,6 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	s.mu.Unlock()
 
 	showWindow(w)
-	go drawLoop(w)
 
 	return w, nil
 }

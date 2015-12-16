@@ -61,6 +61,7 @@ func showWindow(w *windowImpl) {
 	w.glctxMu.Lock()
 	w.glctx, w.worker = glctx, worker
 	w.glctxMu.Unlock()
+	go drawLoop(w)
 }
 
 func closeWindow(id uintptr) {

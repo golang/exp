@@ -19,6 +19,11 @@ void makeCurrentContext(uintptr_t context) {
 	[ctx makeCurrentContext];
 }
 
+void flushContext(uintptr_t context) {
+	NSOpenGLContext* ctx = (NSOpenGLContext*)context;
+	[ctx flushBuffer];
+}
+
 uint64 threadID() {
 	uint64 id;
 	if (pthread_threadid_np(pthread_self(), &id)) {
@@ -36,13 +41,16 @@ uint64 threadID() {
 - (void)prepareOpenGL {
 	[self setWantsBestResolutionOpenGLSurface:YES];
 	GLint swapInt = 1;
-	[[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
+	NSOpenGLContext *ctx = [self openGLContext];
+	[ctx setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
 
 	// Using attribute arrays in OpenGL 3.3 requires the use of a VBA.
 	// But VBAs don't exist in ES 2. So we bind a default one.
 	GLuint vba;
 	glGenVertexArrays(1, &vba);
 	glBindVertexArray(vba);
+
+	preparedOpenGL((GoUintptr)self, (GoUintptr)ctx, (GoUintptr)vba);
 }
 
 - (void)callSetGeom {
@@ -271,13 +279,11 @@ uintptr_t doNewWindow(int width, int height) {
 	return (uintptr_t)view;
 }
 
-uintptr_t doShowWindow(uintptr_t viewID) {
+void doShowWindow(uintptr_t viewID) {
 	ScreenGLView* view = (ScreenGLView*)viewID;
-	uintptr_t ret = (uintptr_t)[view openGLContext];
 	dispatch_async(dispatch_get_main_queue(), ^{
 		[view.window makeKeyAndOrderFront:view.window];
 	});
-	return ret;
 }
 
 void doCloseWindow(uintptr_t viewID) {
