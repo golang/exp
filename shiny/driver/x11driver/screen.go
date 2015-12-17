@@ -203,7 +203,7 @@ func (s *screenImpl) handleCompletions() {
 			log.Printf("x11driver: no matching upload for a SHM completion event")
 			continue
 		}
-		delete(s.uploads, ok)
+		delete(s.uploads, ck)
 		close(completion)
 	}
 	s.completionKeys = s.completionKeys[:0]
