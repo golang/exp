@@ -259,7 +259,25 @@ func cocoaMouseButton(button int32) mouse.Button {
 }
 
 //export mouseEvent
-func mouseEvent(id uintptr, x, y float32, ty, button int32, flags uint32) {
+func mouseEvent(id uintptr, x, y, dx, dy float32, ty, button int32, flags uint32) {
+	if ty == C.NSScrollWheel {
+		// TODO: handle horizontal scrolling
+		button := mouse.ButtonWheelDown
+		if dy < 0 {
+			dy = -dy
+			button = mouse.ButtonWheelUp
+		}
+		for delta := int(dy); delta != 0; delta-- {
+			sendWindowEvent(id, mouse.Event{
+				X:         x,
+				Y:         y,
+				Button:    button,
+				Direction: mouse.DirNone,
+				Modifiers: cocoaMods(flags),
+			})
+		}
+		return
+	}
 	sendWindowEvent(id, mouse.Event{
 		X:         x,
 		Y:         y,

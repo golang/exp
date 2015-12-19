@@ -106,7 +106,13 @@ uint64 threadID() {
 	double x = p.x * scale;
 	double y = (h - p.y) * scale - 1; // flip origin from bottom-left to top-left.
 
-	mouseEvent((GoUintptr)self, x, y, theEvent.type, theEvent.buttonNumber, theEvent.modifierFlags);
+	double dx, dy;
+	if (theEvent.type == NSScrollWheel) {
+		dx = theEvent.scrollingDeltaX;
+		dy = theEvent.scrollingDeltaY;
+	}
+
+	mouseEvent((GoUintptr)self, x, y, dx, dy, theEvent.type, theEvent.buttonNumber, theEvent.modifierFlags);
 }
 
 - (void)mouseDown:(NSEvent *)theEvent         { [self mouseEventNS:theEvent]; }
@@ -118,6 +124,7 @@ uint64 threadID() {
 - (void)otherMouseDown:(NSEvent *)theEvent    { [self mouseEventNS:theEvent]; }
 - (void)otherMouseUp:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
 - (void)otherMouseDragged:(NSEvent *)theEvent { [self mouseEventNS:theEvent]; }
+- (void)scrollWheel:(NSEvent *)theEvent       { [self mouseEventNS:theEvent]; }
 
 // raw modifier key presses
 - (void)flagsChanged:(NSEvent *)theEvent {
