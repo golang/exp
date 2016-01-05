@@ -119,55 +119,20 @@ uint64 threadID() {
 - (void)otherMouseUp:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
 - (void)otherMouseDragged:(NSEvent *)theEvent { [self mouseEventNS:theEvent]; }
 
-- (void)windowDidChangeScreenProfile:(NSNotification *)notification {
-	[self callSetGeom];
+// raw modifier key presses
+- (void)flagsChanged:(NSEvent *)theEvent {
+	flagEvent((GoUintptr)self, theEvent.modifierFlags);
 }
 
-- (void)windowDidExpose:(NSNotification *)notification {
-	lifecycleVisible((GoUintptr)self);
-}
-
-- (void)windowDidBecomeKey:(NSNotification *)notification {
-	lifecycleFocused((GoUintptr)self);
-}
-
-- (void)windowDidResignKey:(NSNotification *)notification {
-	if (![NSApp isHidden]) {
-		lifecycleVisible((GoUintptr)self);
-	}
-}
-
-- (void)windowWillClose:(NSNotification *)notification {
-	if (self.window.nextResponder == NULL) {
-		return; // already called close
-	}
-	windowClosing((GoUintptr)self);
-	[self.window.nextResponder release];
-	self.window.nextResponder = NULL;
-}
-@end
-
-@interface WindowResponder : NSResponder
-{
-}
-@end
-
-@implementation WindowResponder
-{
-	uintptr_t windowID;
-}
-
-- (id)initWithWindowID:(uintptr_t)id {
-    windowID = id;
-    return self;
-}
-
-- (void)keyDown:(NSEvent *)theEvent {
+// overrides special handling of escape and tab
+- (BOOL)performKeyEquivalent:(NSEvent *)theEvent {
 	[self key:theEvent];
+	return YES;
 }
-- (void)keyUp:(NSEvent *)theEvent {
-	[self key:theEvent];
-}
+
+- (void)keyDown:(NSEvent *)theEvent { [self key:theEvent]; }
+- (void)keyUp:(NSEvent *)theEvent { [self key:theEvent]; }
+
 - (void)key:(NSEvent *)theEvent {
 	NSRange range = [theEvent.characters rangeOfComposedCharacterSequenceAtIndex:0];
 
@@ -193,11 +158,34 @@ uint64 threadID() {
 	} else {
 		direction = 2;
 	}
-	keyEvent((GoUintptr)windowID, (int32_t)rune, direction, theEvent.keyCode, theEvent.modifierFlags);
+	keyEvent((GoUintptr)self, (int32_t)rune, direction, theEvent.keyCode, theEvent.modifierFlags);
 }
 
-- (void)flagsChanged:(NSEvent *)theEvent {
-	flagEvent((GoUintptr)windowID, theEvent.modifierFlags);
+- (void)windowDidChangeScreenProfile:(NSNotification *)notification {
+	[self callSetGeom];
+}
+
+- (void)windowDidExpose:(NSNotification *)notification {
+	lifecycleVisible((GoUintptr)self);
+}
+
+- (void)windowDidBecomeKey:(NSNotification *)notification {
+	lifecycleFocused((GoUintptr)self);
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification {
+	if (![NSApp isHidden]) {
+		lifecycleVisible((GoUintptr)self);
+	}
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+	if (self.window.nextResponder == NULL) {
+		return; // already called close
+	}
+	windowClosing((GoUintptr)self);
+	[self.window.nextResponder release];
+	self.window.nextResponder = NULL;
 }
 @end
 
@@ -273,7 +261,7 @@ uintptr_t doNewWindow(int width, int height) {
 		[window setContentView:view];
 		[window setDelegate:view];
 
-		window.nextResponder = [[WindowResponder alloc] initWithWindowID:(uintptr_t)view];
+		window.nextResponder = view;
 	});
 
 	return (uintptr_t)view;
