@@ -102,7 +102,14 @@ func (s *screenImpl) run() {
 			}
 			switch xproto.Atom(ev.Data.Data32[0]) {
 			case s.atomWMDeleteWindow:
-				// TODO.
+				if w := s.findWindow(ev.Window); w != nil {
+					w.mu.Lock()
+					w.dead = true
+					w.mu.Unlock()
+					w.sendLifecycle()
+				} else {
+					noWindowFound = true
+				}
 			case s.atomWMTakeFocus:
 				xproto.SetInputFocus(s.xc, xproto.InputFocusParent, ev.Window, xproto.Timestamp(ev.Data.Data32[1]))
 			}
@@ -130,9 +137,24 @@ func (s *screenImpl) run() {
 			}
 
 		case xproto.FocusInEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.mu.Lock()
+				w.focused = true
+				w.mu.Unlock()
+				w.sendLifecycle()
+			} else {
+				noWindowFound = true
+			}
+
 		case xproto.FocusOutEvent:
-			// TODO: xw = ev.Event
+			if w := s.findWindow(ev.Event); w != nil {
+				w.mu.Lock()
+				w.focused = false
+				w.mu.Unlock()
+				w.sendLifecycle()
+			} else {
+				noWindowFound = true
+			}
 
 		case xproto.KeyPressEvent:
 			if w := s.findWindow(ev.Event); w != nil {
@@ -339,6 +361,8 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	s.mu.Lock()
 	s.windows[xw] = w
 	s.mu.Unlock()
+
+	w.sendLifecycle()
 
 	xproto.CreateWindow(s.xc, s.xsi.RootDepth, xw, s.xsi.Root,
 		0, 0, uint16(width), uint16(height), 0,

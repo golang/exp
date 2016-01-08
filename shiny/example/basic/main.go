@@ -22,6 +22,7 @@ import (
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/key"
+	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 )
@@ -56,13 +57,22 @@ func main() {
 
 		var sz size.Event
 		for e := range w.Events() {
+			// This print message is to help programmers learn what events this
+			// example program generates. A real program shouldn't print such
+			// messages; they're not important to end users.
+			format := "got %#v\n"
+			if _, ok := e.(fmt.Stringer); ok {
+				format = "got %v\n"
+			}
+			fmt.Printf(format, e)
+
 			switch e := e.(type) {
-			default:
-				// TODO: be more interesting.
-				fmt.Printf("got %#v\n", e)
+			case lifecycle.Event:
+				if e.To == lifecycle.StageDead {
+					return
+				}
 
 			case key.Event:
-				fmt.Printf("got %v\n", e)
 				if e.Code == key.CodeEscape {
 					return
 				}

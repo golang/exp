@@ -21,6 +21,7 @@ import (
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/key"
+	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
@@ -42,17 +43,50 @@ type windowImpl struct {
 	width, height int
 
 	mu       sync.Mutex
+	stage    lifecycle.Stage
+	dead     bool
+	visible  bool
+	focused  bool
 	released bool
 }
 
 func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
 func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
+func (w *windowImpl) sendLifecycle() {
+	w.mu.Lock()
+	from, to := w.stage, lifecycle.StageAlive
+	// The order of these if's is important. For example, once a window becomes
+	// StageDead, it should never change stage again.
+	//
+	// Similarly, focused trumps visible. It's hard to imagine a situation
+	// where an X11 window is focused and not visible on screen, but in that
+	// unlikely case, StageFocused seems the most appropriate stage.
+	if w.dead {
+		to = lifecycle.StageDead
+	} else if w.focused {
+		to = lifecycle.StageFocused
+	} else if w.visible {
+		to = lifecycle.StageVisible
+	}
+	w.stage = to
+	w.mu.Unlock()
+
+	if from != to {
+		w.Send(lifecycle.Event{
+			From: from,
+			To:   to,
+		})
+	}
+}
+
 func (w *windowImpl) Release() {
 	w.mu.Lock()
 	released := w.released
 	w.released = true
 	w.mu.Unlock()
+
+	// TODO: set w.dead and call w.sendLifecycle, a la handling atomWMDeleteWindow?
 
 	if released {
 		return
@@ -81,7 +115,13 @@ func (w *windowImpl) Publish() screen.PublishResult {
 }
 
 func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
-	// TODO: lifecycle events.
+	// TODO: does the order of these lifecycle and size events matter? Should
+	// they really be a single, atomic event?
+	w.mu.Lock()
+	w.visible = (int(ev.X)+int(ev.Width)) >= 0 && (int(ev.Y)+int(ev.Height)) >= 0
+	w.mu.Unlock()
+
+	w.sendLifecycle()
 
 	newWidth, newHeight := int(ev.Width), int(ev.Height)
 	if w.width == newWidth && w.height == newHeight {
