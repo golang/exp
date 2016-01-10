@@ -138,7 +138,7 @@ uint64 threadID() {
 }
 
 - (void)keyDown:(NSEvent *)theEvent { [self key:theEvent]; }
-- (void)keyUp:(NSEvent *)theEvent { [self key:theEvent]; }
+- (void)keyUp:(NSEvent *)theEvent   { [self key:theEvent]; }
 
 - (void)key:(NSEvent *)theEvent {
 	NSRange range = [theEvent.characters rangeOfComposedCharacterSequenceAtIndex:0];
@@ -267,8 +267,7 @@ uintptr_t doNewWindow(int width, int height) {
 		view = [[ScreenGLView alloc] initWithFrame:rect pixelFormat:pixFormat];
 		[window setContentView:view];
 		[window setDelegate:view];
-
-		window.nextResponder = view;
+		[window makeFirstResponder:view];
 	});
 
 	return (uintptr_t)view;
