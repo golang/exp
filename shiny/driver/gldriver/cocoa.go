@@ -191,11 +191,6 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 //export windowClosing
 func windowClosing(id uintptr) {
 	sendLifecycle(id, lifecycle.StageDead)
-	theScreen.mu.Lock()
-	w := theScreen.windows[id]
-	delete(theScreen.windows, id)
-	theScreen.mu.Unlock()
-	w.releaseCleanup()
 }
 
 func sendWindowEvent(id uintptr, e interface{}) {
@@ -313,13 +308,18 @@ func flagEvent(id uintptr, flags uint32) {
 
 var lastFlags uint32
 
+// TODO: move sendLifecycle out of cocoa.go, for other platforms to use.
+//
+// TODO: figure out whether we need to mutex-protect windowImpl.lifecycleStage
+// (by re-using glctxMu, if we're also reading windowImpl.glctx??)
+
 func sendLifecycle(id uintptr, to lifecycle.Stage) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
 
 	if w == nil {
-		return // window closing
+		return
 	}
 	if w.lifecycleStage == to {
 		return

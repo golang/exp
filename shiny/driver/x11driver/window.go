@@ -16,7 +16,7 @@ import (
 	"github.com/BurntSushi/xgb/render"
 	"github.com/BurntSushi/xgb/xproto"
 
-	"golang.org/x/exp/shiny/driver/internal/pump"
+	"golang.org/x/exp/shiny/driver/internal/event"
 	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
@@ -35,7 +35,7 @@ type windowImpl struct {
 	xg xproto.Gcontext
 	xp render.Picture
 
-	pump    pump.Pump
+	event.Queue
 	xevents chan xgb.Event
 
 	// This next group of variables are mutable, but are only modified in the
@@ -49,9 +49,6 @@ type windowImpl struct {
 	focused  bool
 	released bool
 }
-
-func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
-func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
 func (w *windowImpl) sendLifecycle() {
 	w.mu.Lock()
@@ -94,7 +91,6 @@ func (w *windowImpl) Release() {
 	render.FreePicture(w.s.xc, w.xp)
 	xproto.FreeGC(w.s.xc, w.xg)
 	xproto.DestroyWindow(w.s.xc, w.xw)
-	w.pump.Release()
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {

@@ -17,6 +17,7 @@
 //	import (
 //		"golang.org/x/exp/shiny/driver"
 //		"golang.org/x/exp/shiny/screen"
+//		"golang.org/x/mobile/event/lifecycle"
 //	)
 //
 //	func main() {
@@ -26,8 +27,18 @@
 //				handleError(err)
 //				return
 //			}
-//			for e := range w.Events() {
-//				handleEvent(e)
+//			defer w.Release()
+//
+//			for {
+//				switch e := w.NextEvent().(type) {
+//				case lifecycle.Event:
+//					if e.To == lifecycle.StageDead {
+//						return
+//					}
+//					etc
+//				case etc:
+//					etc
+//				}
 //			}
 //		})
 //	}
@@ -70,7 +81,10 @@ type Screen interface {
 // (0, 0) in its own coordinate space.
 type Buffer interface {
 	// Release releases the Buffer's resources, after all pending uploads and
-	// draws resolve. The behavior of the Buffer after Release is undefined.
+	// draws resolve.
+	//
+	// The behavior of the Buffer after Release, whether calling its methods or
+	// passing it as an argument, is undefined.
 	Release()
 
 	// Size returns the size of the Buffer's image.
@@ -96,7 +110,10 @@ type Buffer interface {
 // (0, 0) in its own coordinate space.
 type Texture interface {
 	// Release releases the Texture's resources, after all pending uploads and
-	// draws resolve. The behavior of the Texture after Release is undefined.
+	// draws resolve.
+	//
+	// The behavior of the Texture after Release, whether calling its methods
+	// or passing it as an argument, is undefined.
 	Release()
 
 	// Size returns the size of the Texture's image.
@@ -112,19 +129,40 @@ type Texture interface {
 	// interfaces??
 }
 
+// EventQueue is an infinitely buffered FIFO queue of events.
+type EventQueue interface {
+	// Send adds an event to the end of the queue.
+	Send(event interface{})
+
+	// NextEvent returns the next event in the queue. It blocks until such an
+	// event has been sent.
+	//
+	// Typical event types include:
+	//	- lifecycle.Event
+	//	- size.Event
+	//	- paint.Event
+	//	- key.Event
+	//	- mouse.Event
+	//	- touch.Event
+	// from the golang.org/x/mobile/event/... packages. Other packages may send
+	// events, of those types above or of other types, via Send.
+	NextEvent() interface{}
+
+	// TODO: LatestLifecycleEvent? Is that still worth it if the
+	// lifecycle.Event struct type loses its DrawContext field?
+
+	// TODO: LatestSizeEvent?
+}
+
 // Window is a top-level, double-buffered GUI window.
 type Window interface {
-	// Release closes the window and its event channel.
+	// Release closes the window.
+	//
+	// The behavior of the Window after Release, whether calling its methods or
+	// passing it as an argument, is undefined.
 	Release()
 
-	// Events returns the window's event channel, which carries key, mouse,
-	// paint and other events.
-	//
-	// TODO: define and describe these events.
-	Events() <-chan interface{}
-
-	// Send sends an event to the window.
-	Send(event interface{})
+	EventQueue
 
 	Uploader
 

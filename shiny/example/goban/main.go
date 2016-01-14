@@ -51,8 +51,8 @@ func main() {
 			}
 		}()
 
-		for e := range w.Events() {
-			switch e := e.(type) {
+		for {
+			switch e := w.NextEvent().(type) {
 			case lifecycle.Event:
 				if e.To == lifecycle.StageDead {
 					return

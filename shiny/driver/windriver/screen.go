@@ -12,7 +12,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"golang.org/x/exp/shiny/driver/internal/pump"
 	"golang.org/x/exp/shiny/driver/internal/win32"
 	"golang.org/x/exp/shiny/screen"
 )
@@ -63,9 +62,7 @@ func (*screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 }
 
 func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
-	w := &windowImpl{
-		pump: pump.Make(),
-	}
+	w := &windowImpl{}
 
 	var err error
 	w.hwnd, err = win32.NewWindow(opts)

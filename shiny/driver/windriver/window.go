@@ -15,7 +15,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"golang.org/x/exp/shiny/driver/internal/pump"
+	"golang.org/x/exp/shiny/driver/internal/event"
 	"golang.org/x/exp/shiny/driver/internal/win32"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
@@ -34,7 +34,8 @@ var (
 
 type windowImpl struct {
 	hwnd win32.HWND
-	pump pump.Pump
+
+	event.Queue
 
 	sz             size.Event
 	lifecycleStage lifecycle.Stage
@@ -42,11 +43,7 @@ type windowImpl struct {
 
 func (w *windowImpl) Release() {
 	win32.Release(w.hwnd)
-	w.pump.Release()
 }
-
-func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
-func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
 	completion := make(chan struct{})

@@ -5,6 +5,10 @@
 // Package pump provides an infinitely buffered event channel.
 package pump
 
+func init() {
+	println("golang.org/x/exp/shiny/driver/internal/pump is deprecated. Use internal/event instead.")
+}
+
 // Make returns a new Pump. Call Release to stop pumping events.
 func Make() Pump {
 	p := Pump{

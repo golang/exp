@@ -56,7 +56,9 @@ func main() {
 		t.Upload(image.Point{}, b, b.Bounds())
 
 		var sz size.Event
-		for e := range w.Events() {
+		for {
+			e := w.NextEvent()
+
 			// This print message is to help programmers learn what events this
 			// example program generates. A real program shouldn't print such
 			// messages; they're not important to end users.

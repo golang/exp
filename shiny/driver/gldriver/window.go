@@ -10,7 +10,7 @@ import (
 	"image/draw"
 	"sync"
 
-	"golang.org/x/exp/shiny/driver/internal/pump"
+	"golang.org/x/exp/shiny/driver/internal/event"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/lifecycle"
@@ -35,7 +35,7 @@ type windowImpl struct {
 
 	lifecycleStage lifecycle.Stage // current stage
 
-	pump        pump.Pump
+	event.Queue
 	publish     chan struct{}
 	publishDone chan screen.PublishResult
 	drawDone    chan struct{}
@@ -54,28 +54,39 @@ type windowImpl struct {
 }
 
 func (w *windowImpl) Release() {
-	// There are two ways a window can be closed. The first is the user
-	// clicks the red button, in which case windowWillClose is called,
-	// which calls Go's windowClosing, which does cleanup in
-	// releaseCleanup below.
+	// There are two ways a window can be closed: the Operating System or
+	// Desktop Environment can initiate (e.g. in response to a user clicking a
+	// red button), or the Go app can programatically close the window (by
+	// calling Window.Release).
 	//
-	// The second way is Release is called programmatically. This calls
-	// the NSWindow method performClose, which emulates the red button
-	// being clicked.
+	// When the OS closes a window:
+	//	- Cocoa:   Obj-C's windowWillClose calls Go's windowClosing.
+	//	- X11:     TODO: catch WM_DELETE_WINDOW messages (and DestroyNotify
+	//	           events?).
+	//	- Windows: TODO: implement and document this.
 	//
-	// If these two approaches race, experiments suggest it is resolved
-	// by performClose (which is called serially on the main thread).
-	// If that stops being true, there is a check in windowWillClose
-	// that avoids the Go cleanup code being invoked more than once.
+	// This should send a lifecycle event (To: StageDead) to the Go app's event
+	// loop, which should respond by calling Window.Release (this method).
+	// Window.Release is where system resources are actually cleaned up.
+	//
+	// When Window.Release is called, the closeWindow call below:
+	//	- Cocoa:   calls Obj-C's performClose, which emulates the red button
+	//	           being clicked. (TODO: document how this actually cleans up
+	//	           resources??)
+	//	- X11:     TODO: call DestroyWindow.
+	//	- Windows: TODO: implement and document this.
+	//
+	// On Cocoa, if these two approaches race, experiments suggest that the
+	// race is won by performClose (which is called serially on the main
+	// thread). Even if that isn't true, the windowWillClose handler is
+	// idempotent.
+
+	theScreen.mu.Lock()
+	delete(theScreen.windows, w.id)
+	theScreen.mu.Unlock()
+
 	closeWindow(w.id)
 }
-
-func (w *windowImpl) releaseCleanup() {
-	w.pump.Release()
-}
-
-func (w *windowImpl) Events() <-chan interface{} { return w.pump.Events() }
-func (w *windowImpl) Send(event interface{})     { w.pump.Send(event) }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
