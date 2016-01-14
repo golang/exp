@@ -157,7 +157,7 @@ func drawLoop(w *windowImpl, vba uintptr) {
 					break loop
 				}
 			}
-			C.flushContext(C.uintptr_t(w.ctx))
+			C.flushContext(C.uintptr_t(w.ctx.(uintptr)))
 			w.publishDone <- screen.PublishResult{}
 		}
 	}
