@@ -103,10 +103,20 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 	t.Release()
 }
 
+func useOp(glctx gl.Context, op draw.Op) {
+	if op == draw.Over {
+		glctx.Enable(gl.BLEND)
+		glctx.BlendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+	} else {
+		glctx.Disable(gl.BLEND)
+	}
+}
+
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	w.glctxMu.Lock()
 	defer w.glctxMu.Unlock()
 
+	useOp(w.glctx, op)
 	if !w.glctx.IsProgram(w.s.fill.program) {
 		p, err := compileProgram(w.glctx, fillVertexSrc, fillFragmentSrc)
 		if err != nil {
@@ -156,6 +166,7 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	w.glctxMu.Lock()
 	defer w.glctxMu.Unlock()
 
+	useOp(w.glctx, op)
 	w.glctx.UseProgram(w.s.texture.program)
 
 	// Start with src-space left, top, right and bottom.

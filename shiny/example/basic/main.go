@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"log"
 	"math"
 
@@ -30,6 +29,10 @@ import (
 var (
 	blue0 = color.RGBA{0x00, 0x00, 0x1f, 0xff}
 	blue1 = color.RGBA{0x00, 0x00, 0x3f, 0xff}
+	red   = color.RGBA{0x7f, 0x00, 0x00, 0x7f}
+
+	cos30 = math.Cos(math.Pi / 6)
+	sin30 = math.Sin(math.Pi / 6)
 )
 
 func main() {
@@ -80,14 +83,14 @@ func main() {
 				}
 
 			case paint.Event:
-				w.Fill(sz.Bounds(), blue0, draw.Src)
-				w.Fill(sz.Bounds().Inset(10), blue1, draw.Src)
+				w.Fill(sz.Bounds(), blue0, screen.Src)
+				w.Fill(sz.Bounds().Inset(10), blue1, screen.Src)
 				w.Upload(image.Point{}, b, b.Bounds())
-				c := math.Cos(math.Pi / 6)
-				s := math.Sin(math.Pi / 6)
+				w.Fill(image.Rect(50, 50, 350, 120), red, screen.Over)
+				screen.Copy(w, image.Point{150, 100}, t, t.Bounds(), screen.Over, nil)
 				w.Draw(f64.Aff3{
-					+c, -s, 100,
-					+s, +c, 200,
+					+cos30, -sin30, 100,
+					+sin30, +cos30, 200,
 				}, t, t.Bounds(), screen.Over, nil)
 				w.Publish()
 
@@ -112,6 +115,24 @@ func drawGradient(m *image.RGBA) {
 			} else {
 				m.SetRGBA(x, y, color.RGBA{uint8(x), uint8(y), 0x00, 0xff})
 			}
+		}
+	}
+
+	// Round off the corners.
+	const radius = 64
+	lox := b.Min.X + radius - 1
+	loy := b.Min.Y + radius - 1
+	hix := b.Max.X - radius
+	hiy := b.Max.Y - radius
+	for y := 0; y < radius; y++ {
+		for x := 0; x < radius; x++ {
+			if x*x+y*y <= radius*radius {
+				continue
+			}
+			m.SetRGBA(lox-x, loy-y, color.RGBA{})
+			m.SetRGBA(hix+x, loy-y, color.RGBA{})
+			m.SetRGBA(lox-x, hiy+y, color.RGBA{})
+			m.SetRGBA(hix+x, hiy+y, color.RGBA{})
 		}
 	}
 }
