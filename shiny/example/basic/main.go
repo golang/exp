@@ -87,7 +87,7 @@ func main() {
 				w.Fill(sz.Bounds().Inset(10), blue1, screen.Src)
 				w.Upload(image.Point{}, b, b.Bounds())
 				w.Fill(image.Rect(50, 50, 350, 120), red, screen.Over)
-				screen.Copy(w, image.Point{150, 100}, t, t.Bounds(), screen.Over, nil)
+				w.Copy(image.Point{150, 100}, t, t.Bounds(), screen.Over, nil)
 				w.Draw(f64.Aff3{
 					+cos30, -sin30, 100,
 					+sin30, +cos30, 200,

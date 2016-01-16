@@ -10,6 +10,7 @@ import (
 	"image/draw"
 	"sync"
 
+	"golang.org/x/exp/shiny/driver/internal/drawer"
 	"golang.org/x/exp/shiny/driver/internal/event"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
@@ -236,6 +237,14 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 
 	w.glctx.DisableVertexAttribArray(w.s.texture.pos)
 	w.glctx.DisableVertexAttribArray(w.s.texture.inUV)
+}
+
+func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	drawer.Copy(w, dp, src, sr, op, opts)
+}
+
+func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	drawer.Scale(w, dr, src, sr, op, opts)
 }
 
 // mvp returns the Model View Projection matrix that maps the quadCoords unit

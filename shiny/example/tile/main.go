@@ -119,7 +119,7 @@ func drawTile(wg *sync.WaitGroup, w screen.Window, pool *tilePool, origin image.
 		log.Println(err)
 		return
 	}
-	screen.Copy(w, image.Point{x, y}, tex, tileBounds, draw.Src, nil)
+	w.Copy(image.Point{x, y}, tex, tileBounds, screen.Src, nil)
 }
 
 func drawRGBA(m *image.RGBA, tp image.Point) {

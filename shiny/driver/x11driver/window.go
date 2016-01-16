@@ -16,6 +16,7 @@ import (
 	"github.com/BurntSushi/xgb/render"
 	"github.com/BurntSushi/xgb/xproto"
 
+	"golang.org/x/exp/shiny/driver/internal/drawer"
 	"golang.org/x/exp/shiny/driver/internal/event"
 	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
@@ -103,6 +104,14 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	src.(*textureImpl).draw(w.xp, &src2dst, sr, op, w.width, w.height, opts)
+}
+
+func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	drawer.Copy(w, dp, src, sr, op, opts)
+}
+
+func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	drawer.Scale(w, dr, src, sr, op, opts)
 }
 
 func (w *windowImpl) Publish() screen.PublishResult {
