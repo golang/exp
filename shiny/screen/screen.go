@@ -42,6 +42,14 @@
 //			}
 //		})
 //	}
+//
+// Each driver package provides Screen, Buffer, Texture and Window
+// implementations that work together. Such types are interface types because
+// this package is driver-independent, but those interfaces aren't expected to
+// be implemented outside of drivers. For example, a driver's Window
+// implementation will generally work only with that driver's Buffer
+// implementation, and will not work with an arbitrary type that happens to
+// implement the Buffer methods.
 package screen
 
 import (
