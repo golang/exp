@@ -36,6 +36,11 @@
 // such modifications.
 package text
 
+import (
+	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
+)
+
 // These constants are equal to os.SEEK_SET, os.SEEK_CUR and os.SEEK_END,
 // understood by the io.Seeker interface, and are provided so that users of
 // this package don't have to explicitly import "os".
@@ -73,6 +78,9 @@ type Frame struct {
 
 	firstParagraph int32
 
+	maxWidth fixed.Int26_6
+	face     font.Face
+
 	// len is the total length of the Frame's current textual content, in
 	// bytes. It can be smaller then len(text), since that []byte can contain
 	// 'holes' of deleted content.
@@ -83,6 +91,30 @@ type Frame struct {
 	// compactions. Again, the algorithmic complexity of insertions matters.
 	len  int
 	text []byte
+}
+
+// TODO: allow multiple font faces, i.e. rich text?
+
+// SetFace sets the font face for measuring text.
+func (f *Frame) SetFace(face font.Face) {
+	f.face = face
+	if f.len != 0 {
+		panic("TODO: re-layout existing textual content")
+	}
+}
+
+// SetMaxWidth sets the target maximum width of a Line of text. Text will be
+// broken so that a Line's width is less than or equal to this maximum width.
+// This line breaking is not strict. A Line containing asingleverylongword
+// combined with a narrow maximum width will not be broken and will remain
+// longer than the target maximum width; soft hyphens are not inserted.
+//
+// A non-positive argument is treated as an infinite maximum width.
+func (f *Frame) SetMaxWidth(m fixed.Int26_6) {
+	f.maxWidth = m
+	if f.len != 0 {
+		panic("TODO: re-layout existing textual content")
+	}
 }
 
 func (f *Frame) newParagraph() int32 {
@@ -131,8 +163,6 @@ func (f *Frame) Len() int {
 func (f *Frame) NewCaret() *Caret {
 	panic("TODO")
 }
-
-// TODO: be able to set a frame's max width, and font face.
 
 // Paragraph holds Lines of text.
 type Paragraph struct {
