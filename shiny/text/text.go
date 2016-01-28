@@ -56,7 +56,7 @@ const (
 // which contains one Line, which contains one Box.
 type Frame struct {
 	// These slices hold the Frame's Paragraphs, Lines and Boxes, indexed by
-	// fields such as Paragraph.firstLine and Box.next.
+	// fields such as Paragraph.firstL and Box.next.
 	//
 	// Their contents are not necessarily in layout order. Each slice is
 	// obviously backed by an array, but a Frame's list of children
@@ -76,7 +76,7 @@ type Frame struct {
 	lines      []Line
 	boxes      []Box
 
-	firstParagraph int32
+	firstP int32
 
 	maxWidth fixed.Int26_6
 	face     font.Face
@@ -91,6 +91,8 @@ type Frame struct {
 	// compactions. Again, the algorithmic complexity of insertions matters.
 	len  int
 	text []byte
+
+	carets []*Caret
 }
 
 // TODO: allow multiple font faces, i.e. rich text?
@@ -144,14 +146,18 @@ func (f *Frame) newBox() int32 {
 	return int32(len(f.boxes) - 1)
 }
 
-// FirstParagraph returns the first paragraph of this frame.
-func (f *Frame) FirstParagraph() *Paragraph {
-	if f.firstParagraph == 0 {
+func (f *Frame) firstParagraph() int32 {
+	if f.firstP == 0 {
 		// 0 means that the first Paragraph is implicit (and not allocated
 		// yet), so we make an explicit one, with a non-zero index.
-		f.firstParagraph = f.newParagraph()
+		f.firstP = f.newParagraph()
 	}
-	return &f.paragraphs[f.firstParagraph]
+	return f.firstP
+}
+
+// FirstParagraph returns the first paragraph of this frame.
+func (f *Frame) FirstParagraph() *Paragraph {
+	return &f.paragraphs[f.firstParagraph()]
 }
 
 // Len returns the number of bytes in the Frame's text.
@@ -161,24 +167,42 @@ func (f *Frame) Len() int {
 
 // NewCaret returns a new Caret at the start of this Frame.
 func (f *Frame) NewCaret() *Caret {
-	panic("TODO")
+	// Make the first Paragraph, Line and Box explicit, since Carets require an
+	// explicit p, l and b.
+	p := f.FirstParagraph()
+	l := p.FirstLine(f)
+	b := l.FirstBox(f)
+	c := &Caret{
+		f:           f,
+		p:           f.firstP,
+		l:           p.firstL,
+		b:           l.firstB,
+		k:           b.i,
+		caretsIndex: len(f.carets),
+	}
+	f.carets = append(f.carets, c)
+	return c
 }
 
 // Paragraph holds Lines of text.
 type Paragraph struct {
-	firstLine, next, prev int32
+	firstL, next, prev int32
+}
+
+func (p *Paragraph) firstLine(f *Frame) int32 {
+	if p.firstL == 0 {
+		// 0 means that the first Line is implicit (and not allocated yet), so
+		// we make an explicit one, with a non-zero index.
+		p.firstL = f.newLine()
+	}
+	return p.firstL
 }
 
 // FirstLine returns the first Line of this Paragraph.
 //
 // f is the Frame that contains the Paragraph.
 func (p *Paragraph) FirstLine(f *Frame) *Line {
-	if p.firstLine == 0 {
-		// 0 means that the first Line is implicit (and not allocated yet), so
-		// we make an explicit one, with a non-zero index.
-		p.firstLine = f.newLine()
-	}
-	return &f.lines[p.firstLine]
+	return &f.lines[p.firstLine(f)]
 }
 
 // Next returns the next Paragraph after this one in the Frame.
@@ -193,19 +217,23 @@ func (p *Paragraph) Next(f *Frame) *Paragraph {
 
 // Line holds Boxes of text.
 type Line struct {
-	firstBox, next, prev int32
+	firstB, next, prev int32
+}
+
+func (l *Line) firstBox(f *Frame) int32 {
+	if l.firstB == 0 {
+		// 0 means that the first Box is implicit (and not allocated yet), so
+		// we make an explicit one, with a non-zero index.
+		l.firstB = f.newBox()
+	}
+	return l.firstB
 }
 
 // FirstBox returns the first Box of this Line.
 //
 // f is the Frame that contains the Line.
 func (l *Line) FirstBox(f *Frame) *Box {
-	if l.firstBox == 0 {
-		// 0 means that the first Box is implicit (and not allocated yet), so
-		// we make an explicit one, with a non-zero index.
-		l.firstBox = f.newBox()
-	}
-	return &f.boxes[l.firstBox]
+	return &f.boxes[l.firstBox(f)]
 }
 
 // Next returns the next Line after this one in the Paragraph.
