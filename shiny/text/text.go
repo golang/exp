@@ -37,6 +37,9 @@
 package text
 
 import (
+	"io"
+	"unicode/utf8"
+
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
@@ -93,6 +96,10 @@ type Frame struct {
 	text []byte
 
 	carets []*Caret
+
+	// lineReaderData supports the Frame's lineReader, used when reading a
+	// Line's text one rune at a time.
+	lineReaderData bAndK
 }
 
 // TODO: allow multiple font faces, i.e. rich text?
@@ -184,6 +191,52 @@ func (f *Frame) NewCaret() *Caret {
 	return c
 }
 
+func (f *Frame) lineReader(b, k int32) lineReader {
+	f.lineReaderData.b = b
+	f.lineReaderData.k = k
+	return lineReader{f}
+}
+
+// bAndK is a text position k within a Box b. The k is analogous to the Caret.k
+// field. For a bAndK x, letting bb := Frame.boxes[x.b], an invariant is that
+// bb.i <= x.k && x.k <= bb.j.
+type bAndK struct {
+	b int32
+	k int32
+}
+
+// lineReader is an io.RuneReader for a Line of text, from its current position
+// (a bAndK) up until the end of the Line containing that Box.
+//
+// A Frame can have only one active lineReader at any one time. To avoid
+// excessive memory allocation and garbage collection, the lineReader's data is
+// a field of the Frame struct and re-used.
+type lineReader struct{ f *Frame }
+
+func (z lineReader) bAndK() bAndK {
+	return z.f.lineReaderData
+}
+
+func (z lineReader) ReadRune() (r rune, size int, err error) {
+	d := &z.f.lineReaderData
+	for d.b != 0 {
+		bb := &z.f.boxes[d.b]
+		if d.k < bb.j {
+			r, size = utf8.DecodeRune(z.f.text[d.k:bb.j])
+			if r >= utf8.RuneSelf && size == 1 {
+				// We decoded invalid UTF-8, possibly because a valid UTF-8 rune
+				// straddled this box and the next one.
+				panic("TODO: invalid UTF-8")
+			}
+			d.k += int32(size)
+			return r, size, nil
+		}
+		d.b = bb.next
+		d.k = z.f.boxes[d.b].i
+	}
+	return 0, 0, io.EOF
+}
+
 // Paragraph holds Lines of text.
 type Paragraph struct {
 	firstL, next, prev int32
@@ -267,5 +320,19 @@ func (b *Box) Next(f *Frame) *Box {
 //
 // f is the Frame that contains the Box.
 func (b *Box) Text(f *Frame) []byte {
-	return f.text[b.i:b.j:b.j]
+	return f.text[b.i:b.j]
+}
+
+// TrimmedText returns the Box's text, trimmed right of any white space if it
+// is the last Box in its Line.
+//
+// f is the Frame that contains the Box.
+func (b *Box) TrimmedText(f *Frame) []byte {
+	s := f.text[b.i:b.j]
+	if b.next == 0 {
+		for len(s) > 0 && s[len(s)-1] <= ' ' {
+			s = s[:len(s)-1]
+		}
+	}
+	return s
 }

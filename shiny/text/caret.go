@@ -9,6 +9,8 @@ package text
 
 import (
 	"strings"
+
+	"golang.org/x/image/math/fixed"
 )
 
 // Caret is a location in a Frame's text, and is the mechanism for adding and
@@ -42,10 +44,12 @@ type Caret struct {
 
 	// k is the Caret's position in the text, in Frame.text order. It is valid
 	// to index the Frame.text slice with k, analogous to the Box.i and Box.j
-	// fields. For a Caret c, and letting bb := c.f.boxes[c.b], an invariant is
+	// fields. For a Caret c, letting bb := c.f.boxes[c.b], an invariant is
 	// that bb.i <= c.k && c.k <= bb.j.
 	k int32
 }
+
+// TODO: many Caret methods: Seek, ReadXxx, WriteXxx, Delete, maybe others.
 
 // Close closes the Caret.
 func (c *Caret) Close() error {
@@ -117,7 +121,7 @@ func (c *Caret) writeString(s string) {
 		}
 	}
 	c.pos += int32(len(s))
-	oldP := c.p
+	oldL := c.l
 
 	if s[len(s)-1] == '\n' {
 		breakParagraph(c.f, c.p, c.l, c.b)
@@ -127,8 +131,8 @@ func (c *Caret) writeString(s string) {
 		c.k = c.f.boxes[c.b].i
 	}
 
-	// TODO: re-layout the oldP and c.p paragraphs.
-	_ = oldP
+	// TODO: re-layout the new c.p paragraph, if we saw '\n'.
+	layout(c.f, oldL)
 }
 
 // breakParagraph breaks the Paragraph p into two Paragraphs, just after Box b
@@ -183,4 +187,97 @@ func breakParagraph(f *Frame, p, l, b int32) {
 	// TODO: re-layout the newP paragraph.
 }
 
-// TODO: many Caret methods.
+// breakLine breaks the Line l at text index k in Box b. The b-and-k index must
+// not be at the start or end of the Line. Text to the right of b-and-k in the
+// Line l will be moved to the start of the next Line in the Paragraph, with
+// that next Line being created if it didn't already exist.
+func breakLine(f *Frame, l, b, k int32) {
+	// Split this Box into two if necessary, so that k equals a Box's j end.
+	bb := &f.boxes[b]
+	if k != bb.j {
+		if k == bb.i {
+			panic("TODO: degenerate split left, possibly adjusting the Line's firstB??")
+		}
+		newB := f.newBox()
+		nextB := bb.next
+		if nextB != 0 {
+			f.boxes[nextB].prev = newB
+		}
+		f.boxes[newB].next = nextB
+		f.boxes[newB].prev = b
+		f.boxes[newB].i = k
+		f.boxes[newB].j = bb.j
+		bb.next = newB
+		bb.j = k
+	}
+
+	// Assert that the break point isn't already at the start or end of the Line.
+	if bb.next == 0 || (bb.prev == 0 && k == bb.i) {
+		panic("text: invalid state")
+	}
+
+	// Insert a line after this one, if one doesn't already exist.
+	ll := &f.lines[l]
+	if ll.next == 0 {
+		newL := f.newLine()
+		f.lines[ll.next].prev = newL
+		f.lines[newL].next = ll.next
+		f.lines[newL].prev = l
+		ll.next = newL
+	}
+
+	// Move the remaining boxes to the next line.
+	nextB, nextL := bb.next, ll.next
+	bb.next = 0
+	f.boxes[nextB].prev = 0
+	if f.lines[nextL].firstB == 0 {
+		f.lines[nextL].firstB = nextB
+	} else {
+		panic("TODO: prepend the remaining boxes to the next Line's existing boxes")
+	}
+
+	// TODO: fix up other Carets's p, l and b fields.
+}
+
+// layout inserts a soft return in the Line l if its text measures longer than
+// f.maxWidth and a suitable line break point is found. This may spill text
+// onto the next line, which will also be laid out, and so on recursively.
+func layout(f *Frame, l int32) {
+	if f.face == nil {
+		return
+	}
+
+	for ; l != 0; l = f.lines[l].next {
+		var (
+			firstB     = f.lines[l].firstB
+			reader     = f.lineReader(firstB, f.boxes[firstB].i)
+			breakPoint bAndK
+			prevR      rune
+			prevRValid bool
+			advance    fixed.Int26_6
+		)
+		for {
+			r, _, err := reader.ReadRune()
+			if err != nil || r == '\n' {
+				return
+			}
+			if prevRValid {
+				advance += f.face.Kern(prevR, r)
+			}
+			// TODO: match all whitespace, not just ' '?
+			if r == ' ' {
+				breakPoint = reader.bAndK()
+			}
+			a, ok := f.face.GlyphAdvance(r)
+			if !ok {
+				panic("TODO: is falling back on the U+FFFD glyph the responsibility of the caller or the Face?")
+			}
+			advance += a
+			if r != ' ' && advance > f.maxWidth && breakPoint.b != 0 {
+				breakLine(f, l, breakPoint.b, breakPoint.k)
+				break
+			}
+			prevR, prevRValid = r, true
+		}
+	}
+}

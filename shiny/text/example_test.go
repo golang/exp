@@ -41,13 +41,11 @@ func printFrame(f *text.Frame, softReturnsOnly bool) {
 	for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
 		for l := p.FirstLine(f); l != nil; l = l.Next(f) {
 			for b := l.FirstBox(f); b != nil; b = b.Next(f) {
-				s := b.Text(f)
 				if softReturnsOnly {
-					if len(s) > 0 && s[len(s)-1] == '\n' {
-						s = s[:len(s)-1]
-					}
+					os.Stdout.Write(b.TrimmedText(f))
+				} else {
+					os.Stdout.Write(b.Text(f))
 				}
-				os.Stdout.Write(s)
 			}
 			if softReturnsOnly {
 				fmt.Println()
@@ -59,7 +57,6 @@ func printFrame(f *text.Frame, softReturnsOnly bool) {
 func Example() {
 	var f text.Frame
 	f.SetFace(toyFace{})
-	// TODO: honor SetMaxWidth, i.e. implement re-layout.
 	f.SetMaxWidth(fixed.I(60))
 
 	c := f.NewCaret()
@@ -69,6 +66,7 @@ func Example() {
 	fmt.Println("====")
 	printFrame(&f, false)
 	fmt.Println("====")
+	fmt.Println("123456789_123456789_123456789_123456789_123456789_123456789_")
 	printFrame(&f, true)
 	fmt.Println("====")
 
@@ -77,8 +75,12 @@ func Example() {
 	// CHAPTER 1. Loomings.
 	// Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world...
 	// ====
+	// 123456789_123456789_123456789_123456789_123456789_123456789_
 	// CHAPTER 1. Loomings.
-	// Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world...
+	// Call me Ishmael. Some years ago—never mind how long
+	// precisely—having little or no money in my purse, and nothing
+	// particular to interest me on shore, I thought I would sail
+	// about a little and see the watery part of the world...
 	//
 	// ====
 }
