@@ -8,7 +8,9 @@ package text
 // now.
 
 import (
+	"io"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -49,7 +51,7 @@ type Caret struct {
 	k int32
 }
 
-// TODO: many Caret methods: Seek, ReadXxx, WriteXxx, Delete, maybe others.
+// TODO: many Caret methods: Seek, WriteXxx, Delete, maybe others.
 
 // Close closes the Caret.
 func (c *Caret) Close() error {
@@ -66,6 +68,116 @@ func (c *Caret) Close() error {
 	c.f.carets = c.f.carets[:j]
 	*c = Caret{}
 	return nil
+}
+
+// leanForwards moves the Caret from the right end of one Box to the left end
+// of the next Box, crossing Lines and Paragraphs to find that next Box. It
+// returns whether the Caret moved; false means that the Caret was located at
+// the end of the Frame's text.
+//
+// Diagramatically, suppose we have two adjacent boxes (shown by square
+// brackets below), with the Caret (an integer location called Caret.pos in the
+// Frame's text) in the middle of the "foo2bar3" word:
+//	[foo0 foo1 foo2]^[bar3 bar4 bar5]
+// leanForwards moves Caret.k from fooBox.j to barBox.i, also updating the
+// Caret's p, l and b. Caret.pos remains unchanged.
+func (c *Caret) leanForwards() bool {
+	// Assert that the Caret c is at the end of its Box.
+	if c.k != c.f.boxes[c.b].j {
+		panic("text: invalid state")
+	}
+
+	if nextB := c.f.boxes[c.b].next; nextB != 0 {
+		c.b = nextB
+		c.k = c.f.boxes[c.b].i
+		return true
+	}
+	if nextL := c.f.lines[c.l].next; nextL != 0 {
+		c.l = nextL
+		c.b = c.f.lines[c.l].firstB
+		c.k = c.f.boxes[c.b].i
+		return true
+	}
+	if nextP := c.f.paragraphs[c.p].next; nextP != 0 {
+		c.p = nextP
+		c.l = c.f.paragraphs[c.p].firstL
+		c.b = c.f.lines[c.l].firstB
+		c.k = c.f.boxes[c.b].i
+		return true
+	}
+	return false
+}
+
+// Read satisfies the io.Reader interface by copying those bytes after the
+// Caret and incrementing the Caret.
+func (c *Caret) Read(buf []byte) (n int, err error) {
+	for len(buf) > 0 {
+		if j := c.f.boxes[c.b].j; c.k < j {
+			nn := copy(buf, c.f.text[c.k:j])
+			n += nn
+			c.pos += int32(nn)
+			c.k += int32(nn)
+			if c.k == j && buf[nn-1] == '\n' {
+				// A Caret can't be placed at the end of a Paragraph, unless it
+				// is the final Paragraph.
+				c.leanForwards()
+			}
+			buf = buf[nn:]
+			continue
+		}
+		if !c.leanForwards() {
+			break
+		}
+	}
+	if int(c.pos) == c.f.len {
+		err = io.EOF
+	}
+	return n, err
+}
+
+// ReadByte returns the next byte after the Caret and increments the Caret.
+func (c *Caret) ReadByte() (x byte, err error) {
+	for {
+		if j := c.f.boxes[c.b].j; c.k < j {
+			x = c.f.text[c.k]
+			c.pos++
+			c.k++
+			if x == '\n' {
+				// A Caret can't be placed at the end of a Paragraph, unless it
+				// is the final Paragraph.
+				c.leanForwards()
+			}
+			return x, nil
+		}
+		if !c.leanForwards() {
+			return 0, io.EOF
+		}
+	}
+}
+
+// ReadRune returns the next rune after the Caret and increments the Caret.
+func (c *Caret) ReadRune() (r rune, size int, err error) {
+	for {
+		if j := c.f.boxes[c.b].j; c.k < j {
+			r, size = utf8.DecodeRune(c.f.text[c.k:j])
+			if r >= utf8.RuneSelf && size == 1 {
+				// We decoded invalid UTF-8, possibly because a valid UTF-8 rune
+				// straddled this box and the next one.
+				panic("TODO: invalid UTF-8")
+			}
+			c.pos += int32(size)
+			c.k += int32(size)
+			if r == '\n' {
+				// A Caret can't be placed at the end of a Paragraph, unless it
+				// is the final Paragraph.
+				c.leanForwards()
+			}
+			return r, size, nil
+		}
+		if !c.leanForwards() {
+			return 0, 0, io.EOF
+		}
+	}
 }
 
 // WriteString inserts s into the Frame's text at the Caret.
