@@ -243,7 +243,7 @@ func breakLine(f *Frame, l, b, k int32) {
 // f.maxWidth and a suitable line break point is found. This may spill text
 // onto the next line, which will also be laid out, and so on recursively.
 func layout(f *Frame, l int32) {
-	if f.face == nil {
+	if f.maxWidth <= 0 || f.face == nil {
 		return
 	}
 
