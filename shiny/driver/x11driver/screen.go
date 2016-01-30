@@ -275,9 +275,8 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 			Stride: 4 * size.X,
 			Rect:   image.Rectangle{Max: size},
 		},
-		size:     size,
-		xs:       xs,
-		reusable: true,
+		size: size,
+		xs:   xs,
 	}
 
 	s.mu.Lock()
