@@ -34,7 +34,7 @@
 // Paragraphs, Lines and Boxes. The underlying memory for such structs can be
 // re-used, so pointer values, such as of type *Box, should not be held over
 // such modifications.
-package text
+package text // import "golang.org/x/exp/shiny/text"
 
 import (
 	"io"
