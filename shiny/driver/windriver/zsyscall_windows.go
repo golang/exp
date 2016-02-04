@@ -13,15 +13,16 @@ var (
 	modmsimg32 = syscall.NewLazyDLL("msimg32.dll")
 	moduser32  = syscall.NewLazyDLL("user32.dll")
 
-	procCreateDIBSection   = modgdi32.NewProc("CreateDIBSection")
-	procCreateCompatibleDC = modgdi32.NewProc("CreateCompatibleDC")
-	procDeleteDC           = modgdi32.NewProc("DeleteDC")
-	procSelectObject       = modgdi32.NewProc("SelectObject")
-	procAlphaBlend         = modmsimg32.NewProc("AlphaBlend")
-	procBitBlt             = modgdi32.NewProc("BitBlt")
-	procCreateSolidBrush   = modgdi32.NewProc("CreateSolidBrush")
-	procFillRect           = moduser32.NewProc("FillRect")
-	procDeleteObject       = modgdi32.NewProc("DeleteObject")
+	procCreateDIBSection       = modgdi32.NewProc("CreateDIBSection")
+	procCreateCompatibleDC     = modgdi32.NewProc("CreateCompatibleDC")
+	procDeleteDC               = modgdi32.NewProc("DeleteDC")
+	procSelectObject           = modgdi32.NewProc("SelectObject")
+	procAlphaBlend             = modmsimg32.NewProc("AlphaBlend")
+	procBitBlt                 = modgdi32.NewProc("BitBlt")
+	procCreateSolidBrush       = modgdi32.NewProc("CreateSolidBrush")
+	procFillRect               = moduser32.NewProc("FillRect")
+	procDeleteObject           = modgdi32.NewProc("DeleteObject")
+	procCreateCompatibleBitmap = modgdi32.NewProc("CreateCompatibleBitmap")
 )
 
 func _CreateDIBSection(dc syscall.Handle, bmi *_BITMAPINFO, usage uint32, bits **byte, section syscall.Handle, offset uint32) (bitmap syscall.Handle, err error) {
@@ -87,10 +88,9 @@ func _AlphaBlend(dcdest win32.HDC, xoriginDest int32, yoriginDest int32, wDest i
 	return
 }
 
-func _BitBlt(dcdest win32.HDC, xdest int32, ydest int32, width int32, height int32, dcsrc win32.HDC, xsrc int32, ysrc int32, rop int32) (ok int32, err error) {
-	r0, _, e1 := syscall.Syscall9(procBitBlt.Addr(), 9, uintptr(dcdest), uintptr(xdest), uintptr(ydest), uintptr(width), uintptr(height), uintptr(dcsrc), uintptr(xsrc), uintptr(ysrc), uintptr(rop))
-	ok = int32(r0)
-	if ok == 0 {
+func _BitBlt(dcdest win32.HDC, xdest int32, ydest int32, width int32, height int32, dcsrc win32.HDC, xsrc int32, ysrc int32, rop int32) (err error) {
+	r1, _, e1 := syscall.Syscall9(procBitBlt.Addr(), 9, uintptr(dcdest), uintptr(xdest), uintptr(ydest), uintptr(width), uintptr(height), uintptr(dcsrc), uintptr(xsrc), uintptr(ysrc), uintptr(rop))
+	if r1 == 0 {
 		if e1 != 0 {
 			err = error(e1)
 		} else {
@@ -128,6 +128,19 @@ func _FillRect(dc win32.HDC, rc *_RECT, brush syscall.Handle) (err error) {
 func _DeleteObject(object syscall.Handle) (err error) {
 	r1, _, e1 := syscall.Syscall(procDeleteObject.Addr(), 1, uintptr(object), 0, 0)
 	if r1 == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _CreateCompatibleBitmap(dc win32.HDC, width int32, height int32) (bitmap syscall.Handle, err error) {
+	r0, _, e1 := syscall.Syscall(procCreateCompatibleBitmap.Addr(), 3, uintptr(dc), uintptr(width), uintptr(height))
+	bitmap = syscall.Handle(r0)
+	if bitmap == 0 {
 		if e1 != 0 {
 			err = error(e1)
 		} else {

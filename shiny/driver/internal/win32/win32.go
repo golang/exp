@@ -235,6 +235,18 @@ func sendPaint(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr)
 	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
 }
 
+var screenMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){}
+
+func AddScreenMsg(fn func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)) uint32 {
+	uMsg := nextWM
+	nextWM++
+	screenMsgs[uMsg] = func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) uintptr {
+		fn(hwnd, uMsg, wParam, lParam)
+		return 0
+	}
+	return uMsg
+}
+
 func screenWindowWndProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
 	switch uMsg {
 	case msgCreateWindow:
@@ -243,14 +255,20 @@ func screenWindowWndProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr)
 	case msgMainCallback:
 		go func() {
 			mainCallback()
-			SendMessage(screenHWND, msgQuit, 0, 0)
+			SendScreenMessage(msgQuit, 0, 0)
 		}()
 	case msgQuit:
 		_PostQuitMessage(0)
-	default:
-		return _DefWindowProc(hwnd, uMsg, wParam, lParam)
 	}
-	return 0
+	fn := screenMsgs[uMsg]
+	if fn != nil {
+		return fn(hwnd, uMsg, wParam, lParam)
+	}
+	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
+}
+
+func SendScreenMessage(uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
+	return SendMessage(screenHWND, uMsg, wParam, lParam)
 }
 
 var windowMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){
@@ -301,7 +319,7 @@ type newWindowParams struct {
 func NewWindow(opts *screen.NewWindowOptions) (HWND, error) {
 	var p newWindowParams
 	p.opts = opts
-	SendMessage(screenHWND, msgCreateWindow, 0, uintptr(unsafe.Pointer(&p)))
+	SendScreenMessage(msgCreateWindow, 0, uintptr(unsafe.Pointer(&p)))
 	return p.w, p.err
 }
 

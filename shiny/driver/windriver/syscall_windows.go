@@ -138,7 +138,8 @@ func _HIWORD(l uintptr) uint16 {
 //sys	_DeleteDC(dc win32.HDC) (err error) = gdi32.DeleteDC
 //sys	_SelectObject(dc win32.HDC, gdiobj syscall.Handle) (newobj syscall.Handle, err error) = gdi32.SelectObject
 //sys	_AlphaBlend(dcdest win32.HDC, xoriginDest int32, yoriginDest int32, wDest int32, hDest int32, dcsrc win32.HDC, xoriginSrc int32, yoriginSrc int32, wsrc int32, hsrc int32, ftn uintptr) (err error) = msimg32.AlphaBlend
-//sys	_BitBlt(dcdest win32.HDC, xdest int32, ydest int32, width int32, height int32, dcsrc win32.HDC, xsrc int32, ysrc int32, rop int32) (ok int32, err error) = gdi32.BitBlt
+//sys	_BitBlt(dcdest win32.HDC, xdest int32, ydest int32, width int32, height int32, dcsrc win32.HDC, xsrc int32, ysrc int32, rop int32) (err error) = gdi32.BitBlt
 //sys	_CreateSolidBrush(color _COLORREF) (brush syscall.Handle, err error) = gdi32.CreateSolidBrush
 //sys	_FillRect(dc win32.HDC, rc *_RECT, brush syscall.Handle) (err error) = user32.FillRect
 //sys	_DeleteObject(object syscall.Handle) (err error) = gdi32.DeleteObject
+//sys	_CreateCompatibleBitmap(dc win32.HDC, width int32, height int32) (bitmap syscall.Handle, err error) = gdi32.CreateCompatibleBitmap

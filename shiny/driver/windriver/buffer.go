@@ -8,10 +8,12 @@ package windriver
 
 import (
 	"image"
+	"image/draw"
 	"sync"
 	"syscall"
 
 	"golang.org/x/exp/shiny/driver/internal/swizzle"
+	"golang.org/x/exp/shiny/driver/internal/win32"
 )
 
 type bufferImpl struct {
@@ -91,4 +93,11 @@ func (b *bufferImpl) cleanUp() {
 
 	b.rgba.Pix = nil
 	_DeleteObject(b.hbitmap)
+}
+
+func (b *bufferImpl) blitToDC(dc win32.HDC, dp image.Point, sr image.Rectangle) error {
+	b.preUpload(true)
+	defer b.postUpload()
+
+	return copyBitmapToDC(dc, dp, b.hbitmap, sr, draw.Src)
 }

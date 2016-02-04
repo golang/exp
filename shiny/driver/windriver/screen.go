@@ -58,7 +58,7 @@ func (*screenImpl) NewBuffer(size image.Point) (screen.Buffer, error) {
 }
 
 func (*screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
-	return &textureImpl{}, nil
+	return newTexture(size)
 }
 
 func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {

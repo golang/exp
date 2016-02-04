@@ -13,6 +13,7 @@ import (
 	"image/color"
 	"image/draw"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/drawer"
@@ -86,15 +87,13 @@ func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
 	}
 	defer win32.ReleaseDC(hwnd, dc)
 
+	// TODO(brainman): move preUpload / postUpload out of handleUpload,
+	// because handleUpload can only be executed by one (message pump)
+	// thread only
 	u.src.preUpload(true)
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
-	err = blit(dc, _POINT{int32(u.dp.X), int32(u.dp.Y)}, u.src.hbitmap, &_RECT{
-		Left:   int32(u.sr.Min.X),
-		Top:    int32(u.sr.Min.Y),
-		Right:  int32(u.sr.Max.X),
-		Bottom: int32(u.sr.Max.Y),
-	})
+	err = copyBitmapToDC(dc, u.dp, u.src.hbitmap, u.sr, draw.Src)
 	go func() {
 		u.src.postUpload()
 		close(u.completion)
@@ -130,8 +129,42 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	// TODO
 }
 
+type handleCopyParams struct {
+	dp  image.Point
+	src syscall.Handle
+	sr  image.Rectangle
+	op  draw.Op
+}
+
+var msgCopy = win32.AddWindowMsg(handleCopy)
+
 func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	drawer.Copy(w, dp, src, sr, op, opts)
+	if op != draw.Src && op != draw.Over {
+		drawer.Copy(w, dp, src, sr, op, opts)
+		return
+	}
+	p := handleCopyParams{
+		dp:  dp,
+		src: src.(*textureImpl).bitmap,
+		sr:  sr,
+		op:  op,
+	}
+	win32.SendMessage(w.hwnd, msgCopy, 0, uintptr(unsafe.Pointer(&p)))
+}
+
+func handleCopy(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
+	p := (*handleCopyParams)(unsafe.Pointer(lParam))
+
+	dc, err := win32.GetDC(hwnd)
+	if err != nil {
+		panic(err) // TODO handle errors
+	}
+	defer win32.ReleaseDC(hwnd, dc)
+
+	err = copyBitmapToDC(dc, p.dp, p.src, p.sr, p.op)
+	if err != nil {
+		panic(err) // TODO handle errors
+	}
 }
 
 func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {

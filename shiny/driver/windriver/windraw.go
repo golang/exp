@@ -7,6 +7,9 @@
 package windriver
 
 import (
+	"fmt"
+	"image"
+	"image/draw"
 	"syscall"
 	"unsafe"
 
@@ -34,6 +37,13 @@ func mkbitmap(dx, dy int32) (syscall.Handle, *byte, error) {
 	return bitmap, ppvBits, nil
 }
 
+var blendOverFunc = _BLENDFUNCTION{
+	BlendOp:             _AC_SRC_OVER,
+	BlendFlags:          0,
+	SourceConstantAlpha: 255,           // only use per-pixel alphas
+	AlphaFormat:         _AC_SRC_ALPHA, // premultiplied
+}
+
 func blend(dc win32.HDC, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32) (err error) {
 	compatibleDC, err := _CreateCompatibleDC(dc)
 	if err != nil {
@@ -50,16 +60,10 @@ func blend(dc win32.HDC, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32)
 		return err
 	}
 
-	blendfunc := _BLENDFUNCTION{
-		BlendOp:             _AC_SRC_OVER,
-		BlendFlags:          0,
-		SourceConstantAlpha: 255,           // only use per-pixel alphas
-		AlphaFormat:         _AC_SRC_ALPHA, // premultiplied
-	}
 	err = _AlphaBlend(dc, dr.Left, dr.Top,
 		dr.Right-dr.Left, dr.Bottom-dr.Top,
 		compatibleDC, 0, 0, sdx, sdy,
-		blendfunc.ToUintptr())
+		blendOverFunc.ToUintptr())
 	if err != nil {
 		return err
 	}
@@ -68,29 +72,33 @@ func blend(dc win32.HDC, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32)
 	return err
 }
 
-func blit(dc win32.HDC, dp _POINT, bitmap syscall.Handle, sr *_RECT) (err error) {
-	compatibleDC, err := _CreateCompatibleDC(dc)
+func copyBitmapToDC(dc win32.HDC, dp image.Point, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
+	memdc, err := _CreateCompatibleDC(dc)
+	if err != nil {
+		return err
+	}
+	defer _DeleteDC(memdc)
+
+	prev, err := _SelectObject(memdc, src)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err2 := _DeleteDC(compatibleDC)
-		if err == nil {
-			err = err2
+		_, err2 := _SelectObject(memdc, prev)
+		if retErr == nil {
+			retErr = err2
 		}
 	}()
-	prevBitmap, err := _SelectObject(compatibleDC, bitmap)
-	if err != nil {
-		return err
-	}
 
-	dx, dy := sr.Right-sr.Left, sr.Bottom-sr.Top
-	_, err = _BitBlt(dc, dp.X, dp.Y, dx, dy, compatibleDC, sr.Left, sr.Top, _SRCCOPY)
-	if err != nil {
-		return err
+	sdx, sdy := int32(sr.Dx()), int32(sr.Dy())
+	switch op {
+	case draw.Src:
+		return _BitBlt(dc, int32(dp.X), int32(dp.Y), sdx, sdy, memdc, int32(sr.Min.X), int32(sr.Min.Y), _SRCCOPY)
+	case draw.Over:
+		return _AlphaBlend(dc, int32(dp.X), int32(dp.Y), sdx, sdy, memdc, 0, 0, sdx, sdy, blendOverFunc.ToUintptr())
+	default:
+		return fmt.Errorf("windriver: invalid draw operation %v", op)
 	}
-	_, err = _SelectObject(compatibleDC, prevBitmap)
-	return err
 }
 
 func fillSrc(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
