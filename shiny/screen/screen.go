@@ -80,7 +80,10 @@ type Screen interface {
 
 // Buffer is an in-memory pixel buffer. Its pixels can be modified by any Go
 // code that takes an *image.RGBA, such as the standard library's image/draw
-// package.
+// package. A Buffer is essentially an *image.RGBA, but not all *image.RGBA
+// values (including those returned by image.NewRGBA) are valid Buffers, as a
+// driver may assume that the memory backing a Buffer's pixels are specially
+// allocated.
 //
 // To see a Buffer's contents on a screen, upload it to a Texture (and then
 // draw the Texture on a Window) or upload it directly to a Window.
@@ -105,6 +108,31 @@ type Buffer interface {
 	// RGBA returns the pixel buffer as an *image.RGBA.
 	//
 	// Its contents should not be accessed while the Buffer is uploading.
+	//
+	// The contents of the returned *image.RGBA's Pix field (of type []byte)
+	// can be modified at other times, but that Pix slice itself (i.e. its
+	// underlying pointer, length and capacity) should not be modified at any
+	// time.
+	//
+	// The following is valid:
+	//	m := buffer.RGBA()
+	//	if len(m.Pix) >= 4 {
+	//		m.Pix[0] = 0xff
+	//		m.Pix[1] = 0x00
+	//		m.Pix[2] = 0x00
+	//		m.Pix[3] = 0xff
+	//	}
+	// or, equivalently:
+	//	m := buffer.RGBA()
+	//	m.SetRGBA(m.Rect.Min.X, m.Rect.Min.Y, color.RGBA{0xff, 0x00, 0x00, 0xff})
+	// and using the standard library's image/draw package is also valid:
+	//	dst := buffer.RGBA()
+	//	draw.Draw(dst, dst.Bounds(), etc)
+	// but the following is invalid:
+	//	m := buffer.RGBA()
+	//	m.Pix = anotherByteSlice
+	// and so is this:
+	//	*buffer.RGBA() = anotherImageRGBA
 	RGBA() *image.RGBA
 }
 

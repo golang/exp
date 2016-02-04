@@ -40,8 +40,10 @@ type screenImpl struct {
 }
 
 func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr error) {
+	m := image.NewRGBA(image.Rectangle{Max: size})
 	return &bufferImpl{
-		rgba: image.NewRGBA(image.Rectangle{Max: size}),
+		buf:  m.Pix,
+		rgba: *m,
 		size: size,
 	}, nil
 }

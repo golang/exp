@@ -32,6 +32,15 @@ func (b *bufferImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.si
 func (b *bufferImpl) RGBA() *image.RGBA       { return &b.rgba }
 
 func (b *bufferImpl) preUpload(reusable bool) {
+	// Check that the program hasn't tried to modify the rgba field via the
+	// pointer returned by the bufferImpl.RGBA method. This check doesn't catch
+	// 100% of all cases; it simply tries to detect some invalid uses of a
+	// screen.Buffer such as:
+	//	*buffer.RGBA() = anotherImageRGBA
+	if len(b.buf) != 0 && len(b.rgba.Pix) != 0 && &b.buf[0] != &b.rgba.Pix[0] {
+		panic("windriver: invalid Buffer.RGBA modification")
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

@@ -32,12 +32,15 @@ func (t *textureImpl) Release() {
 }
 
 func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+	buf := src.(*bufferImpl)
+	buf.preUpload()
+
 	t.w.glctxMu.Lock()
 	defer t.w.glctxMu.Unlock()
 
 	// TODO: adjust if dp is outside dst bounds, or r is outside src bounds.
 	t.w.glctx.BindTexture(gl.TEXTURE_2D, t.id)
-	m := src.(*bufferImpl).rgba.SubImage(sr).(*image.RGBA)
+	m := buf.rgba.SubImage(sr).(*image.RGBA)
 	b := m.Bounds()
 	// TODO check m bounds smaller than t.size
 	t.w.glctx.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
