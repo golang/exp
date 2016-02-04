@@ -53,6 +53,10 @@ const (
 	SeekEnd int = 2
 )
 
+// maxLen is maximum (inclusive) value of len(Frame.text) and therefore of
+// Box.i, Box.j and Caret.k.
+const maxLen = 0x7fffffff
+
 // Frame holds Paragraphs of text.
 //
 // The zero value is a valid Frame of empty text, which contains one Paragraph,
@@ -153,7 +157,19 @@ func (f *Frame) newBox() int32 {
 	return int32(len(f.boxes) - 1)
 }
 
+func (f *Frame) lastParagraph() int32 {
+	for p := f.firstP; ; {
+		if next := f.paragraphs[p].next; next != 0 {
+			p = next
+			continue
+		}
+		return p
+	}
+}
+
 func (f *Frame) firstParagraph() int32 {
+	// TODO: move this check into the exported methods instead of this imported
+	// one.
 	if f.firstP == 0 {
 		// 0 means that the first Paragraph is implicit (and not allocated
 		// yet), so we make an explicit one, with a non-zero index.
@@ -242,6 +258,16 @@ type Paragraph struct {
 	firstL, next, prev int32
 }
 
+func (p *Paragraph) lastLine(f *Frame) int32 {
+	for l := p.firstL; ; {
+		if next := f.lines[l].next; next != 0 {
+			l = next
+			continue
+		}
+		return l
+	}
+}
+
 func (p *Paragraph) firstLine(f *Frame) int32 {
 	if p.firstL == 0 {
 		// 0 means that the first Line is implicit (and not allocated yet), so
@@ -271,6 +297,16 @@ func (p *Paragraph) Next(f *Frame) *Paragraph {
 // Line holds Boxes of text.
 type Line struct {
 	firstB, next, prev int32
+}
+
+func (l *Line) lastBox(f *Frame) int32 {
+	for b := l.firstB; ; {
+		if next := f.boxes[b].next; next != 0 {
+			b = next
+			continue
+		}
+		return b
+	}
 }
 
 func (l *Line) firstBox(f *Frame) int32 {

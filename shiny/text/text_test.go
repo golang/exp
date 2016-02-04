@@ -8,6 +8,7 @@ import (
 	"image"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -49,6 +50,39 @@ func iRobotFrame() *Frame {
 	c.WriteString(iRobot)
 	c.Close()
 	return f
+}
+
+func TestSeek(t *testing.T) {
+	f := iRobotFrame()
+	c := f.NewCaret()
+	defer c.Close()
+	rng := rand.New(rand.NewSource(1))
+	seen := [1 + len(iRobot)]bool{}
+	for i := 0; i < 10*len(iRobot); i++ {
+		wantPos := int64(rng.Intn(len(iRobot) + 1))
+		gotPos, err := c.Seek(wantPos, SeekSet)
+		if err != nil {
+			t.Fatalf("i=%d: Seek: %v", i, err)
+		}
+		if gotPos != wantPos {
+			t.Fatalf("i=%d: Seek: got %d, want %d", gotPos, wantPos)
+		}
+		seen[gotPos] = true
+
+		gotByte, gotErr := c.ReadByte()
+		wantByte, wantErr := byte(0), io.EOF
+		if gotPos < int64(len(iRobot)) {
+			wantByte, wantErr = iRobot[gotPos], nil
+		}
+		if gotByte != wantByte || gotErr != wantErr {
+			t.Fatalf("i=%d: ReadByte: got %d, %v, want %d, %v", i, gotByte, gotErr, wantByte, wantErr)
+		}
+	}
+	for i, s := range seen {
+		if !s {
+			t.Errorf("randomly generated positions weren't exhaustive: position %d / %d not seen", i, len(iRobot))
+		}
+	}
 }
 
 func TestRead(t *testing.T) {

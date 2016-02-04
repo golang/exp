@@ -8,6 +8,7 @@ package text
 // now.
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -51,7 +52,7 @@ type Caret struct {
 	k int32
 }
 
-// TODO: many Caret methods: Seek, WriteXxx, Delete, maybe others.
+// TODO: many Caret methods: WriteXxx, Delete, maybe others.
 
 // Close closes the Caret.
 func (c *Caret) Close() error {
@@ -106,6 +107,122 @@ func (c *Caret) leanForwards() bool {
 		return true
 	}
 	return false
+}
+
+// leanBackwards is like leanForwards but in the other direction.
+func (c *Caret) leanBackwards() bool {
+	// Assert that the Caret c is at the start of its Box.
+	if c.k != c.f.boxes[c.b].i {
+		panic("text: invalid state")
+	}
+
+	if prevB := c.f.boxes[c.b].prev; prevB != 0 {
+		c.b = prevB
+		c.k = c.f.boxes[c.b].j
+		return true
+	}
+	if prevL := c.f.lines[c.l].prev; prevL != 0 {
+		c.l = prevL
+		c.b = c.f.lines[c.l].lastBox(c.f)
+		c.k = c.f.boxes[c.b].j
+		return true
+	}
+	if prevP := c.f.paragraphs[c.p].prev; prevP != 0 {
+		c.p = prevP
+		c.l = c.f.paragraphs[c.p].lastLine(c.f)
+		c.b = c.f.lines[c.l].lastBox(c.f)
+		c.k = c.f.boxes[c.b].j
+		return true
+	}
+	return false
+}
+
+func (c *Caret) seekStart() {
+	c.p = c.f.firstP
+	c.l = c.f.paragraphs[c.p].firstL
+	c.b = c.f.lines[c.l].firstB
+	c.k = c.f.boxes[c.b].i
+	c.pos = 0
+}
+
+func (c *Caret) seekEnd() {
+	c.p = c.f.lastParagraph()
+	c.l = c.f.paragraphs[c.p].lastLine(c.f)
+	c.b = c.f.lines[c.l].lastBox(c.f)
+	c.k = c.f.boxes[c.b].j
+	c.pos = int32(c.f.len)
+}
+
+// Seek satisfies the io.Seeker interface.
+func (c *Caret) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case SeekSet:
+		// No-op.
+	case SeekCur:
+		offset += int64(c.pos)
+	case SeekEnd:
+		offset += int64(c.f.len)
+	default:
+		return 0, errors.New("text: invalid seek whence")
+	}
+	if offset < 0 {
+		return 0, errors.New("text: negative seek position")
+	}
+	if offset > int64(c.f.len) {
+		offset = int64(c.f.len)
+	}
+	off := int32(offset)
+
+	delta := off - c.pos
+	// If the new offset is closer to the start or the end than to the current
+	// c.pos, move to the start or end first. In case of a tie, we prefer to
+	// seek forwards (i.e. set delta > 0).
+	if delta < 0 && -delta >= off {
+		c.seekStart()
+		delta = off - c.pos
+	} else if delta > 0 && delta > int32(c.f.len)-off {
+		c.seekEnd()
+		delta = off - c.pos
+	}
+
+	if delta != 0 {
+		// Seek forwards.
+		for delta > 0 {
+			if n := c.f.boxes[c.b].j - c.k; n > 0 {
+				if n > delta {
+					n = delta
+				}
+				c.pos += n
+				c.k += n
+				delta -= n
+			} else if !c.leanForwards() {
+				panic("text: invalid state")
+			}
+		}
+
+		// Seek backwards.
+		for delta < 0 {
+			if n := c.f.boxes[c.b].i - c.k; n < 0 {
+				if n < delta {
+					n = delta
+				}
+				c.pos += n
+				c.k += n
+				delta -= n
+			} else if !c.leanBackwards() {
+				panic("text: invalid state")
+			}
+		}
+
+		// A Caret can't be placed at the end of a Paragraph, unless it is the
+		// final Paragraph. A simple way to enforce this is to lean forwards if
+		// c is at the end of its Box.
+		if c.k == c.f.boxes[c.b].j {
+			c.leanForwards()
+		}
+	}
+
+	return offset, nil
 }
 
 // Read satisfies the io.Reader interface by copying those bytes after the
@@ -184,23 +301,29 @@ func (c *Caret) ReadRune() (r rune, size int, err error) {
 //
 // The error returned is always nil.
 func (c *Caret) WriteString(s string) (n int, err error) {
-	n = len(s)
 	for len(s) > 0 {
 		i := 1 + strings.IndexByte(s, '\n')
 		if i == 0 {
 			i = len(s)
 		}
-		c.writeString(s[:i])
+		if err = c.writeString(s[:i]); err != nil {
+			break
+		}
+		n += i
 		s = s[i:]
 	}
-	return n, nil
+	return n, err
 }
 
 // writeString inserts s into the Frame's text at the Caret.
 //
 // s must be non-empty, it must contain at most one '\n' and if it does contain
 // one, it must be the final byte.
-func (c *Caret) writeString(s string) {
+func (c *Caret) writeString(s string) error {
+	if len(s) > maxLen-len(c.f.text) {
+		return errors.New("text: insufficient space for writing")
+	}
+
 	// If the Box's text is empty, move its empty i:j range to the equivalent
 	// empty range at the end of c.f.text.
 	if bb, n := &c.f.boxes[c.b], int32(len(c.f.text)); bb.i == bb.j && bb.i != n {
@@ -245,6 +368,7 @@ func (c *Caret) writeString(s string) {
 
 	// TODO: re-layout the new c.p paragraph, if we saw '\n'.
 	layout(c.f, oldL)
+	return nil
 }
 
 // breakParagraph breaks the Paragraph p into two Paragraphs, just after Box b
