@@ -93,10 +93,10 @@ func (toyFace) Kern(r0, r1 rune) fixed.Int26_6 {
 // iRobot is some text that contains both ASCII and non-ASCII runes.
 const iRobot = "\"I, Robot\" in Russian is \"Я, робот\".\nIt's about robots.\n"
 
-func iRobotFrame() *Frame {
+func iRobotFrame(maxWidth int) *Frame {
 	f := new(Frame)
 	f.SetFace(toyFace{})
-	f.SetMaxWidth(fixed.I(10))
+	f.SetMaxWidth(fixed.I(maxWidth))
 	c := f.NewCaret()
 	c.WriteString(iRobot)
 	c.Close()
@@ -104,7 +104,7 @@ func iRobotFrame() *Frame {
 }
 
 func TestSeek(t *testing.T) {
-	f := iRobotFrame()
+	f := iRobotFrame(10)
 	c := f.NewCaret()
 	defer c.Close()
 	rng := rand.New(rand.NewSource(1))
@@ -153,7 +153,7 @@ func testRead(f *Frame, want string) error {
 }
 
 func TestRead(t *testing.T) {
-	f := iRobotFrame()
+	f := iRobotFrame(10)
 	if err := checkInvariants(f); err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestRead(t *testing.T) {
 }
 
 func TestReadByte(t *testing.T) {
-	f := iRobotFrame()
+	f := iRobotFrame(10)
 	c := f.NewCaret()
 	defer c.Close()
 	got, want := []byte(nil), []byte(iRobot)
@@ -189,7 +189,7 @@ func TestReadByte(t *testing.T) {
 }
 
 func TestReadRune(t *testing.T) {
-	f := iRobotFrame()
+	f := iRobotFrame(10)
 	c := f.NewCaret()
 	defer c.Close()
 	got, want := []rune(nil), []rune(iRobot)
@@ -233,7 +233,7 @@ func TestWrite(t *testing.T) {
 }
 
 func TestSetMaxWidth(t *testing.T) {
-	f := iRobotFrame()
+	f := iRobotFrame(10)
 	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 100; i++ {
 		f.SetMaxWidth(fixed.I(rng.Intn(20)))
@@ -312,6 +312,201 @@ func TestReadRuneAcrossBoxes(t *testing.T) {
 						i, j, gotRunes, wantRunes)
 				}
 			}
+		}
+	}
+}
+
+func TestDelete(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	gotBytesBuf := make([]byte, 0, len(iRobot))
+	wantBytesBuf := make([]byte, 0, len(iRobot))
+
+	for i := 0; i < 100; i++ {
+		f := iRobotFrame(rng.Intn(len(iRobot) + 1))
+		c := f.NewCaret()
+		defer c.Close()
+		wantBytes := append(wantBytesBuf[:0], iRobot...)
+		for j := 0; j < 8; j++ {
+			x := rng.Intn(len(wantBytes) + 1)
+			y := rng.Intn(len(wantBytes) + 1)
+			if x > y {
+				x, y = y, x
+			}
+
+			// Delete the text in the range [x, y).
+			got, want := 0, y-x
+			if rng.Intn(2) == 0 {
+				c.Seek(int64(x), SeekSet)
+				got = c.Delete(Forwards, want)
+			} else {
+				c.Seek(int64(y), SeekSet)
+				got = c.Delete(Backwards, want)
+			}
+			if err := checkInvariants(f); err != nil {
+				t.Fatalf("i=%d, j=%d, x=%d, y=%d: %v", i, j, x, y, err)
+			}
+			if got != want {
+				t.Fatalf("i=%d, j=%d, x=%d, y=%d: Delete: got %d, want %d", i, j, x, y, got, want)
+			}
+
+			gotBytes := readAllText(gotBytesBuf[:0], f)
+			wantBytes = append(wantBytes[:x], wantBytes[y:]...)
+			if !bytes.Equal(gotBytes, wantBytes) {
+				t.Fatalf("i=%d, j=%d, x=%d, y=%d:\ngot  %q\nwant %q", i, j, x, y, gotBytes, wantBytes)
+			}
+		}
+	}
+}
+
+func TestDeleteTooMuch(t *testing.T) {
+	if len(iRobot) < 15+17 {
+		t.Fatal("iRobot string is too short")
+	}
+
+	f := iRobotFrame(10)
+	c := f.NewCaret()
+	defer c.Close()
+
+	c.Seek(-15, SeekEnd)
+	if got, want := c.Delete(Forwards, 18), 15; got != want {
+		t.Errorf("Delete Forwards: got %d, want %d", got, want)
+	}
+
+	c.Seek(+17, SeekSet)
+	if got, want := c.Delete(Backwards, 18), 17; got != want {
+		t.Errorf("Delete Backwards: got %d, want %d", got, want)
+	}
+
+	got := string(readAllText(nil, f))
+	want := iRobot[17 : len(iRobot)-15]
+	if got != want {
+		t.Errorf("\ngot  %q\nwant %q", got, want)
+	}
+}
+
+func TestMergeIntoOneLine(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < 100; i++ {
+		f := new(Frame)
+		f.SetMaxWidth(fixed.I(100))
+
+		p := f.firstParagraph()
+		pp := &f.paragraphs[p]
+		l := pp.firstLine(f)
+		ll := &f.lines[l]
+		b := ll.firstBox(f)
+		bb := &f.boxes[b]
+
+		// Make some Lines and Boxes.
+		wantNUsedBoxes := 0
+		prevIJ := int32(0)
+		emptyRun := true
+		for j := 0; ; j++ {
+			length := rng.Intn(3)
+			bb.i = prevIJ
+			prevIJ += int32(length)
+			bb.j = prevIJ
+			f.len += length
+			if length > 0 && emptyRun {
+				emptyRun = false
+				wantNUsedBoxes++
+			}
+
+			if rng.Intn(20) == 0 {
+				break
+			}
+
+			if rng.Intn(4) == 0 {
+				// Make a new Box on a new Line.
+				l1 := f.newLine()
+
+				// Calling newLine may have made ll a dangling pointer into an
+				// old array, so re-calculate it.
+				//
+				// TODO: fix up any other code that calls Frame.newFoo,
+				// directly or indirectly.
+				ll = &f.lines[l]
+
+				ll1 := &f.lines[l1]
+				ll.next = l1
+				ll1.prev = l
+				l, ll = l1, ll1
+
+				b = ll.firstBox(f)
+				bb = &f.boxes[b]
+
+			} else {
+				// Make a new Box on the same Line.
+				b1 := f.newBox()
+
+				// Calling newBox may have made bb a dangling pointer into an
+				// old array, so re-calculate it.
+				//
+				// TODO: fix up any other code that calls Frame.newFoo,
+				// directly or indirectly.
+				bb = &f.boxes[b]
+
+				bb1 := &f.boxes[b1]
+				bb.next = b1
+				bb1.prev = b
+				b, bb = b1, bb1
+			}
+
+			if rng.Intn(5) == 0 {
+				// Put an i/j gap between this run and the previous one.
+				prevIJ += 1 + int32(rng.Intn(5))
+				emptyRun = true
+			}
+		}
+
+		// We normally remove all empty Boxes. However, if there is no text
+		// whatsoever, we still need one Box.
+		if f.len == 0 {
+			if wantNUsedBoxes != 0 {
+				t.Fatalf("i=%d: no text: wantNUsedBoxes: got %d, want 0", i, wantNUsedBoxes)
+			}
+			wantNUsedBoxes = 1
+		}
+
+		// Make f.text long enough to hold all of the Boxes' i's and j's.
+		f.text = make([]byte, prevIJ)
+		for i := range f.text {
+			f.text[i] = byte('a' + i%16)
+		}
+
+		// Do the merge.
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: before: %v", i, err)
+		}
+		f.mergeIntoOneLine(p)
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: after: %v", i, err)
+		}
+
+		// Check that there is only one Line in use.
+		nUsedLines := 0
+		for l, ll := range f.lines {
+			// The 0th index is a special case. A negative prev means that the
+			// Line is in the free-list.
+			if l != 0 && ll.prev >= 0 {
+				nUsedLines++
+			}
+		}
+		if nUsedLines != 1 {
+			t.Errorf("i=%d: nUsedLines: got %d, want %d", i, nUsedLines, 1)
+		}
+
+		// Check the number of Boxes in use.
+		nUsedBoxes := 0
+		for b, bb := range f.boxes {
+			// The 0th index is a special case. A negative prev means that the
+			// Box is in the free-list.
+			if b != 0 && bb.prev >= 0 {
+				nUsedBoxes++
+			}
+		}
+		if nUsedBoxes != wantNUsedBoxes {
+			t.Errorf("i=%d: nUsedBoxes: got %d, want %d", i, nUsedBoxes, wantNUsedBoxes)
 		}
 	}
 }

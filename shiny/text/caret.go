@@ -555,12 +555,117 @@ func layout(f *Frame, l int32) {
 	}
 }
 
+// Delete deletes nBytes bytes in the specified direction from the Caret's
+// location. It returns the number of bytes deleted, which can be fewer than
+// that requested if it hits the beginning or end of the Frame.
+func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
+	if nBytes <= 0 {
+		return 0
+	}
+
+	// Convert a backwards delete of n bytes from position p to a forwards
+	// delete of n bytes from position p-n.
+	//
+	// In general, it's easier to delete forwards than backwards. For example,
+	// when crossing paragraph boundaries, it's easier to find the first line
+	// of the next paragraph than the last line of the previous paragraph.
+	if dir == Backwards {
+		newPos := int(c.pos) - nBytes
+		if newPos < 0 {
+			newPos = 0
+			nBytes = int(c.pos)
+			if nBytes == 0 {
+				return 0
+			}
+		}
+		if _, err := c.Seek(int64(newPos), SeekSet); err != nil {
+			panic("text: invalid state")
+		}
+	}
+
+	if int(c.pos) == c.f.len {
+		return 0
+	}
+
+	c.leanForwards()
+	if c.f.boxes[c.b].i != c.k && c.splitBox() {
+		c.leanForwards()
+	}
+	for nBytes > 0 && int(c.pos) != c.f.len {
+		bb := &c.f.boxes[c.b]
+		n := bb.j - bb.i
+		newLine := n != 0 && c.f.text[bb.j-1] == '\n'
+		if int(n) > nBytes {
+			n = int32(nBytes)
+		}
+		bb.i += n
+		c.k += n
+		dBytes += int(n)
+		nBytes -= int(n)
+		c.f.len -= int(n)
+
+		if bb.i != bb.j {
+			break
+		}
+
+		if newLine {
+			c.joinNextParagraph()
+		}
+		c.leanForwards()
+	}
+
+	// The mergeIntoOneLine will shake out any empty Boxes.
+	l := c.f.mergeIntoOneLine(c.p)
+	layout(c.f, l)
+
+	// Fix up the Caret.
+	// TODO: be more efficient than a linear scan from the start?
+	pos := c.pos
+	c.seekStart()
+	c.Seek(int64(pos), SeekSet)
+
+	// TODO: fix up other Carets.
+	// TODO: run a compaction if c.f.text holds mainly deleted content.
+	return dBytes
+}
+
+// DeleteRunes deletes nRunes runes in the specified direction from the Caret's
+// location. It returns the number of runes and bytes deleted, which can be
+// fewer than that requested if it hits the beginning or end of the Frame.
+func (c *Caret) DeleteRunes(dir Direction, nRunes int) (dRunes, dBytes int) {
+	panic("TODO")
+}
+
+// joinNextParagraph joins c's current and next Paragraph. That next Paragraph
+// must exist, and c must be at the last Line of its current Paragraph.
+func (c *Caret) joinNextParagraph() {
+	pp0 := &c.f.paragraphs[c.p]
+	ll0 := &c.f.lines[c.l]
+	if pp0.next == 0 || ll0.next != 0 {
+		panic("text: invalid state")
+	}
+	pp1 := &c.f.paragraphs[pp0.next]
+	l1 := pp1.firstL
+
+	ll0.next = l1
+	c.f.lines[l1].prev = c.l
+
+	toFree := pp0.next
+	pp0.next = pp1.next
+	if pp0.next != 0 {
+		c.f.paragraphs[pp0.next].prev = c.p
+	}
+
+	c.f.freeParagraph(toFree)
+}
+
 // splitBox splits the Caret's Box into two, at the Caret's location, provided
-// that the Caret is not at either edge of its Box.
-func (c *Caret) splitBox() {
+// that the Caret is not at either edge of its Box. It returns whether the Box
+// was split.
+func (c *Caret) splitBox() bool {
 	bb := &c.f.boxes[c.b]
 	if c.k == bb.i || c.k == bb.j {
-		return
+		return false
 	}
 	newB := c.f.newBox()
 
@@ -583,4 +688,5 @@ func (c *Caret) splitBox() {
 	}
 	bb.next = newB
 	bb.j = c.k
+	return true
 }

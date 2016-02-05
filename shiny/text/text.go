@@ -47,6 +47,14 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// Direction is either forwards or backwards.
+type Direction bool
+
+const (
+	Forwards  Direction = false
+	Backwards Direction = true
+)
+
 // These constants are equal to os.SEEK_SET, os.SEEK_CUR and os.SEEK_END,
 // understood by the io.Seeker interface, and are provided so that users of
 // this package don't have to explicitly import "os".
@@ -147,53 +155,71 @@ func (f *Frame) SetMaxWidth(m fixed.Int26_6) {
 
 func (f *Frame) relayout() {
 	for p := f.firstP; p != 0; p = f.paragraphs[p].next {
-		f.relayoutParagraph(p)
+		l := f.mergeIntoOneLine(p)
+		layout(f, l)
 	}
 	// TODO: update Carets' p, l, b, k fields?
 }
 
-func (f *Frame) relayoutParagraph(p int32) {
-	// Merge all of pp's Lines into a single Line (the first Line) then layout
-	// that Line.
+// mergeIntoOneLine merges all of a Paragraph's Lines into a single Line, and
+// compacts its empty and otherwise joinable Boxes. It returns the index of
+// that Line.
+func (f *Frame) mergeIntoOneLine(p int32) (l int32) {
 	firstL := f.paragraphs[p].firstL
 	ll := &f.lines[firstL]
-	b := ll.firstB
-	for ll.next != 0 {
-		// Move b to the last Box in ll.
-		for {
-			if next := f.boxes[b].next; next != 0 {
-				b = next
-				continue
+	b0 := ll.firstB
+	bb0 := &f.boxes[b0]
+	for {
+		if b1 := bb0.next; b1 != 0 {
+			bb1 := &f.boxes[b1]
+			if !f.joinBoxes(b0, b1, bb0, bb1) {
+				b0, bb0 = b1, bb1
 			}
-			break
+			continue
 		}
 
-		// Join that last Box with the first Box of ll's next Line.
+		if ll.next == 0 {
+			return firstL
+		}
+
+		// Unbreak the Line.
 		nextLL := &f.lines[ll.next]
-		f.boxes[b].next = nextLL.firstB
-		f.boxes[nextLL.firstB].prev = b
-		f.joinBoxes(b, nextLL.firstB)
+		b1 := nextLL.firstB
+		bb1 := &f.boxes[b1]
+		bb0.next = b1
+		bb1.prev = b0
+
 		toFree := ll.next
 		ll.next = nextLL.next
+		// There's no need to fix up f.lines[ll.next].prev since it will just
+		// be freed later in the loop.
 		f.freeLine(toFree)
 	}
-	layout(f, firstL)
 }
 
-// joinBoxes merges two adjacent Boxes if the Box.j field of the first one
-// equals the Box.i field of the second.
-func (f *Frame) joinBoxes(b0, b1 int32) {
-	bb0 := &f.boxes[b0]
-	bb1 := &f.boxes[b1]
-	if bb0.j != bb1.i {
-		return
+// joinBoxes joins two adjacent Boxes if the Box.j field of the first one
+// equals the Box.i field of the second, or at least one of them is empty. It
+// returns whether they were joined. If they were joined, the second of the two
+// Boxes is freed.
+func (f *Frame) joinBoxes(b0, b1 int32, bb0, bb1 *Box) bool {
+	switch {
+	case bb0.i == bb0.j:
+		// The first Box is empty. Replace its i/j with the second one's.
+		bb0.i, bb0.j = bb1.i, bb1.j
+	case bb1.i == bb1.j:
+		// The second box is empty. Drop it.
+	case bb0.j == bb1.i:
+		// The two non-empty Boxes are joinable.
+		bb0.j = bb1.j
+	default:
+		return false
 	}
-	bb0.j = bb1.j
 	bb0.next = bb1.next
 	if bb0.next != 0 {
 		f.boxes[bb0.next].prev = b0
 	}
 	f.freeBox(b1)
+	return true
 }
 
 func (f *Frame) newParagraph() int32 {
