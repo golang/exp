@@ -71,10 +71,24 @@ func (c *Caret) Close() error {
 	return nil
 }
 
+type leanResult int
+
+const (
+	// leanOK means that the lean changed the Caret's Box.
+	leanOK leanResult = iota
+	// leanFailedEOF means that the lean did not change the Caret's Box,
+	// because the Caret was already at the end / beginning of the Frame (when
+	// leaning forwards / backwards).
+	leanFailedEOF
+	// leanFailedNotEOB means that the lean did not change the Caret's Box,
+	// because the Caret was not placed at the end / beginning of the Box (when
+	// leaning forwards / backwards).
+	leanFailedNotEOB
+)
+
 // leanForwards moves the Caret from the right end of one Box to the left end
 // of the next Box, crossing Lines and Paragraphs to find that next Box. It
-// returns whether the Caret moved; false means that the Caret was located at
-// the end of the Frame's text.
+// returns whether the Caret moved to a different Box.
 //
 // Diagramatically, suppose we have two adjacent boxes (shown by square
 // brackets below), with the Caret (an integer location called Caret.pos in the
@@ -82,59 +96,55 @@ func (c *Caret) Close() error {
 //	[foo0 foo1 foo2]^[bar3 bar4 bar5]
 // leanForwards moves Caret.k from fooBox.j to barBox.i, also updating the
 // Caret's p, l and b. Caret.pos remains unchanged.
-func (c *Caret) leanForwards() bool {
-	// Assert that the Caret c is at the end of its Box.
+func (c *Caret) leanForwards() leanResult {
 	if c.k != c.f.boxes[c.b].j {
-		panic("text: invalid state")
+		return leanFailedNotEOB
 	}
-
 	if nextB := c.f.boxes[c.b].next; nextB != 0 {
 		c.b = nextB
 		c.k = c.f.boxes[c.b].i
-		return true
+		return leanOK
 	}
 	if nextL := c.f.lines[c.l].next; nextL != 0 {
 		c.l = nextL
 		c.b = c.f.lines[c.l].firstB
 		c.k = c.f.boxes[c.b].i
-		return true
+		return leanOK
 	}
 	if nextP := c.f.paragraphs[c.p].next; nextP != 0 {
 		c.p = nextP
 		c.l = c.f.paragraphs[c.p].firstL
 		c.b = c.f.lines[c.l].firstB
 		c.k = c.f.boxes[c.b].i
-		return true
+		return leanOK
 	}
-	return false
+	return leanFailedEOF
 }
 
 // leanBackwards is like leanForwards but in the other direction.
-func (c *Caret) leanBackwards() bool {
-	// Assert that the Caret c is at the start of its Box.
+func (c *Caret) leanBackwards() leanResult {
 	if c.k != c.f.boxes[c.b].i {
-		panic("text: invalid state")
+		return leanFailedNotEOB
 	}
-
 	if prevB := c.f.boxes[c.b].prev; prevB != 0 {
 		c.b = prevB
 		c.k = c.f.boxes[c.b].j
-		return true
+		return leanOK
 	}
 	if prevL := c.f.lines[c.l].prev; prevL != 0 {
 		c.l = prevL
 		c.b = c.f.lines[c.l].lastBox(c.f)
 		c.k = c.f.boxes[c.b].j
-		return true
+		return leanOK
 	}
 	if prevP := c.f.paragraphs[c.p].prev; prevP != 0 {
 		c.p = prevP
 		c.l = c.f.paragraphs[c.p].lastLine(c.f)
 		c.b = c.f.lines[c.l].lastBox(c.f)
 		c.k = c.f.boxes[c.b].j
-		return true
+		return leanOK
 	}
-	return false
+	return leanFailedEOF
 }
 
 func (c *Caret) seekStart() {
@@ -195,7 +205,7 @@ func (c *Caret) Seek(offset int64, whence int) (int64, error) {
 				c.pos += n
 				c.k += n
 				delta -= n
-			} else if !c.leanForwards() {
+			} else if c.leanForwards() != leanOK {
 				panic("text: invalid state")
 			}
 		}
@@ -209,17 +219,14 @@ func (c *Caret) Seek(offset int64, whence int) (int64, error) {
 				c.pos += n
 				c.k += n
 				delta -= n
-			} else if !c.leanBackwards() {
+			} else if c.leanBackwards() != leanOK {
 				panic("text: invalid state")
 			}
 		}
 
 		// A Caret can't be placed at the end of a Paragraph, unless it is the
-		// final Paragraph. A simple way to enforce this is to lean forwards if
-		// c is at the end of its Box.
-		if c.k == c.f.boxes[c.b].j {
-			c.leanForwards()
-		}
+		// final Paragraph. A simple way to enforce this is to lean forwards.
+		c.leanForwards()
 	}
 
 	return offset, nil
@@ -231,18 +238,14 @@ func (c *Caret) Read(buf []byte) (n int, err error) {
 	for len(buf) > 0 {
 		if j := c.f.boxes[c.b].j; c.k < j {
 			nn := copy(buf, c.f.text[c.k:j])
+			buf = buf[nn:]
 			n += nn
 			c.pos += int32(nn)
 			c.k += int32(nn)
-			if c.k == j && buf[nn-1] == '\n' {
-				// A Caret can't be placed at the end of a Paragraph, unless it
-				// is the final Paragraph.
-				c.leanForwards()
-			}
-			buf = buf[nn:]
-			continue
 		}
-		if !c.leanForwards() {
+		// A Caret can't be placed at the end of a Paragraph, unless it is the
+		// final Paragraph. A simple way to enforce this is to lean forwards.
+		if c.leanForwards() == leanFailedEOF {
 			break
 		}
 	}
@@ -259,14 +262,13 @@ func (c *Caret) ReadByte() (x byte, err error) {
 			x = c.f.text[c.k]
 			c.pos++
 			c.k++
-			if x == '\n' {
-				// A Caret can't be placed at the end of a Paragraph, unless it
-				// is the final Paragraph.
-				c.leanForwards()
-			}
+			// A Caret can't be placed at the end of a Paragraph, unless it is
+			// the final Paragraph. A simple way to enforce this is to lean
+			// forwards.
+			c.leanForwards()
 			return x, nil
 		}
-		if !c.leanForwards() {
+		if c.leanForwards() == leanFailedEOF {
 			return 0, io.EOF
 		}
 	}
@@ -284,14 +286,13 @@ func (c *Caret) ReadRune() (r rune, size int, err error) {
 			}
 			c.pos += int32(size)
 			c.k += int32(size)
-			if r == '\n' {
-				// A Caret can't be placed at the end of a Paragraph, unless it
-				// is the final Paragraph.
-				c.leanForwards()
-			}
+			// A Caret can't be placed at the end of a Paragraph, unless it is
+			// the final Paragraph. A simple way to enforce this is to lean
+			// forwards.
+			c.leanForwards()
 			return r, size, nil
 		}
-		if !c.leanForwards() {
+		if c.leanForwards() == leanFailedEOF {
 			return 0, 0, io.EOF
 		}
 	}
