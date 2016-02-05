@@ -6,11 +6,13 @@ package text
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"reflect"
+	"sort"
 	"testing"
 
 	"golang.org/x/image/math/fixed"
@@ -69,6 +71,9 @@ func TestSeek(t *testing.T) {
 			t.Fatalf("i=%d: Seek: got %d, want %d", gotPos, wantPos)
 		}
 		seen[gotPos] = true
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
 
 		gotByte, gotErr := c.ReadByte()
 		wantByte, wantErr := byte(0), io.EOF
@@ -86,17 +91,26 @@ func TestSeek(t *testing.T) {
 	}
 }
 
-func TestRead(t *testing.T) {
-	f := iRobotFrame()
+func testRead(f *Frame, want string) error {
 	c := f.NewCaret()
 	defer c.Close()
 	asBytes, err := ioutil.ReadAll(c)
 	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
+		return fmt.Errorf("ReadAll: %v", err)
 	}
-	got, want := string(asBytes), iRobot
-	if got != want {
-		t.Fatalf("\ngot:  %q\nwant: %q", got, want)
+	if got := string(asBytes); got != want {
+		return fmt.Errorf("Read\ngot:  %q\nwant: %q", got, want)
+	}
+	return nil
+}
+
+func TestRead(t *testing.T) {
+	f := iRobotFrame()
+	if err := checkInvariants(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := testRead(f, iRobot); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -113,7 +127,13 @@ func TestReadByte(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadByte: %v", err)
 		}
+		if err := checkInvariants(f); err != nil {
+			t.Fatal(err)
+		}
 		got = append(got, x)
+	}
+	if err := checkInvariants(f); err != nil {
+		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("\ngot:  %v\nwant: %v", got, want)
@@ -133,7 +153,13 @@ func TestReadRune(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadRune: %v", err)
 		}
+		if err := checkInvariants(f); err != nil {
+			t.Fatal(err)
+		}
 		got = append(got, r)
+	}
+	if err := checkInvariants(f); err != nil {
+		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("\ngot:  %v\nwant: %v", got, want)
@@ -148,6 +174,9 @@ func TestWrite(t *testing.T) {
 	c.WriteRune('\U0001f4a9')
 	c.WriteString("abc\x00")
 	c.Close()
+	if err := checkInvariants(f); err != nil {
+		t.Fatal(err)
+	}
 	got := f.text[:f.len]
 	want := []byte{0xff, 0xfe, 0xfd, 0x80, 0xf0, 0x9f, 0x92, 0xa9, 0x61, 0x62, 0x63, 0x00}
 	if !bytes.Equal(got, want) {
@@ -155,8 +184,180 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+func TestSetMaxWidth(t *testing.T) {
+	f := iRobotFrame()
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < 100; i++ {
+		f.SetMaxWidth(fixed.I(rng.Intn(20)))
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+		if err := testRead(f, iRobot); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+	}
+}
+
 // TODO: fuzz-test that all the invariants remain true when modifying a Frame's
 // text.
-//
-// TODO: enumerate all of the invariants, e.g. that the Boxes' i:j ranges do
-// not overlap.
+
+type ijRange struct {
+	i, j int32
+}
+
+type byI []ijRange
+
+func (b byI) Len() int           { return len(b) }
+func (b byI) Less(x, y int) bool { return b[x].i < b[y].i }
+func (b byI) Swap(x, y int)      { b[x], b[y] = b[y], b[x] }
+
+// TODO: ensure that checkInvariants accepts a zero-valued Frame.
+func checkInvariants(f *Frame) error {
+	const infinity = 1e6
+
+	// Iterate through the Paragraphs, Lines and Boxes. Check that every first
+	// child has no previous sibling, and no child is the first child of
+	// multiple parents.
+	nUsedParagraphs, nUsedLines, nUsedBoxes := 0, 0, 0
+	{
+		firstLines := map[int32]bool{}
+		firstBoxes := map[int32]bool{}
+		p := f.firstP
+		if p == 0 {
+			return fmt.Errorf("firstP is zero")
+		}
+		if x := f.paragraphs[p].prev; x != 0 {
+			return fmt.Errorf("first Paragraph %d's prev: got %d, want 0", p, x)
+		}
+
+		for ; p != 0; p = f.paragraphs[p].next {
+			l := f.paragraphs[p].firstL
+			if l == 0 {
+				return fmt.Errorf("paragraphs[%d].firstL is zero", p)
+			}
+			if x := f.lines[l].prev; x != 0 {
+				return fmt.Errorf("first Line %d's prev: got %d, want 0", l, x)
+			}
+			if firstLines[l] {
+				return fmt.Errorf("duplicate first Line %d", l)
+			}
+			firstLines[l] = true
+
+			for ; l != 0; l = f.lines[l].next {
+				b := f.lines[l].firstB
+				if b == 0 {
+					return fmt.Errorf("lines[%d].firstB is zero", l)
+				}
+				if x := f.boxes[b].prev; x != 0 {
+					return fmt.Errorf("first Box %d's prev: got %d, want 0", b, x)
+				}
+				if firstBoxes[b] {
+					return fmt.Errorf("duplicate first Box %d", b)
+				}
+				firstBoxes[b] = true
+
+				for ; b != 0; b = f.boxes[b].next {
+					nUsedBoxes++
+					if nUsedBoxes >= infinity {
+						return fmt.Errorf("too many used Boxes (infinite loop?)")
+					}
+				}
+				nUsedLines++
+			}
+			nUsedParagraphs++
+		}
+	}
+
+	// TODO: copy/paste the boxes checks below to apply to paragraphs and
+	// lines.
+
+	// Check the boxes.
+	for b, bb := range f.boxes {
+		if b == 0 {
+			if bb != (Box{}) {
+				return fmt.Errorf("boxes[0] is a non-zero Box: %v", bb)
+			}
+			continue
+		}
+		if bb.next < 0 || len(f.boxes) <= int(bb.next) {
+			return fmt.Errorf("invalid boxes[%d].next: got %d, want in [0, %d)", b, bb.next, len(f.boxes))
+		}
+		if len(f.boxes) <= int(bb.prev) {
+			return fmt.Errorf("invalid boxes[%d].prev: got %d, want in [0, %d)", b, bb.prev, len(f.boxes))
+		}
+		if bb.prev < 0 {
+			// The Box is in the free-list, which is checked separately below.
+			continue
+		}
+		if bb.next != 0 && f.boxes[bb.next].prev != int32(b) {
+			return fmt.Errorf("invalid links: boxes[%d].next=%d, boxes[%d].prev=%d",
+				b, bb.next, bb.next, f.boxes[bb.next].prev)
+		}
+		if bb.prev != 0 && f.boxes[bb.prev].next != int32(b) {
+			return fmt.Errorf("invalid links: boxes[%d].prev=%d, boxes[%d].next=%d",
+				b, bb.prev, bb.prev, f.boxes[bb.prev].next)
+		}
+		if 0 > bb.i || bb.i > bb.j || bb.j > int32(len(f.text)) {
+			return fmt.Errorf("invalid boxes[%d] i/j range: i=%d, j=%d, len=%d", b, bb.i, bb.j, len(f.text))
+		}
+	}
+
+	// Check the boxes' free-list.
+	nFreeBoxes := 0
+	for b := f.freeB; b != 0; nFreeBoxes++ {
+		if nFreeBoxes >= infinity {
+			return fmt.Errorf("Box free-list is too long (infinite loop?)")
+		}
+		if b < 0 || len(f.boxes) <= int(b) {
+			return fmt.Errorf("invalid Box free-list index: got %d, want in [0, %d)", b, len(f.boxes))
+		}
+		bb := &f.boxes[b]
+		if bb.i != 0 || bb.j != 0 || bb.prev >= 0 {
+			return fmt.Errorf("boxes[%d] is an invalid free-list element: %#v", b, *bb)
+		}
+		b = bb.next
+	}
+
+	// Check that the boxes' i:j ranges do not overlap, and their total length
+	// equals f.len.
+	nText, ijRanges := 0, []ijRange{}
+	for _, bb := range f.boxes {
+		if bb.i < bb.j {
+			nText += int(bb.j - bb.i)
+			ijRanges = append(ijRanges, ijRange{i: bb.i, j: bb.j})
+		}
+	}
+	sort.Sort(byI(ijRanges))
+	for x := range ijRanges {
+		if x == 0 {
+			continue
+		}
+		if ijRanges[x-1].j > ijRanges[x].i {
+			return fmt.Errorf("overlapping Box i:j ranges: %v and %v", ijRanges[x-1], ijRanges[x])
+		}
+	}
+	if nText != f.len {
+		return fmt.Errorf("text length: got %d, want %d", nText, f.len)
+	}
+
+	// Check that every Box, other than the 0th, is either used or free.
+	//
+	// TODO: likewise for paragraphs and lines.
+	if len(f.boxes) != 1+nUsedBoxes+nFreeBoxes {
+		return fmt.Errorf("#boxes (%d) != 1 + #used (%d) + #free (%d)", len(f.boxes), nUsedBoxes, nFreeBoxes)
+	}
+
+	return nil
+}
+
+// dump is used for debugging.
+func dump(w io.Writer, f *Frame) {
+	for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
+		for l := p.FirstLine(f); l != nil; l = l.Next(f) {
+			for b := l.FirstBox(f); b != nil; b = b.Next(f) {
+				fmt.Fprintf(w, "[%s]", b.TrimmedText(f))
+			}
+			fmt.Fprintln(w)
+		}
+	}
+}

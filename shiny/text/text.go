@@ -36,6 +36,9 @@
 // such modifications.
 package text // import "golang.org/x/exp/shiny/text"
 
+// TODO: for the various Frame and Caret methods, be principled about whether
+// callee or caller is responsible for fixing up other Carets.
+
 import (
 	"io"
 	"unicode/utf8"
@@ -71,17 +74,26 @@ type Frame struct {
 	// insertion has lower algorithmic complexity. Similarly for a Paragraph's
 	// list of children (Lines) and a Line's list of children (Boxes).
 	//
-	// The 0'th index into each slice is a special case.
+	// The 0'th index into each slice is a special case. Otherwise, each
+	// element is either in use (forming a double linked list with its
+	// siblings) or in a free list (forming a single linked list; the prev
+	// field is -1).
 	//
 	// A zero firstFoo field means that the parent holds a single, implicit
 	// (lazily allocated), empty-but-not-nil *Foo child. Every Frame contains
 	// at least one Paragraph. Similarly, every Paragraph contains at least one
 	// Line, and every Line contains at least one Box.
 	//
-	// A zero next or prev field means that there is no such sibling.
+	// A zero next or prev field means that there is no such sibling (for an
+	// in-use Paragraph, Line or Box) or no such next free element (if in the
+	// free list).
 	paragraphs []Paragraph
 	lines      []Line
 	boxes      []Box
+
+	// freeX is the index of the first X (Paragraph, Line or Box) in the
+	// respective free list. Zero means that there is no such free element.
+	freeP, freeL, freeB int32
 
 	firstP int32
 
@@ -112,7 +124,7 @@ type Frame struct {
 func (f *Frame) SetFace(face font.Face) {
 	f.face = face
 	if f.len != 0 {
-		panic("TODO: re-layout existing textual content")
+		f.relayout()
 	}
 }
 
@@ -124,13 +136,74 @@ func (f *Frame) SetFace(face font.Face) {
 //
 // A non-positive argument is treated as an infinite maximum width.
 func (f *Frame) SetMaxWidth(m fixed.Int26_6) {
+	if f.maxWidth == m {
+		return
+	}
 	f.maxWidth = m
 	if f.len != 0 {
-		panic("TODO: re-layout existing textual content")
+		f.relayout()
 	}
 }
 
+func (f *Frame) relayout() {
+	for p := f.firstP; p != 0; p = f.paragraphs[p].next {
+		f.relayoutParagraph(p)
+	}
+	// TODO: update Carets' p, l, b, k fields?
+}
+
+func (f *Frame) relayoutParagraph(p int32) {
+	// Merge all of pp's Lines into a single Line (the first Line) then layout
+	// that Line.
+	firstL := f.paragraphs[p].firstL
+	ll := &f.lines[firstL]
+	b := ll.firstB
+	for ll.next != 0 {
+		// Move b to the last Box in ll.
+		for {
+			if next := f.boxes[b].next; next != 0 {
+				b = next
+				continue
+			}
+			break
+		}
+
+		// Join that last Box with the first Box of ll's next Line.
+		nextLL := &f.lines[ll.next]
+		f.boxes[b].next = nextLL.firstB
+		f.boxes[nextLL.firstB].prev = b
+		f.joinBoxes(b, nextLL.firstB)
+		toFree := ll.next
+		ll.next = nextLL.next
+		f.freeLine(toFree)
+	}
+	layout(f, firstL)
+}
+
+// joinBoxes merges two adjacent Boxes if the Box.j field of the first one
+// equals the Box.i field of the second.
+func (f *Frame) joinBoxes(b0, b1 int32) {
+	bb0 := &f.boxes[b0]
+	bb1 := &f.boxes[b1]
+	if bb0.j != bb1.i {
+		return
+	}
+	bb0.j = bb1.j
+	bb0.next = bb1.next
+	if bb0.next != 0 {
+		f.boxes[bb0.next].prev = b0
+	}
+	f.freeBox(b1)
+}
+
 func (f *Frame) newParagraph() int32 {
+	if f.freeP != 0 {
+		p := f.freeP
+		pp := &f.paragraphs[p]
+		f.freeP = pp.next
+		*pp = Paragraph{}
+		return p
+	}
 	if len(f.paragraphs) == 0 {
 		// The 1 is because the 0'th index is a special case.
 		f.paragraphs = make([]Paragraph, 1, 16)
@@ -140,6 +213,13 @@ func (f *Frame) newParagraph() int32 {
 }
 
 func (f *Frame) newLine() int32 {
+	if f.freeL != 0 {
+		l := f.freeL
+		ll := &f.lines[l]
+		f.freeL = ll.next
+		*ll = Line{}
+		return l
+	}
 	if len(f.lines) == 0 {
 		// The 1 is because the 0'th index is a special case.
 		f.lines = make([]Line, 1, 16)
@@ -149,12 +229,37 @@ func (f *Frame) newLine() int32 {
 }
 
 func (f *Frame) newBox() int32 {
+	if f.freeB != 0 {
+		b := f.freeB
+		bb := &f.boxes[b]
+		f.freeB = bb.next
+		*bb = Box{}
+		return b
+	}
 	if len(f.boxes) == 0 {
 		// The 1 is because the 0'th index is a special case.
 		f.boxes = make([]Box, 1, 16)
 	}
 	f.boxes = append(f.boxes, Box{})
 	return int32(len(f.boxes) - 1)
+}
+
+func (f *Frame) freeParagraph(p int32) {
+	f.paragraphs[p] = Paragraph{next: f.freeP, prev: -1}
+	f.freeP = p
+	// TODO: run a compaction if the free-list is too large?
+}
+
+func (f *Frame) freeLine(l int32) {
+	f.lines[l] = Line{next: f.freeL, prev: -1}
+	f.freeL = l
+	// TODO: run a compaction if the free-list is too large?
+}
+
+func (f *Frame) freeBox(b int32) {
+	f.boxes[b] = Box{next: f.freeB, prev: -1}
+	f.freeB = b
+	// TODO: run a compaction if the free-list is too large?
 }
 
 func (f *Frame) lastParagraph() int32 {
