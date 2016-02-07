@@ -8,6 +8,7 @@ package text
 // now.
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"strings"
@@ -50,9 +51,11 @@ type Caret struct {
 	// fields. For a Caret c, letting bb := c.f.boxes[c.b], an invariant is
 	// that bb.i <= c.k && c.k <= bb.j.
 	k int32
+
+	tmp [utf8.UTFMax]byte
 }
 
-// TODO: many Caret methods: WriteXxx, Delete, maybe others.
+// TODO: many Caret methods: Delete, maybe others.
 
 // Close closes the Caret.
 func (c *Caret) Close() error {
@@ -298,16 +301,32 @@ func (c *Caret) ReadRune() (r rune, size int, err error) {
 	}
 }
 
-// WriteString inserts s into the Frame's text at the Caret.
-//
-// The error returned is always nil.
+// WriteByte inserts x into the Frame's text at the Caret and increments the
+// Caret.
+func (c *Caret) WriteByte(x byte) error {
+	c.tmp[0] = x
+	return c.write(c.tmp[:1], "")
+}
+
+// WriteRune inserts r into the Frame's text at the Caret and increments the
+// Caret.
+func (c *Caret) WriteRune(r rune) (size int, err error) {
+	size = utf8.EncodeRune(c.tmp[:], r)
+	if err = c.write(c.tmp[:size], ""); err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
+// WriteString inserts s into the Frame's text at the Caret and increments the
+// Caret.
 func (c *Caret) WriteString(s string) (n int, err error) {
 	for len(s) > 0 {
 		i := 1 + strings.IndexByte(s, '\n')
 		if i == 0 {
 			i = len(s)
 		}
-		if err = c.writeString(s[:i]); err != nil {
+		if err = c.write(nil, s[:i]); err != nil {
 			break
 		}
 		n += i
@@ -316,12 +335,29 @@ func (c *Caret) WriteString(s string) (n int, err error) {
 	return n, err
 }
 
-// writeString inserts s into the Frame's text at the Caret.
+// Write inserts s into the Frame's text at the Caret and increments the Caret.
+func (c *Caret) Write(s []byte) (n int, err error) {
+	for len(s) > 0 {
+		i := 1 + bytes.IndexByte(s, '\n')
+		if i == 0 {
+			i = len(s)
+		}
+		if err = c.write(s[:i], ""); err != nil {
+			break
+		}
+		n += i
+		s = s[i:]
+	}
+	return n, err
+}
+
+// write inserts a []byte or string into the Frame's text at the Caret.
 //
-// s must be non-empty, it must contain at most one '\n' and if it does contain
-// one, it must be the final byte.
-func (c *Caret) writeString(s string) error {
-	if len(s) > maxLen-len(c.f.text) {
+// Exactly one of s0 and s1 must be non-empty. That non-empty argument must
+// contain at most one '\n' and if it does contain one, it must be the final
+// byte.
+func (c *Caret) write(s0 []byte, s1 string) error {
+	if m := maxLen - len(c.f.text); len(s0) > m || len(s1) > m {
 		return errors.New("text: insufficient space for writing")
 	}
 
@@ -347,19 +383,27 @@ func (c *Caret) writeString(s string) error {
 		panic("text: invalid state")
 	}
 
-	c.f.text = append(c.f.text, s...)
-	c.f.len += len(s)
-	c.f.boxes[c.b].j += int32(len(s))
-	c.k += int32(len(s))
+	length, nl := len(s0), false
+	if length > 0 {
+		nl = s0[length-1] == '\n'
+		c.f.text = append(c.f.text, s0...)
+	} else {
+		length = len(s1)
+		nl = s1[length-1] == '\n'
+		c.f.text = append(c.f.text, s1...)
+	}
+	c.f.len += length
+	c.f.boxes[c.b].j += int32(length)
+	c.k += int32(length)
 	for _, cc := range c.f.carets {
 		if cc.pos > c.pos {
-			cc.pos += int32(len(s))
+			cc.pos += int32(length)
 		}
 	}
-	c.pos += int32(len(s))
+	c.pos += int32(length)
 	oldL := c.l
 
-	if s[len(s)-1] == '\n' {
+	if nl {
 		breakParagraph(c.f, c.p, c.l, c.b)
 		c.p = c.f.paragraphs[c.p].next
 		c.l = c.f.paragraphs[c.p].firstL

@@ -5,6 +5,7 @@
 package text
 
 import (
+	"bytes"
 	"image"
 	"io"
 	"io/ioutil"
@@ -136,6 +137,21 @@ func TestReadRune(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("\ngot:  %v\nwant: %v", got, want)
+	}
+}
+
+func TestWrite(t *testing.T) {
+	f := new(Frame)
+	c := f.NewCaret()
+	c.Write([]byte{0xff, 0xfe, 0xfd})
+	c.WriteByte(0x80)
+	c.WriteRune('\U0001f4a9')
+	c.WriteString("abc\x00")
+	c.Close()
+	got := f.text[:f.len]
+	want := []byte{0xff, 0xfe, 0xfd, 0x80, 0xf0, 0x9f, 0x92, 0xa9, 0x61, 0x62, 0x63, 0x00}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("\ngot  % x\nwant % x", got, want)
 	}
 }
 
