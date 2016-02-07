@@ -55,7 +55,7 @@ func (t *textureImpl) Release() {
 }
 
 func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	src.(*bufferImpl).upload(t, xproto.Drawable(t.xm), t.s.gcontext32, textureDepth, dp, sr)
+	src.(*bufferImpl).upload(xproto.Drawable(t.xm), t.s.gcontext32, textureDepth, dp, sr)
 }
 
 func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {

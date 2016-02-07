@@ -18,7 +18,6 @@ import (
 	"github.com/BurntSushi/xgb/xproto"
 
 	"golang.org/x/exp/shiny/driver/internal/swizzle"
-	"golang.org/x/exp/shiny/screen"
 )
 
 type bufferImpl struct {
@@ -107,9 +106,7 @@ func (b *bufferImpl) cleanUp() {
 	}
 }
 
-func (b *bufferImpl) upload(u screen.Uploader, xd xproto.Drawable, xg xproto.Gcontext, depth uint8,
-	dp image.Point, sr image.Rectangle) {
-
+func (b *bufferImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) {
 	b.preUpload()
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
