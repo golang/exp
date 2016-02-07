@@ -243,40 +243,45 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 	if w < 0 || maxShmSide < w || h < 0 || maxShmSide < h || maxShmSize < 4*w*h {
 		return nil, fmt.Errorf("x11driver: invalid buffer size %v", size)
 	}
-	xs, err := shm.NewSegId(s.xc)
-	if err != nil {
-		return nil, fmt.Errorf("x11driver: shm.NewSegId: %v", err)
-	}
-
-	bufLen := 4 * size.X * size.Y
-	shmid, addr, err := shmOpen(bufLen)
-	if err != nil {
-		return nil, fmt.Errorf("x11driver: shmOpen: %v", err)
-	}
-	defer func() {
-		if retErr != nil {
-			shmClose(addr)
-		}
-	}()
-	a := (*[maxShmSize]byte)(addr)
-	buf := (*a)[:bufLen:bufLen]
-
-	// readOnly is whether the shared memory is read-only from the X11 server's
-	// point of view. We need false to use SHM pixmaps.
-	const readOnly = false
-	shm.Attach(s.xc, xs, uint32(shmid), readOnly)
 
 	b := &bufferImpl{
-		s:    s,
-		addr: addr,
-		buf:  buf,
+		s: s,
 		rgba: image.RGBA{
-			Pix:    buf,
 			Stride: 4 * size.X,
 			Rect:   image.Rectangle{Max: size},
 		},
 		size: size,
-		xs:   xs,
+	}
+
+	if size.X == 0 || size.Y == 0 {
+		// No-op, but we can't take the else path because the minimum shmget
+		// size is 1.
+	} else {
+		xs, err := shm.NewSegId(s.xc)
+		if err != nil {
+			return nil, fmt.Errorf("x11driver: shm.NewSegId: %v", err)
+		}
+
+		bufLen := 4 * size.X * size.Y
+		shmid, addr, err := shmOpen(bufLen)
+		if err != nil {
+			return nil, fmt.Errorf("x11driver: shmOpen: %v", err)
+		}
+		defer func() {
+			if retErr != nil {
+				shmClose(addr)
+			}
+		}()
+		a := (*[maxShmSize]byte)(addr)
+		b.buf = (*a)[:bufLen:bufLen]
+		b.rgba.Pix = b.buf
+		b.addr = addr
+
+		// readOnly is whether the shared memory is read-only from the X11 server's
+		// point of view. We need false to use SHM pixmaps.
+		const readOnly = false
+		shm.Attach(s.xc, xs, uint32(shmid), readOnly)
+		b.xs = xs
 	}
 
 	s.mu.Lock()
@@ -291,6 +296,12 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	if w < 0 || maxShmSide < w || h < 0 || maxShmSide < h || maxShmSize < 4*w*h {
 		return nil, fmt.Errorf("x11driver: invalid texture size %v", size)
 	}
+	if w == 0 || h == 0 {
+		return &textureImpl{
+			s:    s,
+			size: size,
+		}, nil
+	}
 
 	xm, err := xproto.NewPixmapId(s.xc)
 	if err != nil {
@@ -300,18 +311,16 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	if err != nil {
 		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
 	}
+	xproto.CreatePixmap(s.xc, textureDepth, xm, xproto.Drawable(s.window32), uint16(w), uint16(h))
+	render.CreatePicture(s.xc, xp, xproto.Drawable(xm), s.pictformat32, 0, nil)
+	render.SetPictureFilter(s.xc, xp, uint16(len("bilinear")), "bilinear", nil)
 
-	t := &textureImpl{
+	return &textureImpl{
 		s:    s,
 		size: size,
 		xm:   xm,
 		xp:   xp,
-	}
-
-	xproto.CreatePixmap(s.xc, textureDepth, xm, xproto.Drawable(s.window32), uint16(w), uint16(h))
-	render.CreatePicture(s.xc, xp, xproto.Drawable(xm), s.pictformat32, 0, nil)
-	render.SetPictureFilter(s.xc, xp, uint16(len("bilinear")), "bilinear", nil)
-	return t, nil
+	}, nil
 }
 
 func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {

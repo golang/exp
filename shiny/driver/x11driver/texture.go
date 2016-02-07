@@ -38,6 +38,7 @@ type textureImpl struct {
 	released   bool
 }
 
+func (t *textureImpl) degenerate() bool        { return t.size.X == 0 || t.size.Y == 0 }
 func (t *textureImpl) Size() image.Point       { return t.size }
 func (t *textureImpl) Bounds() image.Rectangle { return image.Rectangle{Max: t.size} }
 
@@ -47,7 +48,7 @@ func (t *textureImpl) Release() {
 	t.released = true
 	t.releasedMu.Unlock()
 
-	if released {
+	if released || t.degenerate() {
 		return
 	}
 	render.FreePicture(t.s.xc, t.xp)
@@ -55,10 +56,16 @@ func (t *textureImpl) Release() {
 }
 
 func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+	if t.degenerate() {
+		return
+	}
 	src.(*bufferImpl).upload(xproto.Drawable(t.xm), t.s.gcontext32, textureDepth, dp, sr)
 }
 
 func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	if t.degenerate() {
+		return
+	}
 	fill(t.s.xc, t.xp, dr, src, op)
 }
 
@@ -81,6 +88,10 @@ func inv(x *f64.Aff3) f64.Aff3 {
 
 func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, w, h int, opts *screen.DrawOptions) {
 	// TODO: honor sr.Max
+
+	if t.degenerate() {
+		return
+	}
 
 	t.renderMu.Lock()
 	defer t.renderMu.Unlock()

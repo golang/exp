@@ -35,6 +35,7 @@ type bufferImpl struct {
 	cleanedUp bool
 }
 
+func (b *bufferImpl) degenerate() bool        { return b.size.X == 0 || b.size.Y == 0 }
 func (b *bufferImpl) Size() image.Point       { return b.size }
 func (b *bufferImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
 func (b *bufferImpl) RGBA() *image.RGBA       { return &b.rgba }
@@ -100,6 +101,9 @@ func (b *bufferImpl) cleanUp() {
 	delete(b.s.buffers, b.xs)
 	b.s.mu.Unlock()
 
+	if b.degenerate() {
+		return
+	}
 	shm.Detach(b.s.xc, b.xs)
 	if err := shmClose(b.addr); err != nil {
 		log.Printf("x11driver: shmClose: %v", err)
@@ -107,6 +111,9 @@ func (b *bufferImpl) cleanUp() {
 }
 
 func (b *bufferImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) {
+	if b.degenerate() {
+		return
+	}
 	b.preUpload()
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
