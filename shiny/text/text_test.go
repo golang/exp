@@ -268,8 +268,93 @@ func checkInvariants(f *Frame) error {
 		}
 	}
 
-	// TODO: copy/paste the boxes checks below to apply to paragraphs and
-	// lines.
+	// Check the paragraphs.
+	for p, pp := range f.paragraphs {
+		if p == 0 {
+			if pp != (Paragraph{}) {
+				return fmt.Errorf("paragraphs[0] is a non-zero Paragraph: %v", pp)
+			}
+			continue
+		}
+		if pp.next < 0 || len(f.paragraphs) <= int(pp.next) {
+			return fmt.Errorf("invalid paragraphs[%d].next: got %d, want in [0, %d)", p, pp.next, len(f.paragraphs))
+		}
+		if len(f.paragraphs) <= int(pp.prev) {
+			return fmt.Errorf("invalid paragraphs[%d].prev: got %d, want in [0, %d)", p, pp.prev, len(f.paragraphs))
+		}
+		if pp.prev < 0 {
+			// The Paragraph is in the free-list, which is checked separately below.
+			continue
+		}
+		if pp.next != 0 && f.paragraphs[pp.next].prev != int32(p) {
+			return fmt.Errorf("invalid links: paragraphs[%d].next=%d, paragraphs[%d].prev=%d",
+				p, pp.next, pp.next, f.paragraphs[pp.next].prev)
+		}
+		if pp.prev != 0 && f.paragraphs[pp.prev].next != int32(p) {
+			return fmt.Errorf("invalid links: paragraphs[%d].prev=%d, paragraphs[%d].next=%d",
+				p, pp.prev, pp.prev, f.paragraphs[pp.prev].next)
+		}
+	}
+
+	// Check the paragraphs' free-list.
+	nFreeParagraphs := 0
+	for p := f.freeP; p != 0; nFreeParagraphs++ {
+		if nFreeParagraphs >= infinity {
+			return fmt.Errorf("Paragraph free-list is too long (infinite loop?)")
+		}
+		if p < 0 || len(f.paragraphs) <= int(p) {
+			return fmt.Errorf("invalid Paragraph free-list index: got %d, want in [0, %d)", p, len(f.paragraphs))
+		}
+		pp := &f.paragraphs[p]
+		if pp.prev >= 0 {
+			return fmt.Errorf("paragraphs[%d] is an invalid free-list element: %#v", p, *pp)
+		}
+		p = pp.next
+	}
+
+	// Check the lines.
+	for l, ll := range f.lines {
+		if l == 0 {
+			if ll != (Line{}) {
+				return fmt.Errorf("lines[0] is a non-zero Line: %v", ll)
+			}
+			continue
+		}
+		if ll.next < 0 || len(f.lines) <= int(ll.next) {
+			return fmt.Errorf("invalid lines[%d].next: got %d, want in [0, %d)", l, ll.next, len(f.lines))
+		}
+		if len(f.lines) <= int(ll.prev) {
+			return fmt.Errorf("invalid lines[%d].prev: got %d, want in [0, %d)", l, ll.prev, len(f.lines))
+		}
+		if ll.prev < 0 {
+			// The Line is in the free-list, which is checked separately below.
+			continue
+		}
+		if ll.next != 0 && f.lines[ll.next].prev != int32(l) {
+			return fmt.Errorf("invalid links: lines[%d].next=%d, lines[%d].prev=%d",
+				l, ll.next, ll.next, f.lines[ll.next].prev)
+		}
+		if ll.prev != 0 && f.lines[ll.prev].next != int32(l) {
+			return fmt.Errorf("invalid links: lines[%d].prev=%d, lines[%d].next=%d",
+				l, ll.prev, ll.prev, f.lines[ll.prev].next)
+		}
+	}
+
+	// Check the lines' free-list.
+	nFreeLines := 0
+	for l := f.freeL; l != 0; nFreeLines++ {
+		if nFreeLines >= infinity {
+			return fmt.Errorf("Line free-list is too long (infinite loop?)")
+		}
+		if l < 0 || len(f.lines) <= int(l) {
+			return fmt.Errorf("invalid Line free-list index: got %d, want in [0, %d)", l, len(f.lines))
+		}
+		ll := &f.lines[l]
+		if ll.prev >= 0 {
+			return fmt.Errorf("lines[%d] is an invalid free-list element: %#v", l, *ll)
+		}
+		l = ll.next
+	}
 
 	// Check the boxes.
 	for b, bb := range f.boxes {
@@ -340,9 +425,15 @@ func checkInvariants(f *Frame) error {
 		return fmt.Errorf("text length: got %d, want %d", nText, f.len)
 	}
 
-	// Check that every Box, other than the 0th, is either used or free.
-	//
-	// TODO: likewise for paragraphs and lines.
+	// Check that every Paragraph, Line and Box, other than the 0th of each, is
+	// either used or free.
+	if len(f.paragraphs) != 1+nUsedParagraphs+nFreeParagraphs {
+		return fmt.Errorf("#paragraphs (%d) != 1 + #used (%d) + #free (%d)",
+			len(f.paragraphs), nUsedParagraphs, nFreeParagraphs)
+	}
+	if len(f.lines) != 1+nUsedLines+nFreeLines {
+		return fmt.Errorf("#lines (%d) != 1 + #used (%d) + #free (%d)", len(f.lines), nUsedLines, nFreeLines)
+	}
 	if len(f.boxes) != 1+nUsedBoxes+nFreeBoxes {
 		return fmt.Errorf("#boxes (%d) != 1 + #used (%d) + #free (%d)", len(f.boxes), nUsedBoxes, nFreeBoxes)
 	}

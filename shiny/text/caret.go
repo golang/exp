@@ -501,8 +501,6 @@ func breakLine(f *Frame, l, b, k int32) {
 	ll := &f.lines[l]
 	if ll.next == 0 {
 		newL := f.newLine()
-		f.lines[ll.next].prev = newL
-		f.lines[newL].next = ll.next
 		f.lines[newL].prev = l
 		ll.next = newL
 	}
