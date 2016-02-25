@@ -187,10 +187,17 @@ func (w *windowImpl) handleKey(detail xproto.Keycode, state uint16, dir key.Dire
 func (w *windowImpl) handleMouse(x, y int16, b xproto.Button, state uint16, dir mouse.Direction) {
 	// TODO: should a mouse.Event have a separate MouseModifiers field, for
 	// which buttons are pressed during a mouse move?
+	btn := mouse.Button(b)
+	switch b {
+	case 4:
+		btn = mouse.ButtonWheelUp
+	case 5:
+		btn = mouse.ButtonWheelDown
+	}
 	w.Send(mouse.Event{
 		X:         float32(x),
 		Y:         float32(y),
-		Button:    mouse.Button(b),
+		Button:    btn,
 		Modifiers: x11key.KeyModifiers(state),
 		Direction: dir,
 	})
