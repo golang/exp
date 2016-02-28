@@ -12,6 +12,7 @@ package win32 // import "golang.org/x/exp/shiny/driver/internal/win32"
 import (
 	"fmt"
 	"runtime"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -39,7 +40,25 @@ const (
 	msgLast
 )
 
-var nextWM uint32 = msgLast
+// userWM is used to generate private (WM_USER and above) window message IDs
+// for use by screenWindowWndProc and windowWndProc.
+type userWM struct {
+	sync.Mutex
+	id uint32
+}
+
+func (m *userWM) next() uint32 {
+	m.Lock()
+	if m.id == 0 {
+		m.id = msgLast
+	}
+	r := m.id
+	m.id++
+	m.Unlock()
+	return r
+}
+
+var currentUserWM userWM
 
 func newWindow(opts *screen.NewWindowOptions) (HWND, error) {
 	// TODO(brainman): convert windowClass to *uint16 once (in initWindowClass)
@@ -238,8 +257,7 @@ func sendPaint(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr)
 var screenMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){}
 
 func AddScreenMsg(fn func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)) uint32 {
-	uMsg := nextWM
-	nextWM++
+	uMsg := currentUserWM.next()
 	screenMsgs[uMsg] = func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) uintptr {
 		fn(hwnd, uMsg, wParam, lParam)
 		return 0
@@ -293,8 +311,7 @@ var windowMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)
 }
 
 func AddWindowMsg(fn func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)) uint32 {
-	uMsg := nextWM
-	nextWM++
+	uMsg := currentUserWM.next()
 	windowMsgs[uMsg] = func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) uintptr {
 		fn(hwnd, uMsg, wParam, lParam)
 		return 0
