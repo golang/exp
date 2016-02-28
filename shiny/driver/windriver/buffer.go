@@ -24,7 +24,6 @@ type bufferImpl struct {
 
 	mu        sync.Mutex
 	nUpload   uint32
-	reusable  bool
 	released  bool
 	cleanedUp bool
 }
@@ -33,7 +32,7 @@ func (b *bufferImpl) Size() image.Point       { return b.size }
 func (b *bufferImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
 func (b *bufferImpl) RGBA() *image.RGBA       { return &b.rgba }
 
-func (b *bufferImpl) preUpload(reusable bool) {
+func (b *bufferImpl) preUpload() {
 	// Check that the program hasn't tried to modify the rgba field via the
 	// pointer returned by the bufferImpl.RGBA method. This check doesn't catch
 	// 100% of all cases; it simply tries to detect some invalid uses of a
@@ -53,7 +52,6 @@ func (b *bufferImpl) preUpload(reusable bool) {
 		swizzle.BGRA(b.buf)
 	}
 	b.nUpload++
-	b.reusable = b.reusable && reusable
 }
 
 func (b *bufferImpl) postUpload() {
@@ -67,7 +65,7 @@ func (b *bufferImpl) postUpload() {
 
 	if b.released {
 		go b.cleanUp()
-	} else if b.reusable {
+	} else {
 		swizzle.BGRA(b.buf)
 	}
 }
@@ -96,7 +94,7 @@ func (b *bufferImpl) cleanUp() {
 }
 
 func (b *bufferImpl) blitToDC(dc win32.HDC, dp image.Point, sr image.Rectangle) error {
-	b.preUpload(true)
+	b.preUpload()
 	defer b.postUpload()
 
 	return copyBitmapToDC(dc, dp, b.hbitmap, sr, draw.Src)

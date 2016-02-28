@@ -52,8 +52,7 @@ func (*screenImpl) NewBuffer(size image.Point) (screen.Buffer, error) {
 			Stride: 4 * size.X,
 			Rect:   image.Rectangle{Max: size},
 		},
-		size:     size,
-		reusable: true,
+		size: size,
 	}, nil
 }
 

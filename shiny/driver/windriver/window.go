@@ -90,7 +90,7 @@ func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
 	// TODO(brainman): move preUpload / postUpload out of handleUpload,
 	// because handleUpload can only be executed by one (message pump)
 	// thread only
-	u.src.preUpload(true)
+	u.src.preUpload()
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	err = copyBitmapToDC(dc, u.dp, u.src.hbitmap, u.sr, draw.Src)
