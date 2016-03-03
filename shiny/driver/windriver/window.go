@@ -48,30 +48,24 @@ func (w *windowImpl) Release() {
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	completion := make(chan struct{})
-
 	// Protect struct contents from being GCed
 	uploadsMu.Lock()
 	uploadID++
 	id := uploadID
 	uploads[id] = upload{
-		dp:         dp,
-		src:        src.(*bufferImpl),
-		sr:         sr,
-		completion: completion,
+		dp:  dp,
+		src: src.(*bufferImpl),
+		sr:  sr,
 	}
 	uploadsMu.Unlock()
 
 	win32.SendMessage(w.hwnd, msgUpload, id, 0)
-
-	<-completion
 }
 
 type upload struct {
-	dp         image.Point
-	src        *bufferImpl
-	sr         image.Rectangle
-	completion chan struct{}
+	dp  image.Point
+	src *bufferImpl
+	sr  image.Rectangle
 }
 
 func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
@@ -91,13 +85,10 @@ func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
 	// because handleUpload can only be executed by one (message pump)
 	// thread only
 	u.src.preUpload()
+	defer u.src.postUpload()
 
 	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
 	err = copyBitmapToDC(dc, u.dp, u.src.hbitmap, u.sr, draw.Src)
-	go func() {
-		u.src.postUpload()
-		close(u.completion)
-	}()
 	if err != nil {
 		panic(err) // TODO handle errors
 	}
