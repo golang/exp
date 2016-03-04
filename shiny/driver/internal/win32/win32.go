@@ -30,7 +30,7 @@ import (
 // in an actual Windows window so they all run on the main thread.
 // Since any messages sent to a window will be executed on the
 // main thread, we can safely use the messages below.
-var screenHWND HWND
+var screenHWND syscall.Handle
 
 const (
 	msgCreateWindow = _WM_USER + iota
@@ -60,7 +60,7 @@ func (m *userWM) next() uint32 {
 
 var currentUserWM userWM
 
-func newWindow(opts *screen.NewWindowOptions) (HWND, error) {
+func newWindow(opts *screen.NewWindowOptions) (syscall.Handle, error) {
 	// TODO(brainman): convert windowClass to *uint16 once (in initWindowClass)
 	wcname, err := syscall.UTF16PtrFromString(windowClass)
 	if err != nil {
@@ -101,18 +101,18 @@ func newWindow(opts *screen.NewWindowOptions) (HWND, error) {
 // This is a separate step from NewWindow to give the driver a chance
 // to setup its internal state for a window before events start being
 // delivered.
-func Show(hwnd HWND) {
+func Show(hwnd syscall.Handle) {
 	SendMessage(hwnd, msgShow, 0, 0)
 }
 
-func Release(hwnd HWND) {
+func Release(hwnd syscall.Handle) {
 	// TODO(andlabs): check for errors from this?
 	// TODO(andlabs): remove unsafe
 	_DestroyWindow(hwnd)
 	// TODO(andlabs): what happens if we're still painting?
 }
 
-func sendFocus(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
+func sendFocus(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
 	switch uMsg {
 	case _WM_SETFOCUS:
 		LifecycleEvent(hwnd, lifecycle.StageFocused)
@@ -124,14 +124,14 @@ func sendFocus(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr)
 	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
 }
 
-func sendShow(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
+func sendShow(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
 	LifecycleEvent(hwnd, lifecycle.StageVisible)
 	_ShowWindow(hwnd, _SW_SHOWDEFAULT)
 	sendSize(hwnd)
 	return 0
 }
 
-func sendSizeEvent(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
+func sendSizeEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
 	wp := (*_WINDOWPOS)(unsafe.Pointer(lParam))
 	if wp.Flags&_SWP_NOSIZE != 0 {
 		return 0
@@ -140,7 +140,7 @@ func sendSizeEvent(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uint
 	return 0
 }
 
-func sendSize(hwnd HWND) {
+func sendSize(hwnd syscall.Handle) {
 	var r _RECT
 	if err := _GetClientRect(hwnd, &r); err != nil {
 		panic(err) // TODO(andlabs)
@@ -159,7 +159,7 @@ func sendSize(hwnd HWND) {
 	})
 }
 
-func sendMouseEvent(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
+func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
 	e := mouse.Event{
 		X:         float32(_GET_X_LPARAM(lParam)),
 		Y:         float32(_GET_Y_LPARAM(lParam)),
@@ -242,30 +242,30 @@ func keyModifiers() (m key.Modifiers) {
 }
 
 var (
-	MouseEvent     func(hwnd HWND, e mouse.Event)
-	PaintEvent     func(hwnd HWND, e paint.Event)
-	SizeEvent      func(hwnd HWND, e size.Event)
-	KeyEvent       func(hwnd HWND, e key.Event)
-	LifecycleEvent func(hwnd HWND, e lifecycle.Stage)
+	MouseEvent     func(hwnd syscall.Handle, e mouse.Event)
+	PaintEvent     func(hwnd syscall.Handle, e paint.Event)
+	SizeEvent      func(hwnd syscall.Handle, e size.Event)
+	KeyEvent       func(hwnd syscall.Handle, e key.Event)
+	LifecycleEvent func(hwnd syscall.Handle, e lifecycle.Stage)
 )
 
-func sendPaint(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
+func sendPaint(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
 	PaintEvent(hwnd, paint.Event{})
 	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
 }
 
-var screenMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){}
+var screenMsgs = map[uint32]func(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){}
 
-func AddScreenMsg(fn func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)) uint32 {
+func AddScreenMsg(fn func(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr)) uint32 {
 	uMsg := currentUserWM.next()
-	screenMsgs[uMsg] = func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) uintptr {
+	screenMsgs[uMsg] = func(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) uintptr {
 		fn(hwnd, uMsg, wParam, lParam)
 		return 0
 	}
 	return uMsg
 }
 
-func screenWindowWndProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
+func screenWindowWndProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
 	switch uMsg {
 	case msgCreateWindow:
 		p := (*newWindowParams)(unsafe.Pointer(lParam))
@@ -289,7 +289,7 @@ func SendScreenMessage(uMsg uint32, wParam uintptr, lParam uintptr) (lResult uin
 	return SendMessage(screenHWND, uMsg, wParam, lParam)
 }
 
-var windowMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){
+var windowMsgs = map[uint32]func(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr){
 	_WM_SETFOCUS:         sendFocus,
 	_WM_KILLFOCUS:        sendFocus,
 	_WM_PAINT:            sendPaint,
@@ -310,16 +310,16 @@ var windowMsgs = map[uint32]func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)
 	// TODO case _WM_SYSKEYDOWN, _WM_SYSKEYUP:
 }
 
-func AddWindowMsg(fn func(hwnd HWND, uMsg uint32, wParam, lParam uintptr)) uint32 {
+func AddWindowMsg(fn func(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr)) uint32 {
 	uMsg := currentUserWM.next()
-	windowMsgs[uMsg] = func(hwnd HWND, uMsg uint32, wParam, lParam uintptr) uintptr {
+	windowMsgs[uMsg] = func(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) uintptr {
 		fn(hwnd, uMsg, wParam, lParam)
 		return 0
 	}
 	return uMsg
 }
 
-func windowWndProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
+func windowWndProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
 	fn := windowMsgs[uMsg]
 	if fn != nil {
 		return fn(hwnd, uMsg, wParam, lParam)
@@ -329,11 +329,11 @@ func windowWndProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lRes
 
 type newWindowParams struct {
 	opts *screen.NewWindowOptions
-	w    HWND
+	w    syscall.Handle
 	err  error
 }
 
-func NewWindow(opts *screen.NewWindowOptions) (HWND, error) {
+func NewWindow(opts *screen.NewWindowOptions) (syscall.Handle, error) {
 	var p newWindowParams
 	p.opts = opts
 	SendScreenMessage(msgCreateWindow, 0, uintptr(unsafe.Pointer(&p)))

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"image"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/win32"
@@ -17,12 +18,12 @@ import (
 )
 
 var theScreen = &screenImpl{
-	windows: make(map[win32.HWND]*windowImpl),
+	windows: make(map[syscall.Handle]*windowImpl),
 }
 
 type screenImpl struct {
 	mu      sync.Mutex
-	windows map[win32.HWND]*windowImpl
+	windows map[syscall.Handle]*windowImpl
 }
 
 func (*screenImpl) NewBuffer(size image.Point) (screen.Buffer, error) {

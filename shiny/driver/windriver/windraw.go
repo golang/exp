@@ -44,7 +44,7 @@ var blendOverFunc = _BLENDFUNCTION{
 	AlphaFormat:         _AC_SRC_ALPHA, // premultiplied
 }
 
-func blend(dc win32.HDC, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32) (err error) {
+func blend(dc syscall.Handle, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32) (err error) {
 	compatibleDC, err := _CreateCompatibleDC(dc)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func blend(dc win32.HDC, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32)
 	return err
 }
 
-func copyBitmapToDC(dc win32.HDC, dp image.Point, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
+func copyBitmapToDC(dc syscall.Handle, dp image.Point, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
 	memdc, err := _CreateCompatibleDC(dc)
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func copyBitmapToDC(dc win32.HDC, dp image.Point, src syscall.Handle, sr image.R
 	}
 }
 
-func fillSrc(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
+func fillSrc(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	dc, err := win32.GetDC(hwnd)
 	if err != nil {
 		panic(err) // TODO handle error?
@@ -123,7 +123,7 @@ func fillSrc(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
 	}
 }
 
-func fillOver(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
+func fillOver(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	dc, err := win32.GetDC(hwnd)
 	if err != nil {
 		panic(err) // TODO handle error

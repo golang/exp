@@ -10,10 +10,6 @@ import (
 	"syscall"
 )
 
-type HWND syscall.Handle
-
-type HDC syscall.Handle
-
 type _COLORREF uint32
 
 func _RGB(r, g, b byte) _COLORREF {
@@ -33,7 +29,7 @@ type _RECT struct {
 }
 
 type _MSG struct {
-	HWND    HWND
+	HWND    syscall.Handle
 	Message uint32
 	Wparam  uintptr
 	Lparam  uintptr
@@ -55,8 +51,8 @@ type _WNDCLASS struct {
 }
 
 type _WINDOWPOS struct {
-	HWND            HWND
-	HWNDInsertAfter HWND
+	HWND            syscall.Handle
+	HWNDInsertAfter syscall.Handle
 	X               int32
 	Y               int32
 	Cx              int32
@@ -122,7 +118,7 @@ const (
 
 	_SW_SHOWDEFAULT = 10
 
-	_HWND_MESSAGE = HWND(^uintptr(2)) // -3
+	_HWND_MESSAGE = syscall.Handle(^uintptr(2)) // -3
 
 	_SWP_NOSIZE = 0x0001
 )
@@ -164,22 +160,22 @@ func _HIWORD(l uintptr) uint16 {
 // callbacks = uintptr
 // strings = *uint16
 
-//sys	GetDC(hwnd HWND) (dc HDC, err error) = user32.GetDC
-//sys	ReleaseDC(hwnd HWND, dc HDC) (err error) = user32.ReleaseDC
-//sys	SendMessage(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) = user32.SendMessageW
+//sys	GetDC(hwnd syscall.Handle) (dc syscall.Handle, err error) = user32.GetDC
+//sys	ReleaseDC(hwnd syscall.Handle, dc syscall.Handle) (err error) = user32.ReleaseDC
+//sys	SendMessage(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) = user32.SendMessageW
 
-//sys	_PostMessage(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult bool) = user32.PostMessageW
-//sys	_GetMessage(msg *_MSG, hwnd HWND, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) [failretval==-1] = user32.GetMessageW
+//sys	_PostMessage(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult bool) = user32.PostMessageW
+//sys	_GetMessage(msg *_MSG, hwnd syscall.Handle, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) [failretval==-1] = user32.GetMessageW
 //sys	_TranslateMessage(msg *_MSG) (done bool) = user32.TranslateMessage
 //sys	_DispatchMessage(msg *_MSG) (ret int32) = user32.DispatchMessageW
-//sys	_DefWindowProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) = user32.DefWindowProcW
+//sys	_DefWindowProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) = user32.DefWindowProcW
 //sys	_RegisterClass(wc *_WNDCLASS) (atom uint16, err error) = user32.RegisterClassW
-//sys	_CreateWindowEx(exstyle uint32, className *uint16, windowText *uint16, style uint32, x int32, y int32, width int32, height int32, parent HWND, menu syscall.Handle, hInstance syscall.Handle, lpParam uintptr) (hwnd HWND, err error) = user32.CreateWindowExW
-//sys	_DestroyWindow(hwnd HWND) (err error) = user32.DestroyWindow
+//sys	_CreateWindowEx(exstyle uint32, className *uint16, windowText *uint16, style uint32, x int32, y int32, width int32, height int32, parent syscall.Handle, menu syscall.Handle, hInstance syscall.Handle, lpParam uintptr) (hwnd syscall.Handle, err error) = user32.CreateWindowExW
+//sys	_DestroyWindow(hwnd syscall.Handle) (err error) = user32.DestroyWindow
 //sys	_LoadIcon(hInstance syscall.Handle, iconName uintptr) (icon syscall.Handle, err error) = user32.LoadIconW
 //sys	_LoadCursor(hInstance syscall.Handle, cursorName uintptr) (cursor syscall.Handle, err error) = user32.LoadCursorW
-//sys	_ShowWindow(hwnd HWND, cmdshow int32) (wasvisible bool) = user32.ShowWindow
-//sys	_GetClientRect(hwnd HWND, rect *_RECT) (err error) = user32.GetClientRect
+//sys	_ShowWindow(hwnd syscall.Handle, cmdshow int32) (wasvisible bool) = user32.ShowWindow
+//sys	_GetClientRect(hwnd syscall.Handle, rect *_RECT) (err error) = user32.GetClientRect
 //sys	_GetKeyState(virtkey int32) (keystatus int16) = user32.GetKeyState
 //sys   _PostQuitMessage(exitCode int32) = user32.PostQuitMessage
 //sys   _GetKeyboardLayout(threadID uint32) (locale syscall.Handle) = user32.GetKeyboardLayout

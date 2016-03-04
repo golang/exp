@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"golang.org/x/exp/shiny/driver/internal/swizzle"
-	"golang.org/x/exp/shiny/driver/internal/win32"
 )
 
 type bufferImpl struct {
@@ -93,7 +92,7 @@ func (b *bufferImpl) cleanUp() {
 	_DeleteObject(b.hbitmap)
 }
 
-func (b *bufferImpl) blitToDC(dc win32.HDC, dp image.Point, sr image.Rectangle) error {
+func (b *bufferImpl) blitToDC(dc syscall.Handle, dp image.Point, sr image.Rectangle) error {
 	b.preUpload()
 	defer b.postUpload()
 

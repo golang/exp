@@ -35,7 +35,7 @@ var (
 )
 
 type windowImpl struct {
-	hwnd win32.HWND
+	hwnd syscall.Handle
 
 	event.Queue
 
@@ -68,7 +68,7 @@ type upload struct {
 	sr  image.Rectangle
 }
 
-func handleUpload(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
+func handleUpload(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	id := wParam
 	uploadsMu.Lock()
 	u := uploads[id]
@@ -143,7 +143,7 @@ func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle
 	win32.SendMessage(w.hwnd, msgCopy, 0, uintptr(unsafe.Pointer(&p)))
 }
 
-func handleCopy(hwnd win32.HWND, uMsg uint32, wParam, lParam uintptr) {
+func handleCopy(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	p := (*handleCopyParams)(unsafe.Pointer(lParam))
 
 	dc, err := win32.GetDC(hwnd)
@@ -168,21 +168,21 @@ func (w *windowImpl) Publish() screen.PublishResult {
 }
 
 func init() {
-	send := func(hwnd win32.HWND, e interface{}) {
+	send := func(hwnd syscall.Handle, e interface{}) {
 		theScreen.mu.Lock()
 		w := theScreen.windows[hwnd]
 		theScreen.mu.Unlock()
 
 		w.Send(e)
 	}
-	win32.MouseEvent = func(hwnd win32.HWND, e mouse.Event) { send(hwnd, e) }
-	win32.PaintEvent = func(hwnd win32.HWND, e paint.Event) { send(hwnd, e) }
-	win32.KeyEvent = func(hwnd win32.HWND, e key.Event) { send(hwnd, e) }
+	win32.MouseEvent = func(hwnd syscall.Handle, e mouse.Event) { send(hwnd, e) }
+	win32.PaintEvent = func(hwnd syscall.Handle, e paint.Event) { send(hwnd, e) }
+	win32.KeyEvent = func(hwnd syscall.Handle, e key.Event) { send(hwnd, e) }
 	win32.LifecycleEvent = lifecycleEvent
 	win32.SizeEvent = sizeEvent
 }
 
-func lifecycleEvent(hwnd win32.HWND, to lifecycle.Stage) {
+func lifecycleEvent(hwnd syscall.Handle, to lifecycle.Stage) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[hwnd]
 	theScreen.mu.Unlock()
@@ -197,7 +197,7 @@ func lifecycleEvent(hwnd win32.HWND, to lifecycle.Stage) {
 	w.lifecycleStage = to
 }
 
-func sizeEvent(hwnd win32.HWND, e size.Event) {
+func sizeEvent(hwnd syscall.Handle, e size.Event) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[hwnd]
 	theScreen.mu.Unlock()

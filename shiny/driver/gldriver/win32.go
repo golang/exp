@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/win32"
@@ -76,7 +77,7 @@ func showWindow(w *windowImpl) {
 
 	// Show makes an initial call to sizeEvent (via win32.SizeEvent), where
 	// we setup the EGL surface and GL context.
-	win32.Show(win32.HWND(w.id))
+	win32.Show(syscall.Handle(w.id))
 }
 
 func closeWindow(id uintptr) {} // TODO
@@ -124,7 +125,7 @@ func init() {
 	win32.LifecycleEvent = lifecycleEvent
 }
 
-func lifecycleEvent(hwnd win32.HWND, to lifecycle.Stage) {
+func lifecycleEvent(hwnd syscall.Handle, to lifecycle.Stage) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[uintptr(hwnd)]
 	theScreen.mu.Unlock()
@@ -140,7 +141,7 @@ func lifecycleEvent(hwnd win32.HWND, to lifecycle.Stage) {
 	w.lifecycleStage = to
 }
 
-func mouseEvent(hwnd win32.HWND, e mouse.Event) {
+func mouseEvent(hwnd syscall.Handle, e mouse.Event) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[uintptr(hwnd)]
 	theScreen.mu.Unlock()
@@ -148,7 +149,7 @@ func mouseEvent(hwnd win32.HWND, e mouse.Event) {
 	w.Send(e)
 }
 
-func keyEvent(hwnd win32.HWND, e key.Event) {
+func keyEvent(hwnd syscall.Handle, e key.Event) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[uintptr(hwnd)]
 	theScreen.mu.Unlock()
@@ -156,7 +157,7 @@ func keyEvent(hwnd win32.HWND, e key.Event) {
 	w.Send(e)
 }
 
-func paintEvent(hwnd win32.HWND, e paint.Event) {
+func paintEvent(hwnd syscall.Handle, e paint.Event) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[uintptr(hwnd)]
 	theScreen.mu.Unlock()
@@ -170,7 +171,7 @@ func paintEvent(hwnd win32.HWND, e paint.Event) {
 	w.Send(paint.Event{})
 }
 
-func sizeEvent(hwnd win32.HWND, e size.Event) {
+func sizeEvent(hwnd syscall.Handle, e size.Event) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[uintptr(hwnd)]
 	theScreen.mu.Unlock()
@@ -218,7 +219,7 @@ func eglErr() error {
 	return nil
 }
 
-func createEGLSurface(hwnd win32.HWND, w *windowImpl) error {
+func createEGLSurface(hwnd syscall.Handle, w *windowImpl) error {
 	displayAttrib := [...]eglInt{
 		_EGL_PLATFORM_ANGLE_TYPE_ANGLE,
 		_EGL_PLATFORM_ANGLE_TYPE_DEFAULT_ANGLE,

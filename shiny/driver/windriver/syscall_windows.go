@@ -133,13 +133,13 @@ func _HIWORD(l uintptr) uint16 {
 // callbacks = uintptr
 // strings = *uint16
 
-//sys	_AlphaBlend(dcdest win32.HDC, xoriginDest int32, yoriginDest int32, wDest int32, hDest int32, dcsrc win32.HDC, xoriginSrc int32, yoriginSrc int32, wsrc int32, hsrc int32, ftn uintptr) (err error) = msimg32.AlphaBlend
-//sys	_BitBlt(dcdest win32.HDC, xdest int32, ydest int32, width int32, height int32, dcsrc win32.HDC, xsrc int32, ysrc int32, rop int32) (err error) = gdi32.BitBlt
-//sys	_CreateCompatibleBitmap(dc win32.HDC, width int32, height int32) (bitmap syscall.Handle, err error) = gdi32.CreateCompatibleBitmap
-//sys	_CreateCompatibleDC(dc win32.HDC) (newdc win32.HDC, err error) = gdi32.CreateCompatibleDC
+//sys	_AlphaBlend(dcdest syscall.Handle, xoriginDest int32, yoriginDest int32, wDest int32, hDest int32, dcsrc syscall.Handle, xoriginSrc int32, yoriginSrc int32, wsrc int32, hsrc int32, ftn uintptr) (err error) = msimg32.AlphaBlend
+//sys	_BitBlt(dcdest syscall.Handle, xdest int32, ydest int32, width int32, height int32, dcsrc syscall.Handle, xsrc int32, ysrc int32, rop int32) (err error) = gdi32.BitBlt
+//sys	_CreateCompatibleBitmap(dc syscall.Handle, width int32, height int32) (bitmap syscall.Handle, err error) = gdi32.CreateCompatibleBitmap
+//sys	_CreateCompatibleDC(dc syscall.Handle) (newdc syscall.Handle, err error) = gdi32.CreateCompatibleDC
 //sys	_CreateDIBSection(dc syscall.Handle, bmi *_BITMAPINFO, usage uint32, bits **byte, section syscall.Handle, offset uint32) (bitmap syscall.Handle, err error) = gdi32.CreateDIBSection
 //sys	_CreateSolidBrush(color _COLORREF) (brush syscall.Handle, err error) = gdi32.CreateSolidBrush
-//sys	_DeleteDC(dc win32.HDC) (err error) = gdi32.DeleteDC
+//sys	_DeleteDC(dc syscall.Handle) (err error) = gdi32.DeleteDC
 //sys	_DeleteObject(object syscall.Handle) (err error) = gdi32.DeleteObject
-//sys	_FillRect(dc win32.HDC, rc *_RECT, brush syscall.Handle) (err error) = user32.FillRect
-//sys	_SelectObject(dc win32.HDC, gdiobj syscall.Handle) (newobj syscall.Handle, err error) = gdi32.SelectObject
+//sys	_FillRect(dc syscall.Handle, rc *_RECT, brush syscall.Handle) (err error) = user32.FillRect
+//sys	_SelectObject(dc syscall.Handle, gdiobj syscall.Handle) (newobj syscall.Handle, err error) = gdi32.SelectObject

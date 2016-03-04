@@ -32,9 +32,9 @@ var (
 	procToUnicodeEx       = moduser32.NewProc("ToUnicodeEx")
 )
 
-func GetDC(hwnd HWND) (dc HDC, err error) {
+func GetDC(hwnd syscall.Handle) (dc syscall.Handle, err error) {
 	r0, _, e1 := syscall.Syscall(procGetDC.Addr(), 1, uintptr(hwnd), 0, 0)
-	dc = HDC(r0)
+	dc = syscall.Handle(r0)
 	if dc == 0 {
 		if e1 != 0 {
 			err = error(e1)
@@ -45,7 +45,7 @@ func GetDC(hwnd HWND) (dc HDC, err error) {
 	return
 }
 
-func ReleaseDC(hwnd HWND, dc HDC) (err error) {
+func ReleaseDC(hwnd syscall.Handle, dc syscall.Handle) (err error) {
 	r1, _, e1 := syscall.Syscall(procReleaseDC.Addr(), 2, uintptr(hwnd), uintptr(dc), 0)
 	if r1 == 0 {
 		if e1 != 0 {
@@ -57,19 +57,19 @@ func ReleaseDC(hwnd HWND, dc HDC) (err error) {
 	return
 }
 
-func SendMessage(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
+func SendMessage(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
 	r0, _, _ := syscall.Syscall6(procSendMessageW.Addr(), 4, uintptr(hwnd), uintptr(uMsg), uintptr(wParam), uintptr(lParam), 0, 0)
 	lResult = uintptr(r0)
 	return
 }
 
-func _PostMessage(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult bool) {
+func _PostMessage(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult bool) {
 	r0, _, _ := syscall.Syscall6(procPostMessageW.Addr(), 4, uintptr(hwnd), uintptr(uMsg), uintptr(wParam), uintptr(lParam), 0, 0)
 	lResult = r0 != 0
 	return
 }
 
-func _GetMessage(msg *_MSG, hwnd HWND, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) {
+func _GetMessage(msg *_MSG, hwnd syscall.Handle, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) {
 	r0, _, e1 := syscall.Syscall6(procGetMessageW.Addr(), 4, uintptr(unsafe.Pointer(msg)), uintptr(hwnd), uintptr(msgfiltermin), uintptr(msgfiltermax), 0, 0)
 	ret = int32(r0)
 	if ret == -1 {
@@ -94,7 +94,7 @@ func _DispatchMessage(msg *_MSG) (ret int32) {
 	return
 }
 
-func _DefWindowProc(hwnd HWND, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
+func _DefWindowProc(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult uintptr) {
 	r0, _, _ := syscall.Syscall6(procDefWindowProcW.Addr(), 4, uintptr(hwnd), uintptr(uMsg), uintptr(wParam), uintptr(lParam), 0, 0)
 	lResult = uintptr(r0)
 	return
@@ -113,9 +113,9 @@ func _RegisterClass(wc *_WNDCLASS) (atom uint16, err error) {
 	return
 }
 
-func _CreateWindowEx(exstyle uint32, className *uint16, windowText *uint16, style uint32, x int32, y int32, width int32, height int32, parent HWND, menu syscall.Handle, hInstance syscall.Handle, lpParam uintptr) (hwnd HWND, err error) {
+func _CreateWindowEx(exstyle uint32, className *uint16, windowText *uint16, style uint32, x int32, y int32, width int32, height int32, parent syscall.Handle, menu syscall.Handle, hInstance syscall.Handle, lpParam uintptr) (hwnd syscall.Handle, err error) {
 	r0, _, e1 := syscall.Syscall12(procCreateWindowExW.Addr(), 12, uintptr(exstyle), uintptr(unsafe.Pointer(className)), uintptr(unsafe.Pointer(windowText)), uintptr(style), uintptr(x), uintptr(y), uintptr(width), uintptr(height), uintptr(parent), uintptr(menu), uintptr(hInstance), uintptr(lpParam))
-	hwnd = HWND(r0)
+	hwnd = syscall.Handle(r0)
 	if hwnd == 0 {
 		if e1 != 0 {
 			err = error(e1)
@@ -126,7 +126,7 @@ func _CreateWindowEx(exstyle uint32, className *uint16, windowText *uint16, styl
 	return
 }
 
-func _DestroyWindow(hwnd HWND) (err error) {
+func _DestroyWindow(hwnd syscall.Handle) (err error) {
 	r1, _, e1 := syscall.Syscall(procDestroyWindow.Addr(), 1, uintptr(hwnd), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
@@ -164,13 +164,13 @@ func _LoadCursor(hInstance syscall.Handle, cursorName uintptr) (cursor syscall.H
 	return
 }
 
-func _ShowWindow(hwnd HWND, cmdshow int32) (wasvisible bool) {
+func _ShowWindow(hwnd syscall.Handle, cmdshow int32) (wasvisible bool) {
 	r0, _, _ := syscall.Syscall(procShowWindow.Addr(), 2, uintptr(hwnd), uintptr(cmdshow), 0)
 	wasvisible = r0 != 0
 	return
 }
 
-func _GetClientRect(hwnd HWND, rect *_RECT) (err error) {
+func _GetClientRect(hwnd syscall.Handle, rect *_RECT) (err error) {
 	r1, _, e1 := syscall.Syscall(procGetClientRect.Addr(), 2, uintptr(hwnd), uintptr(unsafe.Pointer(rect)), 0)
 	if r1 == 0 {
 		if e1 != 0 {
