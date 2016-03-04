@@ -280,15 +280,9 @@ func (c *Caret) ReadByte() (x byte, err error) {
 // ReadRune returns the next rune after the Caret and increments the Caret.
 func (c *Caret) ReadRune() (r rune, size int, err error) {
 	for {
-		if j := c.f.boxes[c.b].j; c.k < j {
-			r, size = utf8.DecodeRune(c.f.text[c.k:j])
-			if r >= utf8.RuneSelf && size == 1 {
-				// We decoded invalid UTF-8, possibly because a valid UTF-8 rune
-				// straddled this box and the next one.
-				panic("TODO: invalid UTF-8")
-			}
+		if c.k < c.f.boxes[c.b].j {
+			r, size, c.b, c.k = c.f.readRune(c.b, c.k)
 			c.pos += int32(size)
-			c.k += int32(size)
 			// A Caret can't be placed at the end of a Paragraph, unless it is
 			// the final Paragraph. A simple way to enforce this is to lean
 			// forwards.
@@ -559,4 +553,34 @@ func layout(f *Frame, l int32) {
 			prevR, prevRValid = r, true
 		}
 	}
+}
+
+// splitBox splits the Caret's Box into two, at the Caret's location, provided
+// that the Caret is not at either edge of its Box.
+func (c *Caret) splitBox() {
+	bb := &c.f.boxes[c.b]
+	if c.k == bb.i || c.k == bb.j {
+		return
+	}
+	newB := c.f.newBox()
+
+	// Calling newBox may have made bb a dangling pointer into an old array, so
+	// re-calculate it.
+	//
+	// TODO: fix up any other code that calls Frame.newFoo, directly or
+	// indirectly.
+	bb = &c.f.boxes[c.b]
+
+	nextB := bb.next
+	if nextB != 0 {
+		c.f.boxes[nextB].prev = newB
+	}
+	c.f.boxes[newB] = Box{
+		next: nextB,
+		prev: c.b,
+		i:    c.k,
+		j:    bb.j,
+	}
+	bb.next = newB
+	bb.j = c.k
 }

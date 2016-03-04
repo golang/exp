@@ -312,6 +312,57 @@ func (f *Frame) NewCaret() *Caret {
 	return c
 }
 
+// readRune returns the next rune and its size in bytes, starting from the Box
+// indexed by b and the text in that Box indexed by k. It also returns the new
+// b and k indexes after reading size bytes. The b argument must not be zero,
+// and the newB return value will not be zero.
+//
+// It can cross Box boundaries, but not Line boundaries, in finding the next
+// rune.
+func (f *Frame) readRune(b, k int32) (r rune, size int, newB, newK int32) {
+	bb := &f.boxes[b]
+
+	// In the fastest, common case, see if we can read a rune without crossing
+	// a Box boundary.
+	r, size = utf8.DecodeRune(f.text[k:bb.j])
+	if r < utf8.RuneSelf || size > 1 {
+		return r, size, b, k + int32(size)
+	}
+
+	// Otherwise, we decoded invalid UTF-8, possibly because a valid UTF-8 rune
+	// straddled this Box and the next one. Try again, copying up to
+	// utf8.UTFMax bytes from multiple Boxes into a single contiguous buffer.
+	buf := [utf8.UTFMax]byte{}
+	newBAndKs := [utf8.UTFMax + 1]bAndK{
+		0: bAndK{b, k},
+	}
+	n := 0
+	for {
+		if k < bb.j {
+			nCopied := copy(buf[n:], f.text[k:bb.j])
+			for i := 1; i <= nCopied; i++ {
+				newBAndKs[n+i] = bAndK{b, k + int32(i)}
+			}
+			n += nCopied
+			if n == len(buf) {
+				break
+			}
+		}
+		b = bb.next
+		if b == 0 {
+			break
+		}
+		bb = &f.boxes[b]
+		k = bb.i
+	}
+	r, size = utf8.DecodeRune(buf[:n])
+	bk := newBAndKs[size]
+	if bk.b == 0 {
+		panic("text: invalid state")
+	}
+	return r, size, bk.b, bk.k
+}
+
 func (f *Frame) lineReader(b, k int32) lineReader {
 	f.lineReaderData.b = b
 	f.lineReaderData.k = k
@@ -343,13 +394,7 @@ func (z lineReader) ReadRune() (r rune, size int, err error) {
 	for d.b != 0 {
 		bb := &z.f.boxes[d.b]
 		if d.k < bb.j {
-			r, size = utf8.DecodeRune(z.f.text[d.k:bb.j])
-			if r >= utf8.RuneSelf && size == 1 {
-				// We decoded invalid UTF-8, possibly because a valid UTF-8 rune
-				// straddled this box and the next one.
-				panic("TODO: invalid UTF-8")
-			}
-			d.k += int32(size)
+			r, size, d.b, d.k = z.f.readRune(d.b, d.k)
 			return r, size, nil
 		}
 		d.b = bb.next

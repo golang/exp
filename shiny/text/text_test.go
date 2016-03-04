@@ -13,10 +13,58 @@ import (
 	"math/rand"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"golang.org/x/image/math/fixed"
 )
+
+func readAllText(dst []byte, f *Frame) []byte {
+	for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
+		for l := p.FirstLine(f); l != nil; l = l.Next(f) {
+			for b := l.FirstBox(f); b != nil; b = b.Next(f) {
+				dst = append(dst, b.Text(f)...)
+			}
+		}
+	}
+	return dst
+}
+
+func readAllRunes(dst []rune, rr io.RuneReader) ([]rune, error) {
+	for {
+		r, size, err := rr.ReadRune()
+		if err == io.EOF {
+			return dst, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		// Check that r and size are consistent.
+		if wantSize := utf8.RuneLen(r); size == wantSize {
+			// OK.
+		} else if r == utf8.RuneError && size == 1 {
+			// Also OK; one byte of invalid UTF-8 was replaced by '\ufffd'.
+		} else {
+			return nil, fmt.Errorf("rune %#x: got size %d, want %d", r, size, wantSize)
+		}
+
+		dst = append(dst, r)
+	}
+}
+
+func runesEqual(xs, ys []rune) bool {
+	if len(xs) != len(ys) {
+		return false
+	}
+	for i := range xs {
+		if xs[i] != ys[i] {
+			return false
+		}
+	}
+	return true
+}
 
 // toyFace implements the font.Face interface by measuring every rune's width
 // as 1 pixel.
@@ -68,7 +116,7 @@ func TestSeek(t *testing.T) {
 			t.Fatalf("i=%d: Seek: %v", i, err)
 		}
 		if gotPos != wantPos {
-			t.Fatalf("i=%d: Seek: got %d, want %d", gotPos, wantPos)
+			t.Fatalf("i=%d: Seek: got %d, want %d", i, gotPos, wantPos)
 		}
 		seen[gotPos] = true
 		if err := checkInvariants(f); err != nil {
@@ -194,6 +242,76 @@ func TestSetMaxWidth(t *testing.T) {
 		}
 		if err := testRead(f, iRobot); err != nil {
 			t.Fatalf("i=%d: %v", i, err)
+		}
+	}
+}
+
+func TestReadRuneAcrossBoxes(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < 6; i++ {
+		// text is a mixture of valid and invalid UTF-8.
+		text := "ab_\u0100\u0101_\ufffd中文_\xff\xffñ\xff_z_\U0001f4a9_\U0001f600" +
+			strings.Repeat("\xff", i)
+
+		wantBytes := []byte(text)
+		wantRunes := []rune(text)
+		gotBytesBuf := make([]byte, 0, len(text))
+		gotRunesBuf := make([]rune, 0, len(text))
+
+		for j := 0; j < 100; j++ {
+			f := new(Frame)
+
+			{
+				c := f.NewCaret()
+				c.WriteString(text)
+				// Split the sole Line into multiple Boxes at random byte offsets,
+				// possibly cutting across multi-byte UTF-8 encoded runes.
+				for {
+					if rng.Intn(8) == 0 {
+						break
+					}
+					c.Seek(int64(rng.Intn(len(text)+1)), SeekSet)
+					c.splitBox()
+				}
+				c.Close()
+
+				if err := checkInvariants(f); err != nil {
+					t.Fatalf("i=%d, j=%d: %v", i, j, err)
+				}
+				if gotBytes := readAllText(gotBytesBuf[:0], f); !bytes.Equal(gotBytes, wantBytes) {
+					t.Fatalf("i=%d, j=%d: bytes\ngot  % x\nwant % x", i, j, gotBytes, wantBytes)
+				}
+			}
+
+			// Test lineReader.ReadRune.
+			{
+				p := f.firstP
+				l := f.paragraphs[p].firstL
+				b := f.lines[l].firstB
+				lr := f.lineReader(b, f.boxes[b].i)
+				gotRunes, err := readAllRunes(gotRunesBuf[:0], lr)
+				if err != nil {
+					t.Fatalf("i=%d, j=%d: lineReader readAllRunes: %v", i, j, err)
+				}
+				if !runesEqual(gotRunes, wantRunes) {
+					t.Fatalf("i=%d, j=%d: lineReader readAllRunes:\ngot  %#x\nwant %#x",
+						i, j, gotRunes, wantRunes)
+				}
+			}
+
+			// Test Caret.ReadRune.
+			{
+				c := f.NewCaret()
+				gotRunes, err := readAllRunes(gotRunesBuf[:0], c)
+				c.Close()
+				if err != nil {
+					t.Fatalf("i=%d, j=%d: Caret readAllRunes: %v", i, j, err)
+				}
+				if !runesEqual(gotRunes, wantRunes) {
+					t.Fatalf("i=%d, j=%d: Caret readAllRunes:\ngot  %#x\nwant %#x",
+						i, j, gotRunes, wantRunes)
+				}
+			}
 		}
 	}
 }
