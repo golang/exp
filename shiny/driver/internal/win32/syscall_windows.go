@@ -64,6 +64,7 @@ const (
 	_WM_SETFOCUS         = 7
 	_WM_KILLFOCUS        = 8
 	_WM_PAINT            = 15
+	_WM_CLOSE            = 16
 	_WM_WINDOWPOSCHANGED = 71
 	_WM_KEYDOWN          = 256
 	_WM_KEYUP            = 257
