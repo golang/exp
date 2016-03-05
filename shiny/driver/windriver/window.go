@@ -12,7 +12,6 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"sync"
 	"syscall"
 	"unsafe"
 
@@ -26,12 +25,6 @@ import (
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
-)
-
-var (
-	uploadsMu sync.Mutex
-	uploads   = map[uintptr]upload{}
-	uploadID  uintptr
 )
 
 type windowImpl struct {
@@ -48,18 +41,12 @@ func (w *windowImpl) Release() {
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	// Protect struct contents from being GCed
-	uploadsMu.Lock()
-	uploadID++
-	id := uploadID
-	uploads[id] = upload{
+	p := upload{
 		dp:  dp,
 		src: src.(*bufferImpl),
 		sr:  sr,
 	}
-	uploadsMu.Unlock()
-
-	win32.SendMessage(w.hwnd, msgUpload, id, 0)
+	win32.SendMessage(w.hwnd, msgUpload, 0, uintptr(unsafe.Pointer(&p)))
 }
 
 type upload struct {
@@ -69,11 +56,7 @@ type upload struct {
 }
 
 func handleUpload(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	id := wParam
-	uploadsMu.Lock()
-	u := uploads[id]
-	delete(uploads, id)
-	uploadsMu.Unlock()
+	u := (*upload)(unsafe.Pointer(lParam))
 
 	dc, err := win32.GetDC(hwnd)
 	if err != nil {
