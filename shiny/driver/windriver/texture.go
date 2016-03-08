@@ -90,7 +90,12 @@ func (t *textureImpl) Bounds() image.Rectangle {
 }
 
 func (t *textureImpl) Fill(r image.Rectangle, c color.Color, op draw.Op) {
-	// TODO
+	err := t.update(func(dc syscall.Handle) error {
+		return fill(dc, r, c, op)
+	})
+	if err != nil {
+		panic(err) // TODO handle error
+	}
 }
 
 func (t *textureImpl) Release() {
@@ -120,12 +125,17 @@ func (t *textureImpl) Size() image.Point {
 }
 
 func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	if err := t.upload(dp, src, sr); err != nil {
+	err := t.update(func(dc syscall.Handle) error {
+		return src.(*bufferImpl).blitToDC(dc, dp, sr)
+	})
+	if err != nil {
 		panic(err) // TODO handle error
 	}
 }
 
-func (t *textureImpl) upload(dp image.Point, src screen.Buffer, sr image.Rectangle) (retErr error) {
+// update prepares texture t for update and executes f over texture device
+// context dc in a safe manner.
+func (t *textureImpl) update(f func(dc syscall.Handle) error) (retErr error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -147,5 +157,5 @@ func (t *textureImpl) upload(dp image.Point, src screen.Buffer, sr image.Rectang
 		}
 	}()
 
-	return src.(*bufferImpl).blitToDC(t.dc, dp, sr)
+	return f(t.dc)
 }

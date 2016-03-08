@@ -9,6 +9,7 @@ package windriver
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"syscall"
 	"unsafe"
@@ -72,7 +73,7 @@ func blend(dc syscall.Handle, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy i
 	return err
 }
 
-func copyBitmapToDC(dc syscall.Handle, dp image.Point, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
+func copyBitmapToDC(dc syscall.Handle, dr image.Rectangle, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
 	memdc, err := _CreateCompatibleDC(dc)
 	if err != nil {
 		return err
@@ -90,12 +91,14 @@ func copyBitmapToDC(dc syscall.Handle, dp image.Point, src syscall.Handle, sr im
 		}
 	}()
 
-	sdx, sdy := int32(sr.Dx()), int32(sr.Dy())
 	switch op {
 	case draw.Src:
-		return _BitBlt(dc, int32(dp.X), int32(dp.Y), sdx, sdy, memdc, int32(sr.Min.X), int32(sr.Min.Y), _SRCCOPY)
+		// TODO(brainman): needs to be fixed if we're to use this code for scaling (perhaps use StretchBlt instead)
+		return _BitBlt(dc, int32(dr.Min.X), int32(dr.Min.Y), int32(dr.Dx()), int32(dr.Dy()),
+			memdc, int32(sr.Min.X), int32(sr.Min.Y), _SRCCOPY)
 	case draw.Over:
-		return _AlphaBlend(dc, int32(dp.X), int32(dp.Y), sdx, sdy, memdc, 0, 0, sdx, sdy, blendOverFunc.ToUintptr())
+		return _AlphaBlend(dc, int32(dr.Min.X), int32(dr.Min.Y), int32(dr.Dx()), int32(dr.Dy()),
+			memdc, int32(sr.Min.X), int32(sr.Min.Y), int32(sr.Dx()), int32(sr.Dy()), blendOverFunc.ToUintptr())
 	default:
 		return fmt.Errorf("windriver: invalid draw operation %v", op)
 	}
@@ -145,6 +148,47 @@ func fillOver(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	if err = blend(dc, bitmap, r, 1, 1); err != nil {
 		panic(err) // TODO handle error
 	}
+}
+
+func fill(dc syscall.Handle, dr image.Rectangle, c color.Color, op draw.Op) error {
+	r, g, b, a := c.RGBA()
+	r >>= 8
+	g >>= 8
+	b >>= 8
+	a >>= 8
+
+	if op == draw.Src {
+		color := _RGB(byte(r), byte(g), byte(b))
+		brush, err := _CreateSolidBrush(color)
+		if err != nil {
+			return err
+		}
+		defer _DeleteObject(brush)
+
+		rect := _RECT{
+			Left:   int32(dr.Min.X),
+			Top:    int32(dr.Min.Y),
+			Right:  int32(dr.Max.X),
+			Bottom: int32(dr.Max.Y),
+		}
+		return _FillRect(dc, &rect, brush)
+	}
+
+	// AlphaBlend will stretch the input image (using StretchBlt's
+	// COLORONCOLOR mode) to fill the output rectangle. Testing
+	// this shows that the result appears to be the same as if we had
+	// used a MxN bitmap instead.
+	sr := image.Rect(0, 0, 1, 1)
+	bitmap, bitvalues, err := mkbitmap(int32(sr.Dx()), int32(sr.Dy()))
+	if err != nil {
+		return err
+	}
+	defer _DeleteObject(bitmap) // TODO handle error?
+
+	color := _COLORREF((a << 24) | (r << 16) | (g << 8) | b)
+	*(*_COLORREF)(unsafe.Pointer(bitvalues)) = color
+
+	return copyBitmapToDC(dc, dr, bitmap, sr, draw.Over)
 }
 
 var (

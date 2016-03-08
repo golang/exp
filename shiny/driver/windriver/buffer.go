@@ -96,5 +96,6 @@ func (b *bufferImpl) blitToDC(dc syscall.Handle, dp image.Point, sr image.Rectan
 	b.preUpload()
 	defer b.postUpload()
 
-	return copyBitmapToDC(dc, dp, b.hbitmap, sr, draw.Src)
+	dr := sr.Add(dp.Sub(sr.Min))
+	return copyBitmapToDC(dc, dr, b.hbitmap, sr, draw.Src)
 }
