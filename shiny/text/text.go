@@ -130,6 +130,9 @@ type Frame struct {
 
 // SetFace sets the font face for measuring text.
 func (f *Frame) SetFace(face font.Face) {
+	if !f.initialized() {
+		f.initialize()
+	}
 	f.face = face
 	if f.len != 0 {
 		f.relayout()
@@ -144,6 +147,9 @@ func (f *Frame) SetFace(face font.Face) {
 //
 // A non-positive argument is treated as an infinite maximum width.
 func (f *Frame) SetMaxWidth(m fixed.Int26_6) {
+	if !f.initialized() {
+		f.initialize()
+	}
 	if f.maxWidth == m {
 		return
 	}
@@ -222,6 +228,22 @@ func (f *Frame) joinBoxes(b0, b1 int32, bb0, bb1 *Box) bool {
 	return true
 }
 
+func (f *Frame) initialized() bool {
+	return len(f.paragraphs) > 0
+}
+
+func (f *Frame) initialize() {
+	// The first valid Paragraph, Line and Box all have index 1. The 0'th index
+	// of each slice is a special case.
+	f.paragraphs = make([]Paragraph, 2, 16)
+	f.lines = make([]Line, 2, 16)
+	f.boxes = make([]Box, 2, 16)
+
+	f.firstP = 1
+	f.paragraphs[1].firstL = 1
+	f.lines[1].firstB = 1
+}
+
 func (f *Frame) newParagraph() int32 {
 	if f.freeP != 0 {
 		p := f.freeP
@@ -229,10 +251,6 @@ func (f *Frame) newParagraph() int32 {
 		f.freeP = pp.next
 		*pp = Paragraph{}
 		return p
-	}
-	if len(f.paragraphs) == 0 {
-		// The 1 is because the 0'th index is a special case.
-		f.paragraphs = make([]Paragraph, 1, 16)
 	}
 	f.paragraphs = append(f.paragraphs, Paragraph{})
 	return int32(len(f.paragraphs) - 1)
@@ -246,10 +264,6 @@ func (f *Frame) newLine() int32 {
 		*ll = Line{}
 		return l
 	}
-	if len(f.lines) == 0 {
-		// The 1 is because the 0'th index is a special case.
-		f.lines = make([]Line, 1, 16)
-	}
 	f.lines = append(f.lines, Line{})
 	return int32(len(f.lines) - 1)
 }
@@ -261,10 +275,6 @@ func (f *Frame) newBox() int32 {
 		f.freeB = bb.next
 		*bb = Box{}
 		return b
-	}
-	if len(f.boxes) == 0 {
-		// The 1 is because the 0'th index is a special case.
-		f.boxes = make([]Box, 1, 16)
 	}
 	f.boxes = append(f.boxes, Box{})
 	return int32(len(f.boxes) - 1)
@@ -298,29 +308,27 @@ func (f *Frame) lastParagraph() int32 {
 	}
 }
 
-func (f *Frame) firstParagraph() int32 {
-	// TODO: move this check into the exported methods instead of this imported
-	// one.
-	if f.firstP == 0 {
-		// 0 means that the first Paragraph is implicit (and not allocated
-		// yet), so we make an explicit one, with a non-zero index.
-		f.firstP = f.newParagraph()
-	}
-	return f.firstP
-}
-
 // FirstParagraph returns the first paragraph of this frame.
 func (f *Frame) FirstParagraph() *Paragraph {
-	return &f.paragraphs[f.firstParagraph()]
+	if !f.initialized() {
+		f.initialize()
+	}
+	return &f.paragraphs[f.firstP]
 }
 
 // Len returns the number of bytes in the Frame's text.
 func (f *Frame) Len() int {
+	// We would normally check f.initialized() at the start of each exported
+	// method of a Frame, but that is not necessary here. The Frame's text's
+	// length does not depend on its Paragraphs, Lines and Boxes.
 	return f.len
 }
 
 // NewCaret returns a new Caret at the start of this Frame.
 func (f *Frame) NewCaret() *Caret {
+	if !f.initialized() {
+		f.initialize()
+	}
 	// Make the first Paragraph, Line and Box explicit, since Carets require an
 	// explicit p, l and b.
 	p := f.FirstParagraph()
@@ -444,20 +452,11 @@ func (p *Paragraph) lastLine(f *Frame) int32 {
 	}
 }
 
-func (p *Paragraph) firstLine(f *Frame) int32 {
-	if p.firstL == 0 {
-		// 0 means that the first Line is implicit (and not allocated yet), so
-		// we make an explicit one, with a non-zero index.
-		p.firstL = f.newLine()
-	}
-	return p.firstL
-}
-
 // FirstLine returns the first Line of this Paragraph.
 //
 // f is the Frame that contains the Paragraph.
 func (p *Paragraph) FirstLine(f *Frame) *Line {
-	return &f.lines[p.firstLine(f)]
+	return &f.lines[p.firstL]
 }
 
 // Next returns the next Paragraph after this one in the Frame.
@@ -485,20 +484,11 @@ func (l *Line) lastBox(f *Frame) int32 {
 	}
 }
 
-func (l *Line) firstBox(f *Frame) int32 {
-	if l.firstB == 0 {
-		// 0 means that the first Box is implicit (and not allocated yet), so
-		// we make an explicit one, with a non-zero index.
-		l.firstB = f.newBox()
-	}
-	return l.firstB
-}
-
 // FirstBox returns the first Box of this Line.
 //
 // f is the Frame that contains the Line.
 func (l *Line) FirstBox(f *Frame) *Box {
-	return &f.boxes[l.firstBox(f)]
+	return &f.boxes[l.firstB]
 }
 
 // Next returns the next Line after this one in the Paragraph.

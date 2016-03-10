@@ -103,6 +103,13 @@ func iRobotFrame(maxWidth int) *Frame {
 	return f
 }
 
+func TestZeroFrame(t *testing.T) {
+	f := new(Frame)
+	if err := checkInvariants(f); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSeek(t *testing.T) {
 	f := iRobotFrame(10)
 	c := f.NewCaret()
@@ -390,11 +397,14 @@ func TestMergeIntoOneLine(t *testing.T) {
 		f := new(Frame)
 		f.SetMaxWidth(fixed.I(100))
 
-		p := f.firstParagraph()
+		if !f.initialized() {
+			f.initialize()
+		}
+		p := f.firstP
 		pp := &f.paragraphs[p]
-		l := pp.firstLine(f)
+		l := pp.firstL
 		ll := &f.lines[l]
-		b := ll.firstBox(f)
+		b := ll.firstB
 		bb := &f.boxes[b]
 
 		// Make some Lines and Boxes.
@@ -432,7 +442,8 @@ func TestMergeIntoOneLine(t *testing.T) {
 				ll1.prev = l
 				l, ll = l1, ll1
 
-				b = ll.firstBox(f)
+				ll.firstB = f.newBox()
+				b = ll.firstB
 				bb = &f.boxes[b]
 
 			} else {
@@ -524,9 +535,15 @@ func (b byI) Len() int           { return len(b) }
 func (b byI) Less(x, y int) bool { return b[x].i < b[y].i }
 func (b byI) Swap(x, y int)      { b[x], b[y] = b[y], b[x] }
 
-// TODO: ensure that checkInvariants accepts a zero-valued Frame.
 func checkInvariants(f *Frame) error {
 	const infinity = 1e6
+
+	if !f.initialized() {
+		if !reflect.DeepEqual(*f, Frame{}) {
+			return fmt.Errorf("uninitialized Frame is not zero-valued")
+		}
+		return nil
+	}
 
 	// Iterate through the Paragraphs, Lines and Boxes. Check that every first
 	// child has no previous sibling, and no child is the first child of

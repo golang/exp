@@ -454,8 +454,14 @@ func breakParagraph(f *Frame, p, l, b int32) {
 	// Make the newP Paragraph's first Line and first Box explicit, since
 	// Carets require an explicit p, l and b.
 	{
-		firstL := f.paragraphs[newP].firstLine(f)
-		f.lines[firstL].firstBox(f)
+		pp := &f.paragraphs[newP]
+		if pp.firstL == 0 {
+			pp.firstL = f.newLine()
+		}
+		ll := &f.lines[pp.firstL]
+		if ll.firstB == 0 {
+			ll.firstB = f.newBox()
+		}
 	}
 
 	// TODO: fix up other Carets's p, l and b fields.
