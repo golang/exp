@@ -13,8 +13,6 @@ import (
 	"image/draw"
 	"syscall"
 	"unsafe"
-
-	"golang.org/x/exp/shiny/driver/internal/win32"
 )
 
 func mkbitmap(dx, dy int32) (syscall.Handle, *byte, error) {
@@ -45,34 +43,6 @@ var blendOverFunc = _BLENDFUNCTION{
 	AlphaFormat:         _AC_SRC_ALPHA, // premultiplied
 }
 
-func blend(dc syscall.Handle, bitmap syscall.Handle, dr *_RECT, sdx int32, sdy int32) (err error) {
-	compatibleDC, err := _CreateCompatibleDC(dc)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err2 := _DeleteDC(compatibleDC)
-		if err == nil {
-			err = err2
-		}
-	}()
-	prevBitmap, err := _SelectObject(compatibleDC, bitmap)
-	if err != nil {
-		return err
-	}
-
-	err = _AlphaBlend(dc, dr.Left, dr.Top,
-		dr.Right-dr.Left, dr.Bottom-dr.Top,
-		compatibleDC, 0, 0, sdx, sdy,
-		blendOverFunc.ToUintptr())
-	if err != nil {
-		return err
-	}
-
-	_, err = _SelectObject(compatibleDC, prevBitmap)
-	return err
-}
-
 func copyBitmapToDC(dc syscall.Handle, dr image.Rectangle, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
 	memdc, err := _CreateCompatibleDC(dc)
 	if err != nil {
@@ -101,52 +71,6 @@ func copyBitmapToDC(dc syscall.Handle, dr image.Rectangle, src syscall.Handle, s
 			memdc, int32(sr.Min.X), int32(sr.Min.Y), int32(sr.Dx()), int32(sr.Dy()), blendOverFunc.ToUintptr())
 	default:
 		return fmt.Errorf("windriver: invalid draw operation %v", op)
-	}
-}
-
-func fillSrc(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	dc, err := win32.GetDC(hwnd)
-	if err != nil {
-		panic(err) // TODO handle error?
-	}
-	defer win32.ReleaseDC(hwnd, dc)
-	r := (*_RECT)(unsafe.Pointer(lParam))
-	color := _COLORREF(wParam)
-
-	// COLORREF is 0x00BBGGRR; color is 0xAARRGGBB
-	color = _RGB(byte((color >> 16)), byte((color >> 8)), byte(color))
-	brush, err := _CreateSolidBrush(color)
-	if err != nil {
-		panic(err) // TODO handle error
-	}
-	defer _DeleteObject(brush)
-	err = _FillRect(dc, r, brush)
-	if err != nil {
-		panic(err) // TODO handle error
-	}
-}
-
-func fillOver(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	dc, err := win32.GetDC(hwnd)
-	if err != nil {
-		panic(err) // TODO handle error
-	}
-	defer win32.ReleaseDC(hwnd, dc)
-	r := (*_RECT)(unsafe.Pointer(lParam))
-	color := _COLORREF(wParam)
-
-	// AlphaBlend will stretch the input image (using StretchBlt's
-	// COLORONCOLOR mode) to fill the output rectangle. Testing
-	// this shows that the result appears to be the same as if we had
-	// used a MxN bitmap instead.
-	bitmap, bitvalues, err := mkbitmap(1, 1)
-	if err != nil {
-		panic(err) // TODO handle error
-	}
-	defer _DeleteObject(bitmap) // TODO handle error?
-	*(*_COLORREF)(unsafe.Pointer(bitvalues)) = color
-	if err = blend(dc, bitmap, r, 1, 1); err != nil {
-		panic(err) // TODO handle error
 	}
 }
 
@@ -190,11 +114,5 @@ func fill(dc syscall.Handle, dr image.Rectangle, c color.Color, op draw.Op) erro
 
 	return copyBitmapToDC(dc, dr, bitmap, sr, draw.Over)
 }
-
-var (
-	msgFillSrc  = win32.AddWindowMsg(fillSrc)
-	msgFillOver = win32.AddWindowMsg(fillOver)
-	msgUpload   = win32.AddWindowMsg(handleUpload)
-)
 
 // TODO(andlabs): Draw

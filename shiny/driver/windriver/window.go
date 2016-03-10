@@ -40,6 +40,8 @@ func (w *windowImpl) Release() {
 	win32.Release(w.hwnd)
 }
 
+var msgUpload = win32.AddWindowMsg(handleUpload)
+
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
 	p := upload{
 		dp:  dp,
@@ -78,26 +80,36 @@ func handleUpload(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	}
 }
 
+type handleWindowFillParams struct {
+	dr    image.Rectangle
+	color color.Color
+	op    draw.Op
+}
+
+var msgWindowFill = win32.AddWindowMsg(handleWindowFill)
+
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	rect := _RECT{
-		Left:   int32(dr.Min.X),
-		Top:    int32(dr.Min.Y),
-		Right:  int32(dr.Max.X),
-		Bottom: int32(dr.Max.Y),
+	p := handleWindowFillParams{
+		dr:    dr,
+		color: src,
+		op:    op,
 	}
-	r, g, b, a := src.RGBA()
-	r >>= 8
-	g >>= 8
-	b >>= 8
-	a >>= 8
-	color := (a << 24) | (r << 16) | (g << 8) | b
-	msg := uint32(msgFillOver)
-	if op == draw.Src {
-		msg = msgFillSrc
+	win32.SendMessage(w.hwnd, msgWindowFill, 0, uintptr(unsafe.Pointer(&p)))
+}
+
+func handleWindowFill(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
+	p := (*handleWindowFillParams)(unsafe.Pointer(lParam))
+
+	dc, err := win32.GetDC(hwnd)
+	if err != nil {
+		panic(err) // TODO handle errors
 	}
-	// Note: this SendMessage won't return until after the fill
-	// completes, so using &rect is safe.
-	win32.SendMessage(w.hwnd, msg, uintptr(color), uintptr(unsafe.Pointer(&rect)))
+	defer win32.ReleaseDC(hwnd, dc)
+
+	err = fill(dc, p.dr, p.color, p.op)
+	if err != nil {
+		panic(err) // TODO handle errors
+	}
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
