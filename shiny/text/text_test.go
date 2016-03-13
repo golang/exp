@@ -66,6 +66,22 @@ func runesEqual(xs, ys []rune) bool {
 	return true
 }
 
+func allASCII(rs []rune) bool {
+	for _, r := range rs {
+		if r >= 128 {
+			return false
+		}
+	}
+	return true
+}
+
+func runesLen(rs []rune) (n int) {
+	for _, r := range rs {
+		n += utf8.RuneLen(r)
+	}
+	return n
+}
+
 func rngIntPair(rng *rand.Rand, n int) (x, y int) {
 	x = rng.Intn(n)
 	y = rng.Intn(n)
@@ -101,6 +117,8 @@ func (toyFace) Kern(r0, r1 rune) fixed.Int26_6 {
 
 // iRobot is some text that contains both ASCII and non-ASCII runes.
 const iRobot = "\"I, Robot\" in Russian is \"Я, робот\".\nIt's about robots.\n"
+
+var iRobotRunes = []rune(iRobot)
 
 func iRobotFrame(maxWidth int) *Frame {
 	f := new(Frame)
@@ -439,7 +457,7 @@ func TestDelete(t *testing.T) {
 		defer c.Close()
 		wantBytes := append(wantBytesBuf[:0], iRobot...)
 		for j := 0; j < 8; j++ {
-			// Delete the text in the range [x, y).
+			// Delete the text in the byte range [x, y).
 			x, y := rngIntPair(rng, len(wantBytes)+1)
 			got, want := 0, y-x
 			if rng.Intn(2) == 0 {
@@ -465,8 +483,53 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestDeleteRunes(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	gotBytesBuf := make([]byte, 0, len(iRobot))
+	wantRunesBuf := make([]rune, 0, len(iRobot))
+	wantBytesBuf := make([]byte, 0, len(iRobot))
+
+	for i := 0; i < 100; i++ {
+		f := iRobotFrame(rng.Intn(len(iRobot) + 1))
+		c := f.NewCaret()
+		defer c.Close()
+		wantRunes := append(wantRunesBuf[:0], iRobotRunes...)
+		wantBytes := append(wantBytesBuf[:0], iRobot...)
+		for j := 0; j < 8; j++ {
+			xR, yR := rngIntPair(rng, len(wantRunes)+1)
+			xB := runesLen(wantRunes[:xR])
+			yB := runesLen(wantRunes[:yR])
+
+			// Delete the text in the byte range [xB, yB).
+			gotR, gotB, wantR, wantB := 0, 0, yR-xR, yB-xB
+			if rng.Intn(2) == 0 {
+				c.Seek(int64(xB), SeekSet)
+				gotR, gotB = c.DeleteRunes(Forwards, wantR)
+			} else {
+				c.Seek(int64(yB), SeekSet)
+				gotR, gotB = c.DeleteRunes(Backwards, wantR)
+			}
+			if err := checkInvariants(f); err != nil {
+				t.Fatalf("i=%d, j=%d, xR=%d, xB=%d, yR=%d, yB=%d: %v", i, j, xR, xB, yR, yB, err)
+			}
+			if gotR != wantR || gotB != wantB {
+				t.Fatalf("i=%d, j=%d, xR=%d, xB=%d, yR=%d, yB=%d: Delete: got %d runes, %d bytes, want %d, %d",
+					i, j, xR, xB, yR, yB, gotR, gotB, wantR, wantB)
+			}
+
+			gotBytes := readAllText(gotBytesBuf[:0], f)
+			wantRunes = append(wantRunes[:xR], wantRunes[yR:]...)
+			wantBytes = append(wantBytes[:xB], wantBytes[yB:]...)
+			if !bytes.Equal(gotBytes, wantBytes) {
+				t.Fatalf("i=%d, j=%d, xR=%d, xB=%d, yR=%d, yB=%d:\ngot  %q\nwant %q",
+					i, j, xR, xB, yR, yB, gotBytes, wantBytes)
+			}
+		}
+	}
+}
+
 func TestDeleteTooMuch(t *testing.T) {
-	if len(iRobot) < 15+17 {
+	if len(iRobot) < 17+15 {
 		t.Fatal("iRobot string is too short")
 	}
 
@@ -475,7 +538,7 @@ func TestDeleteTooMuch(t *testing.T) {
 	defer c.Close()
 
 	c.Seek(-15, SeekEnd)
-	if got, want := c.Delete(Forwards, 18), 15; got != want {
+	if got, want := c.Delete(Forwards, 16), 15; got != want {
 		t.Errorf("Delete Forwards: got %d, want %d", got, want)
 	}
 
@@ -486,6 +549,44 @@ func TestDeleteTooMuch(t *testing.T) {
 
 	got := string(readAllText(nil, f))
 	want := iRobot[17 : len(iRobot)-15]
+	if got != want {
+		t.Errorf("\ngot  %q\nwant %q", got, want)
+	}
+}
+
+func TestDeleteRunesTooMuch(t *testing.T) {
+	if len(iRobotRunes) < 30+24 {
+		t.Fatal("iRobotRunes []rune is too short")
+	}
+	prefix := iRobotRunes[:30]
+	suffix := iRobotRunes[len(iRobotRunes)-24:]
+	if allASCII(prefix) {
+		t.Fatal("prefix contains no non-ASCII runes")
+	}
+	if allASCII(suffix) {
+		t.Fatal("suffix contains no non-ASCII runes")
+	}
+	prefixB := runesLen(prefix)
+	suffixB := runesLen(suffix)
+
+	f := iRobotFrame(10)
+	c := f.NewCaret()
+	defer c.Close()
+
+	c.Seek(-int64(suffixB), SeekEnd)
+	wantR, wantB := len(suffix), suffixB
+	if gotR, gotB := c.DeleteRunes(Forwards, 25); gotR != wantR || gotB != wantB {
+		t.Errorf("DeleteRunes Forwards: got %d runes, %d bytes, want %d, %d", gotR, gotB, wantR, wantB)
+	}
+
+	c.Seek(+int64(prefixB), SeekSet)
+	wantR, wantB = len(prefix), prefixB
+	if gotR, gotB := c.DeleteRunes(Backwards, 31); gotR != wantR || gotB != wantB {
+		t.Errorf("DeleteRunes Backwards: got %d runes, %d bytes, want %d, %d", gotR, gotB, wantR, wantB)
+	}
+
+	got := string(readAllText(nil, f))
+	want := iRobot[prefixB : len(iRobot)-suffixB]
 	if got != want {
 		t.Errorf("\ngot  %q\nwant %q", got, want)
 	}

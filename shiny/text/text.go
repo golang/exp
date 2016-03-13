@@ -382,15 +382,15 @@ func (f *Frame) readRune(b, k int32) (r rune, size int, newB, newK int32) {
 	newBAndKs := [utf8.UTFMax + 1]bAndK{
 		0: bAndK{b, k},
 	}
-	n := 0
+	n := int32(0)
 	for {
 		if k < bb.j {
-			nCopied := copy(buf[n:], f.text[k:bb.j])
-			for i := 1; i <= nCopied; i++ {
-				newBAndKs[n+i] = bAndK{b, k + int32(i)}
+			nCopied := int32(copy(buf[n:], f.text[k:bb.j]))
+			for i := int32(1); i <= nCopied; i++ {
+				newBAndKs[n+i] = bAndK{b, k + i}
 			}
 			n += nCopied
-			if n == len(buf) {
+			if n == utf8.UTFMax {
 				break
 			}
 		}
@@ -403,6 +403,56 @@ func (f *Frame) readRune(b, k int32) (r rune, size int, newB, newK int32) {
 	}
 	r, size = utf8.DecodeRune(buf[:n])
 	bk := newBAndKs[size]
+	if bk.b == 0 {
+		panic("text: invalid state")
+	}
+	return r, size, bk.b, bk.k
+}
+
+// readLastRune is like readRune but it reads the last rune before b-and-k
+// instead of the first rune after.
+func (f *Frame) readLastRune(b, k int32) (r rune, size int, newB, newK int32) {
+	bb := &f.boxes[b]
+
+	// In the fastest, common case, see if we can read a rune without crossing
+	// a Box boundary.
+	r, size = utf8.DecodeLastRune(f.text[bb.i:k])
+	if r < utf8.RuneSelf || size > 1 {
+		return r, size, b, k - int32(size)
+	}
+
+	// Otherwise, we decoded invalid UTF-8, possibly because a valid UTF-8 rune
+	// straddled this Box and the previous one. Try again, copying up to
+	// utf8.UTFMax bytes from multiple Boxes into a single contiguous buffer.
+	buf := [utf8.UTFMax]byte{}
+	newBAndKs := [utf8.UTFMax + 1]bAndK{
+		utf8.UTFMax: bAndK{b, k},
+	}
+	n := int32(utf8.UTFMax)
+	for {
+		if k < bb.j {
+			nCopied := k - bb.i
+			if nCopied > n {
+				nCopied = n
+			}
+			copy(buf[n-nCopied:n], f.text[k-nCopied:k])
+			for i := int32(1); i <= nCopied; i++ {
+				newBAndKs[n-i] = bAndK{b, k - i}
+			}
+			n -= nCopied
+			if n == 0 {
+				break
+			}
+		}
+		b = bb.prev
+		if b == 0 {
+			break
+		}
+		bb = &f.boxes[b]
+		k = bb.j
+	}
+	r, size = utf8.DecodeLastRune(buf[n:])
+	bk := newBAndKs[utf8.UTFMax-size]
 	if bk.b == 0 {
 		panic("text: invalid state")
 	}
