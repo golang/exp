@@ -420,7 +420,7 @@ func breakParagraph(f *Frame, p, l, b int32) {
 	}
 
 	// Make a new, empty Paragraph after this Paragraph p.
-	newP := f.newParagraph()
+	newP, _ := f.newParagraph()
 	nextP := f.paragraphs[p].next
 	if nextP != 0 {
 		f.paragraphs[nextP].prev = newP
@@ -442,7 +442,7 @@ func breakParagraph(f *Frame, p, l, b int32) {
 	if nextB := f.boxes[b].next; nextB != 0 {
 		f.boxes[b].next = 0
 		f.boxes[nextB].prev = 0
-		newL := f.newLine()
+		newL, _ := f.newLine()
 		f.lines[newL].firstB = nextB
 		if newPFirstL := f.paragraphs[newP].firstL; newPFirstL != 0 {
 			f.lines[newL].next = newPFirstL
@@ -456,11 +456,11 @@ func breakParagraph(f *Frame, p, l, b int32) {
 	{
 		pp := &f.paragraphs[newP]
 		if pp.firstL == 0 {
-			pp.firstL = f.newLine()
+			pp.firstL, _ = f.newLine()
 		}
 		ll := &f.lines[pp.firstL]
 		if ll.firstB == 0 {
-			ll.firstB = f.newBox()
+			ll.firstB, _ = f.newBox()
 		}
 	}
 
@@ -479,7 +479,10 @@ func breakLine(f *Frame, l, b, k int32) {
 		if k == bb.i {
 			panic("TODO: degenerate split left, possibly adjusting the Line's firstB??")
 		}
-		newB := f.newBox()
+		newB, realloc := f.newBox()
+		if realloc {
+			bb = &f.boxes[b]
+		}
 		nextB := bb.next
 		if nextB != 0 {
 			f.boxes[nextB].prev = newB
@@ -500,7 +503,10 @@ func breakLine(f *Frame, l, b, k int32) {
 	// Insert a line after this one, if one doesn't already exist.
 	ll := &f.lines[l]
 	if ll.next == 0 {
-		newL := f.newLine()
+		newL, realloc := f.newLine()
+		if realloc {
+			ll = &f.lines[l]
+		}
 		f.lines[newL].prev = l
 		ll.next = newL
 	}
@@ -673,15 +679,10 @@ func (c *Caret) splitBox() bool {
 	if c.k == bb.i || c.k == bb.j {
 		return false
 	}
-	newB := c.f.newBox()
-
-	// Calling newBox may have made bb a dangling pointer into an old array, so
-	// re-calculate it.
-	//
-	// TODO: fix up any other code that calls Frame.newFoo, directly or
-	// indirectly.
-	bb = &c.f.boxes[c.b]
-
+	newB, realloc := c.f.newBox()
+	if realloc {
+		bb = &c.f.boxes[c.b]
+	}
 	nextB := bb.next
 	if nextB != 0 {
 		c.f.boxes[nextB].prev = newB

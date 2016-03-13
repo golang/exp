@@ -244,40 +244,52 @@ func (f *Frame) initialize() {
 	f.lines[1].firstB = 1
 }
 
-func (f *Frame) newParagraph() int32 {
+// newParagraph returns the index of an empty Paragraph, and whether or not the
+// underlying memory has been re-allocated. Re-allocation means that any
+// existing *Paragraph pointers become invalid.
+func (f *Frame) newParagraph() (p int32, realloc bool) {
 	if f.freeP != 0 {
 		p := f.freeP
 		pp := &f.paragraphs[p]
 		f.freeP = pp.next
 		*pp = Paragraph{}
-		return p
+		return p, false
 	}
+	realloc = len(f.paragraphs) == cap(f.paragraphs)
 	f.paragraphs = append(f.paragraphs, Paragraph{})
-	return int32(len(f.paragraphs) - 1)
+	return int32(len(f.paragraphs) - 1), realloc
 }
 
-func (f *Frame) newLine() int32 {
+// newLine returns the index of an empty Line, and whether or not the
+// underlying memory has been re-allocated. Re-allocation means that any
+// existing *Line pointers become invalid.
+func (f *Frame) newLine() (l int32, realloc bool) {
 	if f.freeL != 0 {
 		l := f.freeL
 		ll := &f.lines[l]
 		f.freeL = ll.next
 		*ll = Line{}
-		return l
+		return l, false
 	}
+	realloc = len(f.lines) == cap(f.lines)
 	f.lines = append(f.lines, Line{})
-	return int32(len(f.lines) - 1)
+	return int32(len(f.lines) - 1), realloc
 }
 
-func (f *Frame) newBox() int32 {
+// newBox returns the index of an empty Box, and whether or not the underlying
+// memory has been re-allocated. Re-allocation means that any existing *Box
+// pointers become invalid.
+func (f *Frame) newBox() (b int32, realloc bool) {
 	if f.freeB != 0 {
 		b := f.freeB
 		bb := &f.boxes[b]
 		f.freeB = bb.next
 		*bb = Box{}
-		return b
+		return b, false
 	}
+	realloc = len(f.boxes) == cap(f.boxes)
 	f.boxes = append(f.boxes, Box{})
-	return int32(len(f.boxes) - 1)
+	return int32(len(f.boxes) - 1), realloc
 }
 
 func (f *Frame) freeParagraph(p int32) {

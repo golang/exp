@@ -240,14 +240,24 @@ func TestWrite(t *testing.T) {
 }
 
 func TestSetMaxWidth(t *testing.T) {
-	f := iRobotFrame(10)
+	f := new(Frame)
+	f.SetFace(toyFace{})
+	want := ""
 	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 100; i++ {
+		if i%20 == 5 {
+			c := f.NewCaret()
+			// TODO: remove the need to seek to the end.
+			c.Seek(0, SeekEnd)
+			c.WriteString(iRobot)
+			c.Close()
+			want += iRobot
+		}
 		f.SetMaxWidth(fixed.I(rng.Intn(20)))
 		if err := checkInvariants(f); err != nil {
 			t.Fatalf("i=%d: %v", i, err)
 		}
-		if err := testRead(f, iRobot); err != nil {
+		if err := testRead(f, want); err != nil {
 			t.Fatalf("i=%d: %v", i, err)
 		}
 	}
@@ -428,35 +438,25 @@ func TestMergeIntoOneLine(t *testing.T) {
 
 			if rng.Intn(4) == 0 {
 				// Make a new Box on a new Line.
-				l1 := f.newLine()
-
-				// Calling newLine may have made ll a dangling pointer into an
-				// old array, so re-calculate it.
-				//
-				// TODO: fix up any other code that calls Frame.newFoo,
-				// directly or indirectly.
-				ll = &f.lines[l]
-
+				l1, realloc := f.newLine()
+				if realloc {
+					ll = &f.lines[l]
+				}
 				ll1 := &f.lines[l1]
 				ll.next = l1
 				ll1.prev = l
 				l, ll = l1, ll1
 
-				ll.firstB = f.newBox()
+				ll.firstB, _ = f.newBox()
 				b = ll.firstB
 				bb = &f.boxes[b]
 
 			} else {
 				// Make a new Box on the same Line.
-				b1 := f.newBox()
-
-				// Calling newBox may have made bb a dangling pointer into an
-				// old array, so re-calculate it.
-				//
-				// TODO: fix up any other code that calls Frame.newFoo,
-				// directly or indirectly.
-				bb = &f.boxes[b]
-
+				b1, realloc := f.newBox()
+				if realloc {
+					bb = &f.boxes[b]
+				}
 				bb1 := &f.boxes[b1]
 				bb.next = b1
 				bb1.prev = b
