@@ -5,7 +5,7 @@
 // +build ignore
 //
 // This build tag means that "go install golang.org/x/exp/shiny/..." doesn't
-// install this example program. Use "go run main.go draw.go xy.go" to run it.
+// install this example program. Use "go run main.go board.go xy.go" to run it.
 
 package main
 
