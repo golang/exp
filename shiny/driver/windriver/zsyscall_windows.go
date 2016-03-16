@@ -22,6 +22,7 @@ var (
 	procDeleteObject           = modgdi32.NewProc("DeleteObject")
 	procFillRect               = moduser32.NewProc("FillRect")
 	procSelectObject           = modgdi32.NewProc("SelectObject")
+	procStretchBlt             = modgdi32.NewProc("StretchBlt")
 )
 
 func _AlphaBlend(dcdest syscall.Handle, xoriginDest int32, yoriginDest int32, wDest int32, hDest int32, dcsrc syscall.Handle, xoriginSrc int32, yoriginSrc int32, wsrc int32, hsrc int32, ftn uintptr) (err error) {
@@ -36,7 +37,7 @@ func _AlphaBlend(dcdest syscall.Handle, xoriginDest int32, yoriginDest int32, wD
 	return
 }
 
-func _BitBlt(dcdest syscall.Handle, xdest int32, ydest int32, width int32, height int32, dcsrc syscall.Handle, xsrc int32, ysrc int32, rop int32) (err error) {
+func _BitBlt(dcdest syscall.Handle, xdest int32, ydest int32, width int32, height int32, dcsrc syscall.Handle, xsrc int32, ysrc int32, rop uint32) (err error) {
 	r1, _, e1 := syscall.Syscall9(procBitBlt.Addr(), 9, uintptr(dcdest), uintptr(xdest), uintptr(ydest), uintptr(width), uintptr(height), uintptr(dcsrc), uintptr(xsrc), uintptr(ysrc), uintptr(rop))
 	if r1 == 0 {
 		if e1 != 0 {
@@ -140,6 +141,18 @@ func _SelectObject(dc syscall.Handle, gdiobj syscall.Handle) (newobj syscall.Han
 	r0, _, e1 := syscall.Syscall(procSelectObject.Addr(), 2, uintptr(dc), uintptr(gdiobj), 0)
 	newobj = syscall.Handle(r0)
 	if newobj == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _StretchBlt(dcdest syscall.Handle, xdest int32, ydest int32, wdest int32, hdest int32, dcsrc syscall.Handle, xsrc int32, ysrc int32, wsrc int32, hsrc int32, rop uint32) (err error) {
+	r1, _, e1 := syscall.Syscall12(procStretchBlt.Addr(), 11, uintptr(dcdest), uintptr(xdest), uintptr(ydest), uintptr(wdest), uintptr(hdest), uintptr(dcsrc), uintptr(xsrc), uintptr(ysrc), uintptr(wsrc), uintptr(hsrc), uintptr(rop), 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = error(e1)
 		} else {

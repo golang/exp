@@ -131,7 +131,7 @@ func handleWindowFill(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) 
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	// TODO
+	// TODO(brainman): use SetWorldTransform to implement generic Draw
 }
 
 type handleCopyParams struct {
@@ -173,8 +173,42 @@ func handleCopy(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	}
 }
 
+type handleScaleParams struct {
+	dr  image.Rectangle
+	src syscall.Handle
+	sr  image.Rectangle
+	op  draw.Op
+}
+
+var msgScale = win32.AddWindowMsg(handleScale)
+
 func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	drawer.Scale(w, dr, src, sr, op, opts)
+	if op != draw.Src && op != draw.Over {
+		drawer.Scale(w, dr, src, sr, op, opts)
+		return
+	}
+	p := handleScaleParams{
+		dr:  dr,
+		src: src.(*textureImpl).bitmap,
+		sr:  sr,
+		op:  op,
+	}
+	win32.SendMessage(w.hwnd, msgScale, 0, uintptr(unsafe.Pointer(&p)))
+}
+
+func handleScale(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
+	p := (*handleScaleParams)(unsafe.Pointer(lParam))
+
+	dc, err := win32.GetDC(hwnd)
+	if err != nil {
+		panic(err) // TODO handle errors
+	}
+	defer win32.ReleaseDC(hwnd, dc)
+
+	err = copyBitmapToDC(dc, p.dr, p.src, p.sr, p.op)
+	if err != nil {
+		panic(err) // TODO handle errors
+	}
 }
 
 func (w *windowImpl) Publish() screen.PublishResult {
