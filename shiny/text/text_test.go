@@ -271,6 +271,42 @@ func TestManyWrites(t *testing.T) {
 	}
 }
 
+func TestRandomAccessWrite(t *testing.T) {
+	f := new(Frame)
+	c := f.NewCaret()
+	defer c.Close()
+
+	rng := rand.New(rand.NewSource(1))
+	gotBuf := make([]byte, 0, 10000)
+	want := make([]byte, 0, 10000)
+	buf := make([]byte, 10)
+	x := byte(0)
+	for i := 0; i < 100; i++ {
+		n := rng.Intn(len(buf) + 1)
+		for j := range buf[:n] {
+			buf[j] = x
+			x++
+		}
+		offset := rng.Intn(len(want) + 1)
+
+		// Insert buf[:n] into the Frame at the given offset.
+		c.Seek(int64(offset), SeekSet)
+		c.Write(buf[:n])
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+
+		// Insert buf[:n] into want at the given offset.
+		want = want[:len(want)+n]
+		copy(want[offset+n:], want[offset:])
+		copy(want[offset:offset+n], buf[:n])
+
+		if got := readAllText(gotBuf[:0], f); !bytes.Equal(got, want) {
+			t.Errorf("i=%d:\ngot  % x\nwant % x", i, got, want)
+		}
+	}
+}
+
 func TestSetMaxWidth(t *testing.T) {
 	f := new(Frame)
 	f.SetFace(toyFace{})
@@ -279,8 +315,6 @@ func TestSetMaxWidth(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		if i%20 == 5 {
 			c := f.NewCaret()
-			// TODO: remove the need to seek to the end.
-			c.Seek(0, SeekEnd)
 			c.WriteString(iRobot)
 			c.Close()
 			want += iRobot
@@ -320,7 +354,7 @@ func TestReadRuneAcrossBoxes(t *testing.T) {
 						break
 					}
 					c.Seek(int64(rng.Intn(len(text)+1)), SeekSet)
-					c.splitBox()
+					c.splitBox(false)
 				}
 				c.Close()
 
@@ -513,7 +547,7 @@ func TestMergeIntoOneLine(t *testing.T) {
 		}
 
 		// Do the merge.
-		if err := checkInvariants(f); err != nil {
+		if err := checkSomeInvariants(f, ignoreInvariantEmptyBoxes); err != nil {
 			t.Fatalf("i=%d: before: %v", i, err)
 		}
 		f.mergeIntoOneLine(p)
@@ -562,7 +596,15 @@ func (b byI) Len() int           { return len(b) }
 func (b byI) Less(x, y int) bool { return b[x].i < b[y].i }
 func (b byI) Swap(x, y int)      { b[x], b[y] = b[y], b[x] }
 
+const (
+	ignoreInvariantEmptyBoxes = 1 << iota
+)
+
 func checkInvariants(f *Frame) error {
+	return checkSomeInvariants(f, 0)
+}
+
+func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 	const infinity = 1e6
 
 	if !f.initialized() {
@@ -622,6 +664,29 @@ func checkInvariants(f *Frame) error {
 				nUsedLines++
 			}
 			nUsedParagraphs++
+		}
+	}
+
+	// Check that only the last Box can be empty.
+	if ignoredInvariants&ignoreInvariantEmptyBoxes == 0 {
+		for p := f.firstP; p != 0; {
+			nextP := f.paragraphs[p].next
+			for l := f.paragraphs[p].firstL; l != 0; {
+				nextL := f.lines[l].next
+				for b := f.lines[l].firstB; b != 0; {
+					nextB := f.boxes[b].next
+
+					emptyBox := f.boxes[b].i == f.boxes[b].j
+					lastBox := nextP == 0 && nextL == 0 && nextB == 0
+					if emptyBox && !lastBox {
+						return fmt.Errorf("boxes[%d] is empty, but isn't the last Box", b)
+					}
+
+					b = nextB
+				}
+				l = nextL
+			}
+			p = nextP
 		}
 	}
 

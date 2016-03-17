@@ -355,26 +355,36 @@ func (c *Caret) write(s0 []byte, s1 string) error {
 		return errors.New("text: insufficient space for writing")
 	}
 
-	// If the Box's text is empty, move its empty i:j range to the equivalent
-	// empty range at the end of c.f.text.
-	if bb, n := &c.f.boxes[c.b], int32(len(c.f.text)); bb.i == bb.j && bb.i != n {
-		bb.i = n
-		bb.j = n
-		for _, cc := range c.f.carets {
-			if cc.b == c.b {
-				cc.k = n
-			}
-		}
-	}
-
-	if c.k != int32(len(c.f.text)) {
-		panic("TODO: inserting text somewhere other than at the end of the text buffer")
-	}
-
-	// Assert that the Caret c is at the end of its Box, and that Box's text is
+	// Ensure that the Caret is at the end of its Box, and that Box's text is
 	// at the end of the Frame's buffer.
-	if c.k != c.f.boxes[c.b].j || c.k != int32(len(c.f.text)) {
-		panic("text: invalid state")
+	for {
+		bb, n := &c.f.boxes[c.b], int32(len(c.f.text))
+		if c.k == bb.j && c.k == n {
+			break
+		}
+
+		// If the Box's text is empty, move its empty i:j range to the
+		// equivalent empty range at the end of c.f.text.
+		if bb.i == bb.j {
+			bb.i = n
+			bb.j = n
+			for _, cc := range c.f.carets {
+				if cc.b == c.b {
+					cc.k = n
+				}
+			}
+			continue
+		}
+
+		// Make the Caret be at the end of its Box.
+		if c.k != bb.j {
+			c.splitBox(true)
+			continue
+		}
+
+		// Make a new empty Box and move the Caret to it.
+		c.splitBox(true)
+		c.leanForwards()
 	}
 
 	length, nl := len(s0), false
@@ -607,7 +617,7 @@ func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
 	}
 
 	c.leanForwards()
-	if c.f.boxes[c.b].i != c.k && c.splitBox() {
+	if c.f.boxes[c.b].i != c.k && c.splitBox(false) {
 		c.leanForwards()
 	}
 	for nBytes > 0 && int(c.pos) != c.f.len {
@@ -678,12 +688,13 @@ func (c *Caret) joinNextParagraph() {
 	c.f.freeParagraph(toFree)
 }
 
-// splitBox splits the Caret's Box into two, at the Caret's location, provided
-// that the Caret is not at either edge of its Box. It returns whether the Box
-// was split.
-func (c *Caret) splitBox() bool {
+// splitBox splits the Caret's Box into two, at the Caret's location. Unless
+// force is set, it does nothing if the Caret is at either edge of its Box. It
+// returns whether the Box was split. If so, the new Box is created after, not
+// before, the Caret's current Box.
+func (c *Caret) splitBox(force bool) bool {
 	bb := &c.f.boxes[c.b]
-	if c.k == bb.i || c.k == bb.j {
+	if !force && (c.k == bb.i || c.k == bb.j) {
 		return false
 	}
 	newB, realloc := c.f.newBox()
