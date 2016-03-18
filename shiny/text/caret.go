@@ -532,10 +532,18 @@ func breakLine(f *Frame, l, b, k int32) {
 	nextB, nextL := bb.next, ll.next
 	bb.next = 0
 	f.boxes[nextB].prev = 0
-	if f.lines[nextL].firstB == 0 {
-		f.lines[nextL].firstB = nextB
-	} else {
-		panic("TODO: prepend the remaining boxes to the next Line's existing boxes")
+	fb := f.lines[nextL].firstB
+	f.lines[nextL].firstB = nextB
+
+	// If the next Line already contained Boxes, append them to the end of the
+	// nextB chain, and join the two newly linked Boxes if possible.
+	if fb != 0 {
+		lb := f.lines[nextL].lastBox(f)
+		lbb := &f.boxes[lb]
+		fbb := &f.boxes[fb]
+		lbb.next = fb
+		fbb.prev = lb
+		f.joinBoxes(lb, fb, lbb, fbb)
 	}
 
 	// TODO: fix up other Carets's p, l and b fields.

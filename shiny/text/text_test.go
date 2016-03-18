@@ -307,6 +307,35 @@ func TestRandomAccessWrite(t *testing.T) {
 	}
 }
 
+func TestWriteAtStart(t *testing.T) {
+	f := iRobotFrame(10)
+	c := f.NewCaret()
+	defer c.Close()
+
+	prefix := "The Truth of the Matter\n(insofaras): "
+	gotBuf := make([]byte, len(prefix)+len(iRobot))
+	want := make([]byte, len(iRobot), len(prefix)+len(iRobot))
+	copy(want, iRobot)
+
+	for i := 0; i < len(prefix); i++ {
+		x := prefix[len(prefix)-1-i]
+
+		c.Seek(0, SeekSet)
+		c.WriteByte(x)
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+
+		want = want[:len(want)+1]
+		copy(want[1:], want)
+		want[0] = x
+
+		if got := readAllText(gotBuf[:0], f); !bytes.Equal(got, want) {
+			t.Fatalf("i=%d:\ngot  % x\nwant % x", i, got, want)
+		}
+	}
+}
+
 func TestSetMaxWidth(t *testing.T) {
 	f := new(Frame)
 	f.SetFace(toyFace{})
