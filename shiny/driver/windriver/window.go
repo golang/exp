@@ -12,6 +12,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"syscall"
 	"unsafe"
 
@@ -130,74 +131,56 @@ func handleWindowFill(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) 
 	}
 }
 
-func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	// TODO(brainman): use SetWorldTransform to implement generic Draw
-}
-
-type handleCopyParams struct {
-	dp  image.Point
-	src syscall.Handle
-	sr  image.Rectangle
-	op  draw.Op
-}
-
-var msgCopy = win32.AddWindowMsg(handleCopy)
-
-func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	if op != draw.Src && op != draw.Over {
-		drawer.Copy(w, dp, src, sr, op, opts)
-		return
-	}
-	p := handleCopyParams{
-		dp:  dp,
-		src: src.(*textureImpl).bitmap,
-		sr:  sr,
-		op:  op,
-	}
-	win32.SendMessage(w.hwnd, msgCopy, 0, uintptr(unsafe.Pointer(&p)))
-}
-
-func handleCopy(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	p := (*handleCopyParams)(unsafe.Pointer(lParam))
-
-	dc, err := win32.GetDC(hwnd)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-	defer win32.ReleaseDC(hwnd, dc)
-
-	dr := p.sr.Add(p.dp.Sub(p.sr.Min))
-	err = copyBitmapToDC(dc, dr, p.src, p.sr, p.op)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-}
-
-type handleScaleParams struct {
+type handleDrawParams struct {
 	dr  image.Rectangle
 	src syscall.Handle
 	sr  image.Rectangle
 	op  draw.Op
 }
 
-var msgScale = win32.AddWindowMsg(handleScale)
+var msgDraw = win32.AddWindowMsg(handleDraw)
 
-func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	if op != draw.Src && op != draw.Over {
-		drawer.Scale(w, dr, src, sr, op, opts)
-		return
+func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	if op == draw.Src || op == draw.Over {
+		if src2dst[1] == 0 && src2dst[3] == 0 {
+			p := handleDrawParams{
+				src: src.(*textureImpl).bitmap,
+				sr:  sr,
+				op:  op,
+			}
+			if src2dst[0] == 1 && src2dst[4] == 1 {
+				// copy bitmap
+				dp := image.Point{int(src2dst[2]), int(src2dst[5])}
+				p.dr = sr.Add(dp.Sub(sr.Min))
+			} else {
+				// scale bitmap
+				dstXMin := float64(sr.Min.X)*src2dst[0] + src2dst[2]
+				dstXMax := float64(sr.Max.X)*src2dst[0] + src2dst[2]
+				if dstXMin > dstXMax {
+					// TODO: check if this (and below) works when src2dst[0] < 0.
+					dstXMin, dstXMax = dstXMax, dstXMin
+				}
+				dstYMin := float64(sr.Min.Y)*src2dst[4] + src2dst[5]
+				dstYMax := float64(sr.Max.Y)*src2dst[4] + src2dst[5]
+				if dstYMin > dstYMax {
+					// TODO: check if this (and below) works when src2dst[4] < 0.
+					dstYMin, dstYMax = dstYMax, dstYMin
+				}
+				p.dr = image.Rectangle{
+					image.Point{int(math.Floor(dstXMin)), int(math.Floor(dstYMin))},
+					image.Point{int(math.Ceil(dstXMax)), int(math.Ceil(dstYMax))},
+				}
+			}
+			win32.SendMessage(w.hwnd, msgDraw, 0, uintptr(unsafe.Pointer(&p)))
+			return
+		}
 	}
-	p := handleScaleParams{
-		dr:  dr,
-		src: src.(*textureImpl).bitmap,
-		sr:  sr,
-		op:  op,
-	}
-	win32.SendMessage(w.hwnd, msgScale, 0, uintptr(unsafe.Pointer(&p)))
+
+	// TODO(brainman): use SetWorldTransform to implement generic Draw
 }
 
-func handleScale(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	p := (*handleScaleParams)(unsafe.Pointer(lParam))
+func handleDraw(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
+	p := (*handleDrawParams)(unsafe.Pointer(lParam))
 
 	dc, err := win32.GetDC(hwnd)
 	if err != nil {
@@ -209,6 +192,14 @@ func handleScale(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	if err != nil {
 		panic(err) // TODO handle errors
 	}
+}
+
+func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	drawer.Copy(w, dp, src, sr, op, opts)
+}
+
+func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	drawer.Scale(w, dr, src, sr, op, opts)
 }
 
 func (w *windowImpl) Publish() screen.PublishResult {
