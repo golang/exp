@@ -407,6 +407,13 @@ func (c *Caret) write(s0 []byte, s1 string) error {
 
 	// TODO: re-layout the new c.p paragraph, if we saw '\n'.
 	layout(c.f, oldL)
+
+	// Fix up the Caret.
+	// TODO: be more efficient than a linear scan from the start?
+	pos := c.pos
+	c.seekStart()
+	c.Seek(int64(pos), SeekSet)
+
 	return nil
 }
 

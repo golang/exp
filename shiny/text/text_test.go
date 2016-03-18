@@ -66,6 +66,15 @@ func runesEqual(xs, ys []rune) bool {
 	return true
 }
 
+func rngIntPair(rng *rand.Rand, n int) (x, y int) {
+	x = rng.Intn(n)
+	y = rng.Intn(n)
+	if x > y {
+		x, y = y, x
+	}
+	return x, y
+}
+
 // toyFace implements the font.Face interface by measuring every rune's width
 // as 1 pixel.
 type toyFace struct{}
@@ -239,6 +248,29 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+func TestManyWrites(t *testing.T) {
+	f := new(Frame)
+	f.SetFace(toyFace{})
+	f.SetMaxWidth(fixed.I(10))
+	c := f.NewCaret()
+	defer c.Close()
+
+	const n, abc = 100, "abcdefghijkl\n   "
+	rng := rand.New(rand.NewSource(1))
+	buf := make([]byte, n)
+	for i := range buf {
+		buf[i] = abc[rng.Intn(len(abc))]
+	}
+
+	for i := 0; i < 100; i++ {
+		x, y := rngIntPair(rng, len(buf)+1)
+		c.Write(buf[x:y])
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+	}
+}
+
 func TestSetMaxWidth(t *testing.T) {
 	f := new(Frame)
 	f.SetFace(toyFace{})
@@ -344,13 +376,8 @@ func TestDelete(t *testing.T) {
 		defer c.Close()
 		wantBytes := append(wantBytesBuf[:0], iRobot...)
 		for j := 0; j < 8; j++ {
-			x := rng.Intn(len(wantBytes) + 1)
-			y := rng.Intn(len(wantBytes) + 1)
-			if x > y {
-				x, y = y, x
-			}
-
 			// Delete the text in the range [x, y).
+			x, y := rngIntPair(rng, len(wantBytes)+1)
 			got, want := 0, y-x
 			if rng.Intn(2) == 0 {
 				c.Seek(int64(x), SeekSet)
@@ -768,7 +795,56 @@ func checkInvariants(f *Frame) error {
 		return fmt.Errorf("#boxes (%d) != 1 + #used (%d) + #free (%d)", len(f.boxes), nUsedBoxes, nFreeBoxes)
 	}
 
+	// Check that each Caret's pos is in the Frame's 0:len range, the Caret's k
+	// is in its Box's i:j range, and its Box b is in its Line l is in its
+	// Paragraph p.
+	for i, c := range f.carets {
+		if c.pos < 0 || f.len < int(c.pos) {
+			return fmt.Errorf("caret[%d]: pos %d outside range [0, %d]", i, c.pos, f.len)
+		}
+
+		if c.b < 1 || len(f.boxes) < int(c.b) {
+			return fmt.Errorf("caret[%d]: c.b %d outside range [1, %d]", i, c.b, len(f.boxes))
+		}
+		bb := &f.boxes[c.b]
+		if c.k < bb.i || bb.j < c.k {
+			return fmt.Errorf("caret[%d]: c.k %d outside range [%d, %d]", i, c.k, bb.i, bb.j)
+		}
+
+		if c.l < 1 || len(f.lines) < int(c.l) {
+			return fmt.Errorf("caret[%d]: c.l %d outside range [1, %d]", i, c.l, len(f.lines))
+		}
+		if !f.lines[c.l].contains(f, c.b) {
+			return fmt.Errorf("caret[%d]: Line %d does not contain Box %d", i, c.l, c.b)
+		}
+
+		if c.p < 1 || len(f.paragraphs) < int(c.p) {
+			return fmt.Errorf("caret[%d]: c.p %d outside range [1, %d]", i, c.p, len(f.paragraphs))
+		}
+		if !f.paragraphs[c.p].contains(f, c.l) {
+			return fmt.Errorf("caret[%d]: Paragraph %d does not contain Line %d", i, c.p, c.l)
+		}
+	}
+
 	return nil
+}
+
+func (p *Paragraph) contains(f *Frame, l int32) bool {
+	for x := p.firstL; x != 0; x = f.lines[x].next {
+		if x == l {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *Line) contains(f *Frame, b int32) bool {
+	for x := l.firstB; x != 0; x = f.boxes[x].next {
+		if x == b {
+			return true
+		}
+	}
+	return false
 }
 
 // dump is used for debugging.
