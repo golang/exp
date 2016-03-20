@@ -653,6 +653,14 @@ func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
 	l := c.f.mergeIntoOneLine(c.p)
 	layout(c.f, l)
 
+	// Compact c.f.text if it's large enough and the fraction of deleted text
+	// is above some threshold. The actual threshold value (25%) is arbitrary.
+	// A lower value means more frequent compactions, so less memory on average
+	// but more CPU. A higher value means the opposite.
+	if len(c.f.text) > 4096 && len(c.f.text)/4 < c.f.deletedLen() {
+		c.f.compactText()
+	}
+
 	// Fix up the Caret.
 	// TODO: be more efficient than a linear scan from the start?
 	pos := c.pos
@@ -660,7 +668,6 @@ func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
 	c.Seek(int64(pos), SeekSet)
 
 	// TODO: fix up other Carets.
-	// TODO: run a compaction if c.f.text holds mainly deleted content.
 	return dBytes
 }
 

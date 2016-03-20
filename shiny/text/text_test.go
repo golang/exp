@@ -278,11 +278,11 @@ func TestManyWrites(t *testing.T) {
 	c := f.NewCaret()
 	defer c.Close()
 
-	const n, abc = 100, "abcdefghijkl\n   "
+	const n, abc16 = 100, "abcdefghijkl\n   "
 	rng := rand.New(rand.NewSource(1))
 	buf := make([]byte, n)
 	for i := range buf {
-		buf[i] = abc[rng.Intn(len(abc))]
+		buf[i] = abc16[rng.Intn(len(abc16))]
 	}
 
 	for i := 0; i < 100; i++ {
@@ -356,6 +356,14 @@ func TestWriteAtStart(t *testing.T) {
 		if got := readAllText(gotBuf[:0], f); !bytes.Equal(got, want) {
 			t.Fatalf("i=%d:\ngot  % x\nwant % x", i, got, want)
 		}
+	}
+
+	if nl, nb := f.nUsedLines(), f.nUsedBoxes(); nl == nb {
+		t.Fatalf("before compaction: using %d lines and %d boxes, should be not equal", nl, nb)
+	}
+	f.compactText()
+	if nl, nb := f.nUsedLines(), f.nUsedBoxes(); nl != nb {
+		t.Fatalf("after compaction: using %d lines and %d boxes, should be equal", nl, nb)
 	}
 }
 
@@ -597,6 +605,45 @@ func TestDeleteRunesTooMuch(t *testing.T) {
 	}
 }
 
+func TestCompactText(t *testing.T) {
+	f := new(Frame)
+	f.SetFace(toyFace{})
+	f.SetMaxWidth(fixed.I(80))
+	c := f.NewCaret()
+	defer c.Close()
+
+	const n, abc64 = 1024, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n           "
+	rng := rand.New(rand.NewSource(1))
+	buf := make([]byte, n)
+	for i := range buf {
+		buf[i] = abc64[rng.Intn(len(abc64))]
+	}
+
+	written, wantLen := 0, 0
+	for i := 0; written < 32768; i++ {
+		x, y := rngIntPair(rng, len(buf)+1)
+		c.Seek(int64(rng.Intn(f.Len()+1)), SeekSet)
+		c.Write(buf[x:y])
+		written += y - x
+		wantLen += y - x
+
+		x, y = rngIntPair(rng, wantLen+1)
+		c.Seek(int64(x), SeekSet)
+		c.Delete(Forwards, y-x)
+		wantLen -= y - x
+
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+		if gotLen := f.Len(); gotLen != wantLen {
+			t.Fatalf("i=%d: length: got %d, want %d", i, gotLen, wantLen)
+		}
+	}
+	if len(f.text) == written {
+		t.Fatal("f.text was not compacted")
+	}
+}
+
 func TestMergeIntoOneLine(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 100; i++ {
@@ -691,29 +738,13 @@ func TestMergeIntoOneLine(t *testing.T) {
 		}
 
 		// Check that there is only one Line in use.
-		nUsedLines := 0
-		for l, ll := range f.lines {
-			// The 0th index is a special case. A negative prev means that the
-			// Line is in the free-list.
-			if l != 0 && ll.prev >= 0 {
-				nUsedLines++
-			}
-		}
-		if nUsedLines != 1 {
-			t.Errorf("i=%d: nUsedLines: got %d, want %d", i, nUsedLines, 1)
+		if n := f.nUsedLines(); n != 1 {
+			t.Errorf("i=%d: nUsedLines: got %d, want %d", i, n, 1)
 		}
 
 		// Check the number of Boxes in use.
-		nUsedBoxes := 0
-		for b, bb := range f.boxes {
-			// The 0th index is a special case. A negative prev means that the
-			// Box is in the free-list.
-			if b != 0 && bb.prev >= 0 {
-				nUsedBoxes++
-			}
-		}
-		if nUsedBoxes != wantNUsedBoxes {
-			t.Errorf("i=%d: nUsedBoxes: got %d, want %d", i, nUsedBoxes, wantNUsedBoxes)
+		if n := f.nUsedBoxes(); n != wantNUsedBoxes {
+			t.Errorf("i=%d: nUsedBoxes: got %d, want %d", i, n, wantNUsedBoxes)
 		}
 	}
 }
@@ -1027,6 +1058,28 @@ func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 	}
 
 	return nil
+}
+
+func (f *Frame) nUsedLines() (n int) {
+	for l, ll := range f.lines {
+		// The 0th index is a special case. A negative prev means that the
+		// Line is in the free-list.
+		if l != 0 && ll.prev >= 0 {
+			n++
+		}
+	}
+	return n
+}
+
+func (f *Frame) nUsedBoxes() (n int) {
+	for b, bb := range f.boxes {
+		// The 0th index is a special case. A negative prev means that the
+		// Box is in the free-list.
+		if b != 0 && bb.prev >= 0 {
+			n++
+		}
+	}
+	return n
 }
 
 func (p *Paragraph) contains(f *Frame, l int32) bool {

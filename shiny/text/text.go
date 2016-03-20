@@ -336,6 +336,49 @@ func (f *Frame) Len() int {
 	return f.len
 }
 
+// deletedLen returns the number of deleted bytes in the Frame's text.
+func (f *Frame) deletedLen() int {
+	return len(f.text) - f.len
+}
+
+func (f *Frame) compactText() {
+	// f.text contains f.len live bytes and len(f.text) - f.len deleted bytes.
+	// After the compaction, the new f.text slice's capacity should be at least
+	// f.len, to hold all of the live bytes, but also be below len(f.text) to
+	// allow total memory use to decrease. The actual value used (halfway
+	// between them) is arbitrary. A lower value means less up-front memory
+	// consumption but a lower threshold for re-allocating the f.text slice
+	// upon further writes, such as a paste immediately after a cut. A higher
+	// value means the opposite.
+	newText := make([]byte, 0, f.len+f.deletedLen()/2)
+	for p := f.firstP; p != 0; {
+		pp := &f.paragraphs[p]
+		for l := pp.firstL; l != 0; {
+			ll := &f.lines[l]
+
+			i := int32(len(newText))
+			for b := ll.firstB; b != 0; {
+				bb := &f.boxes[b]
+				newText = append(newText, f.text[bb.i:bb.j]...)
+				nextB := bb.next
+				f.freeBox(b)
+				b = nextB
+			}
+			j := int32(len(newText))
+			ll.firstB, _ = f.newBox()
+			bb := &f.boxes[ll.firstB]
+			bb.i, bb.j = i, j
+
+			l = ll.next
+		}
+		p = pp.next
+	}
+	f.text = newText
+	if len(newText) != f.len {
+		panic("text: invalid state")
+	}
+}
+
 // NewCaret returns a new Caret at the start of this Frame.
 func (f *Frame) NewCaret() *Caret {
 	if !f.initialized() {
