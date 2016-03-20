@@ -76,7 +76,7 @@ func newWindow(opts *screen.NewWindowOptions) (syscall.Handle, error) {
 			w = opts.Width
 		}
 		if opts.Height > 0 {
-			w = opts.Height
+			h = opts.Height
 		}
 	}
 	hwnd, err := _CreateWindowEx(0,
