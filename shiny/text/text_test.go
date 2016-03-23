@@ -17,6 +17,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -113,6 +114,10 @@ func (toyFace) GlyphAdvance(r rune) (fixed.Int26_6, bool) {
 
 func (toyFace) Kern(r0, r1 rune) fixed.Int26_6 {
 	return 0
+}
+
+func (toyFace) Metrics() font.Metrics {
+	return font.Metrics{}
 }
 
 // iRobot is some text that contains both ASCII and non-ASCII runes.

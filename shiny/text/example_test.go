@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"golang.org/x/exp/shiny/text"
+	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -35,6 +36,10 @@ func (toyFace) GlyphAdvance(r rune) (fixed.Int26_6, bool) {
 
 func (toyFace) Kern(r0, r1 rune) fixed.Int26_6 {
 	return 0
+}
+
+func (toyFace) Metrics() font.Metrics {
+	return font.Metrics{}
 }
 
 func printFrame(f *text.Frame, softReturnsOnly bool) {
