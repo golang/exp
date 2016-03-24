@@ -131,7 +131,9 @@ func drawRGBA(m *image.RGBA, tp image.Point) {
 		Dst:  m,
 		Src:  image.Black,
 		Face: basicfont.Face7x13,
-		Dot:  fixed.P(0, 12),
+		Dot: fixed.Point26_6{
+			Y: basicfont.Face7x13.Metrics().Ascent,
+		},
 	}
 	d.DrawString(fmt.Sprint(tp))
 }
