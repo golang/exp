@@ -111,19 +111,20 @@ func (d *Device) Do(buf []byte, delay time.Duration) error {
 	return d.ioctl(msgRequestCode(1), uintptr(unsafe.Pointer(&p)))
 }
 
-// Open opens an SPI device by the specified name.
-// The name must be the device name of the SPI bus,
-// e.g. /dev/spidev0.1.
+// Open opens a device with the specified bus identifier and chip select
+// by using the given driver. If an empty string provided for the driver,
+// the default driver (devfs) is used.
 // Mode is the SPI mode. SPI mode is a combination of polarity and phases.
 // CPOL is the high order bit, CPHA is the low order. Pre-computed mode
 // values are Mode0, Mode1, Mode2 and Mode3. The value of the mode argument
 // can be overriden by the device's driver.
 // Max clock speed is in Hz and can be overriden by the device's driver.
-func Open(name string, mode int, maxSpeedHz int) (*Device, error) {
+func Open(driver string, bus, cs int, mode int, maxSpeedHz int) (*Device, error) {
 	// TODO(jbd): Don't depend on devfs. Allow multiple backends and
 	// those who may depend on proprietary APIs. devfs backend
 	// could be the default backend.
-	f, err := os.OpenFile(name, os.O_RDWR, 0)
+	n := fmt.Sprintf("/dev/spidev%d.%d", bus, cs)
+	f, err := os.OpenFile(n, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
