@@ -13,11 +13,15 @@ import (
 	"unsafe"
 )
 
+// Mode represents the SPI mode number where clock parity (CPOL)
+// is the high order and clock edge (CPHA) is the low order bit.
+type Mode int
+
 const (
-	Mode0 = 0
-	Mode1 = 1
-	Mode2 = 2
-	Mode3 = 3
+	Mode0 = Mode(0)
+	Mode1 = Mode(1)
+	Mode2 = Mode(2)
+	Mode3 = Mode(3)
 )
 
 const (
@@ -62,7 +66,7 @@ type payload struct {
 // CPOL is the high order bit, CPHA is the low order. Pre-computed mode
 // values are Mode0, Mode1, Mode2 and Mode3.
 // The value can be changed by SPI device's driver.
-func (d *Device) SetMode(mode int) error {
+func (d *Device) SetMode(mode Mode) error {
 	m := uint8(mode)
 	if err := d.ioctl(requestCode(write, magic, 1, 1), uintptr(unsafe.Pointer(&m))); err != nil {
 		return fmt.Errorf("error setting mode to %v: %v", mode, err)
@@ -119,7 +123,7 @@ func (d *Device) Do(buf []byte, delay time.Duration) error {
 // values are Mode0, Mode1, Mode2 and Mode3. The value of the mode argument
 // can be overriden by the device's driver.
 // Max clock speed is in Hz and can be overriden by the device's driver.
-func Open(driver string, bus, cs int, mode int, maxSpeedHz int) (*Device, error) {
+func Open(driver string, bus, cs int, mode Mode, maxSpeedHz int) (*Device, error) {
 	// TODO(jbd): Don't depend on devfs. Allow multiple backends and
 	// those who may depend on proprietary APIs. devfs backend
 	// could be the default backend.
