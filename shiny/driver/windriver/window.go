@@ -132,66 +132,101 @@ func handleWindowFill(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) 
 }
 
 type handleDrawParams struct {
-	dr  image.Rectangle
-	src syscall.Handle
-	sr  image.Rectangle
-	op  draw.Op
+	src2dst f64.Aff3
+	src     syscall.Handle
+	sr      image.Rectangle
+	op      draw.Op
 }
 
 var msgDraw = win32.AddWindowMsg(handleDraw)
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	if op == draw.Src || op == draw.Over {
-		if src2dst[1] == 0 && src2dst[3] == 0 {
-			p := handleDrawParams{
-				src: src.(*textureImpl).bitmap,
-				sr:  sr,
-				op:  op,
-			}
-			if src2dst[0] == 1 && src2dst[4] == 1 {
-				// copy bitmap
-				dp := image.Point{int(src2dst[2]), int(src2dst[5])}
-				p.dr = sr.Add(dp.Sub(sr.Min))
-			} else {
-				// scale bitmap
-				dstXMin := float64(sr.Min.X)*src2dst[0] + src2dst[2]
-				dstXMax := float64(sr.Max.X)*src2dst[0] + src2dst[2]
-				if dstXMin > dstXMax {
-					// TODO: check if this (and below) works when src2dst[0] < 0.
-					dstXMin, dstXMax = dstXMax, dstXMin
-				}
-				dstYMin := float64(sr.Min.Y)*src2dst[4] + src2dst[5]
-				dstYMax := float64(sr.Max.Y)*src2dst[4] + src2dst[5]
-				if dstYMin > dstYMax {
-					// TODO: check if this (and below) works when src2dst[4] < 0.
-					dstYMin, dstYMax = dstYMax, dstYMin
-				}
-				p.dr = image.Rectangle{
-					image.Point{int(math.Floor(dstXMin)), int(math.Floor(dstYMin))},
-					image.Point{int(math.Ceil(dstXMax)), int(math.Ceil(dstYMax))},
-				}
-			}
-			win32.SendMessage(w.hwnd, msgDraw, 0, uintptr(unsafe.Pointer(&p)))
-			return
-		}
+	if op != draw.Src && op != draw.Over {
+		// TODO:
+		return
 	}
-
-	// TODO(brainman): use SetWorldTransform to implement generic Draw
+	p := handleDrawParams{
+		src2dst: src2dst,
+		src:     src.(*textureImpl).bitmap,
+		sr:      sr,
+		op:      op,
+	}
+	win32.SendMessage(w.hwnd, msgDraw, 0, uintptr(unsafe.Pointer(&p)))
 }
 
 func handleDraw(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	p := (*handleDrawParams)(unsafe.Pointer(lParam))
-
-	dc, err := win32.GetDC(hwnd)
+	err := drawWindow(hwnd, p.src2dst, p.src, p.sr, p.op)
 	if err != nil {
 		panic(err) // TODO handle errors
+	}
+}
+
+func drawWindow(hwnd syscall.Handle, src2dst f64.Aff3, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
+	dc, err := win32.GetDC(hwnd)
+	if err != nil {
+		return err
 	}
 	defer win32.ReleaseDC(hwnd, dc)
 
-	err = copyBitmapToDC(dc, p.dr, p.src, p.sr, p.op)
-	if err != nil {
-		panic(err) // TODO handle errors
+	var dr image.Rectangle
+	if src2dst[1] != 0 || src2dst[3] != 0 {
+		// general drawing
+		dr = sr.Sub(sr.Min)
+
+		prevmode, err := _SetGraphicsMode(dc, _GM_ADVANCED)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_, err := _SetGraphicsMode(dc, prevmode)
+			if retErr == nil {
+				retErr = err
+			}
+		}()
+
+		x := _XFORM{
+			eM11: +float32(src2dst[0]),
+			eM12: -float32(src2dst[1]),
+			eM21: -float32(src2dst[3]),
+			eM22: +float32(src2dst[4]),
+			eDx:  +float32(src2dst[2]),
+			eDy:  +float32(src2dst[5]),
+		}
+		err = _SetWorldTransform(dc, &x)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err := _ModifyWorldTransform(dc, nil, _MWT_IDENTITY)
+			if retErr == nil {
+				retErr = err
+			}
+		}()
+	} else if src2dst[0] == 1 && src2dst[4] == 1 {
+		// copy bitmap
+		dp := image.Point{int(src2dst[2]), int(src2dst[5])}
+		dr = sr.Add(dp.Sub(sr.Min))
+	} else {
+		// scale bitmap
+		dstXMin := float64(sr.Min.X)*src2dst[0] + src2dst[2]
+		dstXMax := float64(sr.Max.X)*src2dst[0] + src2dst[2]
+		if dstXMin > dstXMax {
+			// TODO: check if this (and below) works when src2dst[0] < 0.
+			dstXMin, dstXMax = dstXMax, dstXMin
+		}
+		dstYMin := float64(sr.Min.Y)*src2dst[4] + src2dst[5]
+		dstYMax := float64(sr.Max.Y)*src2dst[4] + src2dst[5]
+		if dstYMin > dstYMax {
+			// TODO: check if this (and below) works when src2dst[4] < 0.
+			dstYMin, dstYMax = dstYMax, dstYMin
+		}
+		dr = image.Rectangle{
+			image.Point{int(math.Floor(dstXMin)), int(math.Floor(dstYMin))},
+			image.Point{int(math.Ceil(dstXMax)), int(math.Ceil(dstYMax))},
+		}
 	}
+	return copyBitmapToDC(dc, dr, src, sr, op)
 }
 
 func (w *windowImpl) Copy(dp image.Point, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {

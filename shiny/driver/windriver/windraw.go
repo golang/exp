@@ -113,5 +113,3 @@ func fill(dc syscall.Handle, dr image.Rectangle, c color.Color, op draw.Op) erro
 
 	return copyBitmapToDC(dc, dr, bitmap, sr, draw.Over)
 }
-
-// TODO(andlabs): Draw

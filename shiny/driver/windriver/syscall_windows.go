@@ -66,6 +66,15 @@ func (bf _BLENDFUNCTION) ToUintptr() uintptr {
 	return *((*uintptr)(unsafe.Pointer(&bf)))
 }
 
+type _XFORM struct {
+	eM11 float32
+	eM12 float32
+	eM21 float32
+	eM22 float32
+	eDx  float32
+	eDy  float32
+}
+
 const (
 	_WM_PAINT            = 15
 	_WM_WINDOWPOSCHANGED = 71
@@ -112,6 +121,13 @@ const (
 	_SRCCOPY = 0x00cc0020
 )
 
+const (
+	_GM_COMPATIBLE = 1
+	_GM_ADVANCED   = 2
+
+	_MWT_IDENTITY = 1
+)
+
 func _GET_X_LPARAM(lp uintptr) int32 {
 	return int32(_LOWORD(lp))
 }
@@ -142,5 +158,8 @@ func _HIWORD(l uintptr) uint16 {
 //sys	_DeleteDC(dc syscall.Handle) (err error) = gdi32.DeleteDC
 //sys	_DeleteObject(object syscall.Handle) (err error) = gdi32.DeleteObject
 //sys	_FillRect(dc syscall.Handle, rc *_RECT, brush syscall.Handle) (err error) = user32.FillRect
+//sys	_ModifyWorldTransform(dc syscall.Handle, x *_XFORM, mode uint32) (err error) = gdi32.ModifyWorldTransform
 //sys	_SelectObject(dc syscall.Handle, gdiobj syscall.Handle) (newobj syscall.Handle, err error) = gdi32.SelectObject
+//sys	_SetGraphicsMode(dc syscall.Handle, mode int32) (oldmode int32, err error) = gdi32.SetGraphicsMode
+//sys	_SetWorldTransform(dc syscall.Handle, x *_XFORM) (err error) = gdi32.SetWorldTransform
 //sys	_StretchBlt(dcdest syscall.Handle, xdest int32, ydest int32, wdest int32, hdest int32, dcsrc syscall.Handle, xsrc int32, ysrc int32, wsrc int32, hsrc int32, rop uint32) (err error) = gdi32.StretchBlt

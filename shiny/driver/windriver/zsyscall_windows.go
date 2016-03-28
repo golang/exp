@@ -21,7 +21,10 @@ var (
 	procDeleteDC               = modgdi32.NewProc("DeleteDC")
 	procDeleteObject           = modgdi32.NewProc("DeleteObject")
 	procFillRect               = moduser32.NewProc("FillRect")
+	procModifyWorldTransform   = modgdi32.NewProc("ModifyWorldTransform")
 	procSelectObject           = modgdi32.NewProc("SelectObject")
+	procSetGraphicsMode        = modgdi32.NewProc("SetGraphicsMode")
+	procSetWorldTransform      = modgdi32.NewProc("SetWorldTransform")
 	procStretchBlt             = modgdi32.NewProc("StretchBlt")
 )
 
@@ -137,10 +140,47 @@ func _FillRect(dc syscall.Handle, rc *_RECT, brush syscall.Handle) (err error) {
 	return
 }
 
+func _ModifyWorldTransform(dc syscall.Handle, x *_XFORM, mode uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procModifyWorldTransform.Addr(), 3, uintptr(dc), uintptr(unsafe.Pointer(x)), uintptr(mode))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
 func _SelectObject(dc syscall.Handle, gdiobj syscall.Handle) (newobj syscall.Handle, err error) {
 	r0, _, e1 := syscall.Syscall(procSelectObject.Addr(), 2, uintptr(dc), uintptr(gdiobj), 0)
 	newobj = syscall.Handle(r0)
 	if newobj == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _SetGraphicsMode(dc syscall.Handle, mode int32) (oldmode int32, err error) {
+	r0, _, e1 := syscall.Syscall(procSetGraphicsMode.Addr(), 2, uintptr(dc), uintptr(mode), 0)
+	oldmode = int32(r0)
+	if oldmode == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func _SetWorldTransform(dc syscall.Handle, x *_XFORM) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetWorldTransform.Addr(), 2, uintptr(dc), uintptr(unsafe.Pointer(x)), 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = error(e1)
 		} else {
