@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package spi allows users to read from and write to an SPI device.
-package spi
+package spi // import "golang.org/x/exp/io/spi"
 
 import (
 	"fmt"
