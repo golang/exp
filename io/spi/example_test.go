@@ -14,7 +14,7 @@ func Example() {
 	}
 	defer dev.Close()
 
-	if err := dev.Do([]byte{
+	if err := dev.Transfer([]byte{
 		0, 0, 0, 0,
 		0xff, 200, 0, 200,
 		0xff, 200, 0, 200,
@@ -28,7 +28,7 @@ func Example() {
 		0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff,
-	}, 0); err != nil {
+	}, nil, 0); err != nil {
 		panic(err)
 	}
 }
