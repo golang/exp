@@ -33,16 +33,16 @@ const (
 )
 
 type payload struct {
-	tx          uint64
-	rx          uint64
-	length      uint32
-	speedHz     uint32
-	delay       uint16
-	bitsPerWord uint8
-	csChange    uint8
-	txNBits     uint8
-	rxNBits     uint8
-	pad         uint16
+	tx       uint64
+	rx       uint64
+	length   uint32
+	speed    uint32
+	delay    uint16
+	bits     uint8
+	csChange uint8
+	txNBits  uint8
+	rxNBits  uint8
+	pad      uint16
 }
 
 // DevFS is an SPI driver that works against the devfs.
@@ -59,13 +59,13 @@ func (d *DevFS) Open(bus, chip int) (driver.Conn, error) {
 }
 
 type devfsConn struct {
-	f           *os.File
-	mode        uint8
-	maxSpeed    uint32
-	bitsPerWord uint8
+	f     *os.File
+	mode  uint8
+	speed uint32
+	bits  uint8
 }
 
-func (c *devfsConn) Configure(mode, bitsPerWord, maxSpeed int) error {
+func (c *devfsConn) Configure(mode, bits, speed int) error {
 	if mode > -1 {
 		m := uint8(mode)
 		if err := c.ioctl(requestCode(write, magic, 1, 1), uintptr(unsafe.Pointer(&m))); err != nil {
@@ -73,31 +73,31 @@ func (c *devfsConn) Configure(mode, bitsPerWord, maxSpeed int) error {
 		}
 		c.mode = m
 	}
-	if bitsPerWord > -1 {
-		b := uint8(bitsPerWord)
+	if bits > -1 {
+		b := uint8(bits)
 		if err := c.ioctl(requestCode(write, magic, 3, 1), uintptr(unsafe.Pointer(&b))); err != nil {
-			return fmt.Errorf("error setting bits per word to %v: %v", bitsPerWord, err)
+			return fmt.Errorf("error setting bits per word to %v: %v", bits, err)
 		}
-		c.bitsPerWord = b
+		c.bits = b
 	}
-	if maxSpeed > -1 {
-		s := uint32(maxSpeed)
+	if speed > -1 {
+		s := uint32(speed)
 		if err := c.ioctl(requestCode(write, magic, 4, 4), uintptr(unsafe.Pointer(&s))); err != nil {
-			return fmt.Errorf("error setting speed to %v: %v", maxSpeed, err)
+			return fmt.Errorf("error setting speed to %v: %v", speed, err)
 		}
-		c.maxSpeed = s
+		c.speed = s
 	}
 	return nil
 }
 
 func (c *devfsConn) Transfer(tx, rx []byte, delay time.Duration) error {
 	p := payload{
-		tx:          uint64(uintptr(unsafe.Pointer(&tx[0]))),
-		rx:          uint64(uintptr(unsafe.Pointer(&rx[0]))),
-		length:      uint32(len(tx)),
-		speedHz:     c.maxSpeed,
-		delay:       uint16(delay.Nanoseconds() / 1000),
-		bitsPerWord: c.bitsPerWord,
+		tx:     uint64(uintptr(unsafe.Pointer(&tx[0]))),
+		rx:     uint64(uintptr(unsafe.Pointer(&rx[0]))),
+		length: uint32(len(tx)),
+		speed:  c.speed,
+		delay:  uint16(delay.Nanoseconds() / 1000),
+		bits:   c.bits,
 	}
 	// TODO(jbd): Read from the device and fill rx.
 	return c.ioctl(msgRequestCode(1), uintptr(unsafe.Pointer(&p)))

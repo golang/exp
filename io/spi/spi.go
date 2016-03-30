@@ -36,13 +36,12 @@ func (d *Device) SetMode(mode Mode) error {
 
 // SetMaxSpeed sets the maximum clock speed in Hz.
 // The value can be overriden by SPI device's driver.
-func (d *Device) SetMaxSpeed(speedHz int) error {
-	return d.conn.Configure(-1, -1, speedHz)
+func (d *Device) SetMaxSpeed(speed int) error {
+	return d.conn.Configure(-1, -1, speed)
 }
 
-// SetBitsPerWord sets how many bits it takes to represent a word.
-// e.g. 8 represents 8-bit words.
-// The default is 8 bits per word if none is set.
+// SetBitsPerWord sets how many bits it takes to represent a word, e.g. 8 represents 8-bit words.
+// The default is 8 bits per word.
 func (d *Device) SetBitsPerWord(bits int) error {
 	return d.conn.Configure(-1, bits, -1)
 }
@@ -54,15 +53,15 @@ func (d *Device) Transfer(tx, rx []byte, delay time.Duration) error {
 	return d.conn.Transfer(tx, rx, delay)
 }
 
-// Open opens a device with the specified bus identifier and chip select
-// by using the given driver name. If an empty string provided for the driver name,
+// Open opens a device with the specified bus and chip select
+// by using the given driver. If a nil driver is provided,
 // the default driver (devfs) is used.
 // Mode is the SPI mode. SPI mode is a combination of polarity and phases.
 // CPOL is the high order bit, CPHA is the low order. Pre-computed mode
 // values are Mode0, Mode1, Mode2 and Mode3. The value of the mode argument
 // can be overriden by the device's driver.
-// Max clock speed is in Hz and can be overriden by the device's driver.
-func Open(o driver.Opener, bus, cs int, mode Mode, maxSpeedHz int) (*Device, error) {
+// Speed is the max clock speed (Hz) and can be overriden by the device's driver.
+func Open(o driver.Opener, bus, cs int, mode Mode, speed int) (*Device, error) {
 	if o == nil {
 		o = &DevFS{}
 	}
@@ -77,7 +76,7 @@ func Open(o driver.Opener, bus, cs int, mode Mode, maxSpeedHz int) (*Device, err
 		dev.Close()
 		return nil, err
 	}
-	if err := dev.SetMaxSpeed(maxSpeedHz); err != nil {
+	if err := dev.SetMaxSpeed(speed); err != nil {
 		dev.Close()
 		return nil, err
 	}
