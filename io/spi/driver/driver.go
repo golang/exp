@@ -7,9 +7,11 @@ package driver // import "golang.org/x/exp/io/spi/driver"
 
 import "time"
 
-// Opener is a function to be implemented by the SPI driver to open
+// Opener is an interface to be implemented by the SPI driver to open
 // a connection an SPI device with the specified bus and chip number.
-type Opener func(bus, chip int) (Conn, error)
+type Opener interface {
+	Open(bus, chip int) (Conn, error)
+}
 
 // Conn is a connection to an SPI device.
 // TODO(jbd): Expand the interface to query mode, bits per word and clock speed.

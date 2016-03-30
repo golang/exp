@@ -8,7 +8,7 @@ import "golang.org/x/exp/io/spi"
 
 // Example illustrates a program that drives an APA-102 LED strip.
 func Example() {
-	dev, err := spi.Open("devfs", 0, 1, spi.Mode3, 500000) // opens /dev/spidev0.1.
+	dev, err := spi.Open(&spi.DevFS{}, 0, 1, spi.Mode3, 500000) // opens /dev/spidev0.1.
 	if err != nil {
 		panic(err)
 	}

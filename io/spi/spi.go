@@ -6,44 +6,10 @@
 package spi // import "golang.org/x/exp/io/spi"
 
 import (
-	"fmt"
-	"sync"
 	"time"
 
 	"golang.org/x/exp/io/spi/driver"
 )
-
-var driversMu sync.Mutex
-var drivers = make(map[string]driver.Opener)
-
-// RegisterDriver registers a driver. Open uses the registered
-// drivers to find a backend SPI implementation and errors if none is
-// found for the given name.
-func RegisterDriver(name string, fn driver.Opener) {
-	driversMu.Lock()
-	defer driversMu.Unlock()
-
-	// TODO(jbd): Could name be an interface{}? If so, the users will be
-	// enforced to import the third party driver packages before they use them,
-	// which is desirable.
-	drivers[name] = fn
-}
-
-// openerFunc returns the opener func for the specified driver name.
-// If empty string is given, it looks up for the devfs driver.
-func openerFunc(name string) (driver.Opener, error) {
-	driversMu.Lock()
-	defer driversMu.Unlock()
-
-	if name == "" {
-		name = "devfs"
-	}
-	fn, ok := drivers[name]
-	if !ok {
-		return nil, fmt.Errorf("no driver registered with the given driver name: %v", name)
-	}
-	return fn, nil
-}
 
 // Mode represents the SPI mode number where clock parity (CPOL)
 // is the high order and clock edge (CPHA) is the low order bit.
@@ -96,13 +62,12 @@ func (d *Device) Transfer(tx, rx []byte, delay time.Duration) error {
 // values are Mode0, Mode1, Mode2 and Mode3. The value of the mode argument
 // can be overriden by the device's driver.
 // Max clock speed is in Hz and can be overriden by the device's driver.
-func Open(driverName string, bus, cs int, mode Mode, maxSpeedHz int) (*Device, error) {
-	fn, err := openerFunc(driverName)
-	if err != nil {
-		return nil, err
+func Open(o driver.Opener, bus, cs int, mode Mode, maxSpeedHz int) (*Device, error) {
+	if o == nil {
+		o = &DevFS{}
 	}
 
-	conn, err := fn(bus, cs)
+	conn, err := o.Open(bus, cs)
 	if err != nil {
 		return nil, err
 	}

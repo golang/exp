@@ -14,10 +14,6 @@ import (
 	"golang.org/x/exp/io/spi/driver"
 )
 
-func init() {
-	RegisterDriver("devfs", openDevfs)
-}
-
 const (
 	magic = 107
 
@@ -49,7 +45,11 @@ type payload struct {
 	pad         uint16
 }
 
-func openDevfs(bus, chip int) (driver.Conn, error) {
+// DevFS is an SPI driver that works against the devfs.
+type DevFS struct{}
+
+// Open opens /dev/spidev<bus>.<chip> and returns a connection.
+func (d *DevFS) Open(bus, chip int) (driver.Conn, error) {
 	n := fmt.Sprintf("/dev/spidev%d.%d", bus, chip)
 	f, err := os.OpenFile(n, os.O_RDWR, 0)
 	if err != nil {
