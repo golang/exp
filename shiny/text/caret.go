@@ -36,21 +36,31 @@ type Caret struct {
 	// caretsIndex is the index of this Caret in the f.carets slice.
 	caretsIndex int
 
-	// p, l and b index the Caret's Paragraph, Line and Box. None of these
-	// values can be zero.
+	// seqNum is the Frame f's sequence number for which this Caret's cached p,
+	// l, b and k fields are valid. If f has been modified since then, those
+	// fields will have to be re-calculated based on the pos field (which is
+	// always valid).
+	//
+	// TODO: when re-calculating p, l, b and k, be more efficient than a linear
+	// scan from the start or end?
+	seqNum uint64
+
+	// p, l and b cache the index of the Caret's Paragraph, Line and Box. None
+	// of these values can be zero.
 	p, l, b int32
+
+	// k caches the Caret's position in the text, in Frame.text order. It is
+	// valid to index the Frame.text slice with k, analogous to the Box.i and
+	// Box.j fields. For a Caret c, letting bb := c.f.boxes[c.b], an invariant
+	// is that bb.i <= c.k && c.k <= bb.j if the cache is valid (i.e. the
+	// Caret's seqNum equals the Frame's seqNum).
+	k int32
 
 	// pos is the Caret's position in the text, in layout order. It is the "c"
 	// as in "t[:c]" in the doc comment for type Caret above. It is not valid
 	// to index the Frame.text slice with pos, since the Frame.text slice does
 	// not necessarily hold the textual content in layout order.
 	pos int32
-
-	// k is the Caret's position in the text, in Frame.text order. It is valid
-	// to index the Frame.text slice with k, analogous to the Box.i and Box.j
-	// fields. For a Caret c, letting bb := c.f.boxes[c.b], an invariant is
-	// that bb.i <= c.k && c.k <= bb.j.
-	k int32
 
 	tmp [utf8.UTFMax]byte
 }
@@ -164,6 +174,14 @@ func (c *Caret) seekEnd() {
 	c.pos = int32(c.f.len)
 }
 
+// calculatePLBK ensures that the Caret's cached p, l, b and k fields are
+// valid.
+func (c *Caret) calculatePLBK() {
+	if c.seqNum != c.f.seqNum {
+		c.seek(c.pos)
+	}
+}
+
 // Seek satisfies the io.Seeker interface.
 func (c *Caret) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
@@ -182,16 +200,21 @@ func (c *Caret) Seek(offset int64, whence int) (int64, error) {
 	if offset > int64(c.f.len) {
 		offset = int64(c.f.len)
 	}
-	off := int32(offset)
+	c.seek(int32(offset))
+	return offset, nil
+}
 
+func (c *Caret) seek(off int32) {
 	delta := off - c.pos
 	// If the new offset is closer to the start or the end than to the current
-	// c.pos, move to the start or end first. In case of a tie, we prefer to
-	// seek forwards (i.e. set delta > 0).
-	if delta < 0 && -delta >= off {
+	// c.pos, or if c's cached {p,l,b,k} values are invalid, move to the start
+	// or end first. In case of a tie, we prefer to seek forwards (i.e. set
+	// delta > 0).
+	if (delta < 0 && -delta >= off) || (c.seqNum != c.f.seqNum) {
 		c.seekStart()
 		delta = off - c.pos
-	} else if delta > 0 && delta > int32(c.f.len)-off {
+	}
+	if delta > 0 && delta > int32(c.f.len)-off {
 		c.seekEnd()
 		delta = off - c.pos
 	}
@@ -230,12 +253,13 @@ func (c *Caret) Seek(offset int64, whence int) (int64, error) {
 		c.leanForwards()
 	}
 
-	return offset, nil
+	c.seqNum = c.f.seqNum
 }
 
 // Read satisfies the io.Reader interface by copying those bytes after the
 // Caret and incrementing the Caret.
 func (c *Caret) Read(buf []byte) (n int, err error) {
+	c.calculatePLBK()
 	for len(buf) > 0 {
 		if j := c.f.boxes[c.b].j; c.k < j {
 			nn := copy(buf, c.f.text[c.k:j])
@@ -258,6 +282,7 @@ func (c *Caret) Read(buf []byte) (n int, err error) {
 
 // ReadByte returns the next byte after the Caret and increments the Caret.
 func (c *Caret) ReadByte() (x byte, err error) {
+	c.calculatePLBK()
 	for {
 		if j := c.f.boxes[c.b].j; c.k < j {
 			x = c.f.text[c.k]
@@ -277,6 +302,7 @@ func (c *Caret) ReadByte() (x byte, err error) {
 
 // ReadRune returns the next rune after the Caret and increments the Caret.
 func (c *Caret) ReadRune() (r rune, size int, err error) {
+	c.calculatePLBK()
 	for {
 		if c.k < c.f.boxes[c.b].j {
 			r, size, c.b, c.k = c.f.readRune(c.b, c.k)
@@ -355,6 +381,7 @@ func (c *Caret) write(s0 []byte, s1 string) error {
 
 	// Ensure that the Caret is at the end of its Box, and that Box's text is
 	// at the end of the Frame's buffer.
+	c.calculatePLBK()
 	for {
 		bb, n := &c.f.boxes[c.b], int32(len(c.f.text))
 		if c.k == bb.j && c.k == n {
@@ -416,12 +443,7 @@ func (c *Caret) write(s0 []byte, s1 string) error {
 	// TODO: re-layout the new c.p paragraph, if we saw '\n'.
 	layout(c.f, oldL)
 
-	// Fix up the Caret.
-	// TODO: be more efficient than a linear scan from the start?
-	pos := c.pos
-	c.seekStart()
-	c.Seek(int64(pos), SeekSet)
-
+	c.f.seqNum++
 	return nil
 }
 
@@ -479,7 +501,6 @@ func breakParagraph(f *Frame, p, l, b int32) {
 		}
 	}
 
-	// TODO: fix up other Carets's p, l and b fields.
 	// TODO: re-layout the newP paragraph.
 }
 
@@ -543,8 +564,6 @@ func breakLine(f *Frame, l, b, k int32) {
 		fbb.prev = lb
 		f.joinBoxes(lb, fb, lbb, fbb)
 	}
-
-	// TODO: fix up other Carets's p, l and b fields.
 }
 
 // layout inserts a soft return in the Line l if its text measures longer than
@@ -554,6 +573,7 @@ func layout(f *Frame, l int32) {
 	if f.maxWidth <= 0 || f.face == nil {
 		return
 	}
+	f.seqNum++
 
 	for ; l != 0; l = f.lines[l].next {
 		var (
@@ -613,15 +633,14 @@ func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
 				return 0
 			}
 		}
-		if _, err := c.Seek(int64(newPos), SeekSet); err != nil {
-			panic("text: invalid state")
-		}
+		c.seek(int32(newPos))
 	}
 
 	if int(c.pos) == c.f.len {
 		return 0
 	}
 
+	c.calculatePLBK()
 	c.leanForwards()
 	if c.f.boxes[c.b].i != c.k && c.splitBox(false) {
 		c.leanForwards()
@@ -661,13 +680,20 @@ func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
 		c.f.compactText()
 	}
 
-	// Fix up the Caret.
-	// TODO: be more efficient than a linear scan from the start?
-	pos := c.pos
-	c.seekStart()
-	c.Seek(int64(pos), SeekSet)
-
-	// TODO: fix up other Carets.
+	c.f.seqNum++
+	for _, cc := range c.f.carets {
+		if cc == c {
+			continue
+		}
+		switch relPos := cc.pos - c.pos; {
+		case relPos <= 0:
+			// No-op.
+		case relPos <= int32(dBytes):
+			cc.pos = c.pos
+		default:
+			cc.pos -= int32(dBytes)
+		}
+	}
 	return dBytes
 }
 
@@ -678,6 +704,7 @@ func (c *Caret) DeleteRunes(dir Direction, nRunes int) (dRunes, dBytes int) {
 	// Save the current Caret position, move the Caret by nRunes runes to
 	// calculate how many bytes to delete, restore that saved Caret position,
 	// then delete that many bytes.
+	c.calculatePLBK()
 	savedC := *c
 	if dir == Forwards {
 		for dRunes < nRunes {

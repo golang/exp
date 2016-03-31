@@ -36,9 +36,6 @@
 // such modifications.
 package text // import "golang.org/x/exp/shiny/text"
 
-// TODO: for the various Frame and Caret methods, be principled about whether
-// callee or caller is responsible for fixing up other Carets.
-
 import (
 	"io"
 	"unicode/utf8"
@@ -119,6 +116,11 @@ type Frame struct {
 	len  int
 	text []byte
 
+	// seqNum is a sequence number that is incremented every time the Frame's
+	// text or layout is modified. It lets us detect whether a Caret's cached
+	// p, l, b and k fields are stale.
+	seqNum uint64
+
 	carets []*Caret
 
 	// lineReaderData supports the Frame's lineReader, used when reading a
@@ -164,7 +166,7 @@ func (f *Frame) relayout() {
 		l := f.mergeIntoOneLine(p)
 		layout(f, l)
 	}
-	// TODO: update Carets' p, l, b, k fields?
+	f.seqNum++
 }
 
 // mergeIntoOneLine merges all of a Paragraph's Lines into a single Line, and

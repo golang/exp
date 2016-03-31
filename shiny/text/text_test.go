@@ -21,6 +21,13 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func readAllText(dst []byte, f *Frame) []byte {
 	for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
 		for l := p.FirstLine(f); l != nil; l = l.Next(f) {
@@ -83,6 +90,17 @@ func runesLen(rs []rune) (n int) {
 	return n
 }
 
+// insert inserts the insert argument into buf at the given offset.
+//
+// cap(buf) must be >= len(buf) + len(insert).
+func insert(buf, insert []byte, offset int) []byte {
+	n := len(insert)
+	buf = buf[:len(buf)+n]
+	copy(buf[offset+n:], buf[offset:])
+	copy(buf[offset:offset+n], insert)
+	return buf
+}
+
 func rngIntPair(rng *rand.Rand, n int) (x, y int) {
 	x = rng.Intn(n)
 	y = rng.Intn(n)
@@ -123,7 +141,10 @@ func (toyFace) Metrics() font.Metrics {
 // iRobot is some text that contains both ASCII and non-ASCII runes.
 const iRobot = "\"I, Robot\" in Russian is \"Я, робот\".\nIt's about robots.\n"
 
-var iRobotRunes = []rune(iRobot)
+var (
+	iRobotBytes = []byte(iRobot)
+	iRobotRunes = []rune(iRobot)
+)
 
 func iRobotFrame(maxWidth int) *Frame {
 	f := new(Frame)
@@ -320,9 +341,7 @@ func TestRandomAccessWrite(t *testing.T) {
 		}
 
 		// Insert buf[:n] into want at the given offset.
-		want = want[:len(want)+n]
-		copy(want[offset+n:], want[offset:])
-		copy(want[offset:offset+n], buf[:n])
+		want = insert(want, buf[:n], offset)
 
 		if got := readAllText(gotBuf[:0], f); !bytes.Equal(got, want) {
 			t.Errorf("i=%d:\ngot  % x\nwant % x", i, got, want)
@@ -749,8 +768,126 @@ func TestMergeIntoOneLine(t *testing.T) {
 	}
 }
 
-// TODO: fuzz-test that all the invariants remain true when modifying a Frame's
-// text.
+// TestMultipleCarets tests multiple Carets all seeking, reading, writing and
+// deleting text.
+func TestMultipleCarets(t *testing.T) {
+	f := new(Frame)
+	f.SetFace(toyFace{})
+	f.SetMaxWidth(fixed.I(10))
+
+	rng := rand.New(rand.NewSource(1))
+	gotBuf := make([]byte, 0, 10000)
+	want := make([]byte, 0, 10000)
+	positions := map[*Caret]int{}
+	carets := []*Caret{}
+	defer func() {
+		for _, c := range carets {
+			c.Close()
+		}
+	}()
+
+	for i := 0; i < 1000; i++ {
+		if err := checkInvariants(f); err != nil {
+			t.Fatalf("i=%d: %v", i, err)
+		}
+		if len(carets) == 0 || rng.Intn(20) == 0 {
+			c := f.NewCaret()
+			carets = append(carets, c)
+			positions[c] = 0
+			continue
+		}
+		caretsIndex := rng.Intn(len(carets))
+		c := carets[caretsIndex]
+
+		if rng.Intn(40) == 0 {
+			c.Close()
+			carets[caretsIndex] = carets[len(carets)-1]
+			carets[len(carets)-1] = nil
+			carets = carets[:len(carets)-1]
+			delete(positions, c)
+			continue
+		}
+
+		// Seek, read, delete or write, with a slight bias to writing.
+		switch rng.Intn(5) {
+		case 0: // Seek.
+			p := rng.Intn(len(want) + 1)
+			c.Seek(int64(p), SeekSet)
+			positions[c] = p
+
+		case 1: // ReadByte.
+			gotB, gotErr := c.ReadByte()
+			wantB, wantErr := byte(0), io.EOF
+			if p := positions[c]; p < len(want) {
+				wantB, wantErr = want[p], nil
+				positions[c] = p + 1
+			}
+			if gotB != wantB || gotErr != wantErr {
+				t.Fatalf("i=%d: ReadByte: got %d, %v, want %d, %v", i, gotB, gotErr, wantB, wantErr)
+			}
+
+		case 2: // Delete.
+			dir := Direction(rng.Intn(2) == 0)
+			nBytes, dBytes := rng.Intn(len(want)), 0
+			pos, x, y := positions[c], 0, 0
+			if dir == Forwards {
+				dBytes = min(nBytes, len(want)-pos)
+				x, y = pos, pos+dBytes
+			} else {
+				dBytes = min(nBytes, pos)
+				x, y = pos-dBytes, pos
+			}
+			if d := c.Delete(dir, nBytes); d != dBytes {
+				t.Fatalf("i=%d: Delete: got %d bytes, want %d", i, d, dBytes)
+			}
+			want = append(want[:x], want[y:]...)
+			for _, cc := range carets {
+				if cc == c {
+					positions[cc] = x
+					continue
+				}
+				switch p := positions[cc]; {
+				case p <= x:
+					// No-op.
+				case p <= y:
+					positions[cc] = x
+				default:
+					positions[cc] -= dBytes
+				}
+			}
+
+		default: // Write.
+			i, j := rngIntPair(rng, len(iRobotBytes))
+			s := iRobotBytes[i:j]
+			c.Write(s)
+			pos := positions[c]
+			want = insert(want, s, pos)
+			for _, cc := range carets {
+				if cc == c || positions[cc] > pos {
+					positions[cc] += j - i
+				}
+			}
+		}
+
+		badPos := false
+		for ci, cc := range carets {
+			if int(cc.pos) != positions[cc] {
+				badPos = true
+				t.Errorf("i=%d, ci=%d: position: got %d, want %d", i, ci, cc.pos, positions[cc])
+			}
+		}
+		if badPos {
+			t.Fatalf("i=%d: there were inconsistent Caret positions", i)
+		}
+
+		if got := readAllText(gotBuf[:0], f); !bytes.Equal(got, want) {
+			t.Fatalf("i=%d:\ngot  % x\nwant % x", i, got, want)
+		}
+	}
+	if err := checkInvariants(f); err != nil {
+		t.Fatal(err)
+	}
+}
 
 type ijRange struct {
 	i, j int32
@@ -1026,12 +1163,16 @@ func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 		return fmt.Errorf("#boxes (%d) != 1 + #used (%d) + #free (%d)", len(f.boxes), nUsedBoxes, nFreeBoxes)
 	}
 
-	// Check that each Caret's pos is in the Frame's 0:len range, the Caret's k
+	// Check that each Caret's pos is in the Frame's 0:len range. If the
+	// Caret's cached {p,l,b,k} values are valid, also check that the Caret's k
 	// is in its Box's i:j range, and its Box b is in its Line l is in its
 	// Paragraph p.
 	for i, c := range f.carets {
 		if c.pos < 0 || f.len < int(c.pos) {
 			return fmt.Errorf("caret[%d]: pos %d outside range [0, %d]", i, c.pos, f.len)
+		}
+		if c.seqNum != f.seqNum {
+			continue
 		}
 
 		if c.b < 1 || len(f.boxes) < int(c.b) {
