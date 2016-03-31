@@ -22,6 +22,16 @@ const (
 	Mode3 = Mode(3)
 )
 
+// Order is the bit justification to be used while transfering
+// words to the SPI device. MSB-first encoding is more popular
+// than LSB-first.
+type Order int
+
+const (
+	MSBFirst = Order(0)
+	LSBFirst = Order(1)
+)
+
 type Device struct {
 	conn driver.Conn
 }
@@ -31,19 +41,25 @@ type Device struct {
 // values are Mode0, Mode1, Mode2 and Mode3.
 // The value can be changed by SPI device's driver.
 func (d *Device) SetMode(mode Mode) error {
-	return d.conn.Configure(int(mode), -1, -1)
+	return d.conn.Configure(driver.Mode, int(mode))
 }
 
 // SetMaxSpeed sets the maximum clock speed in Hz.
 // The value can be overriden by SPI device's driver.
 func (d *Device) SetMaxSpeed(speed int) error {
-	return d.conn.Configure(-1, -1, speed)
+	return d.conn.Configure(driver.Speed, speed)
 }
 
 // SetBitsPerWord sets how many bits it takes to represent a word, e.g. 8 represents 8-bit words.
 // The default is 8 bits per word.
 func (d *Device) SetBitsPerWord(bits int) error {
-	return d.conn.Configure(-1, bits, -1)
+	return d.conn.Configure(driver.Bits, bits)
+}
+
+// SetBitOrder sets the bit justification used to transfer SPI words.
+// Valid values are MSBFirst and LSBFirst.
+func (d *Device) SetBitOrder(o Order) error {
+	return d.conn.Configure(driver.Order, int(o))
 }
 
 // Transfer performs a duplex transmission to write to the SPI device

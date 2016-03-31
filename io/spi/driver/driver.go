@@ -7,6 +7,13 @@ package driver // import "golang.org/x/exp/io/spi/driver"
 
 import "time"
 
+const (
+	Mode = iota
+	Bits
+	Speed
+	Order
+)
+
 // Opener is an interface to be implemented by the SPI driver to open
 // a connection an SPI device with the specified bus and chip number.
 type Opener interface {
@@ -16,12 +23,16 @@ type Opener interface {
 // Conn is a connection to an SPI device.
 // TODO(jbd): Expand the interface to query mode, bits per word and clock speed.
 type Conn interface {
-	// Configure configures the SPI mode, bits per word and max clock
-	// speed (in Hz) to be used. SPI devices can override these values.
+	// Configure configures the SPI device. Available keys are Mode (as the SPI mode),
+	// Bits (as bits per word), Speed (as max clock speed in Hz) and Order
+	// (as bit order to be used in transfers).
+	//
+	// SPI devices can override these values.
+	//
 	// If a negative value is provided, it preserves the previous state
 	// of the setting, e.g. Configure(-1, -1, 10000) will only modify the
 	// speed.
-	Configure(mode, bits, speed int) error
+	Configure(k, v int) error
 
 	// Transfer transfers tx and reads into rx.
 	// Some SPI devices require a minimum amount of wait time after

@@ -65,27 +65,33 @@ type devfsConn struct {
 	bits  uint8
 }
 
-func (c *devfsConn) Configure(mode, bits, speed int) error {
-	if mode > -1 {
-		m := uint8(mode)
+func (c *devfsConn) Configure(k, v int) error {
+	switch k {
+	case driver.Mode:
+		m := uint8(v)
 		if err := c.ioctl(requestCode(write, magic, 1, 1), uintptr(unsafe.Pointer(&m))); err != nil {
-			return fmt.Errorf("error setting mode to %v: %v", mode, err)
+			return fmt.Errorf("error setting mode to %v: %v", m, err)
 		}
 		c.mode = m
-	}
-	if bits > -1 {
-		b := uint8(bits)
+	case driver.Bits:
+		b := uint8(v)
 		if err := c.ioctl(requestCode(write, magic, 3, 1), uintptr(unsafe.Pointer(&b))); err != nil {
-			return fmt.Errorf("error setting bits per word to %v: %v", bits, err)
+			return fmt.Errorf("error setting bits per word to %v: %v", b, err)
 		}
 		c.bits = b
-	}
-	if speed > -1 {
-		s := uint32(speed)
+	case driver.Speed:
+		s := uint32(v)
 		if err := c.ioctl(requestCode(write, magic, 4, 4), uintptr(unsafe.Pointer(&s))); err != nil {
-			return fmt.Errorf("error setting speed to %v: %v", speed, err)
+			return fmt.Errorf("error setting speed to %v: %v", s, err)
 		}
 		c.speed = s
+	case driver.Order:
+		o := uint8(v)
+		if err := c.ioctl(requestCode(write, magic, 2, 1), uintptr(unsafe.Pointer(&o))); err != nil {
+			return fmt.Errorf("error setting bit order to %v: %v", o, err)
+		}
+	default:
+		return fmt.Errorf("unknown key: %v", k)
 	}
 	return nil
 }
