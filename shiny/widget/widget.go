@@ -28,21 +28,21 @@ type Class interface {
 
 	// Measure returns the natural size of a specific node (and its children)
 	// of this class.
-	Measure(n *Node) (size image.Point)
+	Measure(n *Node, t Theme) (size image.Point)
 
 	// Layout lays out a specific node (and its children) of this class.
 	//
 	// TODO: specify how previous measurements and size constraints are passed
 	// down the tree.
-	Layout(n *Node)
+	Layout(n *Node, t Theme)
 
 	// Paint paints a specific node (and its children) of this class onto a
 	// destination image.
 	//
 	// TODO: specify how previous layout is passed down the tree.
-	Paint(n *Node, dst *image.RGBA)
+	Paint(n *Node, t Theme, dst *image.RGBA)
 
-	// TODO: add color/font themes to Measure/Layout/Paint.
+	// TODO: add DPI to Measure/Layout/Paint, via the Theme or otherwise.
 	// TODO: OnXxxEvent methods.
 }
 
@@ -51,10 +51,10 @@ type Class interface {
 // the Class interface's methods.
 type LeafClassEmbed struct{}
 
-func (LeafClassEmbed) Arity() Arity              { return Leaf }
-func (LeafClassEmbed) Measure(*Node) image.Point { return image.Point{} }
-func (LeafClassEmbed) Layout(*Node)              {}
-func (LeafClassEmbed) Paint(*Node, *image.RGBA)  {}
+func (LeafClassEmbed) Arity() Arity                     { return Leaf }
+func (LeafClassEmbed) Measure(*Node, Theme) image.Point { return image.Point{} }
+func (LeafClassEmbed) Layout(*Node, Theme)              {}
+func (LeafClassEmbed) Paint(*Node, Theme, *image.RGBA)  {}
 
 // TODO: ShellClassEmbed, ContainerClassEmbed.
 
