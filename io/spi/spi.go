@@ -62,11 +62,16 @@ func (d *Device) SetBitOrder(o Order) error {
 	return d.conn.Configure(driver.Order, int(o))
 }
 
+// SetDelay sets the amount of pause will be added after each frame write.
+func (d *Device) SetDelay(t time.Duration) error {
+	return d.conn.Configure(driver.Delay, int(t.Nanoseconds()/1000))
+}
+
 // Transfer performs a duplex transmission to write to the SPI device
 // and read len(rx) bytes to rx.
 // User should not mutate the tx and rx until this call returns.
-func (d *Device) Transfer(tx, rx []byte, delay time.Duration) error {
-	return d.conn.Transfer(tx, rx, delay)
+func (d *Device) Transfer(tx, rx []byte) error {
+	return d.conn.Transfer(tx, rx)
 }
 
 // Open opens a device with the specified bus and chip select

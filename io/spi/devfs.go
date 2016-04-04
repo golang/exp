@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"golang.org/x/exp/io/spi/driver"
@@ -62,6 +61,7 @@ type devfsConn struct {
 	mode  uint8
 	speed uint32
 	bits  uint8
+	delay uint16
 }
 
 func (c *devfsConn) Configure(k, v int) error {
@@ -89,19 +89,21 @@ func (c *devfsConn) Configure(k, v int) error {
 		if err := c.ioctl(requestCode(devfs_WRITE, devfs_MAGIC, 2, 1), uintptr(unsafe.Pointer(&o))); err != nil {
 			return fmt.Errorf("error setting bit order to %v: %v", o, err)
 		}
+	case driver.Delay:
+		c.delay = uint16(v)
 	default:
 		return fmt.Errorf("unknown key: %v", k)
 	}
 	return nil
 }
 
-func (c *devfsConn) Transfer(tx, rx []byte, delay time.Duration) error {
+func (c *devfsConn) Transfer(tx, rx []byte) error {
 	p := payload{
 		tx:     uint64(uintptr(unsafe.Pointer(&tx[0]))),
 		rx:     uint64(uintptr(unsafe.Pointer(&rx[0]))),
 		length: uint32(len(tx)),
 		speed:  c.speed,
-		delay:  uint16(delay.Nanoseconds() / 1000),
+		delay:  c.delay,
 		bits:   c.bits,
 	}
 	// TODO(jbd): Read from the device and fill rx.
