@@ -22,13 +22,18 @@ type Opener interface {
 // Conn is a connection to an SPI device.
 // TODO(jbd): Extend the interface to query configuration values.
 type Conn interface {
-	// Configure configures the SPI device. Available keys are Mode (as the SPI mode),
-	// Bits (as bits per word), Speed (as max clock speed in Hz), Order
-	// (as bit order to be used in transfers) and Delay (in usecs).
+	// Configure configures the SPI device.
 	//
-	// Some SPI devices require a minimum amount of wait time after
-	// each frame write. If set, Delay amount of usecs are inserted after
-	// each write.
+	// Available configuration keys are:
+	//  - Mode, the SPI mode (valid values are 0, 1, 2 and 3).
+	//  - Bits, bits per word (default is 8-bit per word).
+	//  - Speed, the max clock speed (in Hz).
+	//  - Order, bit order to be used in transfers. Zero value represents
+	//    the MSB-first, non-zero values represent LSB-first encoding.
+	//  - Delay, the pause time between frames (in usecs).
+	//    Some SPI devices require a minimum amount of wait time after
+	//    each frame write. If set, Delay amount of usecs are inserted after
+	//    each write.
 	//
 	// SPI devices can override these values.
 	Configure(k, v int) error
