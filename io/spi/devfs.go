@@ -99,6 +99,11 @@ func (c *devfsConn) Configure(k, v int) error {
 }
 
 func (c *devfsConn) Transfer(tx, rx []byte) error {
+	if rx == nil {
+		rx = make([]byte, len(tx))
+	}
+	// TODO(jbd): len(tx) == len(rx)?
+	// TODO(jbd): Allow nil tx?
 	p := payload{
 		tx:     uint64(uintptr(unsafe.Pointer(&tx[0]))),
 		rx:     uint64(uintptr(unsafe.Pointer(&rx[0]))),
