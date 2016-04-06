@@ -44,6 +44,7 @@ type payload struct {
 }
 
 // DevFS is an SPI driver that works against the devfs.
+// You need to load the "spidev" module to use this driver.
 type DevFS struct{}
 
 // Open opens /dev/spidev<bus>.<chip> and returns a connection.
