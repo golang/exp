@@ -15,6 +15,8 @@ type Device struct {
 	conn driver.Conn
 }
 
+// TOOD(jbd): Do we need higher level I2C packet writers and readers?
+
 // Read reads at most len(buf) number of bytes from the device. n represents
 // the total number of bytes read.
 func (d *Device) Read(buf []byte) (n int, err error) {
