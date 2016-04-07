@@ -398,12 +398,28 @@ func TestSetMaxWidth(t *testing.T) {
 			c.Close()
 			want += iRobot
 		}
-		f.SetMaxWidth(fixed.I(rng.Intn(20)))
+		maxWidth := rng.Intn(20)
+		f.SetMaxWidth(fixed.I(maxWidth))
 		if err := checkInvariants(f); err != nil {
 			t.Fatalf("i=%d: %v", i, err)
 		}
 		if err := testRead(f, want); err != nil {
 			t.Fatalf("i=%d: %v", i, err)
+		}
+		if want == "" {
+			continue
+		}
+		// Check that a zero (which means infinite) maxWidth corresponds to one
+		// Line per Paragraph.
+		np, nl := f.nUsedParagraphs(), f.nUsedLines()
+		if maxWidth == 0 {
+			if np != nl {
+				t.Fatalf("i=%d: maxWidth=0: got %d paragraphs and %d lines, should be equal", i, np, nl)
+			}
+		} else {
+			if np == nl {
+				t.Fatalf("i=%d: maxWidth=%d: got %d paragraphs and %d lines, should be unequal", i, maxWidth, np, nl)
+			}
 		}
 	}
 }
@@ -1199,6 +1215,17 @@ func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 	}
 
 	return nil
+}
+
+func (f *Frame) nUsedParagraphs() (n int) {
+	for p, pp := range f.paragraphs {
+		// The 0th index is a special case. A negative prev means that the
+		// Paragraph is in the free-list.
+		if p != 0 && pp.prev >= 0 {
+			n++
+		}
+	}
+	return n
 }
 
 func (f *Frame) nUsedLines() (n int) {
