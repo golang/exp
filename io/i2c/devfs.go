@@ -28,7 +28,7 @@ func (d *DevFS) Open(bus, addr int) (driver.Conn, error) {
 		conn.Close()
 		return nil, fmt.Errorf("error opening the address (%v) on the bus (%v): %v", addr, bus, err)
 	}
-	return &devFSConn{f: f}, nil
+	return conn, nil
 }
 
 type devFSConn struct {
