@@ -84,7 +84,7 @@ func (d *Device) Transfer(tx, rx []byte) error {
 // Speed is the max clock speed (Hz) and can be overriden by the device's driver.
 func Open(o driver.Opener, bus, cs int, mode Mode, speed int) (*Device, error) {
 	if o == nil {
-		o = &DevFS{}
+		o = &Devfs{}
 	}
 
 	conn, err := o.Open(bus, cs)

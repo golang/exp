@@ -38,7 +38,7 @@ func (d *Device) Close() error {
 // Open opens an I2C device with the given I2C address on the specified bus.
 func Open(o driver.Opener, bus, addr int) (*Device, error) {
 	if o == nil {
-		o = &DevFS{}
+		o = &Devfs{}
 	}
 	conn, err := o.Open(bus, addr)
 	if err != nil {

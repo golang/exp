@@ -43,12 +43,12 @@ type payload struct {
 	pad      uint16
 }
 
-// DevFS is an SPI driver that works against the devfs.
+// Devfs is an SPI driver that works against the devfs.
 // You need to load the "spidev" module to use this driver.
-type DevFS struct{}
+type Devfs struct{}
 
-// Open opens /dev/spidev<bus>.<chip> and returns a connection.
-func (d *DevFS) Open(bus, chip int) (driver.Conn, error) {
+// Open Devfs /dev/spidev<bus>.<chip> and returns a connection.
+func (d *Devfs) Open(bus, chip int) (driver.Conn, error) {
 	n := fmt.Sprintf("/dev/spidev%d.%d", bus, chip)
 	f, err := os.OpenFile(n, os.O_RDWR, 0)
 	if err != nil {
