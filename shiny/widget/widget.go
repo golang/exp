@@ -11,7 +11,7 @@ import (
 	"image"
 )
 
-// Arity describes the number of children a class of nodes can have.
+// Arity is the number of children a class of nodes can have.
 type Arity uint8
 
 const (
@@ -20,26 +20,34 @@ const (
 	Container = Arity(2) // Container nodes can have any number of children.
 )
 
+// Axis is zero, one or both of the horizontal and vertical axes. For example,
+// a widget may be scrollable in one of the four AxisXxx values.
+type Axis uint8
+
+const (
+	AxisNone       = Axis(0)
+	AxisHorizontal = Axis(1)
+	AxisVertical   = Axis(2)
+	AxisBoth       = Axis(3) // AxisBoth equals AxisHorizontal | AxisVertical.
+)
+
 // Class is a class of nodes. For example, all button widgets would be Nodes
 // whose Class values are a ButtonClass.
 type Class interface {
 	// Arity returns the number of children this class of nodes can have.
 	Arity() Arity
 
-	// Measure returns the natural size of a specific node (and its children)
-	// of this class.
-	Measure(n *Node, t Theme) (size image.Point)
+	// Measure sets n.MeasuredSize to the natural size, in pixels, of a
+	// specific node (and its children) of this class.
+	Measure(n *Node, t Theme)
 
-	// Layout lays out a specific node (and its children) of this class.
-	//
-	// TODO: specify how previous measurements and size constraints are passed
-	// down the tree.
+	// Layout lays out a specific node (and its children) of this class,
+	// setting the Node.Rect fields of each child. The n.Rect field should have
+	// previously been set during the parent node's layout.
 	Layout(n *Node, t Theme)
 
 	// Paint paints a specific node (and its children) of this class onto a
 	// destination image.
-	//
-	// TODO: specify how previous layout is passed down the tree.
 	Paint(n *Node, t Theme, dst *image.RGBA)
 
 	// TODO: add DPI to Measure/Layout/Paint, via the Theme or otherwise.
@@ -51,10 +59,10 @@ type Class interface {
 // the Class interface's methods.
 type LeafClassEmbed struct{}
 
-func (LeafClassEmbed) Arity() Arity                     { return Leaf }
-func (LeafClassEmbed) Measure(*Node, Theme) image.Point { return image.Point{} }
-func (LeafClassEmbed) Layout(*Node, Theme)              {}
-func (LeafClassEmbed) Paint(*Node, Theme, *image.RGBA)  {}
+func (LeafClassEmbed) Arity() Arity                            { return Leaf }
+func (LeafClassEmbed) Measure(n *Node, t Theme)                { n.MeasuredSize = image.Point{} }
+func (LeafClassEmbed) Layout(n *Node, t Theme)                 {}
+func (LeafClassEmbed) Paint(n *Node, t Theme, dst *image.RGBA) {}
 
 // ShellClassEmbed is designed to be embedded in struct types that implement
 // the Class interface and have Shell arity. It provides default
@@ -63,15 +71,18 @@ type ShellClassEmbed struct{}
 
 func (ShellClassEmbed) Arity() Arity { return Shell }
 
-func (ShellClassEmbed) Measure(n *Node, t Theme) image.Point {
+func (ShellClassEmbed) Measure(n *Node, t Theme) {
 	if c := n.FirstChild; c != nil {
-		return c.Class.Measure(c, t)
+		c.Class.Measure(c, t)
+		n.MeasuredSize = c.MeasuredSize
+	} else {
+		n.MeasuredSize = image.Point{}
 	}
-	return image.Point{}
 }
 
 func (ShellClassEmbed) Layout(n *Node, t Theme) {
 	if c := n.FirstChild; c != nil {
+		c.Rect = n.Rect
 		c.Class.Layout(c, t)
 	}
 }
@@ -89,21 +100,23 @@ type ContainerClassEmbed struct{}
 
 func (ContainerClassEmbed) Arity() Arity { return Container }
 
-func (ContainerClassEmbed) Measure(n *Node, t Theme) (ret image.Point) {
+func (ContainerClassEmbed) Measure(n *Node, t Theme) {
+	mSize := image.Point{}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		p := c.Class.Measure(c, t)
-		if ret.X < p.X {
-			ret.X = p.X
+		c.Class.Measure(c, t)
+		if mSize.X < c.MeasuredSize.X {
+			mSize.X = c.MeasuredSize.X
 		}
-		if ret.Y < p.Y {
-			ret.Y = p.Y
+		if mSize.Y < c.MeasuredSize.Y {
+			mSize.Y = c.MeasuredSize.Y
 		}
 	}
-	return ret
+	n.MeasuredSize = mSize
 }
 
 func (ContainerClassEmbed) Layout(n *Node, t Theme) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		c.Rect = image.Rectangle{Max: c.MeasuredSize}
 		c.Class.Layout(c, t)
 	}
 }
@@ -131,6 +144,27 @@ type Node struct {
 	// ButtonClass may store an image and some text in this field. A
 	// ProgressBarClass may store a numerical percentage.
 	ClassData interface{}
+
+	// TODO: add commentary about the Measure / Layout / Paint model, and about
+	// the lifetime of the MeasuredSize and Rect fields, and when user code can
+	// access and/or modify them. At some point a new cycle begins, a call to
+	// measure is necessary, and using MeasuredSize is incorrect (unless you're
+	// trying to recall something about the past).
+
+	// MeasuredSize is the widget's natural size, in pixels, as calculated by
+	// the most recent Class.Measure call.
+	MeasuredSize image.Point
+
+	// Rect is the widget's position and actual (as opposed to natural) size,
+	// in pixels, as calculated by the most recent Class.Layout call on its
+	// parent node. A parent may lay out a child at a size different to its
+	// natural size in order to satisfy a layout constraint, such as a row of
+	// buttons expanding to fill a panel's width.
+	//
+	// The position (Rectangle.Min) is relative to its parent node. This is not
+	// necessarily the same as relative to the screen's, window's or image
+	// buffer's origin.
+	Rect image.Rectangle
 }
 
 // AppendChild adds a node c as a child of n.
