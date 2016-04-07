@@ -56,7 +56,63 @@ func (LeafClassEmbed) Measure(*Node, Theme) image.Point { return image.Point{} }
 func (LeafClassEmbed) Layout(*Node, Theme)              {}
 func (LeafClassEmbed) Paint(*Node, Theme, *image.RGBA)  {}
 
-// TODO: ShellClassEmbed, ContainerClassEmbed.
+// ShellClassEmbed is designed to be embedded in struct types that implement
+// the Class interface and have Shell arity. It provides default
+// implementations of the Class interface's methods.
+type ShellClassEmbed struct{}
+
+func (ShellClassEmbed) Arity() Arity { return Shell }
+
+func (ShellClassEmbed) Measure(n *Node, t Theme) image.Point {
+	if c := n.FirstChild; c != nil {
+		return c.Class.Measure(c, t)
+	}
+	return image.Point{}
+}
+
+func (ShellClassEmbed) Layout(n *Node, t Theme) {
+	if c := n.FirstChild; c != nil {
+		c.Class.Layout(c, t)
+	}
+}
+
+func (ShellClassEmbed) Paint(n *Node, t Theme, dst *image.RGBA) {
+	if c := n.FirstChild; c != nil {
+		c.Class.Paint(c, t, dst)
+	}
+}
+
+// ContainerClassEmbed is designed to be embedded in struct types that
+// implement the Class interface and have Container arity. It provides default
+// implementations of the Class interface's methods.
+type ContainerClassEmbed struct{}
+
+func (ContainerClassEmbed) Arity() Arity { return Container }
+
+func (ContainerClassEmbed) Measure(n *Node, t Theme) (ret image.Point) {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		p := c.Class.Measure(c, t)
+		if ret.X < p.X {
+			ret.X = p.X
+		}
+		if ret.Y < p.Y {
+			ret.Y = p.Y
+		}
+	}
+	return ret
+}
+
+func (ContainerClassEmbed) Layout(n *Node, t Theme) {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		c.Class.Layout(c, t)
+	}
+}
+
+func (ContainerClassEmbed) Paint(n *Node, t Theme, dst *image.RGBA) {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		c.Class.Paint(c, t, dst)
+	}
+}
 
 // Node is an element of a widget tree.
 //
