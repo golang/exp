@@ -49,7 +49,7 @@ func main() {
 	// Make the RGBA image.
 	t := widget.DefaultTheme
 	rgba := image.NewRGBA(image.Rect(0, 0, 640, 480))
-	draw.Draw(rgba, rgba.Bounds(), t.Palette().Neutral, image.Point{}, draw.Src)
+	draw.Draw(rgba, rgba.Bounds(), t.GetPalette().Neutral, image.Point{}, draw.Src)
 
 	// Measure, layout and paint.
 	vf.Class.Measure(vf.Node, t)

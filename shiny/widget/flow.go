@@ -23,7 +23,7 @@ func (o Flow) SetAxis(v Axis) { o.ClassData = v }
 // FlowClass is the Class for Flow nodes.
 type FlowClass struct{ ContainerClassEmbed }
 
-func (k FlowClass) Measure(n *Node, t Theme) {
+func (k FlowClass) Measure(n *Node, t *Theme) {
 	o := Flow{n}
 	axis := o.Axis()
 	if axis != AxisHorizontal && axis != AxisVertical {
@@ -47,7 +47,7 @@ func (k FlowClass) Measure(n *Node, t Theme) {
 	n.MeasuredSize = mSize
 }
 
-func (k FlowClass) Layout(n *Node, t Theme) {
+func (k FlowClass) Layout(n *Node, t *Theme) {
 	o := Flow{n}
 	axis := o.Axis()
 	if axis != AxisHorizontal && axis != AxisVertical {

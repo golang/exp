@@ -23,7 +23,7 @@ func (o Image) SetImage(v image.Image) { o.ClassData = v }
 // ImageClass is the Class for Image nodes.
 type ImageClass struct{ LeafClassEmbed }
 
-func (k ImageClass) Measure(n *Node, t Theme) {
+func (k ImageClass) Measure(n *Node, t *Theme) {
 	o := Image{n}
 	if m := o.Image(); m != nil {
 		n.MeasuredSize = m.Bounds().Size()
@@ -32,7 +32,7 @@ func (k ImageClass) Measure(n *Node, t Theme) {
 	}
 }
 
-func (k ImageClass) Paint(n *Node, t Theme, dst *image.RGBA) {
+func (k ImageClass) Paint(n *Node, t *Theme, dst *image.RGBA) {
 	o := Image{n}
 	if m := o.Image(); m != nil {
 		// TODO: honor an offset and clip. Also, adjust for n.Rect being

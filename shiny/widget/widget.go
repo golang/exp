@@ -39,18 +39,17 @@ type Class interface {
 
 	// Measure sets n.MeasuredSize to the natural size, in pixels, of a
 	// specific node (and its children) of this class.
-	Measure(n *Node, t Theme)
+	Measure(n *Node, t *Theme)
 
 	// Layout lays out a specific node (and its children) of this class,
 	// setting the Node.Rect fields of each child. The n.Rect field should have
 	// previously been set during the parent node's layout.
-	Layout(n *Node, t Theme)
+	Layout(n *Node, t *Theme)
 
 	// Paint paints a specific node (and its children) of this class onto a
 	// destination image.
-	Paint(n *Node, t Theme, dst *image.RGBA)
+	Paint(n *Node, t *Theme, dst *image.RGBA)
 
-	// TODO: add DPI to Measure/Layout/Paint, via the Theme or otherwise.
 	// TODO: OnXxxEvent methods.
 }
 
@@ -59,10 +58,10 @@ type Class interface {
 // the Class interface's methods.
 type LeafClassEmbed struct{}
 
-func (LeafClassEmbed) Arity() Arity                            { return Leaf }
-func (LeafClassEmbed) Measure(n *Node, t Theme)                { n.MeasuredSize = image.Point{} }
-func (LeafClassEmbed) Layout(n *Node, t Theme)                 {}
-func (LeafClassEmbed) Paint(n *Node, t Theme, dst *image.RGBA) {}
+func (LeafClassEmbed) Arity() Arity                             { return Leaf }
+func (LeafClassEmbed) Measure(n *Node, t *Theme)                { n.MeasuredSize = image.Point{} }
+func (LeafClassEmbed) Layout(n *Node, t *Theme)                 {}
+func (LeafClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA) {}
 
 // ShellClassEmbed is designed to be embedded in struct types that implement
 // the Class interface and have Shell arity. It provides default
@@ -71,7 +70,7 @@ type ShellClassEmbed struct{}
 
 func (ShellClassEmbed) Arity() Arity { return Shell }
 
-func (ShellClassEmbed) Measure(n *Node, t Theme) {
+func (ShellClassEmbed) Measure(n *Node, t *Theme) {
 	if c := n.FirstChild; c != nil {
 		c.Class.Measure(c, t)
 		n.MeasuredSize = c.MeasuredSize
@@ -80,14 +79,14 @@ func (ShellClassEmbed) Measure(n *Node, t Theme) {
 	}
 }
 
-func (ShellClassEmbed) Layout(n *Node, t Theme) {
+func (ShellClassEmbed) Layout(n *Node, t *Theme) {
 	if c := n.FirstChild; c != nil {
 		c.Rect = n.Rect
 		c.Class.Layout(c, t)
 	}
 }
 
-func (ShellClassEmbed) Paint(n *Node, t Theme, dst *image.RGBA) {
+func (ShellClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA) {
 	if c := n.FirstChild; c != nil {
 		c.Class.Paint(c, t, dst)
 	}
@@ -100,7 +99,7 @@ type ContainerClassEmbed struct{}
 
 func (ContainerClassEmbed) Arity() Arity { return Container }
 
-func (ContainerClassEmbed) Measure(n *Node, t Theme) {
+func (ContainerClassEmbed) Measure(n *Node, t *Theme) {
 	mSize := image.Point{}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		c.Class.Measure(c, t)
@@ -114,14 +113,14 @@ func (ContainerClassEmbed) Measure(n *Node, t Theme) {
 	n.MeasuredSize = mSize
 }
 
-func (ContainerClassEmbed) Layout(n *Node, t Theme) {
+func (ContainerClassEmbed) Layout(n *Node, t *Theme) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		c.Rect = image.Rectangle{Max: c.MeasuredSize}
 		c.Class.Layout(c, t)
 	}
 }
 
-func (ContainerClassEmbed) Paint(n *Node, t Theme, dst *image.RGBA) {
+func (ContainerClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		c.Class.Paint(c, t, dst)
 	}
