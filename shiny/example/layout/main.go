@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build ignore
+// +build example
 //
 // This build tag means that "go install golang.org/x/exp/shiny/..." doesn't
-// install this example program. Use "go run main.go" to run it.
+// install this example program. Use "go run main.go" to run it or "go install
+// -tags=example" to install it.
 
 // layout is an example of a laying out a widget node tree. Real GUI programs
 // won't need to do this explicitly, as the shiny/widget package will

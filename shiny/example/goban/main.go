@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build ignore
+// +build example
 //
 // This build tag means that "go install golang.org/x/exp/shiny/..." doesn't
-// install this example program. Use "go run main.go board.go xy.go" to run it.
+// install this example program. Use "go run main.go board.go xy.go" to run it
+// or "go install -tags=example" to install it.
 
 // Goban is a simple example of a graphics program using shiny.
 // It implements a Go board that two people can use to play the game.

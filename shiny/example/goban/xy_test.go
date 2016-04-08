@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build ignore
+// +build example
+//
+// Use "go test -tags=example" to run this test.
 
 package main
 
