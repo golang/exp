@@ -47,8 +47,13 @@ type Class interface {
 	Layout(n *Node, t *Theme)
 
 	// Paint paints a specific node (and its children) of this class onto a
-	// destination image.
-	Paint(n *Node, t *Theme, dst *image.RGBA)
+	// destination image. origin is the parent widget's origin with respect to
+	// the dst image's origin; n.Rect.Add(origin) will be n's position and size
+	// in dst's coordinate space.
+	//
+	// TODO: add a clip rectangle? Or rely on the RGBA.SubImage method to pass
+	// smaller dst images?
+	Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point)
 
 	// TODO: OnXxxEvent methods.
 }
@@ -58,10 +63,13 @@ type Class interface {
 // the Class interface's methods.
 type LeafClassEmbed struct{}
 
-func (LeafClassEmbed) Arity() Arity                             { return Leaf }
-func (LeafClassEmbed) Measure(n *Node, t *Theme)                { n.MeasuredSize = image.Point{} }
-func (LeafClassEmbed) Layout(n *Node, t *Theme)                 {}
-func (LeafClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA) {}
+func (LeafClassEmbed) Arity() Arity { return Leaf }
+
+func (LeafClassEmbed) Measure(n *Node, t *Theme) { n.MeasuredSize = image.Point{} }
+
+func (LeafClassEmbed) Layout(n *Node, t *Theme) {}
+
+func (LeafClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {}
 
 // ShellClassEmbed is designed to be embedded in struct types that implement
 // the Class interface and have Shell arity. It provides default
@@ -81,14 +89,14 @@ func (ShellClassEmbed) Measure(n *Node, t *Theme) {
 
 func (ShellClassEmbed) Layout(n *Node, t *Theme) {
 	if c := n.FirstChild; c != nil {
-		c.Rect = n.Rect
+		c.Rect = n.Rect.Sub(n.Rect.Min)
 		c.Class.Layout(c, t)
 	}
 }
 
-func (ShellClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA) {
+func (ShellClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
 	if c := n.FirstChild; c != nil {
-		c.Class.Paint(c, t, dst)
+		c.Class.Paint(c, t, dst, origin.Add(n.Rect.Min))
 	}
 }
 
@@ -120,9 +128,9 @@ func (ContainerClassEmbed) Layout(n *Node, t *Theme) {
 	}
 }
 
-func (ContainerClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA) {
+func (ContainerClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Class.Paint(c, t, dst)
+		c.Class.Paint(c, t, dst, origin.Add(n.Rect.Min))
 	}
 }
 

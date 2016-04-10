@@ -40,11 +40,18 @@ func mkImage(width, height int, c color.RGBA) *widget.Node {
 
 func main() {
 	// Make the widget node tree.
+	hf := widget.NewFlow()
+	hf.SetAxis(widget.AxisHorizontal)
+	hf.AppendChild(mkImage(100, 20, color.RGBA{0x00, 0x7f, 0x7f, 0xff}))
+	hf.AppendChild(mkImage(200, 30, color.RGBA{0x7f, 0x00, 0x7f, 0xff}))
+	hf.AppendChild(mkImage(300, 40, color.RGBA{0x7f, 0x7f, 0x00, 0xff}))
+
 	vf := widget.NewFlow()
 	vf.SetAxis(widget.AxisVertical)
 	vf.AppendChild(mkImage(80, 40, color.RGBA{0xff, 0x00, 0x00, 0xff}))
 	vf.AppendChild(mkImage(50, 50, color.RGBA{0x00, 0xff, 0x00, 0xff}))
 	vf.AppendChild(mkImage(20, 60, color.RGBA{0x00, 0x00, 0xff, 0xff}))
+	vf.AppendChild(hf.Node)
 
 	// Make the RGBA image.
 	t := widget.DefaultTheme
@@ -55,7 +62,7 @@ func main() {
 	vf.Class.Measure(vf.Node, t)
 	vf.Rect = rgba.Bounds()
 	vf.Class.Layout(vf.Node, t)
-	vf.Class.Paint(vf.Node, t, rgba)
+	vf.Class.Paint(vf.Node, t, rgba, image.Point{})
 
 	// Encode to PNG.
 	out, err := os.Create("out.png")
