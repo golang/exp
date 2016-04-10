@@ -15,6 +15,8 @@ import (
 type Flow struct{ *Node }
 
 // NewFlow returns a new Flow widget.
+//
+// TODO: take an "axis Axis" argument?
 func NewFlow() Flow { return Flow{&Node{Class: FlowClass{}}} }
 
 func (o Flow) Axis() Axis     { v, _ := o.ClassData.(Axis); return v }

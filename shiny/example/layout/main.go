@@ -29,6 +29,12 @@ import (
 	"golang.org/x/exp/shiny/widget"
 )
 
+func mkLabel(text string) *widget.Node {
+	l := widget.NewLabel()
+	l.SetText(text)
+	return l.Node
+}
+
 func mkImage(width, height int, c color.RGBA) *widget.Node {
 	src := image.NewRGBA(image.Rect(0, 0, width, height))
 	draw.Draw(src, src.Bounds(), image.NewUniform(c), image.Point{}, draw.Src)
@@ -42,8 +48,11 @@ func main() {
 	// Make the widget node tree.
 	hf := widget.NewFlow()
 	hf.SetAxis(widget.AxisHorizontal)
+	hf.AppendChild(mkLabel("Cyan:"))
 	hf.AppendChild(mkImage(100, 20, color.RGBA{0x00, 0x7f, 0x7f, 0xff}))
+	hf.AppendChild(mkLabel("Magenta:"))
 	hf.AppendChild(mkImage(200, 30, color.RGBA{0x7f, 0x00, 0x7f, 0xff}))
+	hf.AppendChild(mkLabel("Yellow:"))
 	hf.AppendChild(mkImage(300, 40, color.RGBA{0x7f, 0x7f, 0x00, 0xff}))
 
 	vf := widget.NewFlow()
