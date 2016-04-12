@@ -15,9 +15,14 @@ import (
 type Label struct{ *Node }
 
 // NewLabel returns a new Label widget.
-//
-// TODO: take a "text string" argument?
-func NewLabel() Label { return Label{&Node{Class: LabelClass{}}} }
+func NewLabel(text string) Label {
+	return Label{
+		&Node{
+			Class:     LabelClass{},
+			ClassData: text,
+		},
+	}
+}
 
 func (o Label) Text() string     { v, _ := o.ClassData.(string); return v }
 func (o Label) SetText(v string) { o.ClassData = v }

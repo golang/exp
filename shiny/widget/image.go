@@ -15,9 +15,14 @@ import (
 type Image struct{ *Node }
 
 // NewImage returns a new Image widget.
-//
-// TODO: take an "m image.Image" argument?
-func NewImage() Image { return Image{&Node{Class: ImageClass{}}} }
+func NewImage(m image.Image) Image {
+	return Image{
+		&Node{
+			Class:     ImageClass{},
+			ClassData: m,
+		},
+	}
+}
 
 func (o Image) Image() image.Image     { v, _ := o.ClassData.(image.Image); return v }
 func (o Image) SetImage(v image.Image) { o.ClassData = v }
