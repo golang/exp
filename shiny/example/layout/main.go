@@ -58,10 +58,10 @@ func main() {
 	draw.Draw(rgba, rgba.Bounds(), t.GetPalette().Neutral, image.Point{}, draw.Src)
 
 	// Measure, layout and paint.
-	vf.Class.Measure(vf.Node, t)
+	vf.Measure(t)
 	vf.Rect = rgba.Bounds()
-	vf.Class.Layout(vf.Node, t)
-	vf.Class.Paint(vf.Node, t, rgba, image.Point{})
+	vf.Layout(t)
+	vf.Paint(t, rgba, image.Point{})
 
 	// Encode to PNG.
 	out, err := os.Create("out.png")

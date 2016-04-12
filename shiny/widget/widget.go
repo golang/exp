@@ -34,8 +34,8 @@ const (
 // Class is a class of nodes. For example, all button widgets would be Nodes
 // whose Class values are a ButtonClass.
 type Class interface {
-	// Arity returns the number of children this class of nodes can have.
-	Arity() Arity
+	// Arity returns the number of children a specific node can have.
+	Arity(n *Node) Arity
 
 	// Measure sets n.MeasuredSize to the natural size, in pixels, of a
 	// specific node (and its children) of this class.
@@ -63,7 +63,7 @@ type Class interface {
 // the Class interface's methods.
 type LeafClassEmbed struct{}
 
-func (LeafClassEmbed) Arity() Arity { return Leaf }
+func (LeafClassEmbed) Arity(n *Node) Arity { return Leaf }
 
 func (LeafClassEmbed) Measure(n *Node, t *Theme) { n.MeasuredSize = image.Point{} }
 
@@ -76,11 +76,11 @@ func (LeafClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Poi
 // implementations of the Class interface's methods.
 type ShellClassEmbed struct{}
 
-func (ShellClassEmbed) Arity() Arity { return Shell }
+func (ShellClassEmbed) Arity(n *Node) Arity { return Shell }
 
 func (ShellClassEmbed) Measure(n *Node, t *Theme) {
 	if c := n.FirstChild; c != nil {
-		c.Class.Measure(c, t)
+		c.Measure(t)
 		n.MeasuredSize = c.MeasuredSize
 	} else {
 		n.MeasuredSize = image.Point{}
@@ -90,13 +90,13 @@ func (ShellClassEmbed) Measure(n *Node, t *Theme) {
 func (ShellClassEmbed) Layout(n *Node, t *Theme) {
 	if c := n.FirstChild; c != nil {
 		c.Rect = n.Rect.Sub(n.Rect.Min)
-		c.Class.Layout(c, t)
+		c.Layout(t)
 	}
 }
 
 func (ShellClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
 	if c := n.FirstChild; c != nil {
-		c.Class.Paint(c, t, dst, origin.Add(n.Rect.Min))
+		c.Paint(t, dst, origin.Add(n.Rect.Min))
 	}
 }
 
@@ -105,12 +105,12 @@ func (ShellClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Po
 // implementations of the Class interface's methods.
 type ContainerClassEmbed struct{}
 
-func (ContainerClassEmbed) Arity() Arity { return Container }
+func (ContainerClassEmbed) Arity(n *Node) Arity { return Container }
 
 func (ContainerClassEmbed) Measure(n *Node, t *Theme) {
 	mSize := image.Point{}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Class.Measure(c, t)
+		c.Measure(t)
 		if mSize.X < c.MeasuredSize.X {
 			mSize.X = c.MeasuredSize.X
 		}
@@ -124,13 +124,13 @@ func (ContainerClassEmbed) Measure(n *Node, t *Theme) {
 func (ContainerClassEmbed) Layout(n *Node, t *Theme) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		c.Rect = image.Rectangle{Max: c.MeasuredSize}
-		c.Class.Layout(c, t)
+		c.Layout(t)
 	}
 }
 
 func (ContainerClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Class.Paint(c, t, dst, origin.Add(n.Rect.Min))
+		c.Paint(t, dst, origin.Add(n.Rect.Min))
 	}
 }
 
@@ -174,6 +174,26 @@ type Node struct {
 	Rect image.Rectangle
 }
 
+// Arity calls n.Class.Arity with n as its first argument.
+func (n *Node) Arity() Arity {
+	return n.Class.Arity(n)
+}
+
+// Measure calls n.Class.Measure with n as its first argument.
+func (n *Node) Measure(t *Theme) {
+	n.Class.Measure(n, t)
+}
+
+// Layout calls n.Class.Layout with n as its first argument.
+func (n *Node) Layout(t *Theme) {
+	n.Class.Layout(n, t)
+}
+
+// Paint calls n.Class.Paint with n as its first argument.
+func (n *Node) Paint(t *Theme, dst *image.RGBA, origin image.Point) {
+	n.Class.Paint(n, t, dst, origin)
+}
+
 // AppendChild adds a node c as a child of n.
 //
 // It will panic if c already has a parent or siblings.
@@ -181,7 +201,7 @@ func (n *Node) AppendChild(c *Node) {
 	if c.Parent != nil || c.PrevSibling != nil || c.NextSibling != nil {
 		panic("widget: AppendChild called for an attached child Node")
 	}
-	switch n.Class.Arity() {
+	switch n.Arity() {
 	case Leaf:
 		panic("widget: AppendChild called for a leaf parent Node")
 	case Shell:

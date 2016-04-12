@@ -40,7 +40,7 @@ func (k FlowClass) Measure(n *Node, t *Theme) {
 
 	mSize := image.Point{}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Class.Measure(c, t)
+		c.Measure(t)
 		if axis == AxisHorizontal {
 			if mSize.Y < c.MeasuredSize.Y {
 				mSize.Y = c.MeasuredSize.Y
@@ -68,7 +68,7 @@ func (k FlowClass) Layout(n *Node, t *Theme) {
 			Min: min,
 			Max: min.Add(c.MeasuredSize),
 		}
-		c.Class.Layout(c, t)
+		c.Layout(t)
 		if axis == AxisHorizontal {
 			min.X += c.MeasuredSize.X
 		} else {
