@@ -26,34 +26,34 @@ import (
 	"log"
 	"os"
 
+	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/exp/shiny/widget"
 )
 
-func mkImage(width, height int, c color.RGBA) *widget.Node {
-	src := image.NewRGBA(image.Rect(0, 0, width, height))
-	draw.Draw(src, src.Bounds(), image.NewUniform(c), image.Point{}, draw.Src)
-
-	return widget.NewImage(src).Node
-}
+var px = unit.Pixels
 
 func main() {
+	t := widget.DefaultTheme
+
 	// Make the widget node tree.
 	hf := widget.NewFlow(widget.AxisHorizontal)
 	hf.AppendChild(widget.NewLabel("Cyan:").Node)
-	hf.AppendChild(mkImage(100, 20, color.RGBA{0x00, 0x7f, 0x7f, 0xff}))
+	hf.AppendChild(widget.NewUniform(color.RGBA{0x00, 0x7f, 0x7f, 0xff}, px(100), px(20)).Node)
 	hf.AppendChild(widget.NewLabel("Magenta:").Node)
-	hf.AppendChild(mkImage(200, 30, color.RGBA{0x7f, 0x00, 0x7f, 0xff}))
+	hf.AppendChild(widget.NewUniform(color.RGBA{0x7f, 0x00, 0x7f, 0xff}, px(200), px(30)).Node)
 	hf.AppendChild(widget.NewLabel("Yellow:").Node)
-	hf.AppendChild(mkImage(300, 40, color.RGBA{0x7f, 0x7f, 0x00, 0xff}))
+	hf.AppendChild(widget.NewUniform(color.RGBA{0x7f, 0x7f, 0x00, 0xff}, px(300), px(40)).Node)
 
 	vf := widget.NewFlow(widget.AxisVertical)
-	vf.AppendChild(mkImage(80, 40, color.RGBA{0xff, 0x00, 0x00, 0xff}))
-	vf.AppendChild(mkImage(50, 50, color.RGBA{0x00, 0xff, 0x00, 0xff}))
-	vf.AppendChild(mkImage(20, 60, color.RGBA{0x00, 0x00, 0xff, 0xff}))
+	vf.AppendChild(widget.NewUniform(color.RGBA{0xff, 0x00, 0x00, 0xff}, px(80), px(40)).Node)
+	vf.AppendChild(widget.NewUniform(color.RGBA{0x00, 0xff, 0x00, 0xff}, px(50), px(50)).Node)
+	vf.AppendChild(widget.NewUniform(color.RGBA{0x00, 0x00, 0xff, 0xff}, px(20), px(60)).Node)
 	vf.AppendChild(hf.Node)
+	vf.AppendChild(widget.NewLabel(fmt.Sprintf(
+		"The black rectangle is 1.5 inches x 1 inch when viewed at %v DPI.", t.GetDPI())).Node)
+	vf.AppendChild(widget.NewUniform(color.Black, unit.Inches(1.5), unit.Inches(1)).Node)
 
 	// Make the RGBA image.
-	t := widget.DefaultTheme
 	rgba := image.NewRGBA(image.Rect(0, 0, 640, 480))
 	draw.Draw(rgba, rgba.Bounds(), t.GetPalette().Neutral, image.Point{}, draw.Src)
 
