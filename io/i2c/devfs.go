@@ -12,6 +12,8 @@ import (
 	"golang.org/x/exp/io/i2c/driver"
 )
 
+// Devfs is an I2C driver that works against the devfs.
+// You need to load the "i2c-dev" kernel module to use this driver.
 type Devfs struct{}
 
 const i2c_SLAVE = 0x0703 // TODO(jbd): Allow users to use I2C_SLAVE_FORCE?
