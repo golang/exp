@@ -9,6 +9,7 @@ package windriver
 // TODO: implement a back buffer.
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -59,116 +60,39 @@ func (w *windowImpl) Release() {
 	win32.Release(w.hwnd)
 }
 
-var msgUpload = win32.AddWindowMsg(handleUpload)
-
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	p := upload{
-		dp:  dp,
-		src: src.(*bufferImpl),
-		sr:  sr,
-	}
-	win32.SendMessage(w.hwnd, msgUpload, 0, uintptr(unsafe.Pointer(&p)))
+	w.ExecCmd(&cmd{
+		id:     cmdUpload,
+		dp:     dp,
+		buffer: src.(*bufferImpl),
+		sr:     sr,
+	})
 }
-
-type upload struct {
-	dp  image.Point
-	src *bufferImpl
-	sr  image.Rectangle
-}
-
-func handleUpload(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	u := (*upload)(unsafe.Pointer(lParam))
-
-	dc, err := win32.GetDC(hwnd)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-	defer win32.ReleaseDC(hwnd, dc)
-
-	// TODO(brainman): move preUpload / postUpload out of handleUpload,
-	// because handleUpload can only be executed by one (message pump)
-	// thread only
-	u.src.preUpload()
-	defer u.src.postUpload()
-
-	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
-	dr := u.sr.Add(u.dp.Sub(u.sr.Min))
-	err = copyBitmapToDC(dc, dr, u.src.hbitmap, u.sr, draw.Src)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-}
-
-type handleWindowFillParams struct {
-	dr    image.Rectangle
-	color color.Color
-	op    draw.Op
-}
-
-var msgWindowFill = win32.AddWindowMsg(handleWindowFill)
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	p := handleWindowFillParams{
+	w.ExecCmd(&cmd{
+		id:    cmdFill,
 		dr:    dr,
 		color: src,
 		op:    op,
-	}
-	win32.SendMessage(w.hwnd, msgWindowFill, 0, uintptr(unsafe.Pointer(&p)))
+	})
 }
-
-func handleWindowFill(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	p := (*handleWindowFillParams)(unsafe.Pointer(lParam))
-
-	dc, err := win32.GetDC(hwnd)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-	defer win32.ReleaseDC(hwnd, dc)
-
-	err = fill(dc, p.dr, p.color, p.op)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-}
-
-type handleDrawParams struct {
-	src2dst f64.Aff3
-	src     syscall.Handle
-	sr      image.Rectangle
-	op      draw.Op
-}
-
-var msgDraw = win32.AddWindowMsg(handleDraw)
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	if op != draw.Src && op != draw.Over {
 		// TODO:
 		return
 	}
-	p := handleDrawParams{
+	w.ExecCmd(&cmd{
+		id:      cmdDraw,
 		src2dst: src2dst,
-		src:     src.(*textureImpl).bitmap,
+		texture: src.(*textureImpl).bitmap,
 		sr:      sr,
 		op:      op,
-	}
-	win32.SendMessage(w.hwnd, msgDraw, 0, uintptr(unsafe.Pointer(&p)))
+	})
 }
 
-func handleDraw(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
-	p := (*handleDrawParams)(unsafe.Pointer(lParam))
-	err := drawWindow(hwnd, p.src2dst, p.src, p.sr, p.op)
-	if err != nil {
-		panic(err) // TODO handle errors
-	}
-}
-
-func drawWindow(hwnd syscall.Handle, src2dst f64.Aff3, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
-	dc, err := win32.GetDC(hwnd)
-	if err != nil {
-		return err
-	}
-	defer win32.ReleaseDC(hwnd, dc)
-
+func drawWindow(dc syscall.Handle, src2dst f64.Aff3, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
 	var dr image.Rectangle
 	if src2dst[1] != 0 || src2dst[3] != 0 {
 		// general drawing
@@ -283,4 +207,66 @@ func sizeEvent(hwnd syscall.Handle, e size.Event) {
 		w.sz = e
 		w.Send(paint.Event{})
 	}
+}
+
+// cmd is used to carry parameters between user code
+// and Windows message pump thread.
+type cmd struct {
+	id  int
+	err error
+
+	src2dst f64.Aff3
+	sr      image.Rectangle
+	dp      image.Point
+	dr      image.Rectangle
+	color   color.Color
+	op      draw.Op
+	texture syscall.Handle
+	buffer  *bufferImpl
+}
+
+const (
+	cmdDraw = iota
+	cmdFill
+	cmdUpload
+)
+
+var msgCmd = win32.AddWindowMsg(handleCmd)
+
+func (w *windowImpl) ExecCmd(c *cmd) {
+	win32.SendMessage(w.hwnd, msgCmd, 0, uintptr(unsafe.Pointer(c)))
+	if c.err != nil {
+		panic(fmt.Sprintf("ExecCmd faild for cmd.id=%d: %v", c.id, c.err)) // TODO handle errors
+	}
+}
+
+func handleCmd(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
+	c := (*cmd)(unsafe.Pointer(lParam))
+
+	dc, err := win32.GetDC(hwnd)
+	if err != nil {
+		c.err = err
+		return
+	}
+	defer win32.ReleaseDC(hwnd, dc)
+
+	switch c.id {
+	case cmdDraw:
+		c.err = drawWindow(dc, c.src2dst, c.texture, c.sr, c.op)
+	case cmdFill:
+		c.err = fill(dc, c.dr, c.color, c.op)
+	case cmdUpload:
+		// TODO(brainman): move preUpload / postUpload out of handleCmd,
+		// because handleCmd can only be executed by one (message pump)
+		// thread only
+		c.buffer.preUpload()
+		defer c.buffer.postUpload()
+
+		// TODO: adjust if dp is outside dst bounds, or sr is outside buffer bounds.
+		dr := c.sr.Add(c.dp.Sub(c.sr.Min))
+		c.err = copyBitmapToDC(dc, dr, c.buffer.hbitmap, c.sr, draw.Src)
+	default:
+		c.err = fmt.Errorf("unknown command id=%d", c.id)
+	}
+	return
 }
