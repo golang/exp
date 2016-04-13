@@ -16,17 +16,19 @@ type Device struct {
 }
 
 // TOOD(jbd): Do we need higher level I2C packet writers and readers?
+// TODO(jbd): Support bidirectional communication.
+// TODO(jbd): Investigate if command-less read/write is valid.
+//            Tweak interfaces not to require the cmd arg if so.
+// TODO(jbd): How do we support 10-bit addresses and how to enable 10-bit on devfs?
 
-// Read reads at most len(buf) number of bytes from the device. n represents
-// the total number of bytes read.
-func (d *Device) Read(buf []byte) (n int, err error) {
-	return d.conn.Read(buf)
+// Read reads at most len(buf) number of bytes from the device for the given command.
+func (d *Device) Read(cmd byte, buf []byte) error {
+	return d.conn.Read(cmd, buf)
 }
 
-// Write writes the given byte buffer to the device. n represents the total
-// number of bytes written.
-func (d *Device) Write(buf []byte) (n int, err error) {
-	return d.conn.Write(buf)
+// Write writes the buffer for the given command to the device.
+func (d *Device) Write(cmd byte, buf []byte) (err error) {
+	return d.conn.Write(cmd, buf)
 }
 
 // Close closes the device and releases the underlying sources.
