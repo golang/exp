@@ -11,6 +11,13 @@ import (
 	"image"
 )
 
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
 // Arity is the number of children a class of nodes can have.
 type Arity uint8
 
@@ -151,6 +158,11 @@ type Node struct {
 	// ButtonClass may store an image and some text in this field. A
 	// ProgressBarClass may store a numerical percentage.
 	ClassData interface{}
+
+	// LayoutData is layout-specific data for this node. Its type is determined
+	// by its parent node's class. For example, each child of a Flow may hold a
+	// FlowLayoutData in this field.
+	LayoutData interface{}
 
 	// TODO: add commentary about the Measure / Layout / Paint model, and about
 	// the lifetime of the MeasuredSize and Rect fields, and when user code can
