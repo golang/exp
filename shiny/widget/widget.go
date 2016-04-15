@@ -149,6 +149,10 @@ func (ContainerClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin imag
 type Node struct {
 	// Parent, FirstChild, LastChild, PrevSibling and NextSibling describe the
 	// widget tree structure.
+	//
+	// These fields are exported to enable walking the node tree, but they
+	// should not be modified directly. Instead, call the AppendChild and
+	// RemoveChild methods, which keeps the tree structure consistent.
 	Parent, FirstChild, LastChild, PrevSibling, NextSibling *Node
 
 	// Class is class-specific data and behavior for this node. For example, a
