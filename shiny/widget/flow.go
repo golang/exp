@@ -20,22 +20,23 @@ type Flow struct{ *Node }
 func NewFlow(a Axis) Flow {
 	return Flow{
 		&Node{
-			Class:     FlowClass{},
-			ClassData: a,
+			Class: &flowClass{
+				axis: a,
+			},
 		},
 	}
 }
 
-func (o Flow) Axis() Axis     { v, _ := o.ClassData.(Axis); return v }
-func (o Flow) SetAxis(v Axis) { o.ClassData = v }
+func (o Flow) Axis() Axis     { return o.Class.(*flowClass).axis }
+func (o Flow) SetAxis(v Axis) { o.Class.(*flowClass).axis = v }
 
-// FlowClass is the Class for Flow nodes.
-type FlowClass struct{ ContainerClassEmbed }
+type flowClass struct {
+	ContainerClassEmbed
+	axis Axis
+}
 
-func (k FlowClass) Measure(n *Node, t *Theme) {
-	o := Flow{n}
-	axis := o.Axis()
-	if axis != AxisHorizontal && axis != AxisVertical {
+func (k *flowClass) Measure(n *Node, t *Theme) {
+	if k.axis != AxisHorizontal && k.axis != AxisVertical {
 		k.ContainerClassEmbed.Measure(n, t)
 		return
 	}
@@ -43,7 +44,7 @@ func (k FlowClass) Measure(n *Node, t *Theme) {
 	mSize := image.Point{}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		c.Measure(t)
-		if axis == AxisHorizontal {
+		if k.axis == AxisHorizontal {
 			mSize.X += c.MeasuredSize.X
 			if mSize.Y < c.MeasuredSize.Y {
 				mSize.Y = c.MeasuredSize.Y
@@ -58,16 +59,14 @@ func (k FlowClass) Measure(n *Node, t *Theme) {
 	n.MeasuredSize = mSize
 }
 
-func (k FlowClass) Layout(n *Node, t *Theme) {
-	o := Flow{n}
-	axis := o.Axis()
-	if axis != AxisHorizontal && axis != AxisVertical {
+func (k *flowClass) Layout(n *Node, t *Theme) {
+	if k.axis != AxisHorizontal && k.axis != AxisVertical {
 		k.ContainerClassEmbed.Layout(n, t)
 		return
 	}
 
 	eaExtra, eaWeight := 0, 0
-	if axis == AxisHorizontal {
+	if k.axis == AxisHorizontal {
 		eaExtra = n.Rect.Dx()
 	} else {
 		eaExtra = n.Rect.Dy()
@@ -76,7 +75,7 @@ func (k FlowClass) Layout(n *Node, t *Theme) {
 		if d, ok := c.LayoutData.(FlowLayoutData); ok && d.ExpandAlongWeight > 0 {
 			eaWeight += d.ExpandAlongWeight
 		}
-		if axis == AxisHorizontal {
+		if k.axis == AxisHorizontal {
 			eaExtra -= c.MeasuredSize.X
 		} else {
 			eaExtra -= c.MeasuredSize.Y
@@ -94,14 +93,14 @@ func (k FlowClass) Layout(n *Node, t *Theme) {
 				delta := eaExtra * d.ExpandAlongWeight / eaWeight
 				eaExtra -= delta
 				eaWeight -= d.ExpandAlongWeight
-				if axis == AxisHorizontal {
+				if k.axis == AxisHorizontal {
 					q.X += delta
 				} else {
 					q.Y += delta
 				}
 			}
 			if d.ExpandAcross {
-				if axis == AxisHorizontal {
+				if k.axis == AxisHorizontal {
 					q.Y = max(q.Y, n.Rect.Dy())
 				} else {
 					q.X = max(q.X, n.Rect.Dx())
@@ -113,7 +112,7 @@ func (k FlowClass) Layout(n *Node, t *Theme) {
 			Max: q,
 		}
 		c.Layout(t)
-		if axis == AxisHorizontal {
+		if k.axis == AxisHorizontal {
 			p.X = q.X
 		} else {
 			p.Y = q.Y

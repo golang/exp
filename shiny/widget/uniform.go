@@ -22,8 +22,7 @@ type Uniform struct{ *Node }
 func NewUniform(c color.Color, naturalWidth, naturalHeight unit.Value) Uniform {
 	return Uniform{
 		&Node{
-			Class: UniformClass{},
-			ClassData: &uniformClassData{
+			Class: &uniformClass{
 				u: image.NewUniform(c),
 				w: naturalWidth,
 				h: naturalHeight,
@@ -32,31 +31,25 @@ func NewUniform(c color.Color, naturalWidth, naturalHeight unit.Value) Uniform {
 	}
 }
 
-func (o Uniform) Color() color.Color            { return o.classData().u.C }
-func (o Uniform) SetColor(v color.Color)        { o.classData().u.C = v }
-func (o Uniform) NaturalWidth() unit.Value      { return o.classData().w }
-func (o Uniform) SetNaturalWidth(v unit.Value)  { o.classData().w = v }
-func (o Uniform) NaturalHeight() unit.Value     { return o.classData().h }
-func (o Uniform) SetNaturalHeight(v unit.Value) { o.classData().h = v }
+func (o Uniform) Color() color.Color            { return o.Class.(*uniformClass).u.C }
+func (o Uniform) SetColor(v color.Color)        { o.Class.(*uniformClass).u.C = v }
+func (o Uniform) NaturalWidth() unit.Value      { return o.Class.(*uniformClass).w }
+func (o Uniform) SetNaturalWidth(v unit.Value)  { o.Class.(*uniformClass).w = v }
+func (o Uniform) NaturalHeight() unit.Value     { return o.Class.(*uniformClass).h }
+func (o Uniform) SetNaturalHeight(v unit.Value) { o.Class.(*uniformClass).h = v }
 
-func (o Uniform) classData() *uniformClassData { return o.ClassData.(*uniformClassData) }
-
-type uniformClassData struct {
+type uniformClass struct {
+	LeafClassEmbed
 	u *image.Uniform
 	w unit.Value
 	h unit.Value
 }
 
-// UniformClass is the Class for Uniform nodes.
-type UniformClass struct{ LeafClassEmbed }
-
-func (k UniformClass) Measure(n *Node, t *Theme) {
-	d := Uniform{n}.classData()
-	n.MeasuredSize.X = t.Pixels(d.w).Round()
-	n.MeasuredSize.Y = t.Pixels(d.h).Round()
+func (k *uniformClass) Measure(n *Node, t *Theme) {
+	n.MeasuredSize.X = t.Pixels(k.w).Round()
+	n.MeasuredSize.Y = t.Pixels(k.h).Round()
 }
 
-func (k UniformClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
-	d := Uniform{n}.classData()
-	draw.Draw(dst, n.Rect.Add(origin), d.u, image.Point{}, draw.Src)
+func (k *uniformClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
+	draw.Draw(dst, n.Rect.Add(origin), k.u, image.Point{}, draw.Src)
 }

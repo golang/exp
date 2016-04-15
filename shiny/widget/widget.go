@@ -39,7 +39,7 @@ const (
 )
 
 // Class is a class of nodes. For example, all button widgets would be Nodes
-// whose Class values are a ButtonClass.
+// whose Class values have the buttonClass type.
 type Class interface {
 	// Arity returns the number of children a specific node can have.
 	Arity(n *Node) Arity
@@ -151,13 +151,11 @@ type Node struct {
 	// widget tree structure.
 	Parent, FirstChild, LastChild, PrevSibling, NextSibling *Node
 
-	// Class is what class of node this is.
+	// Class is class-specific data and behavior for this node. For example, a
+	// buttonClass-typed value may store an image and some text in this field.
+	// A progressBarClass-typed value may store a numerical percentage.
+	// Different class types would paint their nodes differently.
 	Class Class
-
-	// ClassData is class-specific data for this node. For example, a
-	// ButtonClass may store an image and some text in this field. A
-	// ProgressBarClass may store a numerical percentage.
-	ClassData interface{}
 
 	// LayoutData is layout-specific data for this node. Its type is determined
 	// by its parent node's class. For example, each child of a Flow may hold a

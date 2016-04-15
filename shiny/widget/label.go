@@ -18,32 +18,31 @@ type Label struct{ *Node }
 func NewLabel(text string) Label {
 	return Label{
 		&Node{
-			Class:     LabelClass{},
-			ClassData: text,
+			Class: &labelClass{
+				text: text,
+			},
 		},
 	}
 }
 
-func (o Label) Text() string     { v, _ := o.ClassData.(string); return v }
-func (o Label) SetText(v string) { o.ClassData = v }
+func (o Label) Text() string     { return o.Class.(*labelClass).text }
+func (o Label) SetText(v string) { o.Class.(*labelClass).text = v }
 
-// LabelClass is the Class for Label nodes.
-type LabelClass struct{ LeafClassEmbed }
+type labelClass struct {
+	LeafClassEmbed
+	text string
+}
 
-func (k LabelClass) Measure(n *Node, t *Theme) {
-	o := Label{n}
-
+func (k *labelClass) Measure(n *Node, t *Theme) {
 	f := t.AcquireFontFace(FontFaceOptions{})
 	defer t.ReleaseFontFace(FontFaceOptions{}, f)
 	m := f.Metrics()
 
-	n.MeasuredSize.X = font.MeasureString(f, o.Text()).Ceil()
+	n.MeasuredSize.X = font.MeasureString(f, k.text).Ceil()
 	n.MeasuredSize.Y = m.Ascent.Ceil() + m.Descent.Ceil()
 }
 
-func (k LabelClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
-	o := Label{n}
-
+func (k *labelClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
 	f := t.AcquireFontFace(FontFaceOptions{})
 	defer t.ReleaseFontFace(FontFaceOptions{}, f)
 	m := f.Metrics()
@@ -57,5 +56,5 @@ func (k LabelClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point
 			Y: fixed.I(origin.Y + n.Rect.Min.Y + m.Ascent.Ceil()),
 		},
 	}
-	d.DrawString(o.Text())
+	d.DrawString(k.text)
 }
