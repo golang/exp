@@ -33,6 +33,7 @@ type screenImpl struct {
 	atomWMProtocols    xproto.Atom
 	atomWMTakeFocus    xproto.Atom
 
+	pixelsPerPt  float32
 	pictformat24 render.Pictformat
 	pictformat32 render.Pictformat
 
@@ -64,6 +65,12 @@ func newScreenImpl(xc *xgb.Conn) (*screenImpl, error) {
 	if err := s.initKeyboardMapping(); err != nil {
 		return nil, err
 	}
+	const (
+		mmPerInch = 25.4
+		ptPerInch = 72
+	)
+	pixelsPerMM := float32(s.xsi.WidthInPixels) / float32(s.xsi.WidthInMillimeters)
+	s.pixelsPerPt = pixelsPerMM * mmPerInch / ptPerInch
 	if err := s.initPictformats(); err != nil {
 		return nil, err
 	}
