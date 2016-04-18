@@ -61,6 +61,9 @@ func (w *windowImpl) Release() {
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
+	src.(*bufferImpl).preUpload()
+	defer src.(*bufferImpl).postUpload()
+
 	w.execCmd(&cmd{
 		id:     cmdUpload,
 		dp:     dp,
@@ -256,12 +259,6 @@ func handleCmd(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) {
 	case cmdFill:
 		c.err = fill(dc, c.dr, c.color, c.op)
 	case cmdUpload:
-		// TODO(brainman): move preUpload / postUpload out of handleCmd,
-		// because handleCmd can only be executed by one (message pump)
-		// thread only
-		c.buffer.preUpload()
-		defer c.buffer.postUpload()
-
 		// TODO: adjust if dp is outside dst bounds, or sr is outside buffer bounds.
 		dr := c.sr.Add(c.dp.Sub(c.sr.Min))
 		c.err = copyBitmapToDC(dc, dr, c.buffer.hbitmap, c.sr, draw.Src)
