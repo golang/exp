@@ -61,7 +61,7 @@ func (w *windowImpl) Release() {
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	w.ExecCmd(&cmd{
+	w.execCmd(&cmd{
 		id:     cmdUpload,
 		dp:     dp,
 		buffer: src.(*bufferImpl),
@@ -70,7 +70,7 @@ func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangl
 }
 
 func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
-	w.ExecCmd(&cmd{
+	w.execCmd(&cmd{
 		id:    cmdFill,
 		dr:    dr,
 		color: src,
@@ -83,7 +83,7 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 		// TODO:
 		return
 	}
-	w.ExecCmd(&cmd{
+	w.execCmd(&cmd{
 		id:      cmdDraw,
 		src2dst: src2dst,
 		texture: src.(*textureImpl).bitmap,
@@ -233,10 +233,10 @@ const (
 
 var msgCmd = win32.AddWindowMsg(handleCmd)
 
-func (w *windowImpl) ExecCmd(c *cmd) {
+func (w *windowImpl) execCmd(c *cmd) {
 	win32.SendMessage(w.hwnd, msgCmd, 0, uintptr(unsafe.Pointer(c)))
 	if c.err != nil {
-		panic(fmt.Sprintf("ExecCmd faild for cmd.id=%d: %v", c.id, c.err)) // TODO handle errors
+		panic(fmt.Sprintf("execCmd faild for cmd.id=%d: %v", c.id, c.err)) // TODO handle errors
 	}
 }
 
