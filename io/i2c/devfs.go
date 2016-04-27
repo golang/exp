@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"syscall"
-	"unsafe"
 
 	"golang.org/x/exp/io/i2c/driver"
 )
@@ -18,21 +17,8 @@ import (
 type Devfs struct{}
 
 const (
-	i2c_SMBUS_READ           = 1
-	i2c_SMBUS_WRITE          = 0
-	i2c_SMBUS_I2C_BLOCK_DATA = 8
-
-	i2c_SMBUS = 0x0720
-
 	i2c_SLAVE = 0x0703 // TODO(jbd): Allow users to use I2C_SLAVE_FORCE?
 )
-
-type i2c_smbus_ioctl_data struct {
-	readwrite uint8
-	command   uint8
-	size      uint32
-	data      unsafe.Pointer
-}
 
 // TODO(jbd): Support I2C_RETRIES and I2C_TIMEOUT at the driver and implementation level.
 
@@ -53,39 +39,16 @@ type devfsConn struct {
 	f *os.File
 }
 
-func (c *devfsConn) Read(cmd byte, buf []byte) error {
-	// TODO(jbd): Do not allocate.
-	size := len(buf)
-	buffer := make([]byte, size+1)
-	buffer[0] = byte(size)
-	data := i2c_smbus_ioctl_data{
-		readwrite: i2c_SMBUS_READ,
-		command:   cmd,
-		size:      i2c_SMBUS_I2C_BLOCK_DATA,
-		data:      unsafe.Pointer(&buffer[0]),
-	}
-	if err := c.ioctl(i2c_SMBUS, uintptr(unsafe.Pointer(&data))); err != nil {
-		return fmt.Errorf("error reading from device: %v", err)
-	}
-	copy(buf, buffer[1:])
-	return nil
+func (c *devfsConn) Read(buf []byte) error {
+	_, err := c.f.Read(buf)
+	// TODO(jbd): len(buf) == number of bytes read?
+	return err
 }
 
-func (c *devfsConn) Write(cmd byte, buf []byte) error {
-	// TODO(jbd): Do not allocate.
-	size := len(buf)
-	buffer := append([]byte{byte(size)}, buf...)
-	data := i2c_smbus_ioctl_data{
-		readwrite: i2c_SMBUS_WRITE,
-		command:   cmd,
-		size:      i2c_SMBUS_I2C_BLOCK_DATA,
-		data:      unsafe.Pointer(&buffer[0]),
-	}
-	err := c.ioctl(i2c_SMBUS, uintptr(unsafe.Pointer(&data)))
-	if err != nil {
-		return fmt.Errorf("error writing to device: %v", err)
-	}
-	return nil
+func (c *devfsConn) Write(buf []byte) error {
+	_, err := c.f.Write(buf)
+	// TODO(jbd): len(buf) == number of bytes written?
+	return err
 }
 
 func (c *devfsConn) Close() error {

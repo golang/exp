@@ -6,6 +6,8 @@
 package i2c // import "golang.org/x/exp/io/i2c"
 
 import (
+	"fmt"
+
 	"golang.org/x/exp/io/i2c/driver"
 )
 
@@ -17,18 +19,25 @@ type Device struct {
 
 // TOOD(jbd): Do we need higher level I2C packet writers and readers?
 // TODO(jbd): Support bidirectional communication.
-// TODO(jbd): Investigate if command-less read/write is valid.
-//            Tweak interfaces not to require the cmd arg if so.
 // TODO(jbd): How do we support 10-bit addresses and how to enable 10-bit on devfs?
 
-// Read reads at most len(buf) number of bytes from the device for the given command.
-func (d *Device) Read(cmd byte, buf []byte) error {
-	return d.conn.Read(cmd, buf)
+// Read reads len(buf) bytes from the device.
+func (d *Device) Read(buf []byte) error {
+	// TODO(jbd): Support reading from a register.
+	if err := d.conn.Read(buf); err != nil {
+		return fmt.Errorf("error reading from device: %v", err)
+	}
+	return nil
 }
 
-// Write writes the buffer for the given command to the device.
-func (d *Device) Write(cmd byte, buf []byte) (err error) {
-	return d.conn.Write(cmd, buf)
+// Write writes the buffer to the device. If it is required to write to a
+// specific register, the register should be passed as the first byte in the
+// given buffer.
+func (d *Device) Write(buf []byte) (err error) {
+	if err := d.conn.Write(buf); err != nil {
+		return fmt.Errorf("error writing to the device: %v", err)
+	}
+	return nil
 }
 
 // Close closes the device and releases the underlying sources.

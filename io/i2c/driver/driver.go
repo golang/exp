@@ -14,7 +14,7 @@ type Opener interface {
 
 // Conn represents an active connection to an I2C device.
 type Conn interface {
-	Read(cmd byte, buf []byte) error
-	Write(cmd byte, buf []byte) error
+	Read(buf []byte) error
+	Write(buf []byte) error
 	Close() error
 }
