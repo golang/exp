@@ -50,7 +50,7 @@ type Devfs struct{}
 // Open Devfs /dev/spidev<bus>.<chip> and returns a connection.
 func (d *Devfs) Open(bus, chip int) (driver.Conn, error) {
 	n := fmt.Sprintf("/dev/spidev%d.%d", bus, chip)
-	f, err := os.OpenFile(n, os.O_RDWR, 0)
+	f, err := os.OpenFile(n, os.O_RDWR, os.ModeDevice)
 	if err != nil {
 		return nil, err
 	}

@@ -37,7 +37,7 @@ type i2c_smbus_ioctl_data struct {
 // TODO(jbd): Support I2C_RETRIES and I2C_TIMEOUT at the driver and implementation level.
 
 func (d *Devfs) Open(bus, addr int) (driver.Conn, error) {
-	f, err := os.OpenFile(fmt.Sprintf("/dev/i2c-%d", bus), os.O_RDWR, 0)
+	f, err := os.OpenFile(fmt.Sprintf("/dev/i2c-%d", bus), os.O_RDWR, os.ModeDevice)
 	if err != nil {
 		return nil, err
 	}
