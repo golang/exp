@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package i2c allows users to read from an write to a slave I2C device.
+// Package i2c allows users to read from and write to a slave I2C device.
 package i2c // import "golang.org/x/exp/io/i2c"
 
 import (
