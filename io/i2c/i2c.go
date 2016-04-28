@@ -11,15 +11,21 @@ import (
 	"golang.org/x/exp/io/i2c/driver"
 )
 
+const tenbitMask = 1 << 12
+
 // Device represents an I2C device. Devices must be closed once
 // they are no longer in use.
 type Device struct {
 	conn driver.Conn
 }
 
+// TenBit marks an I2C address as a 10-bit address.
+func TenBit(addr int) int {
+	return addr | tenbitMask
+}
+
 // TOOD(jbd): Do we need higher level I2C packet writers and readers?
 // TODO(jbd): Support bidirectional communication.
-// TODO(jbd): How do we support 10-bit addresses and how to enable 10-bit on devfs?
 
 // Read reads len(buf) bytes from the device.
 func (d *Device) Read(buf []byte) error {
@@ -47,13 +53,19 @@ func (d *Device) Close() error {
 }
 
 // Open opens an I2C device with the given I2C address on the specified bus.
+// Use TenBit to mark your address if your device works with 10-bit addresses.
 func Open(o driver.Opener, bus, addr int) (*Device, error) {
 	if o == nil {
 		o = &Devfs{}
 	}
-	conn, err := o.Open(bus, addr)
+	addr, tenbit := resolveAddr(addr)
+	conn, err := o.Open(bus, addr, tenbit)
 	if err != nil {
 		return nil, err
 	}
 	return &Device{conn: conn}, nil
+}
+
+func resolveAddr(a int) (addr int, tenbit bool) {
+	return a & (tenbitMask - 1), a&tenbitMask == tenbitMask
 }

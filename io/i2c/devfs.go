@@ -17,17 +17,24 @@ import (
 type Devfs struct{}
 
 const (
-	i2c_SLAVE = 0x0703 // TODO(jbd): Allow users to use I2C_SLAVE_FORCE?
+	i2c_SLAVE  = 0x0703 // TODO(jbd): Allow users to use I2C_SLAVE_FORCE?
+	i2c_TENBIT = 0x0704
 )
 
 // TODO(jbd): Support I2C_RETRIES and I2C_TIMEOUT at the driver and implementation level.
 
-func (d *Devfs) Open(bus, addr int) (driver.Conn, error) {
+func (d *Devfs) Open(bus, addr int, tenbit bool) (driver.Conn, error) {
 	f, err := os.OpenFile(fmt.Sprintf("/dev/i2c-%d", bus), os.O_RDWR, os.ModeDevice)
 	if err != nil {
 		return nil, err
 	}
 	conn := &devfsConn{f: f}
+	if tenbit {
+		if err := conn.ioctl(i2c_TENBIT, uintptr(1)); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("cannot enable the 10-bit address mode on bus %v: %v", bus, err)
+		}
+	}
 	if err := conn.ioctl(i2c_SLAVE, uintptr(addr)); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("error opening the address (%v) on the bus (%v): %v", addr, bus, err)
