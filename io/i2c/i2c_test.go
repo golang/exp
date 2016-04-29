@@ -10,21 +10,21 @@ import (
 
 func TestTenBit(t *testing.T) {
 	tc := []struct {
-		masked int
-		addr   int
-		tenbit bool
+		masked     int
+		addrWant   int
+		tenbitWant bool
 	}{
 		{TenBit(0x5), 0x5, true},
 		{0x5, 0x5, false},
-		{TenBit(0x40), 0x40, true},
+		{TenBit(0x200), 0x200, true},
 	}
 
 	for _, tt := range tc {
 		unmasked, tenbit := resolveAddr(tt.masked)
-		if want, got := tt.tenbit, tenbit; got != want {
-			t.Errorf("want address %b as 10-bit; got non 10-bit", tt.addr)
+		if want, got := tt.tenbitWant, tenbit; got != want {
+			t.Errorf("want address %b as 10-bit; got non 10-bit", want)
 		}
-		if want, got := tt.addr, unmasked; got != want {
+		if want, got := tt.addrWant, unmasked; got != want {
 			t.Errorf("want address %b; got %b", want, got)
 		}
 	}
