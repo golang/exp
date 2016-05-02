@@ -19,4 +19,6 @@ func ExampleOpen() {
 	if err != nil {
 		panic(err)
 	}
+
+	_ = d
 }
