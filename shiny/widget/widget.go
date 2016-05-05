@@ -141,6 +141,12 @@ func (ContainerClassEmbed) Paint(n *Node, t *Theme, dst *image.RGBA, origin imag
 	}
 }
 
+// NodeWrapper wraps a Node. It is typically implemented by struct types that
+// embed the Node type.
+type NodeWrapper interface {
+	WrappedNode() *Node
+}
+
 // Node is an element of a widget tree.
 //
 // Every element of a widget tree is a node, but nodes can be of different
@@ -188,6 +194,13 @@ type Node struct {
 	Rect image.Rectangle
 }
 
+// WrappedNode returns the node itself. This method makes struct types that
+// embed the Node type automatically implement the NodeWrapper interface, so
+// they can be passed to AppendChild and RemoveChild.
+func (n *Node) WrappedNode() *Node {
+	return n
+}
+
 // Arity calls n.Class.Arity with n as its first argument.
 func (n *Node) Arity() Arity {
 	return n.Class.Arity(n)
@@ -211,8 +224,9 @@ func (n *Node) Paint(t *Theme, dst *image.RGBA, origin image.Point) {
 // AppendChild adds a node c as a child of n.
 //
 // It will panic if c already has a parent or siblings.
-func (n *Node) AppendChild(c *Node) {
-	if c.Parent != nil || c.PrevSibling != nil || c.NextSibling != nil {
+func (n *Node) AppendChild(c NodeWrapper) {
+	m := c.WrappedNode()
+	if m.Parent != nil || m.PrevSibling != nil || m.NextSibling != nil {
 		panic("widget: AppendChild called for an attached child Node")
 	}
 	switch n.Arity() {
@@ -225,36 +239,37 @@ func (n *Node) AppendChild(c *Node) {
 	}
 	last := n.LastChild
 	if last != nil {
-		last.NextSibling = c
+		last.NextSibling = m
 	} else {
-		n.FirstChild = c
+		n.FirstChild = m
 	}
-	n.LastChild = c
-	c.Parent = n
-	c.PrevSibling = last
+	n.LastChild = m
+	m.Parent = n
+	m.PrevSibling = last
 }
 
 // RemoveChild removes a node c that is a child of n. Afterwards, c will have
 // no parent and no siblings.
 //
 // It will panic if c's parent is not n.
-func (n *Node) RemoveChild(c *Node) {
-	if c.Parent != n {
+func (n *Node) RemoveChild(c NodeWrapper) {
+	m := c.WrappedNode()
+	if m.Parent != n {
 		panic("widget: RemoveChild called for a non-child Node")
 	}
-	if n.FirstChild == c {
-		n.FirstChild = c.NextSibling
+	if n.FirstChild == m {
+		n.FirstChild = m.NextSibling
 	}
-	if c.NextSibling != nil {
-		c.NextSibling.PrevSibling = c.PrevSibling
+	if m.NextSibling != nil {
+		m.NextSibling.PrevSibling = m.PrevSibling
 	}
-	if n.LastChild == c {
-		n.LastChild = c.PrevSibling
+	if n.LastChild == m {
+		n.LastChild = m.PrevSibling
 	}
-	if c.PrevSibling != nil {
-		c.PrevSibling.NextSibling = c.NextSibling
+	if m.PrevSibling != nil {
+		m.PrevSibling.NextSibling = m.NextSibling
 	}
-	c.Parent = nil
-	c.PrevSibling = nil
-	c.NextSibling = nil
+	m.Parent = nil
+	m.PrevSibling = nil
+	m.NextSibling = nil
 }

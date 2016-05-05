@@ -58,7 +58,7 @@ func main() {
 			log.Fatal(err)
 		}
 		m := widget.NewImage(src, src.Bounds())
-		if err := widget.RunWindow(s, m.Node); err != nil {
+		if err := widget.RunWindow(s, m); err != nil {
 			log.Fatal(err)
 		}
 	})
