@@ -8,97 +8,37 @@ package windriver // import "golang.org/x/exp/shiny/driver/windriver"
 /*
 Implementation Details
 
-On Windows, UI can run on any thread, but any windows created
-on a thread must only be manipulated from that thread. You can send
-"window messages" to any window; when you send a window
-message to a window owned by another thread, Windows will
-temporarily switch to that thread to dispatch the message. As such,
-windows serve as the communication endpoints between threads
-on Windows. In addition, each thread that hosts UI must handle
-incoming window messages from the OS through a "message pump".
-These messages include paint events and input events.
+On Windows, GUI is managed via user code and OS sending messages to
+a window. These messages include paint events, input events and others.
+Any thread that hosts GUI must handle incoming window messages through
+a "message loop".
 
-windriver designates the thread that calls Main as the UI thread.
+windriver designates the thread that calls Main as the GUI thread.
 It locks this thread, creates a special window to handle screen.Screen
-calls, runs the function passed to Main on another goroutine, and
-runs a message pump.
+calls and runs message loop. All new windows are created by the
+same thread, so message loop above handles all their window messages.
 
-The window that handles screen.Screen functions is currently called
-the "utility window". A better name can be chosen later. This window
-handles creating screen.Windows/Buffers/Textures. As such, all shiny
-Windows are owned by a single thread.
+Some general Windows rules about thread affinity of GUI objects:
 
-Each function in windriver, be it on screen.Screen or screen.Window,
-is translated into a window message and sent to a window, namely
-the utility window and the screen.Window window, respectively.
-This is how windriver remains thread-safe.
+part 1: Window handles
+https://blogs.msdn.microsoft.com/oldnewthing/20051010-09/?p=33843
 
-(TODO(andlabs): actually move per-window messages to the window itself)
+part 2: Device contexts
+https://blogs.msdn.microsoft.com/oldnewthing/20051011-10/?p=33823
 
-Presently, the actual Windows API work is implemented in C. This is
-to encapsulate Windows's data structures, ensure properly handling
-signed -> unsigned conversions in constants, handle pointer casts
-cleanly, and properly handle the "last error", which I will describe
-later.
+part 3: Menus, icons, cursors, and accelerator tables
+https://blogs.msdn.microsoft.com/oldnewthing/20051012-00/?p=33803
 
-Here is a demonstration of all of the above. When you call
-screen.NewWindow(opts), the Go code calls the C function
-createWindow, which is implemented as something similar to
+part 4: GDI objects and other notes on affinity
+https://blogs.msdn.microsoft.com/oldnewthing/20051013-11/?p=33783
 
-	HRESULT createWindow(newWindowOpts *opts, HWND *phwnd) {
-		return (HRESULT) SendMessageW(utilityWindow,
-			msgCreateWindow,
-			(WPARAM) opts,
-			(LPARAM) phwnd);
-	}
+part 5: Object clean-up
+https://blogs.msdn.microsoft.com/oldnewthing/20051014-19/?p=33763
 
-HRESULT is another type for errors in Windows; I will again describe
-this later. This function tells the utility window to make a new window,
-using the given options, storing the window's OS handle in phwnd, and
-returning any error directly to us through SendMessageW.
+How to build Windows GUI articles:
 
-This code is running on another goroutine, which will definitely be
-run on another OS thread. As such, Windows will switch to the UI
-thread to dispatch this new window message. The code for the
-implementation of the utility window (called a "window procedure")
-contains something like this:
+http://www.codeproject.com/Articles/1988/Guide-to-WIN-Paint-for-Beginners
+http://www.codeproject.com/Articles/2078/Guide-to-WIN-Paint-for-Intermediates
+http://www.codeproject.com/Articles/224754/Guide-to-Win-Memory-DC
 
-		case msgCreateWindow:
-			return utilCreateWindow((newWindowOpts *) wParam,
-				(HWND *) lParam);
-
-and the utilCreateWindow function does the actual work:
-
-	LRESULT utilCreateWindow(newWindowOpts *opts, HWND *phwnd) {
-		*phwnd = CreateWindowExW(...);
-		if (*phwnd == NULL) {
-			return lastErrorAsLRESULT();
-		}
-		return lS_OK;
-	}
-
-When this returns, Windows switches back to the previous thread,
-which can now use the window handle and error value.
-
-Older Windows API functions return a Boolean flag to indicate if they
-succeeded or failed, storing the actual reason for failure in what is
-called the "last error". This is NOT contractual; functions are free to
-fail without setting the last error, or free to clear the last error on
-success.
-
-To simplify error reporting, we instead convert all last errors to the
-newer HRESULT error code system. The rules are simple: if the
-function succeeded, we return the standard success code, S_OK.
-If the function failed, we get the last error. If it's zero (no error),
-we return the special value E_FAIL. Otherwise, we convert the last
-error to an HRESULT (this is a well-defined operation that we can
-reverse later when we're ready to report the error to the user).
-This is all done by the C lastErrorToHRESULT function. Error
-reporting on the Go side is handled by th winerror function.
-
-Because window messages return LRESULTs, not HRESULTs,
-the lastErrorToLRESULT and lS_OK macros are provided, which
-automatically insert the necessary casts. An LRESULT (which is
-pointer-sized) will always be either the same size as or larger than
-an HRESULT (which is strictly 32 bits wide).
 */

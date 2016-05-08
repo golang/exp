@@ -12,9 +12,6 @@ import (
 	"golang.org/x/exp/shiny/screen"
 )
 
-// TODO(andlabs): Should the Windows API code be split into a
-// separate package internal/winbackend so gldriver can use it too?
-
 // Main is called by the program's main function to run the graphical
 // application.
 //

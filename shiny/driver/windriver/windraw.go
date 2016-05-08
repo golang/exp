@@ -15,16 +15,16 @@ import (
 	"unsafe"
 )
 
-func mkbitmap(dx, dy int32) (syscall.Handle, *byte, error) {
+func mkbitmap(size image.Point) (syscall.Handle, *byte, error) {
 	bi := _BITMAPINFO{
 		Header: _BITMAPINFOHEADER{
 			Size:        uint32(unsafe.Sizeof(_BITMAPINFOHEADER{})),
-			Width:       dx,
-			Height:      -dy, // negative height to force top-down drawing
+			Width:       int32(size.X),
+			Height:      -int32(size.Y), // negative height to force top-down drawing
 			Planes:      1,
 			BitCount:    32,
 			Compression: _BI_RGB,
-			SizeImage:   uint32(dx * dy * 4),
+			SizeImage:   uint32(size.X * size.Y * 4),
 		},
 	}
 
@@ -102,7 +102,7 @@ func fill(dc syscall.Handle, dr image.Rectangle, c color.Color, op draw.Op) erro
 	// this shows that the result appears to be the same as if we had
 	// used a MxN bitmap instead.
 	sr := image.Rect(0, 0, 1, 1)
-	bitmap, bitvalues, err := mkbitmap(int32(sr.Dx()), int32(sr.Dy()))
+	bitmap, bitvalues, err := mkbitmap(sr.Size())
 	if err != nil {
 		return err
 	}

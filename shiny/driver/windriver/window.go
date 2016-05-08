@@ -29,24 +29,6 @@ import (
 	"golang.org/x/mobile/event/size"
 )
 
-// Code in this package must follow general Windows rules about
-// thread affinity of user interface objects:
-//
-// part 1: Window handles
-// https://blogs.msdn.microsoft.com/oldnewthing/20051010-09/?p=33843
-//
-// part 2: Device contexts
-// https://blogs.msdn.microsoft.com/oldnewthing/20051011-10/?p=33823
-//
-// part 3: Menus, icons, cursors, and accelerator tables
-// https://blogs.msdn.microsoft.com/oldnewthing/20051012-00/?p=33803
-//
-// part 4: GDI objects and other notes on affinity
-// https://blogs.msdn.microsoft.com/oldnewthing/20051013-11/?p=33783
-//
-// part 5: Object clean-up
-// https://blogs.msdn.microsoft.com/oldnewthing/20051014-19/?p=33763
-
 type windowImpl struct {
 	hwnd syscall.Handle
 

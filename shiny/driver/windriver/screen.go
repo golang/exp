@@ -38,7 +38,7 @@ func (*screenImpl) NewBuffer(size image.Point) (screen.Buffer, error) {
 		return nil, fmt.Errorf("windriver: invalid buffer size %v", size)
 	}
 
-	hbitmap, bitvalues, err := mkbitmap(int32(size.X), int32(size.Y))
+	hbitmap, bitvalues, err := mkbitmap(size)
 	if err != nil {
 		return nil, err
 	}
