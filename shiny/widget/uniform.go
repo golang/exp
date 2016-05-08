@@ -10,18 +10,20 @@ import (
 	"image/draw"
 
 	"golang.org/x/exp/shiny/unit"
+	"golang.org/x/exp/shiny/widget/node"
+	"golang.org/x/exp/shiny/widget/theme"
 )
 
 // Uniform is a leaf widget that paints a uniform color, analogous to an
 // image.Uniform.
-type Uniform struct{ *Node }
+type Uniform struct{ *node.Node }
 
 // NewUniform returns a new Uniform widget of the given color and natural size.
 // Its parent widget may lay it out at a different size than its natural size,
 // such as expanding to fill a panel's width.
 func NewUniform(c color.Color, naturalWidth, naturalHeight unit.Value) Uniform {
 	return Uniform{
-		&Node{
+		&node.Node{
 			Class: &uniformClass{
 				u: image.NewUniform(c),
 				w: naturalWidth,
@@ -39,18 +41,18 @@ func (o Uniform) NaturalHeight() unit.Value     { return o.Class.(*uniformClass)
 func (o Uniform) SetNaturalHeight(v unit.Value) { o.Class.(*uniformClass).h = v }
 
 type uniformClass struct {
-	LeafClassEmbed
+	node.LeafClassEmbed
 	u *image.Uniform
 	w unit.Value
 	h unit.Value
 }
 
-func (k *uniformClass) Measure(n *Node, t *Theme) {
+func (k *uniformClass) Measure(n *node.Node, t *theme.Theme) {
 	n.MeasuredSize.X = t.Pixels(k.w).Round()
 	n.MeasuredSize.Y = t.Pixels(k.h).Round()
 }
 
-func (k *uniformClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
+func (k *uniformClass) Paint(n *node.Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	if k.u.C == nil {
 		return
 	}

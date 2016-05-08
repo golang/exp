@@ -28,12 +28,13 @@ import (
 
 	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/exp/shiny/widget"
+	"golang.org/x/exp/shiny/widget/theme"
 )
 
 var px = unit.Pixels
 
 func main() {
-	t := widget.DefaultTheme
+	t := theme.Default
 
 	// Make the widget node tree.
 	hf := widget.NewFlow(widget.AxisHorizontal)

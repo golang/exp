@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package widget
+// Package theme provides widget themes.
+package theme
 
 import (
 	"image"
@@ -82,10 +83,10 @@ var (
 		Background: &image.Uniform{C: color.RGBA{0xff, 0xff, 0xff, 0xff}}, // Material Design "White".
 	}
 
-	// DefaultTheme uses the default DPI, FontFaceCatalog and Palette.
+	// Default uses the default DPI, FontFaceCatalog and Palette.
 	//
 	// The nil-valued pointer is a valid receiver for a Theme's methods.
-	DefaultTheme *Theme
+	Default *Theme
 )
 
 // Note that a basicfont.Face is stateless and safe to use concurrently, so

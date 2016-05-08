@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package widget
+package theme
 
 import (
 	"testing"
@@ -13,7 +13,7 @@ import (
 
 func TestThemeIsAUnitConverter(t *testing.T) {
 	// 1.5 inches (at the default 72 DPI) should be 108 pixels.
-	c := unit.Converter(DefaultTheme)
+	c := unit.Converter(Default)
 	got := c.Pixels(unit.Inches(1.5))
 	want := fixed.I(108)
 	if got != want {

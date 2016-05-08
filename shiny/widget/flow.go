@@ -6,6 +6,9 @@ package widget
 
 import (
 	"image"
+
+	"golang.org/x/exp/shiny/widget/node"
+	"golang.org/x/exp/shiny/widget/theme"
 )
 
 // TODO: padding, alignment.
@@ -14,12 +17,12 @@ import (
 // axis, either horizontally or vertically. The children's laid out size may
 // differ from their natural size, along or across that axis, if a child's
 // LayoutData is a FlowLayoutData.
-type Flow struct{ *Node }
+type Flow struct{ *node.Node }
 
 // NewFlow returns a new Flow widget.
 func NewFlow(a Axis) Flow {
 	return Flow{
-		&Node{
+		&node.Node{
 			Class: &flowClass{
 				axis: a,
 			},
@@ -31,11 +34,11 @@ func (o Flow) Axis() Axis     { return o.Class.(*flowClass).axis }
 func (o Flow) SetAxis(v Axis) { o.Class.(*flowClass).axis = v }
 
 type flowClass struct {
-	ContainerClassEmbed
+	node.ContainerClassEmbed
 	axis Axis
 }
 
-func (k *flowClass) Measure(n *Node, t *Theme) {
+func (k *flowClass) Measure(n *node.Node, t *theme.Theme) {
 	if k.axis != AxisHorizontal && k.axis != AxisVertical {
 		k.ContainerClassEmbed.Measure(n, t)
 		return
@@ -59,7 +62,7 @@ func (k *flowClass) Measure(n *Node, t *Theme) {
 	n.MeasuredSize = mSize
 }
 
-func (k *flowClass) Layout(n *Node, t *Theme) {
+func (k *flowClass) Layout(n *node.Node, t *theme.Theme) {
 	if k.axis != AxisHorizontal && k.axis != AxisVertical {
 		k.ContainerClassEmbed.Layout(n, t)
 		return

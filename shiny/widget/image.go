@@ -7,6 +7,9 @@ package widget
 import (
 	"image"
 	"image/draw"
+
+	"golang.org/x/exp/shiny/widget/node"
+	"golang.org/x/exp/shiny/widget/theme"
 )
 
 // TODO: mask and maskPoint, not just src and srcRect.
@@ -23,13 +26,13 @@ import (
 // source image within the widget?
 
 // Image is a leaf widget that paints an image.Image.
-type Image struct{ *Node }
+type Image struct{ *node.Node }
 
 // NewImage returns a new Image widget for the part of a source image defined
 // by src and srcRect.
 func NewImage(src image.Image, srcRect image.Rectangle) Image {
 	return Image{
-		&Node{
+		&node.Node{
 			Class: &imageClass{
 				src:     src,
 				srcRect: srcRect,
@@ -44,16 +47,16 @@ func (o Image) SrcRect() image.Rectangle     { return o.Class.(*imageClass).srcR
 func (o Image) SetSrcRect(v image.Rectangle) { o.Class.(*imageClass).srcRect = v }
 
 type imageClass struct {
-	LeafClassEmbed
+	node.LeafClassEmbed
 	src     image.Image
 	srcRect image.Rectangle
 }
 
-func (k *imageClass) Measure(n *Node, t *Theme) {
+func (k *imageClass) Measure(n *node.Node, t *theme.Theme) {
 	n.MeasuredSize = k.srcRect.Size()
 }
 
-func (k *imageClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
+func (k *imageClass) Paint(n *node.Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	if k.src == nil {
 		return
 	}

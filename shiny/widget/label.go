@@ -7,17 +7,19 @@ package widget
 import (
 	"image"
 
+	"golang.org/x/exp/shiny/widget/node"
+	"golang.org/x/exp/shiny/widget/theme"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
 
 // Label is a leaf widget that holds a text label.
-type Label struct{ *Node }
+type Label struct{ *node.Node }
 
 // NewLabel returns a new Label widget.
 func NewLabel(text string) Label {
 	return Label{
-		&Node{
+		&node.Node{
 			Class: &labelClass{
 				text: text,
 			},
@@ -29,22 +31,22 @@ func (o Label) Text() string     { return o.Class.(*labelClass).text }
 func (o Label) SetText(v string) { o.Class.(*labelClass).text = v }
 
 type labelClass struct {
-	LeafClassEmbed
+	node.LeafClassEmbed
 	text string
 }
 
-func (k *labelClass) Measure(n *Node, t *Theme) {
-	f := t.AcquireFontFace(FontFaceOptions{})
-	defer t.ReleaseFontFace(FontFaceOptions{}, f)
+func (k *labelClass) Measure(n *node.Node, t *theme.Theme) {
+	f := t.AcquireFontFace(theme.FontFaceOptions{})
+	defer t.ReleaseFontFace(theme.FontFaceOptions{}, f)
 	m := f.Metrics()
 
 	n.MeasuredSize.X = font.MeasureString(f, k.text).Ceil()
 	n.MeasuredSize.Y = m.Ascent.Ceil() + m.Descent.Ceil()
 }
 
-func (k *labelClass) Paint(n *Node, t *Theme, dst *image.RGBA, origin image.Point) {
-	f := t.AcquireFontFace(FontFaceOptions{})
-	defer t.ReleaseFontFace(FontFaceOptions{}, f)
+func (k *labelClass) Paint(n *node.Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	f := t.AcquireFontFace(theme.FontFaceOptions{})
+	defer t.ReleaseFontFace(theme.FontFaceOptions{}, f)
 	m := f.Metrics()
 
 	d := font.Drawer{
