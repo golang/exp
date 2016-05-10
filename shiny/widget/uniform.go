@@ -16,45 +16,34 @@ import (
 
 // Uniform is a leaf widget that paints a uniform color, analogous to an
 // image.Uniform.
-type Uniform struct{ *node.Node }
+type Uniform struct {
+	node.LeafEmbed
+	Uniform       image.Uniform
+	NaturalWidth  unit.Value
+	NaturalHeight unit.Value
+}
 
 // NewUniform returns a new Uniform widget of the given color and natural size.
 // Its parent widget may lay it out at a different size than its natural size,
 // such as expanding to fill a panel's width.
-func NewUniform(c color.Color, naturalWidth, naturalHeight unit.Value) Uniform {
-	return Uniform{
-		&node.Node{
-			Class: &uniformClass{
-				u: image.NewUniform(c),
-				w: naturalWidth,
-				h: naturalHeight,
-			},
-		},
+func NewUniform(c color.Color, naturalWidth, naturalHeight unit.Value) *Uniform {
+	w := &Uniform{
+		Uniform:       image.Uniform{c},
+		NaturalWidth:  naturalWidth,
+		NaturalHeight: naturalHeight,
 	}
+	w.Wrapper = w
+	return w
 }
 
-func (o Uniform) Color() color.Color            { return o.Class.(*uniformClass).u.C }
-func (o Uniform) SetColor(v color.Color)        { o.Class.(*uniformClass).u.C = v }
-func (o Uniform) NaturalWidth() unit.Value      { return o.Class.(*uniformClass).w }
-func (o Uniform) SetNaturalWidth(v unit.Value)  { o.Class.(*uniformClass).w = v }
-func (o Uniform) NaturalHeight() unit.Value     { return o.Class.(*uniformClass).h }
-func (o Uniform) SetNaturalHeight(v unit.Value) { o.Class.(*uniformClass).h = v }
-
-type uniformClass struct {
-	node.LeafClassEmbed
-	u *image.Uniform
-	w unit.Value
-	h unit.Value
+func (w *Uniform) Measure(t *theme.Theme) {
+	w.MeasuredSize.X = t.Pixels(w.NaturalWidth).Round()
+	w.MeasuredSize.Y = t.Pixels(w.NaturalHeight).Round()
 }
 
-func (k *uniformClass) Measure(n *node.Node, t *theme.Theme) {
-	n.MeasuredSize.X = t.Pixels(k.w).Round()
-	n.MeasuredSize.Y = t.Pixels(k.h).Round()
-}
-
-func (k *uniformClass) Paint(n *node.Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	if k.u.C == nil {
+func (w *Uniform) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	if w.Uniform.C == nil {
 		return
 	}
-	draw.Draw(dst, n.Rect.Add(origin), k.u, image.Point{}, draw.Src)
+	draw.Draw(dst, w.Rect.Add(origin), &w.Uniform, image.Point{}, draw.Src)
 }

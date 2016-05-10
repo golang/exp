@@ -47,7 +47,7 @@ const (
 
 // RunWindow creates a new window for s, with the given widget tree, and runs
 // its event loop.
-func RunWindow(s screen.Screen, root node.NodeWrapper) error {
+func RunWindow(s screen.Screen, root node.Node) error {
 	var (
 		buf screen.Buffer
 		t   theme.Theme
@@ -63,7 +63,6 @@ func RunWindow(s screen.Screen, root node.NodeWrapper) error {
 		return err
 	}
 	defer w.Release()
-	rootNode := root.WrappedNode()
 	for {
 		switch e := w.NextEvent().(type) {
 		case lifecycle.Event:
@@ -87,10 +86,10 @@ func RunWindow(s screen.Screen, root node.NodeWrapper) error {
 				return err
 			}
 			t.DPI = float64(e.PixelsPerPt) * unit.PointsPerInch
-			rootNode.Measure(&t)
-			rootNode.Rect = e.Bounds()
-			rootNode.Layout(&t)
-			rootNode.Paint(&t, buf.RGBA(), image.Point{})
+			root.Measure(&t)
+			root.Wrappee().Rect = e.Bounds()
+			root.Layout(&t)
+			root.Paint(&t, buf.RGBA(), image.Point{})
 
 		case error:
 			return e

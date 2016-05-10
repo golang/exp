@@ -6,7 +6,39 @@
 //
 // Most programmers should not need to import this package, only the top-level
 // widget package. Only those that write custom widgets need to explicitly
-// refer to the Node, Class and related types.
+// refer to the Node, Embed and related types.
+//
+// The Node interface is usually implemented by struct types that embed one of
+// LeafEmbed, ShellEmbed or ContainerEmbed (all of which themselves embed an
+// Embed), providing default implementations of all of Node's methods.
+//
+// The split between an outer wrapper (Node) interface type and an inner
+// wrappee (Embed) struct type enables heterogenous nodes, such as a buttons
+// and labels, in a widget tree where every node contains common fields such as
+// position, size and tree structure links (parent, siblings and children).
+//
+// In a traditional object-oriented type system, this might be represented by
+// the Button and Label types both subclassing the Node type. Go does not have
+// inheritance, so the outer / inner split is composed explicitly. For example,
+// the concrete Button type is a struct type that embeds an XxxEmbed (such as
+// LeafEmbed), and the NewButton function sets the inner Embed's Wrapper field
+// to point back to the outer value.
+//
+// There are three layers here (Button embeds LeafEmbed embeds Embed) instead
+// of two. The intermediate layer exists because there needs to be a place to
+// provide default implementations of methods like Measure, but that place
+// shouldn't be the inner-most type (Embed), otherwise it'd be too easy to
+// write subtly incorrect code like:
+//
+//	for c := w.FirstChild; c != nil; c = c.NextSibling {
+//		c.Measure(t) // This should instead be c.Wrapper.Measure(t).
+//	}
+//
+// In any case, most programmers that want to construct a widget tree should
+// not need to know this detail. It usually suffices to call functions such as
+// widget.NewButton or widget.NewLabel, and then parent.AppendChild(button).
+//
+// TODO: give some example code for a custom widget.
 package node // import "golang.org/x/exp/shiny/widget/node"
 
 import (
@@ -15,95 +47,106 @@ import (
 	"golang.org/x/exp/shiny/widget/theme"
 )
 
-// Arity is the number of children a class of nodes can have.
-type Arity uint8
+// Node is a node in the widget tree.
+type Node interface {
+	// Wrappee returns the inner (embedded) type that is wrapped by this type.
+	Wrappee() *Embed
 
-const (
-	Leaf      = Arity(0) // Leaf nodes have no children.
-	Shell     = Arity(1) // Shell nodes have at most one child.
-	Container = Arity(2) // Container nodes can have any number of children.
-)
+	// AppendChild adds a node c as a child of this node.
+	//
+	// It will panic if c already has a parent or siblings.
+	AppendChild(c Node)
 
-// Class is a class of nodes. For example, all button widgets would be Nodes
-// whose Class values have the buttonClass type.
-type Class interface {
-	// Arity returns the number of children a specific node can have.
-	Arity(n *Node) Arity
+	// RemoveChild removes a node c that is a child of this node. Afterwards, c
+	// will have no parent and no siblings.
+	//
+	// It will panic if c's parent is not this node.
+	RemoveChild(c Node)
 
-	// Measure sets n.MeasuredSize to the natural size, in pixels, of a
-	// specific node (and its children) of this class.
-	Measure(n *Node, t *theme.Theme)
+	// Measure sets this node's Embed.MeasuredSize to its natural size, taking
+	// its children into account.
+	Measure(t *theme.Theme)
 
-	// Layout lays out a specific node (and its children) of this class,
-	// setting the Node.Rect fields of each child. The n.Rect field should have
+	// Layout lays out this node (and its children), setting the Embed.Rect
+	// fields of each child. This node's Embed.Rect field should have
 	// previously been set during the parent node's layout.
-	Layout(n *Node, t *theme.Theme)
+	Layout(t *theme.Theme)
 
-	// Paint paints a specific node (and its children) of this class onto a
-	// destination image. origin is the parent widget's origin with respect to
-	// the dst image's origin; n.Rect.Add(origin) will be n's position and size
+	// Paint paints this node (and its children) onto a destination image.
+	// origin is the parent widget's origin with respect to the dst image's
+	// origin; this node's Embed.Rect.Add(origin) will be its position and size
 	// in dst's coordinate space.
 	//
 	// TODO: add a clip rectangle? Or rely on the RGBA.SubImage method to pass
 	// smaller dst images?
-	Paint(n *Node, t *theme.Theme, dst *image.RGBA, origin image.Point)
+	Paint(t *theme.Theme, dst *image.RGBA, origin image.Point)
 
 	// TODO: OnXxxEvent methods.
 }
 
-// LeafClassEmbed is designed to be embedded in struct types that implement the
-// Class interface and have Leaf arity. It provides default implementations of
-// the Class interface's methods.
-type LeafClassEmbed struct{}
+// LeafEmbed is designed to be embedded in struct types for nodes with no
+// children.
+type LeafEmbed struct{ Embed }
 
-func (LeafClassEmbed) Arity(n *Node) Arity { return Leaf }
+func (e *LeafEmbed) AppendChild(c Node) {
+	panic("node: AppendChild called for a leaf parent")
+}
 
-func (LeafClassEmbed) Measure(n *Node, t *theme.Theme) { n.MeasuredSize = image.Point{} }
+func (e *LeafEmbed) RemoveChild(c Node) { e.removeChild(c) }
 
-func (LeafClassEmbed) Layout(n *Node, t *theme.Theme) {}
+func (e *LeafEmbed) Measure(t *theme.Theme) { e.MeasuredSize = image.Point{} }
 
-func (LeafClassEmbed) Paint(n *Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {}
+func (e *LeafEmbed) Layout(t *theme.Theme) {}
 
-// ShellClassEmbed is designed to be embedded in struct types that implement
-// the Class interface and have Shell arity. It provides default
-// implementations of the Class interface's methods.
-type ShellClassEmbed struct{}
+func (e *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {}
 
-func (ShellClassEmbed) Arity(n *Node) Arity { return Shell }
+// ShellEmbed is designed to be embedded in struct types for nodes with at most
+// one child.
+type ShellEmbed struct{ Embed }
 
-func (ShellClassEmbed) Measure(n *Node, t *theme.Theme) {
-	if c := n.FirstChild; c != nil {
-		c.Measure(t)
-		n.MeasuredSize = c.MeasuredSize
+func (e *ShellEmbed) AppendChild(c Node) {
+	if e.FirstChild != nil {
+		panic("node: AppendChild called for a shell parent that already has a child")
+	}
+	e.appendChild(c)
+}
+
+func (e *ShellEmbed) RemoveChild(c Node) { e.removeChild(c) }
+
+func (e *ShellEmbed) Measure(t *theme.Theme) {
+	if c := e.FirstChild; c != nil {
+		c.Wrapper.Measure(t)
+		e.MeasuredSize = c.MeasuredSize
 	} else {
-		n.MeasuredSize = image.Point{}
+		e.MeasuredSize = image.Point{}
 	}
 }
 
-func (ShellClassEmbed) Layout(n *Node, t *theme.Theme) {
-	if c := n.FirstChild; c != nil {
-		c.Rect = n.Rect.Sub(n.Rect.Min)
-		c.Layout(t)
+func (e *ShellEmbed) Layout(t *theme.Theme) {
+	if c := e.FirstChild; c != nil {
+		c.Rect = e.Rect.Sub(e.Rect.Min)
+		c.Wrapper.Layout(t)
 	}
 }
 
-func (ShellClassEmbed) Paint(n *Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	if c := n.FirstChild; c != nil {
-		c.Paint(t, dst, origin.Add(n.Rect.Min))
+func (e *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	if c := e.FirstChild; c != nil {
+		c.Wrapper.Paint(t, dst, origin.Add(e.Rect.Min))
 	}
 }
 
-// ContainerClassEmbed is designed to be embedded in struct types that
-// implement the Class interface and have Container arity. It provides default
-// implementations of the Class interface's methods.
-type ContainerClassEmbed struct{}
+// ContainerEmbed is designed to be embedded in struct types for nodes with any
+// number of children.
+type ContainerEmbed struct{ Embed }
 
-func (ContainerClassEmbed) Arity(n *Node) Arity { return Container }
+func (e *ContainerEmbed) AppendChild(c Node) { e.appendChild(c) }
 
-func (ContainerClassEmbed) Measure(n *Node, t *theme.Theme) {
+func (e *ContainerEmbed) RemoveChild(c Node) { e.removeChild(c) }
+
+func (e *ContainerEmbed) Measure(t *theme.Theme) {
 	mSize := image.Point{}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Measure(t)
+	for c := e.FirstChild; c != nil; c = c.NextSibling {
+		c.Wrapper.Measure(t)
 		if mSize.X < c.MeasuredSize.X {
 			mSize.X = c.MeasuredSize.X
 		}
@@ -111,50 +154,38 @@ func (ContainerClassEmbed) Measure(n *Node, t *theme.Theme) {
 			mSize.Y = c.MeasuredSize.Y
 		}
 	}
-	n.MeasuredSize = mSize
+	e.MeasuredSize = mSize
 }
 
-func (ContainerClassEmbed) Layout(n *Node, t *theme.Theme) {
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
+func (e *ContainerEmbed) Layout(t *theme.Theme) {
+	for c := e.FirstChild; c != nil; c = c.NextSibling {
 		c.Rect = image.Rectangle{Max: c.MeasuredSize}
-		c.Layout(t)
+		c.Wrapper.Layout(t)
 	}
 }
 
-func (ContainerClassEmbed) Paint(n *Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Paint(t, dst, origin.Add(n.Rect.Min))
+func (e *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	for c := e.FirstChild; c != nil; c = c.NextSibling {
+		c.Wrapper.Paint(t, dst, origin.Add(e.Rect.Min))
 	}
 }
 
-// NodeWrapper wraps a Node. It is typically implemented by struct types that
-// embed the Node type.
-type NodeWrapper interface {
-	WrappedNode() *Node
-}
+// Embed is the common data structure for each node in a widget tree.
+type Embed struct {
+	// Wrapper is the outer type that wraps (embeds) this type. It should not
+	// be nil.
+	Wrapper Node
 
-// Node is an element of a widget tree.
-//
-// Every element of a widget tree is a node, but nodes can be of different
-// classes. For example, a Flow node (i.e. one whose Class is FlowClass) can
-// contain two Button nodes and an Image node.
-type Node struct {
 	// Parent, FirstChild, LastChild, PrevSibling and NextSibling describe the
 	// widget tree structure.
 	//
 	// These fields are exported to enable walking the node tree, but they
 	// should not be modified directly. Instead, call the AppendChild and
 	// RemoveChild methods, which keeps the tree structure consistent.
-	Parent, FirstChild, LastChild, PrevSibling, NextSibling *Node
-
-	// Class is class-specific data and behavior for this node. For example, a
-	// buttonClass-typed value may store an image and some text in this field.
-	// A progressBarClass-typed value may store a numerical percentage.
-	// Different class types would paint their nodes differently.
-	Class Class
+	Parent, FirstChild, LastChild, PrevSibling, NextSibling *Embed
 
 	// LayoutData is layout-specific data for this node. Its type is determined
-	// by its parent node's class. For example, each child of a Flow may hold a
+	// by its parent node's type. For example, each child of a Flow may hold a
 	// FlowLayoutData in this field.
 	LayoutData interface{}
 
@@ -165,14 +196,14 @@ type Node struct {
 	// trying to recall something about the past).
 
 	// MeasuredSize is the widget's natural size, in pixels, as calculated by
-	// the most recent Class.Measure call.
+	// the most recent Measure call.
 	MeasuredSize image.Point
 
 	// Rect is the widget's position and actual (as opposed to natural) size,
-	// in pixels, as calculated by the most recent Class.Layout call on its
-	// parent node. A parent may lay out a child at a size different to its
-	// natural size in order to satisfy a layout constraint, such as a row of
-	// buttons expanding to fill a panel's width.
+	// in pixels, as calculated by the most recent Layout call on its parent
+	// node. A parent may lay out a child at a size different to its natural
+	// size in order to satisfy a layout constraint, such as a row of buttons
+	// expanding to fill a panel's width.
 	//
 	// The position (Rectangle.Min) is relative to its parent node. This is not
 	// necessarily the same as relative to the screen's, window's or image
@@ -180,82 +211,42 @@ type Node struct {
 	Rect image.Rectangle
 }
 
-// WrappedNode returns the node itself. This method makes struct types that
-// embed the Node type automatically implement the NodeWrapper interface, so
-// they can be passed to AppendChild and RemoveChild.
-func (n *Node) WrappedNode() *Node {
-	return n
-}
+func (e *Embed) Wrappee() *Embed { return e }
 
-// Arity calls n.Class.Arity with n as its first argument.
-func (n *Node) Arity() Arity {
-	return n.Class.Arity(n)
-}
-
-// Measure calls n.Class.Measure with n as its first argument.
-func (n *Node) Measure(t *theme.Theme) {
-	n.Class.Measure(n, t)
-}
-
-// Layout calls n.Class.Layout with n as its first argument.
-func (n *Node) Layout(t *theme.Theme) {
-	n.Class.Layout(n, t)
-}
-
-// Paint calls n.Class.Paint with n as its first argument.
-func (n *Node) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	n.Class.Paint(n, t, dst, origin)
-}
-
-// AppendChild adds a node c as a child of n.
-//
-// It will panic if c already has a parent or siblings.
-func (n *Node) AppendChild(c NodeWrapper) {
-	m := c.WrappedNode()
-	if m.Parent != nil || m.PrevSibling != nil || m.NextSibling != nil {
-		panic("widget: AppendChild called for an attached child Node")
+func (e *Embed) appendChild(c Node) {
+	f := c.Wrappee()
+	if f.Parent != nil || f.PrevSibling != nil || f.NextSibling != nil {
+		panic("node: AppendChild called for an attached child")
 	}
-	switch n.Arity() {
-	case Leaf:
-		panic("widget: AppendChild called for a leaf parent Node")
-	case Shell:
-		if n.FirstChild != nil {
-			panic("widget: AppendChild called for a shell parent Node that already has a child Node")
-		}
-	}
-	last := n.LastChild
+	last := e.LastChild
 	if last != nil {
-		last.NextSibling = m
+		last.NextSibling = f
 	} else {
-		n.FirstChild = m
+		e.FirstChild = f
 	}
-	n.LastChild = m
-	m.Parent = n
-	m.PrevSibling = last
+	e.LastChild = f
+	f.Parent = e
+	f.PrevSibling = last
 }
 
-// RemoveChild removes a node c that is a child of n. Afterwards, c will have
-// no parent and no siblings.
-//
-// It will panic if c's parent is not n.
-func (n *Node) RemoveChild(c NodeWrapper) {
-	m := c.WrappedNode()
-	if m.Parent != n {
-		panic("widget: RemoveChild called for a non-child Node")
+func (e *Embed) removeChild(c Node) {
+	f := c.Wrappee()
+	if f.Parent != e {
+		panic("node: RemoveChild called for a non-child node")
 	}
-	if n.FirstChild == m {
-		n.FirstChild = m.NextSibling
+	if e.FirstChild == f {
+		e.FirstChild = f.NextSibling
 	}
-	if m.NextSibling != nil {
-		m.NextSibling.PrevSibling = m.PrevSibling
+	if f.NextSibling != nil {
+		f.NextSibling.PrevSibling = f.PrevSibling
 	}
-	if n.LastChild == m {
-		n.LastChild = m.PrevSibling
+	if e.LastChild == f {
+		e.LastChild = f.PrevSibling
 	}
-	if m.PrevSibling != nil {
-		m.PrevSibling.NextSibling = m.NextSibling
+	if f.PrevSibling != nil {
+		f.PrevSibling.NextSibling = f.NextSibling
 	}
-	m.Parent = nil
-	m.PrevSibling = nil
-	m.NextSibling = nil
+	f.Parent = nil
+	f.PrevSibling = nil
+	f.NextSibling = nil
 }

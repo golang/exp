@@ -17,37 +17,30 @@ import (
 // axis, either horizontally or vertically. The children's laid out size may
 // differ from their natural size, along or across that axis, if a child's
 // LayoutData is a FlowLayoutData.
-type Flow struct{ *node.Node }
+type Flow struct {
+	node.ContainerEmbed
+	Axis Axis
+}
 
 // NewFlow returns a new Flow widget.
-func NewFlow(a Axis) Flow {
-	return Flow{
-		&node.Node{
-			Class: &flowClass{
-				axis: a,
-			},
-		},
+func NewFlow(a Axis) *Flow {
+	w := &Flow{
+		Axis: a,
 	}
+	w.Wrapper = w
+	return w
 }
 
-func (o Flow) Axis() Axis     { return o.Class.(*flowClass).axis }
-func (o Flow) SetAxis(v Axis) { o.Class.(*flowClass).axis = v }
-
-type flowClass struct {
-	node.ContainerClassEmbed
-	axis Axis
-}
-
-func (k *flowClass) Measure(n *node.Node, t *theme.Theme) {
-	if k.axis != AxisHorizontal && k.axis != AxisVertical {
-		k.ContainerClassEmbed.Measure(n, t)
+func (w *Flow) Measure(t *theme.Theme) {
+	if w.Axis != AxisHorizontal && w.Axis != AxisVertical {
+		w.ContainerEmbed.Measure(t)
 		return
 	}
 
 	mSize := image.Point{}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		c.Measure(t)
-		if k.axis == AxisHorizontal {
+	for c := w.FirstChild; c != nil; c = c.NextSibling {
+		c.Wrapper.Measure(t)
+		if w.Axis == AxisHorizontal {
 			mSize.X += c.MeasuredSize.X
 			if mSize.Y < c.MeasuredSize.Y {
 				mSize.Y = c.MeasuredSize.Y
@@ -59,26 +52,26 @@ func (k *flowClass) Measure(n *node.Node, t *theme.Theme) {
 			}
 		}
 	}
-	n.MeasuredSize = mSize
+	w.MeasuredSize = mSize
 }
 
-func (k *flowClass) Layout(n *node.Node, t *theme.Theme) {
-	if k.axis != AxisHorizontal && k.axis != AxisVertical {
-		k.ContainerClassEmbed.Layout(n, t)
+func (w *Flow) Layout(t *theme.Theme) {
+	if w.Axis != AxisHorizontal && w.Axis != AxisVertical {
+		w.ContainerEmbed.Layout(t)
 		return
 	}
 
 	eaExtra, eaWeight := 0, 0
-	if k.axis == AxisHorizontal {
-		eaExtra = n.Rect.Dx()
+	if w.Axis == AxisHorizontal {
+		eaExtra = w.Rect.Dx()
 	} else {
-		eaExtra = n.Rect.Dy()
+		eaExtra = w.Rect.Dy()
 	}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
+	for c := w.FirstChild; c != nil; c = c.NextSibling {
 		if d, ok := c.LayoutData.(FlowLayoutData); ok && d.ExpandAlongWeight > 0 {
 			eaWeight += d.ExpandAlongWeight
 		}
-		if k.axis == AxisHorizontal {
+		if w.Axis == AxisHorizontal {
 			eaExtra -= c.MeasuredSize.X
 		} else {
 			eaExtra -= c.MeasuredSize.Y
@@ -89,24 +82,24 @@ func (k *flowClass) Layout(n *node.Node, t *theme.Theme) {
 	}
 
 	p := image.Point{}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
+	for c := w.FirstChild; c != nil; c = c.NextSibling {
 		q := p.Add(c.MeasuredSize)
 		if d, ok := c.LayoutData.(FlowLayoutData); ok {
 			if d.ExpandAlongWeight > 0 {
 				delta := eaExtra * d.ExpandAlongWeight / eaWeight
 				eaExtra -= delta
 				eaWeight -= d.ExpandAlongWeight
-				if k.axis == AxisHorizontal {
+				if w.Axis == AxisHorizontal {
 					q.X += delta
 				} else {
 					q.Y += delta
 				}
 			}
 			if d.ExpandAcross {
-				if k.axis == AxisHorizontal {
-					q.Y = max(q.Y, n.Rect.Dy())
+				if w.Axis == AxisHorizontal {
+					q.Y = max(q.Y, w.Rect.Dy())
 				} else {
-					q.X = max(q.X, n.Rect.Dx())
+					q.X = max(q.X, w.Rect.Dx())
 				}
 			}
 		}
@@ -114,8 +107,8 @@ func (k *flowClass) Layout(n *node.Node, t *theme.Theme) {
 			Min: p,
 			Max: q,
 		}
-		c.Layout(t)
-		if k.axis == AxisHorizontal {
+		c.Wrapper.Layout(t)
+		if w.Axis == AxisHorizontal {
 			p.X = q.X
 		} else {
 			p.Y = q.Y
@@ -123,7 +116,7 @@ func (k *flowClass) Layout(n *node.Node, t *theme.Theme) {
 	}
 }
 
-// FlowLayoutData is the Node.LayoutData type for a Flow's children.
+// FlowLayoutData is the node LayoutData type for a Flow's children.
 type FlowLayoutData struct {
 	// ExpandAlongWeight is the relative weight for distributing any excess
 	// space along the Flow's axis. For example, if an AxisHorizontal Flow's

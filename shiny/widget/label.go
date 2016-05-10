@@ -14,37 +14,30 @@ import (
 )
 
 // Label is a leaf widget that holds a text label.
-type Label struct{ *node.Node }
+type Label struct {
+	node.LeafEmbed
+	Text string
+}
 
 // NewLabel returns a new Label widget.
-func NewLabel(text string) Label {
-	return Label{
-		&node.Node{
-			Class: &labelClass{
-				text: text,
-			},
-		},
+func NewLabel(text string) *Label {
+	w := &Label{
+		Text: text,
 	}
+	w.Wrapper = w
+	return w
 }
 
-func (o Label) Text() string     { return o.Class.(*labelClass).text }
-func (o Label) SetText(v string) { o.Class.(*labelClass).text = v }
-
-type labelClass struct {
-	node.LeafClassEmbed
-	text string
-}
-
-func (k *labelClass) Measure(n *node.Node, t *theme.Theme) {
+func (w *Label) Measure(t *theme.Theme) {
 	f := t.AcquireFontFace(theme.FontFaceOptions{})
 	defer t.ReleaseFontFace(theme.FontFaceOptions{}, f)
 	m := f.Metrics()
 
-	n.MeasuredSize.X = font.MeasureString(f, k.text).Ceil()
-	n.MeasuredSize.Y = m.Ascent.Ceil() + m.Descent.Ceil()
+	w.MeasuredSize.X = font.MeasureString(f, w.Text).Ceil()
+	w.MeasuredSize.Y = m.Ascent.Ceil() + m.Descent.Ceil()
 }
 
-func (k *labelClass) Paint(n *node.Node, t *theme.Theme, dst *image.RGBA, origin image.Point) {
+func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	f := t.AcquireFontFace(theme.FontFaceOptions{})
 	defer t.ReleaseFontFace(theme.FontFaceOptions{}, f)
 	m := f.Metrics()
@@ -54,9 +47,9 @@ func (k *labelClass) Paint(n *node.Node, t *theme.Theme, dst *image.RGBA, origin
 		Src:  t.GetPalette().Foreground,
 		Face: f,
 		Dot: fixed.Point26_6{
-			X: fixed.I(origin.X + n.Rect.Min.X),
-			Y: fixed.I(origin.Y + n.Rect.Min.Y + m.Ascent.Ceil()),
+			X: fixed.I(origin.X + w.Rect.Min.X),
+			Y: fixed.I(origin.Y + w.Rect.Min.Y + m.Ascent.Ceil()),
 		},
 	}
-	d.DrawString(k.text)
+	d.DrawString(w.Text)
 }
