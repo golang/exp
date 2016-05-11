@@ -21,6 +21,7 @@ type layoutTest struct {
 	direction    Direction
 	wrap         FlexWrap
 	alignContent AlignContent
+	justify      Justify
 	size         image.Point       // size of container
 	measured     [][2]float64      // MeasuredSize of child elements
 	layoutData   []LayoutData      // LayoutData of child elements
@@ -64,6 +65,17 @@ func (t *layoutTest) html() string {
 		fmt.Fprintf(buf, "\talign-content: space-around;\n")
 	case AlignContentStretch:
 		fmt.Fprintf(buf, "\talign-content: stretch;\n")
+	}
+	switch t.justify {
+	case JustifyStart:
+	case JustifyEnd:
+		fmt.Fprintf(buf, "\tjustify-content: flex-end;\n")
+	case JustifyCenter:
+		fmt.Fprintf(buf, "\tjustify-content: center;\n")
+	case JustifySpaceBetween:
+		fmt.Fprintf(buf, "\tjustify-content: space-between;\n")
+	case JustifySpaceAround:
+		fmt.Fprintf(buf, "\tjustify-content: space-around;\n")
 	}
 	fmt.Fprintf(buf, "}\n")
 
@@ -314,6 +326,56 @@ var layoutTests = []layoutTest{{
 		{},
 		{Grow: 1},
 	},
+}, {
+	desc:     "justify-content: flex-start",
+	size:     image.Point{90, 90},
+	measured: [][2]float64{{5, 10}, {5, 10}, {10, 10}},
+	justify:  JustifyStart,
+	want: []image.Rectangle{
+		image.Rect(0, 0, 5, 10),
+		image.Rect(5, 0, 10, 10),
+		image.Rect(10, 0, 20, 10),
+	},
+}, {
+	desc:     "justify-content: flex-end",
+	size:     image.Point{90, 90},
+	measured: [][2]float64{{5, 10}, {5, 10}, {10, 10}},
+	justify:  JustifyEnd,
+	want: []image.Rectangle{
+		image.Rect(70, 0, 75, 10),
+		image.Rect(75, 0, 80, 10),
+		image.Rect(80, 0, 90, 10),
+	},
+}, {
+	desc:     "justify-content: center",
+	size:     image.Point{90, 90},
+	measured: [][2]float64{{5, 10}, {5, 10}, {10, 10}},
+	justify:  JustifyCenter,
+	want: []image.Rectangle{
+		image.Rect(35, 0, 40, 10),
+		image.Rect(40, 0, 45, 10),
+		image.Rect(45, 0, 55, 10),
+	},
+}, {
+	desc:     "justify-content: space-between",
+	size:     image.Point{90, 90},
+	measured: [][2]float64{{5, 10}, {5, 10}, {10, 10}},
+	justify:  JustifySpaceBetween,
+	want: []image.Rectangle{
+		image.Rect(0, 0, 5, 10),
+		image.Rect(40, 0, 45, 10),
+		image.Rect(80, 0, 90, 10),
+	},
+}, {
+	desc:     "justify-content: space-around",
+	size:     image.Point{90, 90},
+	measured: [][2]float64{{5, 10}, {5, 10}, {10, 10}},
+	justify:  JustifySpaceAround,
+	want: []image.Rectangle{
+		image.Rect(12, 0, 17, 10),
+		image.Rect(40, 0, 45, 10),
+		image.Rect(68, 0, 78, 10),
+	},
 }}
 
 func TestLayout(t *testing.T) {
@@ -322,6 +384,7 @@ func TestLayout(t *testing.T) {
 		w.Direction = test.direction
 		w.Wrap = test.wrap
 		w.AlignContent = test.alignContent
+		w.Justify = test.justify
 
 		var children []node.Node
 		for i, sz := range test.measured {

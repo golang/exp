@@ -409,12 +409,23 @@ func (w *Flex) Layout(t *theme.Theme) {
 		for _, child := range line.child {
 			total += child.mainSize
 		}
-
-		// TODO: alternate values of w.Justify
-		off := 0.0
+		remFree := containerMainSize - total
+		off, spacing := 0.0, 0.0
+		switch w.Justify {
+		case JustifyStart:
+		case JustifyEnd:
+			off = remFree
+		case JustifyCenter:
+			off = remFree / 2
+		case JustifySpaceBetween:
+			spacing = remFree / float64(len(line.child)-1)
+		case JustifySpaceAround:
+			spacing = remFree / float64(len(line.child))
+			off = spacing / 2
+		}
 		for _, child := range line.child {
 			child.mainOffset = off
-			off += child.mainSize
+			off += spacing + child.mainSize
 		}
 	}
 
@@ -494,21 +505,25 @@ func (w *Flex) Layout(t *theme.Theme) {
 		for _, child := range line.child {
 			switch w.Direction {
 			case Row, RowReverse:
-				child.n.Rect.Min.X = int(math.Ceil(child.mainOffset))
-				child.n.Rect.Max.X = int(math.Ceil(child.mainOffset + child.mainSize))
-				child.n.Rect.Min.Y = int(math.Ceil(child.crossOffset))
-				child.n.Rect.Max.Y = int(math.Ceil(child.crossOffset + child.crossSize))
+				child.n.Rect.Min.X = round(child.mainOffset)
+				child.n.Rect.Max.X = round(child.mainOffset + child.mainSize)
+				child.n.Rect.Min.Y = round(child.crossOffset)
+				child.n.Rect.Max.Y = round(child.crossOffset + child.crossSize)
 			case Column, ColumnReverse:
-				child.n.Rect.Min.Y = int(math.Ceil(child.mainOffset))
-				child.n.Rect.Max.Y = int(math.Ceil(child.mainOffset + child.mainSize))
-				child.n.Rect.Min.X = int(math.Ceil(child.crossOffset))
-				child.n.Rect.Max.X = int(math.Ceil(child.crossOffset + child.crossSize))
+				child.n.Rect.Min.Y = round(child.mainOffset)
+				child.n.Rect.Max.Y = round(child.mainOffset + child.mainSize)
+				child.n.Rect.Min.X = round(child.crossOffset)
+				child.n.Rect.Max.X = round(child.crossOffset + child.crossSize)
 			default:
 				panic(fmt.Sprint("flex: bad direction ", w.Direction))
 			}
 			child.n.Wrapper.Layout(t)
 		}
 	}
+}
+
+func round(f float64) int {
+	return int(math.Floor(f + .5))
 }
 
 type element struct {
