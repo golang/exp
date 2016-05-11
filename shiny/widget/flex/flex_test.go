@@ -17,6 +17,7 @@ import (
 )
 
 type layoutTest struct {
+	desc         string
 	direction    Direction
 	wrap         FlexWrap
 	alignContent AlignContent
@@ -131,12 +132,19 @@ var colors = []color.RGBA{
 }
 
 var layoutTests = []layoutTest{{
+	desc: "no children",
+}, {
+	desc: "no children wrapped",
+	wrap: Wrap,
+}, {
+	desc:     "single unflexed child",
 	size:     image.Point{100, 100},
 	measured: [][2]float64{{100, 100}},
 	want: []image.Rectangle{
 		image.Rect(0, 0, 100, 100),
 	},
 }, {
+	desc:     "unflexed children",
 	size:     image.Point{350, 100},
 	measured: [][2]float64{{100, 100}, {100, 100}, {100, 100}},
 	want: []image.Rectangle{
@@ -145,6 +153,7 @@ var layoutTests = []layoutTest{{
 		image.Rect(200, 0, 300, 100),
 	},
 }, {
+	desc:     "final child that grows",
 	size:     image.Point{300, 100},
 	measured: [][2]float64{{100, 100}, {100, 100}},
 	want: []image.Rectangle{
@@ -153,6 +162,7 @@ var layoutTests = []layoutTest{{
 	},
 	layoutData: []LayoutData{{}, {Grow: 1}},
 }, {
+	desc:     "share growth equally",
 	size:     image.Point{300, 100},
 	measured: [][2]float64{{50, 50}, {100, 100}, {100, 100}},
 	want: []image.Rectangle{
@@ -162,6 +172,7 @@ var layoutTests = []layoutTest{{
 	},
 	layoutData: []LayoutData{{}, {Grow: 1}, {Grow: 1}},
 }, {
+	desc:     "share growth inequally",
 	size:     image.Point{300, 100},
 	measured: [][2]float64{{20, 100}, {20, 100}, {20, 100}},
 	want: []image.Rectangle{
@@ -173,6 +184,135 @@ var layoutTests = []layoutTest{{
 		{MaxSize: &image.Point{30, 100}, Grow: 1},
 		{MinSize: image.Point{100, 0}, Grow: 1},
 		{Grow: 4},
+	},
+}, {
+	desc:     "wrap",
+	size:     image.Point{300, 200},
+	wrap:     Wrap,
+	measured: [][2]float64{{150, 100}, {280, 100}, {20, 100}},
+	want: []image.Rectangle{
+		image.Rect(0, 0, 30, 100),
+		image.Rect(0, 100, 280, 200),
+		image.Rect(280, 100, 300, 200),
+	},
+	layoutData: []LayoutData{
+		{MaxSize: &image.Point{30, 100}, Grow: 1},
+		{MinSize: image.Point{100, 0}, Grow: 1},
+		{Grow: 1},
+	},
+}, {
+	desc:      "align-content default",
+	size:      image.Point{300, 200},
+	direction: Column,
+	wrap:      Wrap,
+	measured:  [][2]float64{{150, 100}, {160, 100}, {20, 100}, {300, 300}},
+	want: []image.Rectangle{
+		image.Rect(0, 0, 30, 100),
+		image.Rect(0, 100, 160, 200),
+		image.Rect(220, 0, 240, 195),
+		image.Rect(220, 195, 225, 200),
+	},
+	layoutData: []LayoutData{
+		{MaxSize: &image.Point{30, 100}, Grow: 1},
+		{MinSize: image.Point{100, 0}, Grow: 1},
+		{Grow: 1},
+		{MaxSize: &image.Point{5, 5}},
+	},
+}, {
+	desc:         "align-content: space-around",
+	size:         image.Point{300, 200},
+	direction:    Column,
+	wrap:         Wrap,
+	alignContent: AlignContentSpaceAround,
+	measured:     [][2]float64{{150, 100}, {160, 100}, {20, 100}, {300, 300}},
+	want: []image.Rectangle{
+		image.Rect(30, 0, 60, 100),
+		image.Rect(30, 100, 190, 200),
+		image.Rect(250, 0, 270, 195),
+		image.Rect(250, 195, 255, 200),
+	},
+	layoutData: []LayoutData{
+		{MaxSize: &image.Point{30, 100}, Grow: 1},
+		{MinSize: image.Point{100, 0}, Grow: 1},
+		{Grow: 1},
+		{MaxSize: &image.Point{5, 5}},
+	},
+}, {
+	desc:         "align-content: space-between",
+	size:         image.Point{300, 200},
+	direction:    Column,
+	wrap:         Wrap,
+	alignContent: AlignContentSpaceBetween,
+	measured:     [][2]float64{{150, 100}, {160, 100}, {20, 100}, {300, 300}},
+	want: []image.Rectangle{
+		image.Rect(0, 0, 30, 100),
+		image.Rect(0, 100, 160, 200),
+		image.Rect(280, 0, 300, 195),
+		image.Rect(280, 195, 285, 200),
+	},
+	layoutData: []LayoutData{
+		{MaxSize: &image.Point{30, 100}, Grow: 1},
+		{MinSize: image.Point{100, 0}, Grow: 1},
+		{Grow: 1},
+		{MaxSize: &image.Point{5, 5}},
+	},
+}, {
+	desc:         "align-content: end",
+	size:         image.Point{300, 200},
+	direction:    Column,
+	wrap:         Wrap,
+	alignContent: AlignContentEnd,
+	measured:     [][2]float64{{150, 100}, {160, 100}, {20, 100}, {300, 300}},
+	want: []image.Rectangle{
+		image.Rect(120, 0, 150, 100),
+		image.Rect(120, 100, 280, 200),
+		image.Rect(280, 0, 300, 195),
+		image.Rect(280, 195, 285, 200),
+	},
+	layoutData: []LayoutData{
+		{MaxSize: &image.Point{30, 100}, Grow: 1},
+		{MinSize: image.Point{100, 0}, Grow: 1},
+		{Grow: 1},
+		{MaxSize: &image.Point{5, 5}},
+	},
+}, {
+	desc:         "align-content: center",
+	size:         image.Point{300, 200},
+	direction:    Column,
+	wrap:         Wrap,
+	alignContent: AlignContentCenter,
+	measured:     [][2]float64{{150, 100}, {160, 100}, {20, 100}, {300, 300}},
+	want: []image.Rectangle{
+		image.Rect(60, 0, 90, 100),
+		image.Rect(60, 100, 220, 200),
+		image.Rect(220, 0, 240, 195),
+		image.Rect(220, 195, 225, 200),
+	},
+	layoutData: []LayoutData{
+		{MaxSize: &image.Point{30, 100}, Grow: 1},
+		{MinSize: image.Point{100, 0}, Grow: 1},
+		{Grow: 1},
+		{MaxSize: &image.Point{5, 5}},
+	},
+}, {
+	desc:      "column-reverse",
+	size:      image.Point{300, 60},
+	direction: ColumnReverse,
+	wrap:      Wrap,
+	measured:  [][2]float64{{25, 25}, {25, 25}, {25, 25}, {25, 25}, {25, 25}},
+	want: []image.Rectangle{
+		image.Rect(0, 35, 25, 60),
+		image.Rect(0, 0, 25, 35),
+		image.Rect(100, 35, 125, 60),
+		image.Rect(100, 10, 125, 35),
+		image.Rect(200, 0, 225, 60),
+	},
+	layoutData: []LayoutData{
+		{},
+		{Grow: 1},
+		{},
+		{},
+		{Grow: 1},
 	},
 }}
 
@@ -205,7 +345,7 @@ func TestLayout(t *testing.T) {
 			}
 		}
 		if bad {
-			t.Logf("Bad testNum %d:\n%s", testNum, test.html())
+			t.Logf("Bad test %d, %q:\n%s", testNum, test.desc, test.html())
 		}
 		for i, n := range children {
 			if got, want := n.Wrappee().Rect, test.want[i]; got != want {

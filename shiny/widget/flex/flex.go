@@ -167,19 +167,22 @@ func (w *Flex) Layout(t *theme.Theme) {
 
 		for i := range children {
 			child := &children[i]
-			if line.mainSize > 0 && line.mainSize+child.flexBaseSize > containerMainSize {
+
+			hypotheticalMainSize := w.clampSize(child.flexBaseSize, child.n)
+
+			if line.mainSize > 0 && line.mainSize+hypotheticalMainSize > containerMainSize {
 				lines = append(lines, line)
 				line = flexLine{}
 			}
 			line.child = append(line.child, child)
-			line.mainSize += child.flexBaseSize
+			line.mainSize += hypotheticalMainSize
 
 			if d, ok := child.n.LayoutData.(LayoutData); ok && d.BreakAfter {
 				lines = append(lines, line)
 				line = flexLine{}
 			}
 		}
-		if len(line.child) > 0 {
+		if len(line.child) > 0 || len(children) == 0 {
 			lines = append(lines, line)
 		}
 
@@ -197,16 +200,17 @@ func (w *Flex) Layout(t *theme.Theme) {
 
 		// §9.7.2 freeze inflexible children.
 		for _, child := range line.child {
-			mainSize := w.mainSize(child.n.MeasuredSize)
+			mainSize := float64(w.mainSize(child.n.MeasuredSize))
+			hypotheticalMainSize := w.clampSize(mainSize, child.n)
 			if grow {
-				if growFactor(child.n) == 0 || w.flexBaseSize(child.n) > mainSize {
+				if growFactor(child.n) == 0 || float64(w.flexBaseSize(child.n)) > hypotheticalMainSize {
 					child.frozen = true
-					child.mainSize = float64(mainSize)
+					child.mainSize = hypotheticalMainSize
 				}
 			} else {
-				if shrinkFactor(child.n) == 0 || w.flexBaseSize(child.n) < mainSize {
+				if shrinkFactor(child.n) == 0 || float64(w.flexBaseSize(child.n)) < hypotheticalMainSize {
 					child.frozen = true
-					child.mainSize = float64(mainSize)
+					child.mainSize = hypotheticalMainSize
 				}
 			}
 		}
@@ -295,20 +299,8 @@ func (w *Flex) Layout(t *theme.Theme) {
 					continue
 				}
 				child.unclamped = child.mainSize
-				if d, ok := child.n.LayoutData.(LayoutData); ok {
-					minSize := float64(w.mainSize(d.MinSize))
-					if minSize > child.mainSize {
-						child.mainSize = minSize
-					} else if d.MaxSize != nil {
-						maxSize := float64(w.mainSize(*d.MaxSize))
-						if child.mainSize > maxSize {
-							child.mainSize = maxSize
-						}
-					}
-				}
-				if child.mainSize < 0 {
-					child.mainSize = 0
-				}
+				child.mainSize = w.clampSize(child.mainSize, child.n)
+
 				sumClampDiff += child.mainSize - child.unclamped
 			}
 
@@ -426,10 +418,75 @@ func (w *Flex) Layout(t *theme.Theme) {
 		}
 	}
 
-	// TODO
 	// §9.6 cross axis alignment
+	// §9.6.13 no 'auto' margins
+	// §9.6.14 align items inside line, 'align-self'.
+	for l := range lines {
+		line := &lines[l]
+		for _, child := range line.child {
+			child.crossOffset = line.crossOffset
+			if child.crossSize == line.crossSize {
+				continue
+			}
+			diff := line.crossSize - child.crossSize
+			switch w.alignItem(child.n) {
+			case AlignItemStart:
+				// already laid out correctly
+			case AlignItemEnd:
+				child.crossOffset = line.crossOffset + diff
+			case AlignItemCenter:
+				child.crossOffset = line.crossOffset + diff/2
+			case AlignItemBaseline:
+				// TODO requires introducing inline-axis concept
+			case AlignItemStretch:
+				// handled earlier, so child.crossSize == line.crossSize
+			}
+		}
+	}
+	// §9.6.15 determine container cross size used
+	crossSize := lines[len(lines)-1].crossOffset + lines[len(lines)-1].crossSize
+	remFree := containerCrossSize - crossSize
 
-	// TODO: RowReverse, ColumnReverse
+	// §9.6.16 align flex lines, 'align-content'.
+	if remFree > 0 {
+		spacing, off := 0.0, 0.0
+		switch w.AlignContent {
+		case AlignContentStart:
+			// already laid out correctly
+		case AlignContentEnd:
+			off = remFree
+		case AlignContentCenter:
+			off = remFree / 2
+		case AlignContentSpaceBetween:
+			spacing = remFree / float64(len(lines)-1)
+		case AlignContentSpaceAround:
+			spacing = remFree / float64(len(lines))
+			off = spacing / 2
+		case AlignContentStretch:
+			// handled earlier, why is remFree > 0?
+		}
+		if w.AlignContent != AlignContentStart && w.AlignContent != AlignContentStretch {
+			for l := range lines {
+				line := &lines[l]
+				line.crossOffset += off
+				for _, child := range line.child {
+					child.crossOffset += off
+				}
+				off += spacing
+			}
+		}
+	}
+
+	switch w.Direction {
+	case RowReverse, ColumnReverse:
+		// Invert main-start and main-end.
+		for l := range lines {
+			line := &lines[l]
+			for _, child := range line.child {
+				child.mainOffset = containerMainSize - child.mainOffset - child.mainSize
+			}
+		}
+	}
 
 	// Layout complete. Generate child Rect values.
 	for l := range lines {
@@ -518,6 +575,24 @@ func aspectRatio(n *node.Embed) (ratio float64, ok bool) {
 		return float64(d.MinSize.X) / float64(d.MinSize.Y), true
 	}
 	return 0, false
+}
+
+func (w *Flex) clampSize(size float64, n *node.Embed) float64 {
+	if d, ok := n.LayoutData.(LayoutData); ok {
+		minSize := float64(w.mainSize(d.MinSize))
+		if minSize > size {
+			size = minSize
+		} else if d.MaxSize != nil {
+			maxSize := float64(w.mainSize(*d.MaxSize))
+			if size > maxSize {
+				size = maxSize
+			}
+		}
+	}
+	if size < 0 {
+		return 0
+	}
+	return size
 }
 
 func (w *Flex) mainSize(p image.Point) int {
