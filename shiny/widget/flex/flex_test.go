@@ -5,6 +5,8 @@
 package flex
 
 import (
+	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"testing"
@@ -22,6 +24,101 @@ type layoutTest struct {
 	measured     [][2]float64      // MeasuredSize of child elements
 	layoutData   []LayoutData      // LayoutData of child elements
 	want         []image.Rectangle // final Rect of child elements
+}
+
+func (t *layoutTest) html() string {
+	buf := new(bytes.Buffer)
+	fmt.Fprintf(buf, `<style>
+#container {
+	display: flex;
+	width:   %dpx;
+	height:  %dpx;
+`, t.size.X, t.size.Y)
+
+	switch t.direction {
+	case Row:
+	case RowReverse:
+		fmt.Fprintf(buf, "\tflex-direction: row-reverse;\n")
+	case Column:
+		fmt.Fprintf(buf, "\tflex-direction: column;\n")
+	case ColumnReverse:
+		fmt.Fprintf(buf, "\tflex-direction: column-reverse;\n")
+	}
+	switch t.wrap {
+	case NoWrap:
+	case Wrap:
+		fmt.Fprintf(buf, "\tflex-wrap: wrap;\n")
+	case WrapReverse:
+		fmt.Fprintf(buf, "\tflex-wrap: wrap-reverse;\n")
+	}
+	switch t.alignContent {
+	case AlignContentStart:
+	case AlignContentEnd:
+		fmt.Fprintf(buf, "\talign-content: flex-end;\n")
+	case AlignContentCenter:
+		fmt.Fprintf(buf, "\talign-content: center;\n")
+	case AlignContentSpaceBetween:
+		fmt.Fprintf(buf, "\talign-content: space-between;\n")
+	case AlignContentSpaceAround:
+		fmt.Fprintf(buf, "\talign-content: space-around;\n")
+	case AlignContentStretch:
+		fmt.Fprintf(buf, "\talign-content: stretch;\n")
+	}
+	fmt.Fprintf(buf, "}\n")
+
+	for i, m := range t.measured {
+		fmt.Fprintf(buf, `#child%d {
+	width: %.2fpx;
+	height: %.2fpx;
+`, i, m[0], m[1])
+		c := colors[i%len(colors)]
+		fmt.Fprintf(buf, "\tbackground-color: rgb(%d, %d, %d);\n", c.R, c.G, c.B)
+		if t.layoutData != nil {
+			d := t.layoutData[i]
+			if d.MinSize.X != 0 {
+				fmt.Fprintf(buf, "\tmin-width: %dpx;\n", d.MinSize.X)
+			}
+			if d.MinSize.Y != 0 {
+				fmt.Fprintf(buf, "\tmin-height: %dpx;\n", d.MinSize.Y)
+			}
+			if d.MaxSize != nil {
+				fmt.Fprintf(buf, "\tmax-width: %dpx;\n", d.MaxSize.X)
+				fmt.Fprintf(buf, "\tmax-height: %dpx;\n", d.MaxSize.Y)
+			}
+			if d.Grow != 0 {
+				fmt.Fprintf(buf, "\tflex-grow: %f;\n", d.Grow)
+			}
+			if d.Shrink != nil {
+				fmt.Fprintf(buf, "\tflex-shrink: %f;\n", *d.Shrink)
+			}
+			// TODO: Basis, Align, BreakAfter
+		}
+		fmt.Fprintf(buf, "}\n")
+	}
+	fmt.Fprintf(buf, `</style>
+<div id="container">
+`)
+	for i := range t.measured {
+		fmt.Fprintf(buf, "\t<div id=\"child%d\"></div>\n", i)
+	}
+	fmt.Fprintf(buf, `</div>
+<pre id="out"></pre>
+<script>
+var out = document.getElementById("out");
+var container = document.getElementById("container");
+for (var i = 0; i < container.children.length; i++) {
+	var c = container.children[i];
+	var ctop = c.offsetTop - container.offsetTop;
+	var cleft = c.offsetLeft - container.offsetLeft;
+	var cbottom = ctop + c.offsetHeight;
+	var cright = cleft + c.offsetWidth;
+
+	out.innerHTML += "\timage.Rect(" + cleft + ", " + ctop + ", " + cright + ", " + cbottom + "),\n";
+}
+</script>
+`)
+
+	return buf.String()
 }
 
 var colors = []color.RGBA{
@@ -70,8 +167,7 @@ func TestLayout(t *testing.T) {
 			}
 		}
 		if bad {
-			t.Logf("Bad testNum %d", testNum)
-			// TODO print html so we can see the correct layout
+			t.Logf("Bad testNum %d:\n%s", testNum, test.html())
 		}
 		for i, n := range children {
 			if got, want := n.Wrappee().Rect, test.want[i]; got != want {
