@@ -38,13 +38,24 @@
 // not need to know this detail. It usually suffices to call functions such as
 // widget.NewButton or widget.NewLabel, and then parent.AppendChild(button).
 //
-// TODO: give some example code for a custom widget.
+// See the example/gallery program for some example code for a custom widget.
 package node // import "golang.org/x/exp/shiny/widget/node"
 
 import (
 	"image"
 
 	"golang.org/x/exp/shiny/widget/theme"
+	"golang.org/x/mobile/event/mouse"
+)
+
+// EventHandled is whether or not an input event, such as a key or mouse event,
+// was handled by a widget. If it was not handled, the event is propagated
+// along the widget tree.
+type EventHandled bool
+
+const (
+	NotHandled = EventHandled(false)
+	Handled    = EventHandled(true)
 )
 
 // Node is a node in the widget tree.
@@ -73,6 +84,7 @@ type Node interface {
 	Layout(t *theme.Theme)
 
 	// Paint paints this node (and its children) onto a destination image.
+	//
 	// origin is the parent widget's origin with respect to the dst image's
 	// origin; this node's Embed.Rect.Add(origin) will be its position and size
 	// in dst's coordinate space.
@@ -80,6 +92,13 @@ type Node interface {
 	// TODO: add a clip rectangle? Or rely on the RGBA.SubImage method to pass
 	// smaller dst images?
 	Paint(t *theme.Theme, dst *image.RGBA, origin image.Point)
+
+	// OnMouseEvent handles a mouse event.
+	//
+	// origin is the parent widget's origin with respect to the mouse event
+	// origin; this node's Embed.Rect.Add(origin) will be its position and size
+	// in mouse event coordinate space.
+	OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled
 
 	// TODO: OnXxxEvent methods.
 }
@@ -99,6 +118,8 @@ func (e *LeafEmbed) Measure(t *theme.Theme) { e.MeasuredSize = image.Point{} }
 func (e *LeafEmbed) Layout(t *theme.Theme) {}
 
 func (e *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {}
+
+func (e *LeafEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled { return NotHandled }
 
 // ShellEmbed is designed to be embedded in struct types for nodes with at most
 // one child.
@@ -135,6 +156,13 @@ func (e *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) 
 	}
 }
 
+func (e *ShellEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled {
+	if c := e.FirstChild; c != nil {
+		return c.Wrapper.OnMouseEvent(ev, origin.Add(e.Rect.Min))
+	}
+	return NotHandled
+}
+
 // ContainerEmbed is designed to be embedded in struct types for nodes with any
 // number of children.
 type ContainerEmbed struct{ Embed }
@@ -165,9 +193,26 @@ func (e *ContainerEmbed) Layout(t *theme.Theme) {
 }
 
 func (e *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	origin = origin.Add(e.Rect.Min)
 	for c := e.FirstChild; c != nil; c = c.NextSibling {
-		c.Wrapper.Paint(t, dst, origin.Add(e.Rect.Min))
+		c.Wrapper.Paint(t, dst, origin)
 	}
+}
+
+func (e *ContainerEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled {
+	origin = origin.Add(e.Rect.Min)
+	p := image.Point{
+		X: int(ev.X) - origin.X,
+		Y: int(ev.Y) - origin.Y,
+	}
+	// Iterate backwards. Later children have priority over earlier children,
+	// as later ones are usually drawn over earlier ones.
+	for c := e.LastChild; c != nil; c = c.PrevSibling {
+		if p.In(c.Rect) && c.Wrapper.OnMouseEvent(ev, origin) == Handled {
+			return Handled
+		}
+	}
+	return NotHandled
 }
 
 // Embed is the common data structure for each node in a widget tree.

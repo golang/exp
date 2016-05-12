@@ -15,6 +15,7 @@ import (
 	"golang.org/x/exp/shiny/widget/node"
 	"golang.org/x/exp/shiny/widget/theme"
 	"golang.org/x/mobile/event/lifecycle"
+	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
 )
@@ -69,6 +70,9 @@ func RunWindow(s screen.Screen, root node.Node) error {
 			if e.To == lifecycle.StageDead {
 				return nil
 			}
+
+		case mouse.Event:
+			root.OnMouseEvent(e, image.Point{})
 
 		case paint.Event:
 			if buf != nil {
