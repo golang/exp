@@ -39,9 +39,9 @@ func newCustom() *custom {
 	return w
 }
 
-func (w *custom) OnMouseEvent(ev mouse.Event, origin image.Point) node.EventHandled {
+func (w *custom) OnMouseEvent(e mouse.Event, origin image.Point) node.EventHandled {
 	// TODO: do something more interesting.
-	fmt.Println(ev)
+	fmt.Println(e)
 	return node.Handled
 }
 

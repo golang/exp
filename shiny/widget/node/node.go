@@ -98,7 +98,7 @@ type Node interface {
 	// origin is the parent widget's origin with respect to the mouse event
 	// origin; this node's Embed.Rect.Add(origin) will be its position and size
 	// in mouse event coordinate space.
-	OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled
+	OnMouseEvent(e mouse.Event, origin image.Point) EventHandled
 
 	// TODO: OnXxxEvent methods.
 }
@@ -107,58 +107,58 @@ type Node interface {
 // children.
 type LeafEmbed struct{ Embed }
 
-func (e *LeafEmbed) AppendChild(c Node) {
+func (m *LeafEmbed) AppendChild(c Node) {
 	panic("node: AppendChild called for a leaf parent")
 }
 
-func (e *LeafEmbed) RemoveChild(c Node) { e.removeChild(c) }
+func (m *LeafEmbed) RemoveChild(c Node) { m.removeChild(c) }
 
-func (e *LeafEmbed) Measure(t *theme.Theme) { e.MeasuredSize = image.Point{} }
+func (m *LeafEmbed) Measure(t *theme.Theme) { m.MeasuredSize = image.Point{} }
 
-func (e *LeafEmbed) Layout(t *theme.Theme) {}
+func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
-func (e *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {}
+func (m *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {}
 
-func (e *LeafEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled { return NotHandled }
+func (m *LeafEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled { return NotHandled }
 
 // ShellEmbed is designed to be embedded in struct types for nodes with at most
 // one child.
 type ShellEmbed struct{ Embed }
 
-func (e *ShellEmbed) AppendChild(c Node) {
-	if e.FirstChild != nil {
+func (m *ShellEmbed) AppendChild(c Node) {
+	if m.FirstChild != nil {
 		panic("node: AppendChild called for a shell parent that already has a child")
 	}
-	e.appendChild(c)
+	m.appendChild(c)
 }
 
-func (e *ShellEmbed) RemoveChild(c Node) { e.removeChild(c) }
+func (m *ShellEmbed) RemoveChild(c Node) { m.removeChild(c) }
 
-func (e *ShellEmbed) Measure(t *theme.Theme) {
-	if c := e.FirstChild; c != nil {
+func (m *ShellEmbed) Measure(t *theme.Theme) {
+	if c := m.FirstChild; c != nil {
 		c.Wrapper.Measure(t)
-		e.MeasuredSize = c.MeasuredSize
+		m.MeasuredSize = c.MeasuredSize
 	} else {
-		e.MeasuredSize = image.Point{}
+		m.MeasuredSize = image.Point{}
 	}
 }
 
-func (e *ShellEmbed) Layout(t *theme.Theme) {
-	if c := e.FirstChild; c != nil {
-		c.Rect = e.Rect.Sub(e.Rect.Min)
+func (m *ShellEmbed) Layout(t *theme.Theme) {
+	if c := m.FirstChild; c != nil {
+		c.Rect = m.Rect.Sub(m.Rect.Min)
 		c.Wrapper.Layout(t)
 	}
 }
 
-func (e *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	if c := e.FirstChild; c != nil {
-		c.Wrapper.Paint(t, dst, origin.Add(e.Rect.Min))
+func (m *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	if c := m.FirstChild; c != nil {
+		c.Wrapper.Paint(t, dst, origin.Add(m.Rect.Min))
 	}
 }
 
-func (e *ShellEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled {
-	if c := e.FirstChild; c != nil {
-		return c.Wrapper.OnMouseEvent(ev, origin.Add(e.Rect.Min))
+func (m *ShellEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled {
+	if c := m.FirstChild; c != nil {
+		return c.Wrapper.OnMouseEvent(e, origin.Add(m.Rect.Min))
 	}
 	return NotHandled
 }
@@ -167,13 +167,13 @@ func (e *ShellEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandl
 // number of children.
 type ContainerEmbed struct{ Embed }
 
-func (e *ContainerEmbed) AppendChild(c Node) { e.appendChild(c) }
+func (m *ContainerEmbed) AppendChild(c Node) { m.appendChild(c) }
 
-func (e *ContainerEmbed) RemoveChild(c Node) { e.removeChild(c) }
+func (m *ContainerEmbed) RemoveChild(c Node) { m.removeChild(c) }
 
-func (e *ContainerEmbed) Measure(t *theme.Theme) {
+func (m *ContainerEmbed) Measure(t *theme.Theme) {
 	mSize := image.Point{}
-	for c := e.FirstChild; c != nil; c = c.NextSibling {
+	for c := m.FirstChild; c != nil; c = c.NextSibling {
 		c.Wrapper.Measure(t)
 		if mSize.X < c.MeasuredSize.X {
 			mSize.X = c.MeasuredSize.X
@@ -182,33 +182,33 @@ func (e *ContainerEmbed) Measure(t *theme.Theme) {
 			mSize.Y = c.MeasuredSize.Y
 		}
 	}
-	e.MeasuredSize = mSize
+	m.MeasuredSize = mSize
 }
 
-func (e *ContainerEmbed) Layout(t *theme.Theme) {
-	for c := e.FirstChild; c != nil; c = c.NextSibling {
+func (m *ContainerEmbed) Layout(t *theme.Theme) {
+	for c := m.FirstChild; c != nil; c = c.NextSibling {
 		c.Rect = image.Rectangle{Max: c.MeasuredSize}
 		c.Wrapper.Layout(t)
 	}
 }
 
-func (e *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	origin = origin.Add(e.Rect.Min)
-	for c := e.FirstChild; c != nil; c = c.NextSibling {
+func (m *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	origin = origin.Add(m.Rect.Min)
+	for c := m.FirstChild; c != nil; c = c.NextSibling {
 		c.Wrapper.Paint(t, dst, origin)
 	}
 }
 
-func (e *ContainerEmbed) OnMouseEvent(ev mouse.Event, origin image.Point) EventHandled {
-	origin = origin.Add(e.Rect.Min)
+func (m *ContainerEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled {
+	origin = origin.Add(m.Rect.Min)
 	p := image.Point{
-		X: int(ev.X) - origin.X,
-		Y: int(ev.Y) - origin.Y,
+		X: int(e.X) - origin.X,
+		Y: int(e.Y) - origin.Y,
 	}
 	// Iterate backwards. Later children have priority over earlier children,
 	// as later ones are usually drawn over earlier ones.
-	for c := e.LastChild; c != nil; c = c.PrevSibling {
-		if p.In(c.Rect) && c.Wrapper.OnMouseEvent(ev, origin) == Handled {
+	for c := m.LastChild; c != nil; c = c.PrevSibling {
+		if p.In(c.Rect) && c.Wrapper.OnMouseEvent(e, origin) == Handled {
 			return Handled
 		}
 	}
@@ -256,42 +256,42 @@ type Embed struct {
 	Rect image.Rectangle
 }
 
-func (e *Embed) Wrappee() *Embed { return e }
+func (m *Embed) Wrappee() *Embed { return m }
 
-func (e *Embed) appendChild(c Node) {
-	f := c.Wrappee()
-	if f.Parent != nil || f.PrevSibling != nil || f.NextSibling != nil {
+func (m *Embed) appendChild(c Node) {
+	n := c.Wrappee()
+	if n.Parent != nil || n.PrevSibling != nil || n.NextSibling != nil {
 		panic("node: AppendChild called for an attached child")
 	}
-	last := e.LastChild
+	last := m.LastChild
 	if last != nil {
-		last.NextSibling = f
+		last.NextSibling = n
 	} else {
-		e.FirstChild = f
+		m.FirstChild = n
 	}
-	e.LastChild = f
-	f.Parent = e
-	f.PrevSibling = last
+	m.LastChild = n
+	n.Parent = m
+	n.PrevSibling = last
 }
 
-func (e *Embed) removeChild(c Node) {
-	f := c.Wrappee()
-	if f.Parent != e {
+func (m *Embed) removeChild(c Node) {
+	n := c.Wrappee()
+	if n.Parent != m {
 		panic("node: RemoveChild called for a non-child node")
 	}
-	if e.FirstChild == f {
-		e.FirstChild = f.NextSibling
+	if m.FirstChild == n {
+		m.FirstChild = n.NextSibling
 	}
-	if f.NextSibling != nil {
-		f.NextSibling.PrevSibling = f.PrevSibling
+	if n.NextSibling != nil {
+		n.NextSibling.PrevSibling = n.PrevSibling
 	}
-	if e.LastChild == f {
-		e.LastChild = f.PrevSibling
+	if m.LastChild == n {
+		m.LastChild = n.PrevSibling
 	}
-	if f.PrevSibling != nil {
-		f.PrevSibling.NextSibling = f.NextSibling
+	if n.PrevSibling != nil {
+		n.PrevSibling.NextSibling = n.NextSibling
 	}
-	f.Parent = nil
-	f.PrevSibling = nil
-	f.NextSibling = nil
+	n.Parent = nil
+	n.PrevSibling = nil
+	n.NextSibling = nil
 }
