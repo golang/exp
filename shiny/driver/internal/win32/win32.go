@@ -252,6 +252,9 @@ var (
 	SizeEvent      func(hwnd syscall.Handle, e size.Event)
 	KeyEvent       func(hwnd syscall.Handle, e key.Event)
 	LifecycleEvent func(hwnd syscall.Handle, e lifecycle.Stage)
+
+	// TODO: use the golang.org/x/exp/shiny/driver/internal/lifecycler package
+	// instead of or together with the LifecycleEvent callback?
 )
 
 func sendPaint(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {

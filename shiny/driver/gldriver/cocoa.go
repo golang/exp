@@ -43,6 +43,8 @@ import (
 	"golang.org/x/mobile/gl"
 )
 
+const useLifecycler = false
+
 var initThreadID C.uint64_t
 
 func init() {

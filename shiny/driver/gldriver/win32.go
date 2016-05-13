@@ -23,6 +23,8 @@ import (
 	"golang.org/x/mobile/gl"
 )
 
+const useLifecycler = false
+
 func main(f func(screen.Screen)) error {
 	return win32.Main(func() { f(theScreen) })
 }

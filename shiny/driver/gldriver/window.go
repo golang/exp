@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/exp/shiny/driver/internal/drawer"
 	"golang.org/x/exp/shiny/driver/internal/event"
+	"golang.org/x/exp/shiny/driver/internal/lifecycler"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/lifecycle"
@@ -34,6 +35,9 @@ type windowImpl struct {
 	//	- Windows: ctxWin32
 	ctx interface{}
 
+	lifecycler lifecycler.State
+	// TODO: Delete the field below (and the useLifecycler constant), and use
+	// the field above for cocoa and win32.
 	lifecycleStage lifecycle.Stage // current stage
 
 	event.Queue
@@ -62,8 +66,7 @@ func (w *windowImpl) Release() {
 	//
 	// When the OS closes a window:
 	//	- Cocoa:   Obj-C's windowWillClose calls Go's windowClosing.
-	//	- X11:     TODO: catch WM_DELETE_WINDOW messages (and DestroyNotify
-	//	           events?).
+	//	- X11:     the X11 server sends a WM_DELETE_WINDOW message.
 	//	- Windows: TODO: implement and document this.
 	//
 	// This should send a lifecycle event (To: StageDead) to the Go app's event
@@ -74,7 +77,7 @@ func (w *windowImpl) Release() {
 	//	- Cocoa:   calls Obj-C's performClose, which emulates the red button
 	//	           being clicked. (TODO: document how this actually cleans up
 	//	           resources??)
-	//	- X11:     TODO: call DestroyWindow.
+	//	- X11:     calls C's XDestroyWindow.
 	//	- Windows: TODO: implement and document this.
 	//
 	// On Cocoa, if these two approaches race, experiments suggest that the

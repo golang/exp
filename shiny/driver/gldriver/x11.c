@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+Atom wm_delete_window;
+Atom wm_protocols;
+Atom wm_take_focus;
 EGLConfig e_config;
 EGLContext e_ctx;
 EGLDisplay e_dpy;
@@ -123,6 +126,10 @@ startDriver() {
 		fprintf(stderr, "eglCreateContext failed: %s\n", eglGetErrorStr());
 		exit(1);
 	}
+
+	wm_delete_window = XInternAtom(x_dpy, "WM_DELETE_WINDOW", False);
+	wm_protocols = XInternAtom(x_dpy, "WM_PROTOCOLS", False);
+	wm_take_focus= XInternAtom(x_dpy, "WM_TAKE_FOCUS", False);
 }
 
 void
@@ -139,6 +146,10 @@ processEvents() {
 		case MotionNotify:
 			onMouse(ev.xmotion.window, ev.xmotion.x, ev.xmotion.y, ev.xmotion.state, 0, 0);
 			break;
+		case FocusIn:
+		case FocusOut:
+			onFocus(ev.xmotion.window, ev.type == FocusIn);
+			break;
 		case Expose:
 			// A non-zero Count means that there are more expose events coming. For
 			// example, a non-rectangular exposure (e.g. from a partially overlapped
@@ -150,7 +161,18 @@ processEvents() {
 			}
 			break;
 		case ConfigureNotify:
-			onResize(ev.xconfigure.window, ev.xconfigure.width, ev.xconfigure.height);
+			onConfigure(ev.xconfigure.window, ev.xconfigure.x, ev.xconfigure.y, ev.xconfigure.width, ev.xconfigure.height);
+			break;
+		case ClientMessage:
+			if ((ev.xclient.message_type != wm_protocols) || (ev.xclient.format != 32)) {
+				break;
+			}
+			Atom a = ev.xclient.data.l[0];
+			if (a == wm_delete_window) {
+				onDeleteWindow(ev.xclient.window);
+			} else if (a == wm_take_focus) {
+				XSetInputFocus(x_dpy, ev.xclient.window, RevertToParent, ev.xclient.data.l[1]);
+			}
 			break;
 		}
 	}
@@ -174,6 +196,12 @@ swapBuffers(uintptr_t surface) {
 	}
 }
 
+void
+doCloseWindow(uintptr_t id) {
+	Window win = (Window)(id);
+	XDestroyWindow(x_dpy, win);
+}
+
 uintptr_t
 doNewWindow(int width, int height) {
 	XSetWindowAttributes attr;
@@ -182,17 +210,25 @@ doNewWindow(int width, int height) {
 		ButtonPressMask |
 		ButtonReleaseMask |
 		PointerMotionMask |
-		ButtonMotionMask |
 		ExposureMask |
-		StructureNotifyMask;
+		StructureNotifyMask |
+		FocusChangeMask;
+
 	Window win = XCreateWindow(
 		x_dpy, x_root, 0, 0, width, height, 0, x_visual_info->depth, InputOutput,
 		x_visual_info->visual, CWColormap | CWEventMask, &attr);
+
 	XSizeHints sizehints;
 	sizehints.width = width;
 	sizehints.height = height;
 	sizehints.flags = USSize;
 	XSetNormalHints(x_dpy, win, &sizehints);
+
+	Atom atoms[2];
+	atoms[0] = wm_delete_window;
+	atoms[1] = wm_take_focus;
+	XSetWMProtocols(x_dpy, win, atoms, 2);
+
 	XSetStandardProperties(x_dpy, win, "App", "App", None, (char **)NULL, 0, &sizehints);
 	return win;
 }

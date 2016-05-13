@@ -15,6 +15,7 @@ void startDriver();
 void processEvents();
 void makeCurrent(uintptr_t ctx);
 void swapBuffers(uintptr_t ctx);
+void doCloseWindow(uintptr_t id);
 uintptr_t doNewWindow(int width, int height);
 uintptr_t doShowWindow(uintptr_t id);
 */
@@ -31,6 +32,8 @@ import (
 	"golang.org/x/mobile/geom"
 	"golang.org/x/mobile/gl"
 )
+
+const useLifecycler = true
 
 func init() {
 	// It might not be necessary, but it probably doesn't hurt to try to make
@@ -66,7 +69,12 @@ func showWindow(w *windowImpl) {
 }
 
 func closeWindow(id uintptr) {
-	// TODO.
+	uic <- uiClosure{
+		f: func() uintptr {
+			C.doCloseWindow(C.uintptr_t(id))
+			return 0
+		},
+	}
 }
 
 func drawLoop(w *windowImpl) {
@@ -136,7 +144,10 @@ func main(f func(screen.Screen)) error {
 			C.swapBuffers(C.uintptr_t(w.ctx.(uintptr)))
 			w.publishDone <- screen.PublishResult{}
 		case req := <-uic:
-			req.retc <- req.f()
+			ret := req.f()
+			if req.retc != nil {
+				req.retc <- ret
+			}
 		case <-heartbeat.C:
 			C.processEvents()
 		case <-workAvailable:
@@ -179,8 +190,22 @@ func onMouse(id uintptr, x, y, state, button, dir int32) {
 	})
 }
 
-//export onResize
-func onResize(id uintptr, width, height int32) {
+//export onFocus
+func onFocus(id uintptr, focused bool) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	if w == nil {
+		return
+	}
+
+	w.lifecycler.SetFocused(focused)
+	w.lifecycler.SendEvent(w)
+}
+
+//export onConfigure
+func onConfigure(id uintptr, x, y, width, height int32) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
@@ -198,6 +223,9 @@ func onResize(id uintptr, width, height int32) {
 		w.glctxMu.Unlock()
 	}()
 
+	w.lifecycler.SetVisible(x+width > 0 && y+height > 0)
+	w.lifecycler.SendEvent(w)
+
 	sz := size.Event{
 		WidthPx:  int(width),
 		HeightPx: int(height),
@@ -213,6 +241,18 @@ func onResize(id uintptr, width, height int32) {
 	w.szMu.Unlock()
 
 	w.Send(sz)
+}
 
-	// TODO: lifecycle events?
+//export onDeleteWindow
+func onDeleteWindow(id uintptr) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	if w == nil {
+		return
+	}
+
+	w.lifecycler.SetDead(true)
+	w.lifecycler.SendEvent(w)
 }
