@@ -184,17 +184,7 @@ func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (l
 
 	switch uMsg {
 	case _WM_MOUSEMOVE:
-		switch {
-		case wParam&_MK_LBUTTON == _MK_LBUTTON:
-			e.Button = mouse.ButtonLeft
-		case wParam&_MK_MBUTTON == _MK_MBUTTON:
-			e.Button = mouse.ButtonMiddle
-		case wParam&_MK_RBUTTON == _MK_RBUTTON:
-			e.Button = mouse.ButtonRight
-		default:
-			// TODO: send move events when no buttons are held down?
-			return 0
-		}
+		// No-op.
 	case _WM_LBUTTONDOWN, _WM_LBUTTONUP:
 		e.Button = mouse.ButtonLeft
 	case _WM_MBUTTONDOWN, _WM_MBUTTONUP:
