@@ -28,9 +28,10 @@ import (
 )
 
 var (
-	blue0 = color.RGBA{0x00, 0x00, 0x1f, 0xff}
-	blue1 = color.RGBA{0x00, 0x00, 0x3f, 0xff}
-	red   = color.RGBA{0x7f, 0x00, 0x00, 0x7f}
+	blue0    = color.RGBA{0x00, 0x00, 0x1f, 0xff}
+	blue1    = color.RGBA{0x00, 0x00, 0x3f, 0xff}
+	darkGray = color.RGBA{0x3f, 0x3f, 0x3f, 0xff}
+	red      = color.RGBA{0x7f, 0x00, 0x00, 0x7f}
 
 	cos30 = math.Cos(math.Pi / 6)
 	sin30 = math.Sin(math.Pi / 6)
@@ -88,11 +89,36 @@ func main() {
 				w.Fill(sz.Bounds().Inset(10), blue1, screen.Src)
 				w.Upload(image.Point{}, b, b.Bounds())
 				w.Fill(image.Rect(50, 50, 350, 120), red, screen.Over)
-				w.Copy(image.Point{150, 100}, t, t.Bounds(), screen.Over, nil)
-				w.Draw(f64.Aff3{
-					+cos30, -sin30, 100,
-					+sin30, +cos30, 200,
-				}, t, t.Bounds(), screen.Over, nil)
+
+				// By default, draw the entirety of the texture using the Over
+				// operator. Uncomment one or both of the lines below to see
+				// their different effects.
+				op := screen.Over
+				// op = screen.Src
+				tRect := t.Bounds()
+				// TODO: fix a non-zero tRect.Min for the x11driver. It looks
+				// good under the gldriver.
+				// tRect = image.Rect(16, 0, 240, 100)
+
+				// Draw the texture t twice, as a 1:1 copy and under the
+				// transform src2dst.
+				w.Copy(image.Point{150, 100}, t, tRect, op, nil)
+				src2dst := f64.Aff3{
+					+0.5 * cos30, -1.0 * sin30, 100,
+					+0.5 * sin30, +1.0 * cos30, 200,
+				}
+				w.Draw(src2dst, t, tRect, op, nil)
+
+				// Draw crosses at the transformed corners of tRect.
+				for _, sx := range []int{tRect.Min.X, tRect.Max.X} {
+					for _, sy := range []int{tRect.Min.Y, tRect.Max.Y} {
+						dx := int(src2dst[0]*float64(sx) + src2dst[1]*float64(sy) + src2dst[2])
+						dy := int(src2dst[3]*float64(sx) + src2dst[4]*float64(sy) + src2dst[5])
+						w.Fill(image.Rect(dx-0, dy-1, dx+1, dy+2), darkGray, screen.Src)
+						w.Fill(image.Rect(dx-1, dy-0, dx+2, dy+1), darkGray, screen.Src)
+					}
+				}
+
 				w.Publish()
 
 			case size.Event:

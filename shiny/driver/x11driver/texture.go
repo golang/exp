@@ -86,7 +86,7 @@ func inv(x *f64.Aff3) f64.Aff3 {
 	}
 }
 
-func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, w, h int, opts *screen.DrawOptions) {
+func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	// TODO: honor sr.Max
 
 	if t.degenerate() {
@@ -137,25 +137,45 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 	// pixels, so we invert src2dst.
 	dst2src := inv(src2dst)
 	render.SetPictureTransform(t.s.xc, t.xp, render.Transform{
-		f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), f64ToFixed(dst2src[2]),
-		f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), f64ToFixed(dst2src[5]),
+		f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), 0,
+		f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), 0,
 		0, 0, 1 << 16,
 	})
 
+	minX := float64(sr.Min.X)
+	maxX := float64(sr.Max.X)
+	minY := float64(sr.Min.Y)
+	maxY := float64(sr.Max.Y)
+	points := [4]render.Pointfix{{
+		f64ToFixed(src2dst[0]*minX + src2dst[1]*minY + src2dst[2]),
+		f64ToFixed(src2dst[3]*minX + src2dst[4]*minY + src2dst[5]),
+	}, {
+		f64ToFixed(src2dst[0]*maxX + src2dst[1]*minY + src2dst[2]),
+		f64ToFixed(src2dst[3]*maxX + src2dst[4]*minY + src2dst[5]),
+	}, {
+		f64ToFixed(src2dst[0]*maxX + src2dst[1]*maxY + src2dst[2]),
+		f64ToFixed(src2dst[3]*maxX + src2dst[4]*maxY + src2dst[5]),
+	}, {
+		f64ToFixed(src2dst[0]*minX + src2dst[1]*maxY + src2dst[2]),
+		f64ToFixed(src2dst[3]*minX + src2dst[4]*maxY + src2dst[5]),
+	}}
+
 	if op == draw.Src {
-		// render.Composite visits every dst-space pixel in the rectangle
-		// defined by its args DstX, DstY, Width, Height. That axis-aligned
-		// bounding box (AABB) must contain the transformation of the sr
-		// rectangle in src-space to a quad in dst-space, but it need not be
-		// the smallest possible AABB.
+		// render.TriFan visits every dst-space pixel in the axis-aligned
+		// bounding box (AABB) containing the transformation of the sr
+		// rectangle in src-space to a quad in dst-space.
+		//
+		// render.TriFan is like render.Composite, except that the AABB is
+		// defined implicitly by the transformed triangle vertices instead of
+		// being passed explicitly as arguments. It implies the minimal AABB.
 		//
 		// In any case, for arbitrary src2dst affine transformations, which
-		// include rotations, this means that a naive render.Composite call
-		// will affect those pixels inside the AABB but outside the quad. For
-		// the draw.Src operator, this means that pixels in that AABB can be
+		// include rotations, this means that a naive render.TriFan call will
+		// affect those pixels inside the AABB but outside the quad. For the
+		// draw.Src operator, this means that pixels in that AABB can be
 		// incorrectly set to zero.
 		//
-		// Instead, we implement the draw.Src operator as two render.Composite
+		// Instead, we implement the draw.Src operator as two render.TriFan
 		// calls. The first one (using the PictOpOutReverse operator and a
 		// fully opaque source) clears the dst-space quad but leaves pixels
 		// outside that quad (but inside the AABB) untouched. The second one
@@ -171,25 +191,14 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 		// the transform math correctly.
 		t.s.useOpaque(sr.Dx(), sr.Dy(), func(opaqueP render.Picture) {
 			render.SetPictureTransform(t.s.xc, opaqueP, render.Transform{
-				f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), f64ToFixed(dst2src[2]),
-				f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), f64ToFixed(dst2src[5]),
+				f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), 0,
+				f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), 0,
 				0, 0, 1 << 16,
 			})
-			render.Composite(t.s.xc, render.PictOpOutReverse, opaqueP, 0, xp,
-				0, 0, 0, 0, 0, 0, uint16(w), uint16(h),
-			)
+			render.TriFan(t.s.xc, render.PictOpOutReverse, opaqueP, xp, 0, 0, 0, points[:])
 		})
 	}
-
-	// TODO: tighten the (0, 0)-(w, h) dst rectangle. As it is, we're
-	// compositing an unnecessarily large number of pixels.
-
-	render.Composite(t.s.xc, render.PictOpOver, t.xp, 0, xp,
-		int16(sr.Min.X), int16(sr.Min.Y), // SrcX, SrcY,
-		0, 0, // MaskX, MaskY,
-		0, 0, // DstX, DstY,
-		uint16(w), uint16(h), // Width, Height,
-	)
+	render.TriFan(t.s.xc, render.PictOpOver, t.xp, xp, 0, 0, 0, points[:])
 }
 
 func renderOp(op draw.Op) byte {
