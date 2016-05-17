@@ -43,6 +43,18 @@ type screenImpl struct {
 	gcontext32 xproto.Gcontext
 	window32   xproto.Window
 
+	// opaque is a cached, fully opaque mask picture.
+	//
+	// Note that there is a lock ordering here. The textureImpl.draw method can
+	// hold textureImpl.renderMu when acquiring screenImpl.opaqueMu.
+	//
+	// TODO: should this be per-texture instead of per-screen?
+	opaqueMu     sync.Mutex
+	opaqueM      xproto.Pixmap
+	opaqueP      render.Picture
+	opaqueWidth  int
+	opaqueHeight int
+
 	mu              sync.Mutex
 	buffers         map[shm.Seg]*bufferImpl
 	uploads         map[uint16]chan struct{}
@@ -510,6 +522,50 @@ func (s *screenImpl) initWindow32() error {
 	)
 	xproto.CreateGC(s.xc, s.gcontext32, xproto.Drawable(s.window32), 0, nil)
 	return nil
+}
+
+func (s *screenImpl) useOpaque(width, height int, f func(render.Picture)) {
+	s.opaqueMu.Lock()
+	defer s.opaqueMu.Unlock()
+
+	if s.opaqueM == 0 || s.opaqueP == 0 || s.opaqueWidth != width || s.opaqueHeight != height {
+		if s.opaqueP != 0 {
+			render.FreePicture(s.xc, s.opaqueP)
+			s.opaqueP = 0
+		}
+		if s.opaqueM != 0 {
+			xproto.FreePixmap(s.xc, s.opaqueM)
+			s.opaqueM = 0
+		}
+		var err error
+		s.opaqueM, err = xproto.NewPixmapId(s.xc)
+		if err != nil {
+			log.Printf("x11driver: xproto.NewPixmapId failed: %v", err)
+			return
+		}
+		s.opaqueP, err = render.NewPictureId(s.xc)
+		if err != nil {
+			log.Printf("x11driver: xproto.NewPictureId failed: %v", err)
+			return
+		}
+		s.opaqueWidth = width
+		s.opaqueHeight = height
+		w := uint16(width)
+		h := uint16(height)
+		xproto.CreatePixmap(s.xc, textureDepth, s.opaqueM, xproto.Drawable(s.window32), w, h)
+		render.CreatePicture(s.xc, s.opaqueP, xproto.Drawable(s.opaqueM), s.pictformat32, 0, nil)
+		render.FillRectangles(s.xc, render.PictOpSrc, s.opaqueP, render.Color{
+			Red:   0xffff,
+			Green: 0xffff,
+			Blue:  0xffff,
+			Alpha: 0xffff,
+		}, []xproto.Rectangle{{
+			Width:  w,
+			Height: h,
+		}})
+	}
+
+	f(s.opaqueP)
 }
 
 func findVisual(xsi *xproto.ScreenInfo, depth byte) (xproto.Visualid, error) {

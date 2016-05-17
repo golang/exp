@@ -156,23 +156,29 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 		// incorrectly set to zero.
 		//
 		// Instead, we implement the draw.Src operator as two render.Composite
-		// calls. The first one (using the PictOpOutReverse operator) clears
-		// the dst-space quad but leaves pixels outside that quad (but inside
-		// the AABB) untouched. The second one (using the PictOpOver operator)
-		// fills in the quad and again does not touch the pixels outside.
+		// calls. The first one (using the PictOpOutReverse operator and a
+		// fully opaque source) clears the dst-space quad but leaves pixels
+		// outside that quad (but inside the AABB) untouched. The second one
+		// (using the PictOpOver operator and the texture t as source) fills in
+		// the quad and again does not touch the pixels outside.
 		//
 		// What X11/Render calls PictOpOutReverse is also known as dst-out. See
 		// http://www.w3.org/TR/SVGCompositing/examples/compop-porterduff-examples.png
 		// for a visualization.
 		//
-		// The arguments to this render.Composite call are identical to the
-		// second one call below, other than the compositing operator.
-		//
-		// TODO: the source picture for this call needs to be fully opaque even
-		// if t.xp isn't.
-		render.Composite(t.s.xc, render.PictOpOutReverse, t.xp, 0, xp,
-			int16(sr.Min.X), int16(sr.Min.Y), 0, 0, 0, 0, uint16(w), uint16(h),
-		)
+		// TODO: is the picture transform right when sr.Min isn't (0, 0)? In
+		// any case, we could probably always use a 1x1 opaque mask, if we do
+		// the transform math correctly.
+		t.s.useOpaque(sr.Dx(), sr.Dy(), func(opaqueP render.Picture) {
+			render.SetPictureTransform(t.s.xc, opaqueP, render.Transform{
+				f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), f64ToFixed(dst2src[2]),
+				f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), f64ToFixed(dst2src[5]),
+				0, 0, 1 << 16,
+			})
+			render.Composite(t.s.xc, render.PictOpOutReverse, opaqueP, 0, xp,
+				0, 0, 0, 0, 0, 0, uint16(w), uint16(h),
+			)
+		})
 	}
 
 	// TODO: tighten the (0, 0)-(w, h) dst rectangle. As it is, we're
