@@ -15,6 +15,7 @@ import (
 	"github.com/BurntSushi/xgb/shm"
 	"github.com/BurntSushi/xgb/xproto"
 
+	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/mouse"
@@ -27,7 +28,7 @@ import (
 type screenImpl struct {
 	xc      *xgb.Conn
 	xsi     *xproto.ScreenInfo
-	keysyms [256][2]xproto.Keysym
+	keysyms x11key.KeysymTable
 
 	atomWMDeleteWindow xproto.Atom
 	atomWMProtocols    xproto.Atom
@@ -444,8 +445,8 @@ func (s *screenImpl) initKeyboardMapping() error {
 		return fmt.Errorf("x11driver: too few keysyms per keycode: %d", n)
 	}
 	for i := keyLo; i <= keyHi; i++ {
-		s.keysyms[i][0] = km.Keysyms[(i-keyLo)*n+0]
-		s.keysyms[i][1] = km.Keysyms[(i-keyLo)*n+1]
+		s.keysyms[i][0] = uint32(km.Keysyms[(i-keyLo)*n+0])
+		s.keysyms[i][1] = uint32(km.Keysyms[(i-keyLo)*n+1])
 	}
 	return nil
 }

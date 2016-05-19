@@ -130,6 +130,21 @@ startDriver() {
 	wm_delete_window = XInternAtom(x_dpy, "WM_DELETE_WINDOW", False);
 	wm_protocols = XInternAtom(x_dpy, "WM_PROTOCOLS", False);
 	wm_take_focus= XInternAtom(x_dpy, "WM_TAKE_FOCUS", False);
+
+	const int key_lo = 8;
+	const int key_hi = 255;
+	int keysyms_per_keycode;
+	KeySym *keysyms = XGetKeyboardMapping(x_dpy, key_lo, key_hi-key_lo+1, &keysyms_per_keycode);
+	if (keysyms_per_keycode < 2) {
+		fprintf(stderr, "XGetKeyboardMapping returned too few keysyms per keycode: %d\n", keysyms_per_keycode);
+		exit(1);
+	}
+	int k;
+	for (k = key_lo; k <= key_hi; k++) {
+		onKeysym(k,
+			keysyms[(k-key_lo)*keysyms_per_keycode + 0],
+			keysyms[(k-key_lo)*keysyms_per_keycode + 1]);
+	}
 }
 
 void
@@ -138,6 +153,10 @@ processEvents() {
 		XEvent ev;
 		XNextEvent(x_dpy, &ev);
 		switch (ev.type) {
+		case KeyPress:
+		case KeyRelease:
+			onKey(ev.xkey.window, ev.xkey.state, ev.xkey.keycode, ev.type == KeyPress ? 1 : 2);
+			break;
 		case ButtonPress:
 		case ButtonRelease:
 			onMouse(ev.xbutton.window, ev.xbutton.x, ev.xbutton.y, ev.xbutton.state, ev.xbutton.button,
@@ -207,6 +226,8 @@ doNewWindow(int width, int height) {
 	XSetWindowAttributes attr;
 	attr.colormap = x_colormap;
 	attr.event_mask =
+		KeyPressMask |
+		KeyReleaseMask |
 		ButtonPressMask |
 		ButtonReleaseMask |
 		PointerMotionMask |

@@ -116,30 +116,7 @@ func (w *windowImpl) handleExpose() {
 }
 
 func (w *windowImpl) handleKey(detail xproto.Keycode, state uint16, dir key.Direction) {
-	// The key event's rune depends on whether the shift key is down.
-	unshifted := rune(w.s.keysyms[detail][0])
-	r := unshifted
-	if state&x11key.ShiftMask != 0 {
-		r = rune(w.s.keysyms[detail][1])
-		// In X11, a zero xproto.Keysym when shift is down means to use what
-		// the xproto.Keysym is when shift is up.
-		if r == 0 {
-			r = unshifted
-		}
-	}
-
-	// The key event's code is independent of whether the shift key is down.
-	var c key.Code
-	if 0 <= unshifted && unshifted < 0x80 {
-		// TODO: distinguish the regular '2' key and number-pad '2' key (with
-		// Num-Lock).
-		c = x11key.ASCIIKeycodes[unshifted]
-	} else {
-		r, c = -1, x11key.NonUnicodeKeycodes[unshifted]
-	}
-
-	// TODO: Unicode-but-not-ASCII keysyms like the Swiss keyboard's 'ö'.
-
+	r, c := w.s.keysyms.Lookup(uint8(detail), state)
 	w.Send(key.Event{
 		Rune:      r,
 		Code:      c,

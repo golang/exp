@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
@@ -34,6 +35,8 @@ import (
 )
 
 const useLifecycler = true
+
+var theKeysyms x11key.KeysymTable
 
 func init() {
 	// It might not be necessary, but it probably doesn't hurt to try to make
@@ -169,8 +172,33 @@ func onExpose(id uintptr) {
 	w.Send(paint.Event{External: true})
 }
 
+//export onKeysym
+func onKeysym(k, unshifted, shifted uint32) {
+	theKeysyms[k][0] = unshifted
+	theKeysyms[k][1] = shifted
+}
+
+//export onKey
+func onKey(id uintptr, state uint16, detail, dir uint8) {
+	theScreen.mu.Lock()
+	w := theScreen.windows[id]
+	theScreen.mu.Unlock()
+
+	if w == nil {
+		return
+	}
+
+	r, c := theKeysyms.Lookup(detail, state)
+	w.Send(key.Event{
+		Rune:      r,
+		Code:      c,
+		Modifiers: x11key.KeyModifiers(state),
+		Direction: key.Direction(dir),
+	})
+}
+
 //export onMouse
-func onMouse(id uintptr, x, y, state, button, dir int32) {
+func onMouse(id uintptr, x, y int32, state uint16, button, dir uint8) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
@@ -185,7 +213,7 @@ func onMouse(id uintptr, x, y, state, button, dir int32) {
 		X:         float32(x),
 		Y:         float32(y),
 		Button:    mouse.Button(button),
-		Modifiers: x11key.KeyModifiers(uint16(state)),
+		Modifiers: x11key.KeyModifiers(state),
 		Direction: mouse.Direction(dir),
 	})
 }
