@@ -89,7 +89,7 @@ func inv(x *f64.Aff3) f64.Aff3 {
 func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	// TODO: honor sr.Max
 
-	if t.degenerate() {
+	if t.degenerate() || sr.Empty() {
 		return
 	}
 
@@ -186,13 +186,13 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 		// http://www.w3.org/TR/SVGCompositing/examples/compop-porterduff-examples.png
 		// for a visualization.
 		//
-		// TODO: is the picture transform right when sr.Min isn't (0, 0)? In
-		// any case, we could probably always use a 1x1 opaque mask, if we do
-		// the transform math correctly.
-		t.s.useOpaque(sr.Dx(), sr.Dy(), func(opaqueP render.Picture) {
+		// TODO: is the picture transform right when sr.Min isn't (0, 0)?
+		invW := 1 / float64(sr.Dx())
+		invH := 1 / float64(sr.Dy())
+		t.s.useOpaque(func(opaqueP render.Picture) {
 			render.SetPictureTransform(t.s.xc, opaqueP, render.Transform{
-				f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), 0,
-				f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), 0,
+				f64ToFixed(invW * dst2src[0]), f64ToFixed(invW * dst2src[1]), 0,
+				f64ToFixed(invH * dst2src[3]), f64ToFixed(invH * dst2src[4]), 0,
 				0, 0, 1 << 16,
 			})
 			render.TriFan(t.s.xc, render.PictOpOutReverse, opaqueP, xp, 0, 0, 0, points[:])

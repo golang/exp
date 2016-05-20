@@ -50,11 +50,9 @@ type screenImpl struct {
 	// hold textureImpl.renderMu when acquiring screenImpl.opaqueMu.
 	//
 	// TODO: should this be per-texture instead of per-screen?
-	opaqueMu     sync.Mutex
-	opaqueM      xproto.Pixmap
-	opaqueP      render.Picture
-	opaqueWidth  int
-	opaqueHeight int
+	opaqueMu sync.Mutex
+	opaqueM  xproto.Pixmap
+	opaqueP  render.Picture
 
 	mu              sync.Mutex
 	buffers         map[shm.Seg]*bufferImpl
@@ -525,19 +523,11 @@ func (s *screenImpl) initWindow32() error {
 	return nil
 }
 
-func (s *screenImpl) useOpaque(width, height int, f func(render.Picture)) {
+func (s *screenImpl) useOpaque(f func(render.Picture)) {
 	s.opaqueMu.Lock()
 	defer s.opaqueMu.Unlock()
 
-	if s.opaqueM == 0 || s.opaqueP == 0 || s.opaqueWidth != width || s.opaqueHeight != height {
-		if s.opaqueP != 0 {
-			render.FreePicture(s.xc, s.opaqueP)
-			s.opaqueP = 0
-		}
-		if s.opaqueM != 0 {
-			xproto.FreePixmap(s.xc, s.opaqueM)
-			s.opaqueM = 0
-		}
+	if s.opaqueM == 0 || s.opaqueP == 0 {
 		var err error
 		s.opaqueM, err = xproto.NewPixmapId(s.xc)
 		if err != nil {
@@ -549,11 +539,7 @@ func (s *screenImpl) useOpaque(width, height int, f func(render.Picture)) {
 			log.Printf("x11driver: xproto.NewPictureId failed: %v", err)
 			return
 		}
-		s.opaqueWidth = width
-		s.opaqueHeight = height
-		w := uint16(width)
-		h := uint16(height)
-		xproto.CreatePixmap(s.xc, textureDepth, s.opaqueM, xproto.Drawable(s.window32), w, h)
+		xproto.CreatePixmap(s.xc, textureDepth, s.opaqueM, xproto.Drawable(s.window32), 1, 1)
 		render.CreatePicture(s.xc, s.opaqueP, xproto.Drawable(s.opaqueM), s.pictformat32, 0, nil)
 		render.FillRectangles(s.xc, render.PictOpSrc, s.opaqueP, render.Color{
 			Red:   0xffff,
@@ -561,8 +547,8 @@ func (s *screenImpl) useOpaque(width, height int, f func(render.Picture)) {
 			Blue:  0xffff,
 			Alpha: 0xffff,
 		}, []xproto.Rectangle{{
-			Width:  w,
-			Height: h,
+			Width:  1,
+			Height: 1,
 		}})
 	}
 
