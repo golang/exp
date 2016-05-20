@@ -8,15 +8,15 @@ package driver // import "golang.org/x/exp/io/spi/driver"
 const (
 	Mode = iota
 	Bits
-	Speed
+	MaxSpeed
 	Order
 	Delay
 )
 
 // Opener is an interface to be implemented by the SPI driver to open
-// a connection an SPI device with the specified bus and chip number.
+// a connection to an SPI device.
 type Opener interface {
-	Open(bus, chip int) (Conn, error)
+	Open() (Conn, error)
 }
 
 // Conn is a connection to an SPI device.

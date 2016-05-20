@@ -47,7 +47,7 @@ func (d *Device) SetMode(mode Mode) error {
 // SetMaxSpeed sets the maximum clock speed in Hz.
 // The value can be overriden by SPI device's driver.
 func (d *Device) SetMaxSpeed(speed int) error {
-	return d.conn.Configure(driver.Speed, speed)
+	return d.conn.Configure(driver.MaxSpeed, speed)
 }
 
 // SetBitsPerWord sets how many bits it takes to represent a word, e.g. 8 represents 8-bit words.
@@ -77,31 +77,13 @@ func (d *Device) Transfer(tx, rx []byte) error {
 // Open opens a device with the specified bus and chip select
 // by using the given driver. If a nil driver is provided,
 // the default driver (devfs) is used.
-// Mode is the SPI mode. SPI mode is a combination of polarity and phases.
-// CPOL is the high order bit, CPHA is the low order. Pre-computed mode
-// values are Mode0, Mode1, Mode2 and Mode3. The value of the mode argument
-// can be overriden by the device's driver.
-// Speed is the max clock speed (Hz) and can be overriden by the device's driver.
-func Open(o driver.Opener, bus, cs int, mode Mode, speed int) (*Device, error) {
-	if o == nil {
-		o = &Devfs{}
-	}
 
-	conn, err := o.Open(bus, cs)
+func Open(o driver.Opener) (*Device, error) {
+	conn, err := o.Open()
 	if err != nil {
 		return nil, err
 	}
-
-	dev := &Device{conn: conn}
-	if err := dev.SetMode(mode); err != nil {
-		dev.Close()
-		return nil, err
-	}
-	if err := dev.SetMaxSpeed(speed); err != nil {
-		dev.Close()
-		return nil, err
-	}
-	return dev, nil
+	return &Device{conn: conn}, nil
 }
 
 // Close closes the SPI device and releases the related resources.
