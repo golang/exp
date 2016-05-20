@@ -14,7 +14,16 @@ import (
 
 // Devfs is an I2C driver that works against the devfs.
 // You need to load the "i2c-dev" kernel module to use this driver.
-type Devfs struct{}
+type Devfs struct {
+	// Dev is the I2C bus device, e.g. /dev/i2c-1.
+	// Required.
+	Dev string
+
+	// Addr is the device's I2C address on the specified bus.
+	// Use TenBit to mark your address if your device works with 10-bit addresses.
+	// Required.
+	Addr int
+}
 
 const (
 	i2c_SLAVE  = 0x0703 // TODO(jbd): Allow users to use I2C_SLAVE_FORCE?
@@ -23,8 +32,9 @@ const (
 
 // TODO(jbd): Support I2C_RETRIES and I2C_TIMEOUT at the driver and implementation level.
 
-func (d *Devfs) Open(bus, addr int, tenbit bool) (driver.Conn, error) {
-	f, err := os.OpenFile(fmt.Sprintf("/dev/i2c-%d", bus), os.O_RDWR, os.ModeDevice)
+func (d *Devfs) Open() (driver.Conn, error) {
+	addr, tenbit := resolveAddr(d.Addr)
+	f, err := os.OpenFile(d.Dev, os.O_RDWR, os.ModeDevice)
 	if err != nil {
 		return nil, err
 	}
@@ -32,12 +42,12 @@ func (d *Devfs) Open(bus, addr int, tenbit bool) (driver.Conn, error) {
 	if tenbit {
 		if err := conn.ioctl(i2c_TENBIT, uintptr(1)); err != nil {
 			conn.Close()
-			return nil, fmt.Errorf("cannot enable the 10-bit address mode on bus %v: %v", bus, err)
+			return nil, fmt.Errorf("cannot enable the 10-bit address mode on bus %v: %v", d.Dev, err)
 		}
 	}
 	if err := conn.ioctl(i2c_SLAVE, uintptr(addr)); err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("error opening the address (%v) on the bus (%v): %v", addr, bus, err)
+		return nil, fmt.Errorf("error opening the address (%v) on the bus (%v): %v", addr, d.Dev, err)
 	}
 	return conn, nil
 }

@@ -19,12 +19,12 @@ const (
 )
 
 func main() {
-	d, err := i2c.Open(&i2c.Devfs{}, 1, DISPLAY_RGB_ADDR)
+	d, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1", Addr: DISPLAY_RGB_ADDR})
 	if err != nil {
 		panic(err)
 	}
 
-	td, err := i2c.Open(&i2c.Devfs{}, 1, DISPLAY_TEXT_ADDR)
+	td, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1", Addr: DISPLAY_TEXT_ADDR})
 	if err != nil {
 		panic(err)
 	}

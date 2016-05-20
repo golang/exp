@@ -47,19 +47,14 @@ func (d *Device) Write(buf []byte) (err error) {
 }
 
 // Close closes the device and releases the underlying sources.
-// All devices must be closed once they are no longer in use.
 func (d *Device) Close() error {
 	return d.conn.Close()
 }
 
-// Open opens an I2C device with the given I2C address on the specified bus.
-// Use TenBit to mark your address if your device works with 10-bit addresses.
-func Open(o driver.Opener, bus, addr int) (*Device, error) {
-	if o == nil {
-		o = &Devfs{}
-	}
-	addr, tenbit := resolveAddr(addr)
-	conn, err := o.Open(bus, addr, tenbit)
+// Open opens a connection to an I2C device.
+// All devices must be closed once they are no longer in use.
+func Open(o driver.Opener) (*Device, error) {
+	conn, err := o.Open()
 	if err != nil {
 		return nil, err
 	}
