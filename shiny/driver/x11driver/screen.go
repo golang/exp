@@ -44,16 +44,6 @@ type screenImpl struct {
 	gcontext32 xproto.Gcontext
 	window32   xproto.Window
 
-	// opaque is a cached, fully opaque mask picture.
-	//
-	// Note that there is a lock ordering here. The textureImpl.draw method can
-	// hold textureImpl.renderMu when acquiring screenImpl.opaqueMu.
-	//
-	// TODO: should this be per-texture instead of per-screen?
-	opaqueMu sync.Mutex
-	opaqueM  xproto.Pixmap
-	opaqueP  render.Picture
-
 	mu              sync.Mutex
 	buffers         map[shm.Seg]*bufferImpl
 	uploads         map[uint16]chan struct{}
@@ -323,15 +313,25 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	if err != nil {
 		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
 	}
+	opaqueM, err := xproto.NewPixmapId(s.xc)
+	if err != nil {
+		return nil, fmt.Errorf("x11driver: xproto.NewPixmapId failed: %v", err)
+	}
+	opaqueP, err := render.NewPictureId(s.xc)
+	if err != nil {
+		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
+	}
 	xproto.CreatePixmap(s.xc, textureDepth, xm, xproto.Drawable(s.window32), uint16(w), uint16(h))
 	render.CreatePicture(s.xc, xp, xproto.Drawable(xm), s.pictformat32, 0, nil)
 	render.SetPictureFilter(s.xc, xp, uint16(len("bilinear")), "bilinear", nil)
 
 	return &textureImpl{
-		s:    s,
-		size: size,
-		xm:   xm,
-		xp:   xp,
+		s:       s,
+		size:    size,
+		xm:      xm,
+		xp:      xp,
+		opaqueM: opaqueM,
+		opaqueP: opaqueP,
 	}, nil
 }
 
@@ -521,38 +521,6 @@ func (s *screenImpl) initWindow32() error {
 	)
 	xproto.CreateGC(s.xc, s.gcontext32, xproto.Drawable(s.window32), 0, nil)
 	return nil
-}
-
-func (s *screenImpl) useOpaque(f func(render.Picture)) {
-	s.opaqueMu.Lock()
-	defer s.opaqueMu.Unlock()
-
-	if s.opaqueM == 0 || s.opaqueP == 0 {
-		var err error
-		s.opaqueM, err = xproto.NewPixmapId(s.xc)
-		if err != nil {
-			log.Printf("x11driver: xproto.NewPixmapId failed: %v", err)
-			return
-		}
-		s.opaqueP, err = render.NewPictureId(s.xc)
-		if err != nil {
-			log.Printf("x11driver: xproto.NewPictureId failed: %v", err)
-			return
-		}
-		xproto.CreatePixmap(s.xc, textureDepth, s.opaqueM, xproto.Drawable(s.window32), 1, 1)
-		render.CreatePicture(s.xc, s.opaqueP, xproto.Drawable(s.opaqueM), s.pictformat32, 0, nil)
-		render.FillRectangles(s.xc, render.PictOpSrc, s.opaqueP, render.Color{
-			Red:   0xffff,
-			Green: 0xffff,
-			Blue:  0xffff,
-			Alpha: 0xffff,
-		}, []xproto.Rectangle{{
-			Width:  1,
-			Height: 1,
-		}})
-	}
-
-	f(s.opaqueP)
 }
 
 func findVisual(xsi *xproto.ScreenInfo, depth byte) (xproto.Visualid, error) {

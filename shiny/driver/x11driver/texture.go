@@ -32,7 +32,13 @@ type textureImpl struct {
 	// multiple X11/Render calls. X11/Render is a stateful API, so interleaving
 	// X11/Render calls from separate higher-level operations causes
 	// inconsistencies.
-	renderMu sync.Mutex
+	//
+	// It also protects the opaqueXxx fields, which hold a lazily created,
+	// fully opaque mask picture.
+	renderMu      sync.Mutex
+	opaqueM       xproto.Pixmap
+	opaqueP       render.Picture
+	opaqueCreated bool
 
 	releasedMu sync.Mutex
 	released   bool
@@ -50,6 +56,10 @@ func (t *textureImpl) Release() {
 
 	if released || t.degenerate() {
 		return
+	}
+	if t.opaqueCreated {
+		render.FreePicture(t.s.xc, t.opaqueP)
+		xproto.FreePixmap(t.s.xc, t.opaqueM)
 	}
 	render.FreePicture(t.s.xc, t.xp)
 	xproto.FreePixmap(t.s.xc, t.xm)
@@ -161,6 +171,22 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 	}}
 
 	if op == draw.Src {
+		// Lazily create the opaque mask picture.
+		if !t.opaqueCreated {
+			t.opaqueCreated = true
+			xproto.CreatePixmap(t.s.xc, textureDepth, t.opaqueM, xproto.Drawable(t.s.window32), 1, 1)
+			render.CreatePicture(t.s.xc, t.opaqueP, xproto.Drawable(t.opaqueM), t.s.pictformat32, 0, nil)
+			render.FillRectangles(t.s.xc, render.PictOpSrc, t.opaqueP, render.Color{
+				Red:   0xffff,
+				Green: 0xffff,
+				Blue:  0xffff,
+				Alpha: 0xffff,
+			}, []xproto.Rectangle{{
+				Width:  1,
+				Height: 1,
+			}})
+		}
+
 		// render.TriFan visits every dst-space pixel in the axis-aligned
 		// bounding box (AABB) containing the transformation of the sr
 		// rectangle in src-space to a quad in dst-space.
@@ -189,14 +215,12 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 		// TODO: is the picture transform right when sr.Min isn't (0, 0)?
 		invW := 1 / float64(sr.Dx())
 		invH := 1 / float64(sr.Dy())
-		t.s.useOpaque(func(opaqueP render.Picture) {
-			render.SetPictureTransform(t.s.xc, opaqueP, render.Transform{
-				f64ToFixed(invW * dst2src[0]), f64ToFixed(invW * dst2src[1]), 0,
-				f64ToFixed(invH * dst2src[3]), f64ToFixed(invH * dst2src[4]), 0,
-				0, 0, 1 << 16,
-			})
-			render.TriFan(t.s.xc, render.PictOpOutReverse, opaqueP, xp, 0, 0, 0, points[:])
+		render.SetPictureTransform(t.s.xc, t.opaqueP, render.Transform{
+			f64ToFixed(invW * dst2src[0]), f64ToFixed(invW * dst2src[1]), 0,
+			f64ToFixed(invH * dst2src[3]), f64ToFixed(invH * dst2src[4]), 0,
+			0, 0, 1 << 16,
 		})
+		render.TriFan(t.s.xc, render.PictOpOutReverse, t.opaqueP, xp, 0, 0, 0, points[:])
 	}
 	render.TriFan(t.s.xc, render.PictOpOver, t.xp, xp, 0, 0, 0, points[:])
 }
