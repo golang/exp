@@ -290,12 +290,14 @@ func (b *Board) drawPiece(m *image.RGBA, ij IJ, piece *Piece) {
 	draw.DrawMask(m, xy, piece.stone.image, ZP, piece.stone.mask, ZP, draw.Over)
 }
 
-func (b *Board) click(m *image.RGBA, x, y, button int) {
+func (b *Board) click(m *image.RGBA, x, y, button int) bool {
 	ij, ok := XY{x, y}.IJ(&b.Dims)
 	if !ok {
-		return
+		return false
 	}
 	switch button {
+	default:
+		return false
 	case 1:
 		b.putPiece(ij, b.selectBlackPiece())
 	case 2:
@@ -304,4 +306,5 @@ func (b *Board) click(m *image.RGBA, x, y, button int) {
 		b.putPiece(ij, nil)
 	}
 	render(m, b) // TODO: Connect this to paint events.
+	return true
 }
