@@ -43,6 +43,8 @@
 //		})
 //	}
 //
+// Complete examples can be found in the shiny/example directory.
+//
 // Each driver package provides Screen, Buffer, Texture and Window
 // implementations that work together. Such types are interface types because
 // this package is driver-independent, but those interfaces aren't expected to
