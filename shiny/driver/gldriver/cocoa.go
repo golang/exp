@@ -262,7 +262,7 @@ func mouseEvent(id uintptr, x, y, dx, dy float32, ty, button int32, flags uint32
 	switch ty {
 	default:
 		cmButton = cocoaMouseButton(button)
-	case C.NSLeftMouseDragged, C.NSRightMouseDragged, C.NSOtherMouseDragged:
+	case C.NSMouseMoved, C.NSLeftMouseDragged, C.NSRightMouseDragged, C.NSOtherMouseDragged:
 		// No-op.
 	case C.NSScrollWheel:
 		// TODO: handle horizontal scrolling

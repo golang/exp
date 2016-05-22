@@ -115,6 +115,7 @@ uint64 threadID() {
 	mouseEvent((GoUintptr)self, x, y, dx, dy, theEvent.type, theEvent.buttonNumber, theEvent.modifierFlags);
 }
 
+- (void)mouseMoved:(NSEvent *)theEvent        { [self mouseEventNS:theEvent]; }
 - (void)mouseDown:(NSEvent *)theEvent         { [self mouseEventNS:theEvent]; }
 - (void)mouseUp:(NSEvent *)theEvent           { [self mouseEventNS:theEvent]; }
 - (void)mouseDragged:(NSEvent *)theEvent      { [self mouseEventNS:theEvent]; }
@@ -252,6 +253,7 @@ uintptr_t doNewWindow(int width, int height) {
 		window.title = name;
 		window.displaysWhenScreenProfileChanges = YES;
 		[window cascadeTopLeftFromPoint:NSMakePoint(20,20)];
+		[window setAcceptsMouseMovedEvents:YES];
 
 		NSOpenGLPixelFormatAttribute attr[] = {
 			NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
