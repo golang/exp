@@ -35,7 +35,7 @@ const (
 // TODO(jbd): Support I2C_RETRIES and I2C_TIMEOUT at the driver and implementation level.
 
 func (d *Devfs) Open() (driver.Conn, error) {
-	addr, tenbit := resolveAddr(d.Addr)
+	addr, tenbit := ResolveAddr(d.Addr)
 	f, err := os.OpenFile(d.Dev, os.O_RDWR, os.ModeDevice)
 	if err != nil {
 		return nil, err

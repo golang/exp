@@ -61,6 +61,8 @@ func Open(o driver.Opener) (*Device, error) {
 	return &Device{conn: conn}, nil
 }
 
-func resolveAddr(a int) (addr int, tenbit bool) {
-	return a & (tenbitMask - 1), a&tenbitMask == tenbitMask
+// ResolveAddr returns whether the addr is 10-bit masked or not.
+// It also returns the unmasked address.
+func ResolveAddr(addr int) (unmasked int, tenbit bool) {
+	return addr & (tenbitMask - 1), addr&tenbitMask == tenbitMask
 }
