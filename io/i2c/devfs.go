@@ -58,16 +58,18 @@ type devfsConn struct {
 	f *os.File
 }
 
-func (c *devfsConn) Read(buf []byte) error {
-	_, err := c.f.Read(buf)
-	// TODO(jbd): len(buf) == number of bytes read?
-	return err
-}
-
-func (c *devfsConn) Write(buf []byte) error {
-	_, err := c.f.Write(buf)
-	// TODO(jbd): len(buf) == number of bytes written?
-	return err
+func (c *devfsConn) Tx(w, r []byte) error {
+	if w != nil {
+		if _, err := d.f.Write(w); err != nil {
+			return err
+		}
+	}
+	if r != nil {
+		if _, err := d.f.Read(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *devfsConn) Close() error {

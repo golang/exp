@@ -6,8 +6,6 @@
 package i2c // import "golang.org/x/exp/io/i2c"
 
 import (
-	"fmt"
-
 	"golang.org/x/exp/io/i2c/driver"
 )
 
@@ -24,26 +22,27 @@ func TenBit(addr int) int {
 	return addr | tenbitMask
 }
 
-// TOOD(jbd): Do we need higher level I2C packet writers and readers?
-// TODO(jbd): Support bidirectional communication.
-
 // Read reads len(buf) bytes from the device.
 func (d *Device) Read(buf []byte) error {
-	// TODO(jbd): Support reading from a register.
-	if err := d.conn.Read(buf); err != nil {
-		return fmt.Errorf("error reading from device: %v", err)
-	}
-	return nil
+	return d.conn.Tx(nil, buf)
+}
+
+// ReadReg is similar to Read but it reads from a register.
+func (d *Device) ReadReg(reg byte, buf []byte) error {
+	return d.conn.Tx([]byte{reg}, buf)
 }
 
 // Write writes the buffer to the device. If it is required to write to a
 // specific register, the register should be passed as the first byte in the
 // given buffer.
 func (d *Device) Write(buf []byte) (err error) {
-	if err := d.conn.Write(buf); err != nil {
-		return fmt.Errorf("error writing to the device: %v", err)
-	}
-	return nil
+	return d.conn.Tx(buf, nil)
+}
+
+// WriteReg is similar to Write but writes to a register.
+func (d *Device) WriteReg(reg byte, buf []byte) (err error) {
+	// TODO(jbd): Do not allocate, not optimal.
+	return d.conn.Tx(append([]byte{reg}, buf...), nil)
 }
 
 // Close closes the device and releases the underlying sources.
