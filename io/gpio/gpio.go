@@ -24,6 +24,7 @@ const (
 // TODO(jbd): Allow users to set active value.
 // TODO(jbd): How to support analog pins?
 
+// TODO(jbd): Support interrupts.
 // TODO(jbd): Allow users to configure edge trigger type.
 
 // Open opens a connection to the GPIO device with the given driver.
