@@ -96,8 +96,6 @@ func main() {
 				op := screen.Over
 				// op = screen.Src
 				tRect := t.Bounds()
-				// TODO: fix a non-zero tRect.Min for the x11driver. It looks
-				// good under the gldriver.
 				// tRect = image.Rect(16, 0, 240, 100)
 
 				// Draw the texture t twice, as a 1:1 copy and under the

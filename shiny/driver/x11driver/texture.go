@@ -97,7 +97,7 @@ func inv(x *f64.Aff3) f64.Aff3 {
 }
 
 func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	// TODO: honor sr.Max
+	// TODO: handle sr being out of t.Bounds().
 
 	if t.degenerate() || sr.Empty() {
 		return
@@ -147,8 +147,8 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 	// pixels, so we invert src2dst.
 	dst2src := inv(src2dst)
 	render.SetPictureTransform(t.s.xc, t.xp, render.Transform{
-		f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), 0,
-		f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), 0,
+		f64ToFixed(dst2src[0]), f64ToFixed(dst2src[1]), render.Fixed(sr.Min.X << 16),
+		f64ToFixed(dst2src[3]), f64ToFixed(dst2src[4]), render.Fixed(sr.Min.Y << 16),
 		0, 0, 1 << 16,
 	})
 
@@ -211,8 +211,6 @@ func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectan
 		// What X11/Render calls PictOpOutReverse is also known as dst-out. See
 		// http://www.w3.org/TR/SVGCompositing/examples/compop-porterduff-examples.png
 		// for a visualization.
-		//
-		// TODO: is the picture transform right when sr.Min isn't (0, 0)?
 		invW := 1 / float64(sr.Dx())
 		invH := 1 / float64(sr.Dy())
 		render.SetPictureTransform(t.s.xc, t.opaqueP, render.Transform{
