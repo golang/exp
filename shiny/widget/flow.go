@@ -22,12 +22,15 @@ type Flow struct {
 	Axis Axis
 }
 
-// NewFlow returns a new Flow widget.
-func NewFlow(a Axis) *Flow {
+// NewFlow returns a new Flow widget containing the given children.
+func NewFlow(a Axis, children ...node.Node) *Flow {
 	w := &Flow{
 		Axis: a,
 	}
 	w.Wrapper = w
+	for _, c := range children {
+		w.AppendChild(c)
+	}
 	return w
 }
 

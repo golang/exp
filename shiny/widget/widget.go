@@ -38,6 +38,13 @@ const (
 	AxisBoth       = Axis(3) // AxisBoth equals AxisHorizontal | AxisVertical.
 )
 
+// WithLayoutData returns the given node after setting its embedded LayoutData
+// field.
+func WithLayoutData(n node.Node, layoutData interface{}) node.Node {
+	n.Wrappee().LayoutData = layoutData
+	return n
+}
+
 // TODO: how does RunWindow's caller inject or process events (whether general
 // like lifecycle events or app-specific)? How does it stop the event loop when
 // the app's work is done?

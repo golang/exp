@@ -120,10 +120,13 @@ type Flex struct {
 	AlignContent AlignContent
 }
 
-// NewFlex returns a new Flex widget.
-func NewFlex() *Flex {
+// NewFlex returns a new Flex widget containing the given children.
+func NewFlex(children ...node.Node) *Flex {
 	w := new(Flex)
 	w.Wrapper = w
+	for _, c := range children {
+		w.AppendChild(c)
+	}
 	return w
 }
 

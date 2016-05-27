@@ -380,21 +380,20 @@ var layoutTests = []layoutTest{{
 
 func TestLayout(t *testing.T) {
 	for testNum, test := range layoutTests {
-		w := NewFlex()
-		w.Direction = test.direction
-		w.Wrap = test.wrap
-		w.AlignContent = test.alignContent
-		w.Justify = test.justify
-
 		var children []node.Node
 		for i, sz := range test.measured {
 			n := widget.NewUniform(colors[i], unit.Pixels(sz[0]), unit.Pixels(sz[1]))
 			if test.layoutData != nil {
 				n.LayoutData = test.layoutData[i]
 			}
-			w.AppendChild(n)
 			children = append(children, n)
 		}
+
+		w := NewFlex(children...)
+		w.Direction = test.direction
+		w.Wrap = test.wrap
+		w.AlignContent = test.alignContent
+		w.Justify = test.justify
 
 		w.Measure(nil)
 		w.Rect = image.Rectangle{Max: test.size}

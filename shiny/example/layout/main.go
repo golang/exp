@@ -37,26 +37,36 @@ func main() {
 	t := theme.Default
 
 	// Make the widget node tree.
-	hf := widget.NewFlow(widget.AxisHorizontal)
-	hf.AppendChild(widget.NewLabel("Cyan:"))
-	hf.AppendChild(widget.NewUniform(color.RGBA{0x00, 0x7f, 0x7f, 0xff}, px(0), px(20)))
-	hf.LastChild.LayoutData = widget.FlowLayoutData{ExpandAlongWeight: 1}
-	hf.AppendChild(widget.NewLabel("Magenta:"))
-	hf.AppendChild(widget.NewUniform(color.RGBA{0x7f, 0x00, 0x7f, 0xff}, px(0), px(30)))
-	hf.LastChild.LayoutData = widget.FlowLayoutData{ExpandAlongWeight: 2}
-	hf.AppendChild(widget.NewLabel("Yellow:"))
-	hf.AppendChild(widget.NewUniform(color.RGBA{0x7f, 0x7f, 0x00, 0xff}, px(0), px(40)))
-	hf.LastChild.LayoutData = widget.FlowLayoutData{ExpandAlongWeight: 3}
+	hf := widget.NewFlow(widget.AxisHorizontal,
+		widget.NewLabel("Cyan:"),
+		widget.WithLayoutData(
+			widget.NewUniform(color.RGBA{0x00, 0x7f, 0x7f, 0xff}, px(0), px(20)),
+			widget.FlowLayoutData{ExpandAlongWeight: 1},
+		),
+		widget.NewLabel("Magenta:"),
+		widget.WithLayoutData(
+			widget.NewUniform(color.RGBA{0x7f, 0x00, 0x7f, 0xff}, px(0), px(30)),
+			widget.FlowLayoutData{ExpandAlongWeight: 2},
+		),
+		widget.NewLabel("Yellow:"),
+		widget.WithLayoutData(
+			widget.NewUniform(color.RGBA{0x7f, 0x7f, 0x00, 0xff}, px(0), px(40)),
+			widget.FlowLayoutData{ExpandAlongWeight: 3},
+		),
+	)
 
-	vf := widget.NewFlow(widget.AxisVertical)
-	vf.AppendChild(widget.NewUniform(color.RGBA{0xff, 0x00, 0x00, 0xff}, px(80), px(40)))
-	vf.AppendChild(widget.NewUniform(color.RGBA{0x00, 0xff, 0x00, 0xff}, px(50), px(50)))
-	vf.AppendChild(widget.NewUniform(color.RGBA{0x00, 0x00, 0xff, 0xff}, px(20), px(60)))
-	vf.AppendChild(hf)
-	vf.LastChild.LayoutData = widget.FlowLayoutData{ExpandAcross: true}
-	vf.AppendChild(widget.NewLabel(fmt.Sprintf(
-		"The black rectangle is 1.5 inches x 1 inch when viewed at %v DPI.", t.GetDPI())))
-	vf.AppendChild(widget.NewUniform(color.Black, unit.Inches(1.5), unit.Inches(1)))
+	vf := widget.NewFlow(widget.AxisVertical,
+		widget.NewUniform(color.RGBA{0xff, 0x00, 0x00, 0xff}, px(80), px(40)),
+		widget.NewUniform(color.RGBA{0x00, 0xff, 0x00, 0xff}, px(50), px(50)),
+		widget.NewUniform(color.RGBA{0x00, 0x00, 0xff, 0xff}, px(20), px(60)),
+		widget.WithLayoutData(
+			hf,
+			widget.FlowLayoutData{ExpandAcross: true},
+		),
+		widget.NewLabel(fmt.Sprintf(
+			"The black rectangle is 1.5 inches x 1 inch when viewed at %v DPI.", t.GetDPI())),
+		widget.NewUniform(color.Black, unit.Inches(1.5), unit.Inches(1)),
+	)
 
 	// Make the RGBA image.
 	rgba := image.NewRGBA(image.Rect(0, 0, 640, 480))
