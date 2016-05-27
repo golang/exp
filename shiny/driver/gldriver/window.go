@@ -93,13 +93,18 @@ func (w *windowImpl) Release() {
 }
 
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
-	// TODO: adjust if dp is outside dst bounds, or sr is outside src bounds.
+	originalSRMin := sr.Min
+	sr = sr.Intersect(src.Bounds())
+	if sr.Empty() {
+		return
+	}
+	dp = dp.Add(sr.Min.Sub(originalSRMin))
 	// TODO: keep a texture around for this purpose?
 	t, err := w.s.NewTexture(sr.Size())
 	if err != nil {
 		panic(err)
 	}
-	t.Upload(dp, src, sr)
+	t.Upload(image.Point{}, src, sr)
 	w.Draw(f64.Aff3{
 		1, 0, float64(dp.X),
 		0, 1, float64(dp.Y),
@@ -167,6 +172,12 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	t := src.(*textureImpl)
+	sr = sr.Intersect(t.Bounds())
+	if sr.Empty() {
+		return
+	}
+
 	w.glctxMu.Lock()
 	defer w.glctxMu.Unlock()
 
@@ -203,7 +214,6 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	//
 	// The PQRS quad is always axis-aligned. First of all, convert
 	// from pixel space to texture space.
-	t := src.(*textureImpl)
 	tw := float64(t.size.X)
 	th := float64(t.size.Y)
 	px := float64(sr.Min.X-0) / tw

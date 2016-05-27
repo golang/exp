@@ -35,15 +35,39 @@ func (t *textureImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectang
 	buf := src.(*bufferImpl)
 	buf.preUpload()
 
+	// src2dst is added to convert from the src coordinate space to the dst
+	// coordinate space. It is subtracted to convert the other way.
+	src2dst := dp.Sub(sr.Min)
+
+	// Clip to the source.
+	sr = sr.Intersect(buf.Bounds())
+
+	// Clip to the destination.
+	dr := sr.Add(src2dst)
+	dr = dr.Intersect(t.Bounds())
+	if dr.Empty() {
+		return
+	}
+
+	// Bring dr.Min in dst-space back to src-space to get the pixel buffer offset.
+	pix := buf.rgba.Pix[buf.rgba.PixOffset(dr.Min.X-src2dst.X, dr.Min.Y-src2dst.Y):]
+
 	t.w.glctxMu.Lock()
 	defer t.w.glctxMu.Unlock()
 
-	// TODO: adjust if dp is outside dst bounds, or r is outside src bounds.
 	t.w.glctx.BindTexture(gl.TEXTURE_2D, t.id)
-	m := buf.rgba.SubImage(sr).(*image.RGBA)
-	b := m.Bounds()
-	// TODO check m bounds smaller than t.size
-	t.w.glctx.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, b.Dx(), b.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, m.Pix)
+
+	width := dr.Dx()
+	if width*4 == buf.rgba.Stride {
+		t.w.glctx.TexSubImage2D(gl.TEXTURE_2D, 0, dr.Min.X, dr.Min.Y, width, dr.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, pix)
+		return
+	}
+	// TODO: can we use GL_UNPACK_ROW_LENGTH with glPixelStorei for stride in
+	// ES 3.0, instead of uploading the pixels row-by-row?
+	for y, p := dr.Min.Y, 0; y < dr.Max.Y; y++ {
+		t.w.glctx.TexSubImage2D(gl.TEXTURE_2D, 0, dr.Min.X, y, width, 1, gl.RGBA, gl.UNSIGNED_BYTE, pix[p:])
+		p += buf.rgba.Stride
+	}
 }
 
 func (t *textureImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {

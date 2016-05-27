@@ -97,9 +97,8 @@ func inv(x *f64.Aff3) f64.Aff3 {
 }
 
 func (t *textureImpl) draw(xp render.Picture, src2dst *f64.Aff3, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
-	// TODO: handle sr being out of t.Bounds().
-
-	if t.degenerate() || sr.Empty() {
+	sr = sr.Intersect(t.Bounds())
+	if sr.Empty() {
 		return
 	}
 

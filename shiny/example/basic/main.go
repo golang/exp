@@ -87,7 +87,7 @@ func main() {
 			case paint.Event:
 				w.Fill(sz.Bounds(), blue0, screen.Src)
 				w.Fill(sz.Bounds().Inset(10), blue1, screen.Src)
-				w.Upload(image.Point{}, b, b.Bounds())
+				w.Upload(image.Point{20, 0}, b, b.Bounds())
 				w.Fill(image.Rect(50, 50, 350, 120), red, screen.Over)
 
 				// By default, draw the entirety of the texture using the Over
