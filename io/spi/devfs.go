@@ -125,15 +125,15 @@ func (c *devfsConn) Configure(k, v int) error {
 	return nil
 }
 
-func (c *devfsConn) Transfer(tx, rx []byte) error {
-	if rx == nil {
-		rx = make([]byte, len(tx))
+func (c *devfsConn) Tx(w, r []byte) error {
+	if r == nil {
+		r = make([]byte, len(w))
 	}
-	// TODO(jbd): len(tx) == len(rx)?
-	// TODO(jbd): Allow nil tx?
+	// TODO(jbd): len(w) == len(r)?
+	// TODO(jbd): Allow nil w.
 	p := payload{
-		tx:     uint64(uintptr(unsafe.Pointer(&tx[0]))),
-		rx:     uint64(uintptr(unsafe.Pointer(&rx[0]))),
+		tx:     uint64(uintptr(unsafe.Pointer(&w[0]))),
+		rx:     uint64(uintptr(unsafe.Pointer(&r[0]))),
 		length: uint32(len(tx)),
 		speed:  c.speed,
 		delay:  c.delay,

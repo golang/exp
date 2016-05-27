@@ -20,7 +20,7 @@ func Example() {
 	}
 	defer dev.Close()
 
-	if err := dev.Transfer([]byte{
+	if err := dev.Tx([]byte{
 		0, 0, 0, 0,
 		0xff, 200, 0, 200,
 		0xff, 200, 0, 200,

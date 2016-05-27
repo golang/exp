@@ -38,8 +38,10 @@ type Conn interface {
 	// SPI devices can override these values.
 	Configure(k, v int) error
 
-	// Transfer transfers tx and reads into rx.
-	Transfer(tx, rx []byte) error
+	// Tx performs a SPI transaction: w is written if not nil, the result is
+	// put into r if not nil. len(w) must be equal to len(r), otherwise the
+	// driver should return an error.
+	Tx(w, r []byte) error
 
 	// Close frees the underlying resources and closes the connection.
 	Close() error

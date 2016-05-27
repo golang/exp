@@ -67,11 +67,12 @@ func (d *Device) SetDelay(t time.Duration) error {
 	return d.conn.Configure(driver.Delay, int(t.Nanoseconds()/1000))
 }
 
-// Transfer performs a duplex transmission to write to the SPI device
-// and read len(rx) bytes to rx.
-// User should not mutate the tx and rx until this call returns.
-func (d *Device) Transfer(tx, rx []byte) error {
-	return d.conn.Transfer(tx, rx)
+// Tx performs a duplex transmission to write w to the SPI device
+// and read len(r) bytes to r.
+// User should not mutate the w and r until this call returns.
+func (d *Device) Tx(w, r []byte) error {
+	// TODO(jbd): Allow nil w.
+	return d.conn.Tx(w, r)
 }
 
 // Open opens a device with the specified bus and chip select
