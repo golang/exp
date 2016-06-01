@@ -60,12 +60,12 @@ type devfsConn struct {
 
 func (c *devfsConn) Tx(w, r []byte) error {
 	if w != nil {
-		if _, err := d.f.Write(w); err != nil {
+		if _, err := c.f.Write(w); err != nil {
 			return err
 		}
 	}
 	if r != nil {
-		if _, err := d.f.Read(r); err != nil {
+		if _, err := c.f.Read(r); err != nil {
 			return err
 		}
 	}

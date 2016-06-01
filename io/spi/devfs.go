@@ -134,7 +134,7 @@ func (c *devfsConn) Tx(w, r []byte) error {
 	p := payload{
 		tx:     uint64(uintptr(unsafe.Pointer(&w[0]))),
 		rx:     uint64(uintptr(unsafe.Pointer(&r[0]))),
-		length: uint32(len(tx)),
+		length: uint32(len(w)),
 		speed:  c.speed,
 		delay:  c.delay,
 		bits:   c.bits,
