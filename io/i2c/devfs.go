@@ -8,6 +8,7 @@ package i2c
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"syscall"
 
@@ -65,7 +66,7 @@ func (c *devfsConn) Tx(w, r []byte) error {
 		}
 	}
 	if r != nil {
-		if _, err := c.f.Read(r); err != nil {
+		if _, err := io.ReadFull(c.f, r); err != nil {
 			return err
 		}
 	}
