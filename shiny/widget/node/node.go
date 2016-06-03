@@ -36,7 +36,7 @@
 //
 // In any case, most programmers that want to construct a widget tree should
 // not need to know this detail. It usually suffices to call functions such as
-// widget.NewButton or widget.NewLabel, and then parent.AppendChild(button).
+// widget.NewButton or widget.NewLabel, and then parent.Insert(button, nil).
 //
 // See the example/gallery program for some example code for a custom widget.
 package node // import "golang.org/x/exp/shiny/widget/node"
@@ -63,16 +63,18 @@ type Node interface {
 	// Wrappee returns the inner (embedded) type that is wrapped by this type.
 	Wrappee() *Embed
 
-	// AppendChild adds a node c as a child of this node.
+	// Insert adds a node c as a child of this node. If nextSibling is nil, c
+	// will be inserted at the end of this node's children. Otherwise, c will
+	// be inserted such that its next sibling is nextSibling.
 	//
 	// It will panic if c already has a parent or siblings.
-	AppendChild(c Node)
+	Insert(c, nextSibling Node)
 
-	// RemoveChild removes a node c that is a child of this node. Afterwards, c
-	// will have no parent and no siblings.
+	// Remove removes a node c that is a child of this node. Afterwards, c will
+	// have no parent and no siblings.
 	//
 	// It will panic if c's parent is not this node.
-	RemoveChild(c Node)
+	Remove(c Node)
 
 	// Measure sets this node's Embed.MeasuredSize to its natural size, taking
 	// its children into account.
@@ -107,11 +109,11 @@ type Node interface {
 // children.
 type LeafEmbed struct{ Embed }
 
-func (m *LeafEmbed) AppendChild(c Node) {
-	panic("node: AppendChild called for a leaf parent")
+func (m *LeafEmbed) Insert(c, nextSibling Node) {
+	panic("node: Insert called for a leaf parent")
 }
 
-func (m *LeafEmbed) RemoveChild(c Node) { m.removeChild(c) }
+func (m *LeafEmbed) Remove(c Node) { m.remove(c) }
 
 func (m *LeafEmbed) Measure(t *theme.Theme) { m.MeasuredSize = image.Point{} }
 
@@ -125,14 +127,14 @@ func (m *LeafEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled
 // one child.
 type ShellEmbed struct{ Embed }
 
-func (m *ShellEmbed) AppendChild(c Node) {
+func (m *ShellEmbed) Insert(c, nextSibling Node) {
 	if m.FirstChild != nil {
-		panic("node: AppendChild called for a shell parent that already has a child")
+		panic("node: Insert called for a shell parent that already has a child")
 	}
-	m.appendChild(c)
+	m.insert(c, nextSibling)
 }
 
-func (m *ShellEmbed) RemoveChild(c Node) { m.removeChild(c) }
+func (m *ShellEmbed) Remove(c Node) { m.remove(c) }
 
 func (m *ShellEmbed) Measure(t *theme.Theme) {
 	if c := m.FirstChild; c != nil {
@@ -167,9 +169,9 @@ func (m *ShellEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandle
 // number of children.
 type ContainerEmbed struct{ Embed }
 
-func (m *ContainerEmbed) AppendChild(c Node) { m.appendChild(c) }
+func (m *ContainerEmbed) Insert(c, nextSibling Node) { m.insert(c, nextSibling) }
 
-func (m *ContainerEmbed) RemoveChild(c Node) { m.removeChild(c) }
+func (m *ContainerEmbed) Remove(c Node) { m.remove(c) }
 
 func (m *ContainerEmbed) Measure(t *theme.Theme) {
 	mSize := image.Point{}
@@ -225,8 +227,8 @@ type Embed struct {
 	// widget tree structure.
 	//
 	// These fields are exported to enable walking the node tree, but they
-	// should not be modified directly. Instead, call the AppendChild and
-	// RemoveChild methods, which keeps the tree structure consistent.
+	// should not be modified directly. Instead, call the Insert and Remove
+	// methods, which keeps the tree structure consistent.
 	Parent, FirstChild, LastChild, PrevSibling, NextSibling *Embed
 
 	// LayoutData is layout-specific data for this node. Its type is determined
@@ -258,26 +260,46 @@ type Embed struct {
 
 func (m *Embed) Wrappee() *Embed { return m }
 
-func (m *Embed) appendChild(c Node) {
+func (m *Embed) insert(c, nextSibling Node) {
 	n := c.Wrappee()
 	if n.Parent != nil || n.PrevSibling != nil || n.NextSibling != nil {
-		panic("node: AppendChild called for an attached child")
+		panic("node: Insert called for an attached child")
 	}
-	last := m.LastChild
-	if last != nil {
-		last.NextSibling = n
-	} else {
-		m.FirstChild = n
-	}
-	m.LastChild = n
 	n.Parent = m
-	n.PrevSibling = last
+
+	if nextSibling == nil {
+		last := m.LastChild
+		if last != nil {
+			last.NextSibling = n
+		} else {
+			m.FirstChild = n
+		}
+		m.LastChild = n
+		n.PrevSibling = last
+		return
+	}
+
+	o := nextSibling.Wrappee()
+	if o.Parent != m {
+		panic("node: Insert called for a non-sibling nextSibling node")
+	}
+	if o.PrevSibling == nil {
+		o.PrevSibling = n
+		n.NextSibling = o
+		m.FirstChild = n
+		return
+	}
+
+	o.PrevSibling.NextSibling = n
+	n.PrevSibling = o.PrevSibling
+	n.NextSibling = o
+	o.PrevSibling = n
 }
 
-func (m *Embed) removeChild(c Node) {
+func (m *Embed) remove(c Node) {
 	n := c.Wrappee()
 	if n.Parent != m {
-		panic("node: RemoveChild called for a non-child node")
+		panic("node: Remove called for a non-child node")
 	}
 	if m.FirstChild == n {
 		m.FirstChild = n.NextSibling

@@ -29,7 +29,7 @@ func NewFlow(a Axis, children ...node.Node) *Flow {
 	}
 	w.Wrapper = w
 	for _, c := range children {
-		w.AppendChild(c)
+		w.Insert(c, nil)
 	}
 	return w
 }

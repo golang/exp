@@ -125,7 +125,7 @@ func NewFlex(children ...node.Node) *Flex {
 	w := new(Flex)
 	w.Wrapper = w
 	for _, c := range children {
-		w.AppendChild(c)
+		w.Insert(c, nil)
 	}
 	return w
 }
