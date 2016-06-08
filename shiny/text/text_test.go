@@ -135,8 +135,13 @@ func (toyFace) Kern(r0, r1 rune) fixed.Int26_6 {
 }
 
 func (toyFace) Metrics() font.Metrics {
-	return font.Metrics{}
+	return font.Metrics{
+		Ascent:  fixed.I(2),
+		Descent: fixed.I(1),
+	}
 }
+
+const toyFaceLineHeight = 3
 
 // iRobot is some text that contains both ASCII and non-ASCII runes.
 const iRobot = "\"I, Robot\" in Russian is \"Я, робот\".\nIt's about robots.\n"
@@ -383,6 +388,74 @@ func TestWriteAtStart(t *testing.T) {
 	f.compactText()
 	if nl, nb := f.nUsedLines(), f.nUsedBoxes(); nl != nb {
 		t.Fatalf("after compaction: using %d lines and %d boxes, should be equal", nl, nb)
+	}
+}
+
+func TestLineCount(t *testing.T) {
+	f := iRobotFrame(0)
+
+	testCases := []struct {
+		desc           string
+		maxWidth       int
+		wantLines      []string
+		wantLineCounts []int
+	}{{
+		desc:     "infinite maxWidth",
+		maxWidth: 0,
+		wantLines: []string{
+			`"I, Robot" in Russian is "Я, робот".`,
+			`It's about robots.`,
+			``,
+		},
+		wantLineCounts: []int{1, 1, 1},
+	}, {
+		desc:     "finite maxWidth",
+		maxWidth: 10,
+		wantLines: []string{
+			`"I, Robot"`,
+			`in Russian`,
+			`is "Я,`,
+			`робот".`,
+			`It's about`,
+			`robots.`,
+			``,
+		},
+		wantLineCounts: []int{4, 2, 1},
+	}}
+	for _, tc := range testCases {
+		f.SetMaxWidth(fixed.I(tc.maxWidth))
+		lines, lineCounts := []string{}, []int{}
+		for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
+			for l := p.FirstLine(f); l != nil; l = l.Next(f) {
+				var line []byte
+				for b := l.FirstBox(f); b != nil; b = b.Next(f) {
+					line = append(line, b.TrimmedText(f)...)
+				}
+				lines = append(lines, string(line))
+			}
+			lineCounts = append(lineCounts, p.LineCount(f))
+		}
+
+		if got, want := f.LineCount(), len(tc.wantLines); got != want {
+			t.Errorf("%s: LineCount: got %d, want %d", tc.desc, got, want)
+			continue
+		}
+		if !reflect.DeepEqual(lines, tc.wantLines) {
+			t.Errorf("%s: lines: got %q, want %q", tc.desc, lines, tc.wantLines)
+			continue
+		}
+		if got, want := f.ParagraphCount(), len(tc.wantLineCounts); got != want {
+			t.Errorf("%s: ParagraphCount: got %d, want %d", tc.desc, got, want)
+			continue
+		}
+		if !reflect.DeepEqual(lineCounts, tc.wantLineCounts) {
+			t.Errorf("%s: lineCounts: got %d, want %d", tc.desc, lineCounts, tc.wantLineCounts)
+			continue
+		}
+		if got, want := f.Height(), toyFaceLineHeight*len(tc.wantLines); got != want {
+			t.Errorf("%s: Height: got %d, want %d", tc.desc, got, want)
+			continue
+		}
 	}
 }
 
@@ -655,17 +728,33 @@ func TestCompactText(t *testing.T) {
 	}
 
 	written, wantLen := 0, 0
-	for i := 0; written < 32768; i++ {
-		x, y := rngIntPair(rng, len(buf)+1)
-		c.Seek(int64(rng.Intn(f.Len()+1)), SeekSet)
-		c.Write(buf[x:y])
-		written += y - x
-		wantLen += y - x
+	for i := 0; written < 131072; i++ {
+		if rng.Intn(10) != 0 {
+			x, y := rngIntPair(rng, len(buf)+1)
+			c.Seek(int64(rng.Intn(f.Len()+1)), SeekSet)
+			c.Write(buf[x:y])
+			written += y - x
+			wantLen += y - x
+		}
 
-		x, y = rngIntPair(rng, wantLen+1)
-		c.Seek(int64(x), SeekSet)
-		c.Delete(Forwards, y-x)
-		wantLen -= y - x
+		if rng.Intn(10) != 0 {
+			x, y := rngIntPair(rng, wantLen+1)
+			c.Seek(int64(x), SeekSet)
+			c.Delete(Forwards, y-x)
+			wantLen -= y - x
+		}
+
+		// Calculate cached counts, some of the time.
+		if rng.Intn(3) == 0 {
+			f.ParagraphCount()
+		}
+		if rng.Intn(4) == 0 {
+			f.LineCount()
+		}
+		if rng.Intn(5) == 0 {
+			c.Seek(int64(rng.Intn(f.Len()+1)), SeekSet)
+			f.paragraphs[c.p].LineCount(f)
+		}
 
 		if err := checkInvariants(f); err != nil {
 			t.Fatalf("i=%d: %v", i, err)
@@ -935,7 +1024,7 @@ func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 
 	// Iterate through the Paragraphs, Lines and Boxes. Check that every first
 	// child has no previous sibling, and no child is the first child of
-	// multiple parents.
+	// multiple parents. Also check the cached Paragraph and Line counts.
 	nUsedParagraphs, nUsedLines, nUsedBoxes := 0, 0, 0
 	{
 		firstLines := map[int32]bool{}
@@ -961,6 +1050,7 @@ func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 			}
 			firstLines[l] = true
 
+			nUsedLinesThisParagraph := 0
 			for ; l != 0; l = f.lines[l].next {
 				b := f.lines[l].firstB
 				if b == 0 {
@@ -981,8 +1071,19 @@ func checkSomeInvariants(f *Frame, ignoredInvariants uint32) error {
 					}
 				}
 				nUsedLines++
+				nUsedLinesThisParagraph++
 			}
 			nUsedParagraphs++
+
+			if n := int(f.paragraphs[p].cachedLineCountPlus1 - 1); n >= 0 && n != nUsedLinesThisParagraph {
+				return fmt.Errorf("Paragraph cached Line count: got %d, want %d", n, nUsedLinesThisParagraph)
+			}
+		}
+		if n := int(f.cachedLineCountPlus1 - 1); n >= 0 && n != nUsedLines {
+			return fmt.Errorf("Frame cached Line count: got %d, want %d", n, nUsedLines)
+		}
+		if n := int(f.cachedParagraphCountPlus1 - 1); n >= 0 && n != nUsedParagraphs {
+			return fmt.Errorf("Frame cached Paragraph count: got %d, want %d", n, nUsedParagraphs)
 		}
 	}
 

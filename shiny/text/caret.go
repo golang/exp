@@ -412,6 +412,10 @@ func (c *Caret) write(s0 []byte, s1 string) error {
 		c.leanForwards()
 	}
 
+	c.f.invalidateCaches()
+	c.f.paragraphs[c.p].invalidateCaches()
+	c.f.lines[c.l].invalidateCaches()
+
 	length, nl := len(s0), false
 	if length > 0 {
 		nl = s0[length-1] == '\n'
@@ -671,6 +675,7 @@ func (c *Caret) Delete(dir Direction, nBytes int) (dBytes int) {
 	// The mergeIntoOneLine will shake out any empty Boxes.
 	l := c.f.mergeIntoOneLine(c.p)
 	layout(c.f, l)
+	c.f.invalidateCaches()
 
 	// Compact c.f.text if it's large enough and the fraction of deleted text
 	// is above some threshold. The actual threshold value (25%) is arbitrary.

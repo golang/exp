@@ -96,6 +96,13 @@ type Frame struct {
 	lines      []Line
 	boxes      []Box
 
+	// These values cache the total height-in-pixels of or the number of
+	// elements in the paragraphs or lines linked lists. The plus one is so
+	// that the zero value means the cache is invalid.
+	cachedHeightPlus1         int32
+	cachedLineCountPlus1      int32
+	cachedParagraphCountPlus1 int32
+
 	// freeX is the index of the first X (Paragraph, Line or Box) in the
 	// respective free list. Zero means that there is no such free element.
 	freeP, freeL, freeB int32
@@ -103,7 +110,9 @@ type Frame struct {
 	firstP int32
 
 	maxWidth fixed.Int26_6
-	face     font.Face
+
+	faceHeight int32
+	face       font.Face
 
 	// len is the total length of the Frame's current textual content, in
 	// bytes. It can be smaller then len(text), since that []byte can contain
@@ -136,16 +145,39 @@ func (f *Frame) SetFace(face font.Face) {
 		f.initialize()
 	}
 	f.face = face
+	if face == nil {
+		f.faceHeight = 0
+	} else {
+		// We round up the ascent and descent separately, instead of asking for
+		// the metrics' height, since we quantize the baseline to the integer
+		// pixel grid. For example, if ascent and descent were both 3.2 pixels,
+		// then the naive height would be 6.4, which rounds up to 7, but we
+		// should really provide 8 pixels (= ceil(3.2) + ceil(3.2)) between
+		// each line to avoid overlap.
+		//
+		// TODO: is a font.Metrics.Height actually useful in practice??
+		//
+		// TODO: is it the font face's responsibility to track line spacing, as
+		// in "double line spacing", or does that belong somewhere else, since
+		// it doesn't affect the face's glyph masks?
+		m := face.Metrics()
+		f.faceHeight = int32(m.Ascent.Ceil() + m.Descent.Ceil())
+	}
 	if f.len != 0 {
 		f.relayout()
 	}
 }
 
-// SetMaxWidth sets the target maximum width of a Line of text. Text will be
-// broken so that a Line's width is less than or equal to this maximum width.
-// This line breaking is not strict. A Line containing asingleverylongword
-// combined with a narrow maximum width will not be broken and will remain
-// longer than the target maximum width; soft hyphens are not inserted.
+// TODO: should SetMaxWidth take an int number of pixels instead of a
+// fixed.Int26_6 number of sub-pixels? Height returns an int, since it assumes
+// that the text baselines are quantized to the integer pixel grid.
+
+// SetMaxWidth sets the target maximum width of a Line of text, as a
+// fixed-point fractional number of pixels. Text will be broken so that a
+// Line's width is less than or equal to this maximum width. This line breaking
+// is not strict. A Line containing asingleverylongword combined with a narrow
+// maximum width will not be broken and will remain longer than the target
+// maximum width; soft hyphens are not inserted.
 //
 // A non-positive argument is treated as an infinite maximum width.
 func (f *Frame) SetMaxWidth(m fixed.Int26_6) {
@@ -166,6 +198,7 @@ func (f *Frame) relayout() {
 		l := f.mergeIntoOneLine(p)
 		layout(f, l)
 	}
+	f.invalidateCaches()
 	f.seqNum++
 }
 
@@ -187,6 +220,8 @@ func (f *Frame) mergeIntoOneLine(p int32) (l int32) {
 		}
 
 		if ll.next == 0 {
+			f.paragraphs[p].invalidateCaches()
+			f.lines[firstL].invalidateCaches()
 			return firstL
 		}
 
@@ -328,6 +363,61 @@ func (f *Frame) FirstParagraph() *Paragraph {
 		f.initialize()
 	}
 	return &f.paragraphs[f.firstP]
+}
+
+func (f *Frame) invalidateCaches() {
+	f.cachedHeightPlus1 = 0
+	f.cachedLineCountPlus1 = 0
+	f.cachedParagraphCountPlus1 = 0
+}
+
+// Height returns the height in pixels of this Frame.
+func (f *Frame) Height() int {
+	if !f.initialized() {
+		f.initialize()
+	}
+	if f.cachedHeightPlus1 <= 0 {
+		h := 1
+		for p := f.firstP; p != 0; p = f.paragraphs[p].next {
+			h += f.paragraphs[p].Height(f)
+		}
+		f.cachedHeightPlus1 = int32(h)
+	}
+	return int(f.cachedHeightPlus1 - 1)
+}
+
+// LineCount returns the number of Lines in this Frame.
+//
+// This count includes any soft returns inserted to wrap text to the maxWidth.
+func (f *Frame) LineCount() int {
+	if !f.initialized() {
+		f.initialize()
+	}
+	if f.cachedLineCountPlus1 <= 0 {
+		n := 1
+		for p := f.firstP; p != 0; p = f.paragraphs[p].next {
+			n += f.paragraphs[p].LineCount(f)
+		}
+		f.cachedLineCountPlus1 = int32(n)
+	}
+	return int(f.cachedLineCountPlus1 - 1)
+}
+
+// ParagraphCount returns the number of Paragraphs in this Frame.
+//
+// This count excludes any soft returns inserted to wrap text to the maxWidth.
+func (f *Frame) ParagraphCount() int {
+	if !f.initialized() {
+		f.initialize()
+	}
+	if f.cachedParagraphCountPlus1 <= 0 {
+		n := 1
+		for p := f.firstP; p != 0; p = f.paragraphs[p].next {
+			n++
+		}
+		f.cachedParagraphCountPlus1 = int32(n)
+	}
+	return int(f.cachedParagraphCountPlus1 - 1)
 }
 
 // Len returns the number of bytes in the Frame's text.
@@ -546,7 +636,9 @@ func (z lineReader) ReadRune() (r rune, size int, err error) {
 
 // Paragraph holds Lines of text.
 type Paragraph struct {
-	firstL, next, prev int32
+	firstL, next, prev   int32
+	cachedHeightPlus1    int32
+	cachedLineCountPlus1 int32
 }
 
 func (p *Paragraph) lastLine(f *Frame) int32 {
@@ -576,9 +668,41 @@ func (p *Paragraph) Next(f *Frame) *Paragraph {
 	return &f.paragraphs[p.next]
 }
 
+func (p *Paragraph) invalidateCaches() {
+	p.cachedHeightPlus1 = 0
+	p.cachedLineCountPlus1 = 0
+}
+
+// Height returns the height in pixels of this Paragraph.
+func (p *Paragraph) Height(f *Frame) int {
+	if p.cachedHeightPlus1 <= 0 {
+		h := 1
+		for l := p.firstL; l != 0; l = f.lines[l].next {
+			h += f.lines[l].Height(f)
+		}
+		p.cachedHeightPlus1 = int32(h)
+	}
+	return int(p.cachedHeightPlus1 - 1)
+}
+
+// LineCount returns the number of Lines in this Paragraph.
+//
+// This count includes any soft returns inserted to wrap text to the maxWidth.
+func (p *Paragraph) LineCount(f *Frame) int {
+	if p.cachedLineCountPlus1 <= 0 {
+		n := 1
+		for l := p.firstL; l != 0; l = f.lines[l].next {
+			n++
+		}
+		p.cachedLineCountPlus1 = int32(n)
+	}
+	return int(p.cachedLineCountPlus1 - 1)
+}
+
 // Line holds Boxes of text.
 type Line struct {
 	firstB, next, prev int32
+	cachedHeightPlus1  int32
 }
 
 func (l *Line) lastBox(f *Frame) int32 {
@@ -606,6 +730,23 @@ func (l *Line) Next(f *Frame) *Line {
 		return nil
 	}
 	return &f.lines[l.next]
+}
+
+func (l *Line) invalidateCaches() {
+	l.cachedHeightPlus1 = 0
+}
+
+// Height returns the height in pixels of this Line.
+func (l *Line) Height(f *Frame) int {
+	// TODO: measure the height of each box, if we allow rich text (i.e. more
+	// than one Frame-wide font face).
+	if f.face == nil {
+		return 0
+	}
+	if l.cachedHeightPlus1 <= 0 {
+		l.cachedHeightPlus1 = f.faceHeight + 1
+	}
+	return int(l.cachedHeightPlus1 - 1)
 }
 
 // Box holds a contiguous run of text.
