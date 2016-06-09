@@ -46,7 +46,7 @@ type payload struct {
 }
 
 // Devfs is an SPI driver that works against the devfs.
-// You need to load the "spidev" module to use this driver.
+// You need to have loaded the "spidev" Linux module to use this driver.
 type Devfs struct {
 	// Dev is the device to be opened.
 	// Device name is usually in the /dev/spidev<bus>.<chip> format.
@@ -65,7 +65,7 @@ type Devfs struct {
 	MaxSpeed int64
 }
 
-// Open opens the provided device with the speicifed options
+// Open opens the provided device with the specified options
 // and returns a connection.
 func (d *Devfs) Open() (driver.Conn, error) {
 	f, err := os.OpenFile(d.Dev, os.O_RDWR, os.ModeDevice)
