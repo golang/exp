@@ -29,26 +29,34 @@ func NewLabel(text string) *Label {
 }
 
 func (w *Label) Measure(t *theme.Theme) {
-	f := t.AcquireFontFace(theme.FontFaceOptions{})
-	defer t.ReleaseFontFace(theme.FontFaceOptions{}, f)
-	m := f.Metrics()
+	face := t.AcquireFontFace(theme.FontFaceOptions{})
+	defer t.ReleaseFontFace(theme.FontFaceOptions{}, face)
+	m := face.Metrics()
 
-	w.MeasuredSize.X = font.MeasureString(f, w.Text).Ceil()
+	// TODO: padding, to match a Text widget?
+
+	w.MeasuredSize.X = font.MeasureString(face, w.Text).Ceil()
 	w.MeasuredSize.Y = m.Ascent.Ceil() + m.Descent.Ceil()
 }
 
 func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	f := t.AcquireFontFace(theme.FontFaceOptions{})
-	defer t.ReleaseFontFace(theme.FontFaceOptions{}, f)
-	m := f.Metrics()
+	dst = dst.SubImage(w.Rect.Add(origin)).(*image.RGBA)
+	if dst.Bounds().Empty() {
+		return
+	}
+
+	face := t.AcquireFontFace(theme.FontFaceOptions{})
+	defer t.ReleaseFontFace(theme.FontFaceOptions{}, face)
+	m := face.Metrics()
+	ascent := m.Ascent.Ceil()
 
 	d := font.Drawer{
 		Dst:  dst,
 		Src:  t.GetPalette().Foreground,
-		Face: f,
+		Face: face,
 		Dot: fixed.Point26_6{
 			X: fixed.I(origin.X + w.Rect.Min.X),
-			Y: fixed.I(origin.Y + w.Rect.Min.Y + m.Ascent.Ceil()),
+			Y: fixed.I(origin.Y + w.Rect.Min.Y + ascent),
 		},
 	}
 	d.DrawString(w.Text)

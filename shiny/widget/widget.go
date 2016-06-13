@@ -58,7 +58,7 @@ func WithLayoutData(n node.Node, layoutData interface{}) node.Node {
 func RunWindow(s screen.Screen, root node.Node) error {
 	var (
 		buf screen.Buffer
-		t   theme.Theme
+		t   = &theme.Theme{}
 	)
 	defer func() {
 		if buf != nil {
@@ -96,11 +96,20 @@ func RunWindow(s screen.Screen, root node.Node) error {
 			if err != nil {
 				return err
 			}
-			t.DPI = float64(e.PixelsPerPt) * unit.PointsPerInch
-			root.Measure(&t)
+
+			if dpi := float64(e.PixelsPerPt) * unit.PointsPerInch; dpi != t.GetDPI() {
+				newT := new(theme.Theme)
+				if t != nil {
+					*newT = *t
+				}
+				newT.DPI = dpi
+				t = newT
+			}
+
+			root.Measure(t)
 			root.Wrappee().Rect = e.Bounds()
-			root.Layout(&t)
-			root.Paint(&t, buf.RGBA(), image.Point{})
+			root.Layout(t)
+			root.Paint(t, buf.RGBA(), image.Point{})
 
 		case error:
 			return e

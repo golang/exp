@@ -78,6 +78,8 @@ type Node interface {
 
 	// Measure sets this node's Embed.MeasuredSize to its natural size, taking
 	// its children into account.
+	//
+	// TODO: include width / height hints, for width-in-height-out layout?
 	Measure(t *theme.Theme)
 
 	// Layout lays out this node (and its children), setting the Embed.Rect
