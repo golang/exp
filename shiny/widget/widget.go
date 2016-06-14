@@ -45,6 +45,12 @@ func WithLayoutData(n node.Node, layoutData interface{}) node.Node {
 	return n
 }
 
+// RunWindowOptions are optional arguments to RunWindow.
+type RunWindowOptions struct {
+	NewWindowOptions screen.NewWindowOptions
+	Theme            theme.Theme
+}
+
 // TODO: how does RunWindow's caller inject or process events (whether general
 // like lifecycle events or app-specific)? How does it stop the event loop when
 // the app's work is done?
@@ -55,18 +61,25 @@ func WithLayoutData(n node.Node, layoutData interface{}) node.Node {
 
 // RunWindow creates a new window for s, with the given widget tree, and runs
 // its event loop.
-func RunWindow(s screen.Screen, root node.Node) error {
+//
+// A nil opts is valid and means to use the default option values.
+func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 	var (
 		buf screen.Buffer
-		t   = &theme.Theme{}
+		nwo *screen.NewWindowOptions
+		t   *theme.Theme
 	)
+	if opts != nil {
+		nwo = &opts.NewWindowOptions
+		t = &opts.Theme
+	}
 	defer func() {
 		if buf != nil {
 			buf.Release()
 		}
 	}()
 
-	w, err := s.NewWindow(nil)
+	w, err := s.NewWindow(nwo)
 	if err != nil {
 		return err
 	}

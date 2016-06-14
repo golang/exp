@@ -74,6 +74,8 @@ type Screen interface {
 	NewTexture(size image.Point) (Texture, error)
 
 	// NewWindow returns a new Window for this screen.
+	//
+	// A nil opts is valid and means to use the default option values.
 	NewWindow(opts *NewWindowOptions) (Window, error)
 }
 

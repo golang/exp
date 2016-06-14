@@ -55,7 +55,7 @@ func main() {
 	driver.Main(func(s screen.Screen) {
 		// TODO: create a bunch of standard widgets: buttons, labels, etc.
 		w := newCustom()
-		if err := widget.RunWindow(s, w); err != nil {
+		if err := widget.RunWindow(s, w, nil); err != nil {
 			log.Fatal(err)
 		}
 	})

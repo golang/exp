@@ -26,7 +26,7 @@ func main() {
 	log.SetFlags(0)
 	driver.Main(func(s screen.Screen) {
 		w := widget.NewText(prideAndPrejudice)
-		if err := widget.RunWindow(s, w); err != nil {
+		if err := widget.RunWindow(s, w, nil); err != nil {
 			log.Fatal(err)
 		}
 	})
