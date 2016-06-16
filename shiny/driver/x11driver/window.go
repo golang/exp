@@ -36,7 +36,7 @@ type windowImpl struct {
 	xg xproto.Gcontext
 	xp render.Picture
 
-	event.Queue
+	event.Deque
 	xevents chan xgb.Event
 
 	// This next group of variables are mutable, but are only modified in the

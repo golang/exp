@@ -169,12 +169,17 @@ type Texture interface {
 	// interfaces??
 }
 
-// EventQueue is an infinitely buffered FIFO queue of events.
-type EventQueue interface {
-	// Send adds an event to the end of the queue.
+// EventDeque is an infinitely buffered double-ended queue of events.
+type EventDeque interface {
+	// Send adds an event to the end of the deque. They are returned by
+	// NextEvent in FIFO order.
 	Send(event interface{})
 
-	// NextEvent returns the next event in the queue. It blocks until such an
+	// SendFirst adds an event to the start of the deque. They are returned by
+	// NextEvent in LIFO order, and have priority over events sent via Send.
+	SendFirst(event interface{})
+
+	// NextEvent returns the next event in the deque. It blocks until such an
 	// event has been sent.
 	//
 	// Typical event types include:
@@ -185,7 +190,7 @@ type EventQueue interface {
 	//	- mouse.Event
 	//	- touch.Event
 	// from the golang.org/x/mobile/event/... packages. Other packages may send
-	// events, of those types above or of other types, via Send.
+	// events, of those types above or of other types, via Send or SendFirst.
 	NextEvent() interface{}
 
 	// TODO: LatestLifecycleEvent? Is that still worth it if the
@@ -202,7 +207,7 @@ type Window interface {
 	// passing it as an argument, is undefined.
 	Release()
 
-	EventQueue
+	EventDeque
 
 	Uploader
 

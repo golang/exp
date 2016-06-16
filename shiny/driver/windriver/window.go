@@ -32,7 +32,7 @@ import (
 type windowImpl struct {
 	hwnd syscall.Handle
 
-	event.Queue
+	event.Deque
 
 	sz             size.Event
 	lifecycleStage lifecycle.Stage

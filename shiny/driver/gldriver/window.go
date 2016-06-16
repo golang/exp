@@ -40,7 +40,7 @@ type windowImpl struct {
 	// the field above for cocoa and win32.
 	lifecycleStage lifecycle.Stage // current stage
 
-	event.Queue
+	event.Deque
 	publish     chan struct{}
 	publishDone chan screen.PublishResult
 	drawDone    chan struct{}

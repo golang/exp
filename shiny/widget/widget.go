@@ -49,6 +49,8 @@ func WithLayoutData(n node.Node, layoutData interface{}) node.Node {
 type RunWindowOptions struct {
 	NewWindowOptions screen.NewWindowOptions
 	Theme            theme.Theme
+
+	// TODO: some mechanism to process, filter and inject events.
 }
 
 // TODO: how does RunWindow's caller inject or process events (whether general
