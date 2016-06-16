@@ -33,6 +33,7 @@ var (
 	blue1    = color.RGBA{0x00, 0x00, 0x3f, 0xff}
 	darkGray = color.RGBA{0x3f, 0x3f, 0x3f, 0xff}
 	red      = color.RGBA{0x7f, 0x00, 0x00, 0x7f}
+	yellow   = color.RGBA{0x3f, 0x3f, 0x00, 0x3f}
 
 	cos30 = math.Cos(math.Pi / 6)
 	sin30 = math.Sin(math.Pi / 6)
@@ -110,6 +111,7 @@ func main() {
 					+0.5 * sin30, +1.0 * cos30, 200,
 				}
 				w.Draw(src2dst, t, tRect, op, nil)
+				w.DrawUniform(src2dst, yellow, tRect.Inset(30), screen.Over, nil)
 
 				// Draw crosses at the transformed corners of tRect.
 				for _, sx := range []int{tRect.Min.X, tRect.Max.X} {

@@ -74,6 +74,10 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	fill(w.s.xc, w.xp, dr, src, op)
 }
 
+func (w *windowImpl) DrawUniform(src2dst f64.Aff3, src color.Color, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	w.s.drawUniform(w.xp, &src2dst, src, sr, op, opts)
+}
+
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
 	src.(*textureImpl).draw(w.xp, &src2dst, sr, op, opts)
 }

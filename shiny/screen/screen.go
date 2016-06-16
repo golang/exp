@@ -290,6 +290,10 @@ type Drawer interface {
 	// (m00*sx + m01*sy + m02, m10*sx + m11*sy + m12).
 	Draw(src2dst f64.Aff3, src Texture, sr image.Rectangle, op draw.Op, opts *DrawOptions)
 
+	// DrawUniform is like Draw except that the src is a uniform color instead
+	// of a Texture.
+	DrawUniform(src2dst f64.Aff3, src color.Color, sr image.Rectangle, op draw.Op, opts *DrawOptions)
+
 	// Copy copies the sub-Texture defined by src and sr to the destination
 	// (the method receiver), such that sr.Min in src-space aligns with dp in
 	// dst-space.

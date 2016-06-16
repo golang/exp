@@ -7,6 +7,8 @@ package x11driver
 import (
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	"log"
 	"sync"
 
@@ -17,6 +19,7 @@ import (
 
 	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/mouse"
 )
@@ -43,6 +46,13 @@ type screenImpl struct {
 	// with an alpha channel. The root window isn't guaranteed to be depth-32.
 	gcontext32 xproto.Gcontext
 	window32   xproto.Window
+
+	// opaqueP is a fully opaque, solid fill picture.
+	opaqueP render.Picture
+
+	uniformMu sync.Mutex
+	uniformC  render.Color
+	uniformP  render.Picture
 
 	mu              sync.Mutex
 	buffers         map[shm.Seg]*bufferImpl
@@ -78,6 +88,24 @@ func newScreenImpl(xc *xgb.Conn) (*screenImpl, error) {
 	if err := s.initWindow32(); err != nil {
 		return nil, err
 	}
+
+	var err error
+	s.opaqueP, err = render.NewPictureId(xc)
+	if err != nil {
+		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
+	}
+	s.uniformP, err = render.NewPictureId(xc)
+	if err != nil {
+		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
+	}
+	render.CreateSolidFill(s.xc, s.opaqueP, render.Color{
+		Red:   0xffff,
+		Green: 0xffff,
+		Blue:  0xffff,
+		Alpha: 0xffff,
+	})
+	render.CreateSolidFill(s.xc, s.uniformP, render.Color{})
+
 	go s.run()
 	return s, nil
 }
@@ -313,14 +341,6 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	if err != nil {
 		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
 	}
-	opaqueM, err := xproto.NewPixmapId(s.xc)
-	if err != nil {
-		return nil, fmt.Errorf("x11driver: xproto.NewPixmapId failed: %v", err)
-	}
-	opaqueP, err := render.NewPictureId(s.xc)
-	if err != nil {
-		return nil, fmt.Errorf("x11driver: xproto.NewPictureId failed: %v", err)
-	}
 	xproto.CreatePixmap(s.xc, textureDepth, xm, xproto.Drawable(s.window32), uint16(w), uint16(h))
 	render.CreatePicture(s.xc, xp, xproto.Drawable(xm), s.pictformat32, render.CpRepeat, []uint32{render.RepeatPad})
 	render.SetPictureFilter(s.xc, xp, uint16(len("bilinear")), "bilinear", nil)
@@ -331,12 +351,10 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 	}})
 
 	return &textureImpl{
-		s:       s,
-		size:    size,
-		xm:      xm,
-		xp:      xp,
-		opaqueM: opaqueM,
-		opaqueP: opaqueP,
+		s:    s,
+		size: size,
+		xm:   xm,
+		xp:   xp,
 	}, nil
 }
 
@@ -551,4 +569,40 @@ func (s *screenImpl) setProperty(xw xproto.Window, prop xproto.Atom, values ...x
 		b[4*i+3] = uint8(v >> 24)
 	}
 	xproto.ChangeProperty(s.xc, xproto.PropModeReplace, xw, prop, xproto.AtomAtom, 32, uint32(len(values)), b)
+}
+
+func (s *screenImpl) drawUniform(xp render.Picture, src2dst *f64.Aff3, src color.Color, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	if sr.Empty() {
+		return
+	}
+
+	if opts == nil && *src2dst == (f64.Aff3{1, 0, 0, 0, 1, 0}) {
+		fill(s.xc, xp, sr, src, op)
+		return
+	}
+
+	r, g, b, a := src.RGBA()
+	c := render.Color{
+		Red:   uint16(r),
+		Green: uint16(g),
+		Blue:  uint16(b),
+		Alpha: uint16(a),
+	}
+	points := trifanPoints(src2dst, sr)
+
+	s.uniformMu.Lock()
+	defer s.uniformMu.Unlock()
+
+	if s.uniformC != c {
+		s.uniformC = c
+		render.FreePicture(s.xc, s.uniformP)
+		render.CreateSolidFill(s.xc, s.uniformP, c)
+	}
+
+	if op == draw.Src {
+		// We implement draw.Src as render.PictOpOutReverse followed by
+		// render.PictOpOver, for the same reason as in textureImpl.draw.
+		render.TriFan(s.xc, render.PictOpOutReverse, s.opaqueP, xp, 0, 0, 0, points[:])
+	}
+	render.TriFan(s.xc, render.PictOpOver, s.uniformP, xp, 0, 0, 0, points[:])
 }

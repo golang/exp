@@ -77,6 +77,10 @@ func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectang
 	})
 }
 
+func (w *windowImpl) DrawUniform(src2dst f64.Aff3, src color.Color, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	panic("TODO: implement")
+}
+
 func drawWindow(dc syscall.Handle, src2dst f64.Aff3, src syscall.Handle, sr image.Rectangle, op draw.Op) (retErr error) {
 	var dr image.Rectangle
 	if src2dst[1] != 0 || src2dst[3] != 0 {

@@ -121,7 +121,7 @@ func useOp(glctx gl.Context, op draw.Op) {
 	}
 }
 
-func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+func (w *windowImpl) fill(mvp f64.Aff3, src color.Color, op draw.Op) {
 	w.glctxMu.Lock()
 	defer w.glctxMu.Unlock()
 
@@ -143,15 +143,7 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	}
 	w.glctx.UseProgram(w.s.fill.program)
 
-	dstL := float64(dr.Min.X)
-	dstT := float64(dr.Min.Y)
-	dstR := float64(dr.Max.X)
-	dstB := float64(dr.Max.Y)
-	writeAff3(w.glctx, w.s.fill.mvp, w.mvp(
-		dstL, dstT,
-		dstR, dstT,
-		dstL, dstB,
-	))
+	writeAff3(w.glctx, w.s.fill.mvp, mvp)
 
 	r, g, b, a := src.RGBA()
 	w.glctx.Uniform4f(
@@ -169,6 +161,33 @@ func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
 	w.glctx.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
 	w.glctx.DisableVertexAttribArray(w.s.fill.pos)
+}
+
+func (w *windowImpl) Fill(dr image.Rectangle, src color.Color, op draw.Op) {
+	minX := float64(dr.Min.X)
+	minY := float64(dr.Min.Y)
+	maxX := float64(dr.Max.X)
+	maxY := float64(dr.Max.Y)
+	w.fill(w.mvp(
+		minX, minY,
+		maxX, minY,
+		minX, maxY,
+	), src, op)
+}
+
+func (w *windowImpl) DrawUniform(src2dst f64.Aff3, src color.Color, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	minX := float64(sr.Min.X)
+	minY := float64(sr.Min.Y)
+	maxX := float64(sr.Max.X)
+	maxY := float64(sr.Max.Y)
+	w.fill(w.mvp(
+		src2dst[0]*minX+src2dst[1]*minY+src2dst[2],
+		src2dst[3]*minX+src2dst[4]*minY+src2dst[5],
+		src2dst[0]*maxX+src2dst[1]*minY+src2dst[2],
+		src2dst[3]*maxX+src2dst[4]*minY+src2dst[5],
+		src2dst[0]*minX+src2dst[1]*maxY+src2dst[2],
+		src2dst[3]*minX+src2dst[4]*maxY+src2dst[5],
+	), src, op)
 }
 
 func (w *windowImpl) Draw(src2dst f64.Aff3, src screen.Texture, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
