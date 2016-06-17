@@ -23,7 +23,6 @@ import (
 	"golang.org/x/exp/shiny/widget"
 	"golang.org/x/exp/shiny/widget/node"
 	"golang.org/x/exp/shiny/widget/theme"
-	"golang.org/x/mobile/event/mouse"
 )
 
 var red = image.NewUniform(color.RGBA{0xff, 0x00, 0x00, 0xff})
@@ -39,9 +38,9 @@ func newCustom() *custom {
 	return w
 }
 
-func (w *custom) OnMouseEvent(e mouse.Event, origin image.Point) node.EventHandled {
+func (w *custom) OnInputEvent(e interface{}, origin image.Point) node.EventHandled {
 	// TODO: do something more interesting.
-	fmt.Println(e)
+	fmt.Printf("%T %v\n", e, e)
 	return node.Handled
 }
 

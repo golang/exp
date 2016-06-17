@@ -44,13 +44,14 @@ package node // import "golang.org/x/exp/shiny/widget/node"
 import (
 	"image"
 
+	"golang.org/x/exp/shiny/gesture"
 	"golang.org/x/exp/shiny/widget/theme"
 	"golang.org/x/mobile/event/mouse"
 )
 
-// EventHandled is whether or not an input event, such as a key or mouse event,
-// was handled by a widget. If it was not handled, the event is propagated
-// along the widget tree.
+// EventHandled is whether or not an input event (a key, mouse, touch or
+// gesture event) was handled by a widget. If it was not handled, the event is
+// propagated along the widget tree.
 type EventHandled bool
 
 const (
@@ -97,14 +98,14 @@ type Node interface {
 	// smaller dst images?
 	Paint(t *theme.Theme, dst *image.RGBA, origin image.Point)
 
-	// OnMouseEvent handles a mouse event.
+	// OnInputEvent handles a key, mouse, touch or gesture event.
 	//
-	// origin is the parent widget's origin with respect to the mouse event
-	// origin; this node's Embed.Rect.Add(origin) will be its position and size
-	// in mouse event coordinate space.
-	OnMouseEvent(e mouse.Event, origin image.Point) EventHandled
+	// origin is the parent widget's origin with respect to the event origin;
+	// this node's Embed.Rect.Add(origin) will be its position and size in
+	// event coordinate space.
+	OnInputEvent(e interface{}, origin image.Point) EventHandled
 
-	// TODO: OnXxxEvent methods.
+	// TODO: other OnXxxEvent methods?
 }
 
 // LeafEmbed is designed to be embedded in struct types for nodes with no
@@ -123,7 +124,7 @@ func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
 func (m *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {}
 
-func (m *LeafEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled { return NotHandled }
+func (m *LeafEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled { return NotHandled }
 
 // ShellEmbed is designed to be embedded in struct types for nodes with at most
 // one child.
@@ -160,9 +161,9 @@ func (m *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) 
 	}
 }
 
-func (m *ShellEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled {
+func (m *ShellEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled {
 	if c := m.FirstChild; c != nil {
-		return c.Wrapper.OnMouseEvent(e, origin.Add(m.Rect.Min))
+		return c.Wrapper.OnInputEvent(e, origin.Add(m.Rect.Min))
 	}
 	return NotHandled
 }
@@ -203,16 +204,25 @@ func (m *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Poi
 	}
 }
 
-func (m *ContainerEmbed) OnMouseEvent(e mouse.Event, origin image.Point) EventHandled {
+func (m *ContainerEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled {
 	origin = origin.Add(m.Rect.Min)
-	p := image.Point{
-		X: int(e.X) - origin.X,
-		Y: int(e.Y) - origin.Y,
+	var p image.Point
+	switch e := e.(type) {
+	case gesture.Event:
+		p = image.Point{
+			X: int(e.CurrentPos.X) - origin.X,
+			Y: int(e.CurrentPos.Y) - origin.Y,
+		}
+	case mouse.Event:
+		p = image.Point{
+			X: int(e.X) - origin.X,
+			Y: int(e.Y) - origin.Y,
+		}
 	}
 	// Iterate backwards. Later children have priority over earlier children,
 	// as later ones are usually drawn over earlier ones.
 	for c := m.LastChild; c != nil; c = c.PrevSibling {
-		if p.In(c.Rect) && c.Wrapper.OnMouseEvent(e, origin) == Handled {
+		if p.In(c.Rect) && c.Wrapper.OnInputEvent(e, origin) == Handled {
 			return Handled
 		}
 	}

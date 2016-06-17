@@ -10,6 +10,7 @@ package widget // import "golang.org/x/exp/shiny/widget"
 import (
 	"image"
 
+	"golang.org/x/exp/shiny/gesture"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/exp/shiny/widget/node"
@@ -50,7 +51,9 @@ type RunWindowOptions struct {
 	NewWindowOptions screen.NewWindowOptions
 	Theme            theme.Theme
 
-	// TODO: some mechanism to process, filter and inject events.
+	// TODO: some mechanism to process, filter and inject events. Perhaps a
+	// screen.EventFilter interface, and note that the zero value in this
+	// RunWindowOptions implicitly includes the gesture.EventFilter?
 }
 
 // TODO: how does RunWindow's caller inject or process events (whether general
@@ -86,15 +89,22 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 		return err
 	}
 	defer w.Release()
+	gef := gesture.EventFilter{EventDeque: w}
 	for {
-		switch e := w.NextEvent().(type) {
+		e := w.NextEvent()
+
+		if e = gef.Filter(e); e == nil {
+			continue
+		}
+
+		switch e := e.(type) {
 		case lifecycle.Event:
 			if e.To == lifecycle.StageDead {
 				return nil
 			}
 
-		case mouse.Event:
-			root.OnMouseEvent(e, image.Point{})
+		case gesture.Event, mouse.Event:
+			root.OnInputEvent(e, image.Point{})
 
 		case paint.Event:
 			if buf != nil {
