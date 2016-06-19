@@ -18,14 +18,8 @@ import (
 // Devfs is an I2C driver that works against the devfs.
 // You need to load the "i2c-dev" kernel module to use this driver.
 type Devfs struct {
-	// Dev is the I2C bus device, e.g. /dev/i2c-1.
-	// Required.
+	// Dev is the I2C bus device, e.g. /dev/i2c-1. Required.
 	Dev string
-
-	// Addr is the device's I2C address on the specified bus.
-	// Use TenBit to mark your address if your device works with 10-bit addresses.
-	// Required.
-	Addr int
 }
 
 const (
@@ -35,8 +29,7 @@ const (
 
 // TODO(jbd): Support I2C_RETRIES and I2C_TIMEOUT at the driver and implementation level.
 
-func (d *Devfs) Open() (driver.Conn, error) {
-	addr, tenbit := ResolveAddr(d.Addr)
+func (d *Devfs) Open(addr int, tenbit bool) (driver.Conn, error) {
 	f, err := os.OpenFile(d.Dev, os.O_RDWR, os.ModeDevice)
 	if err != nil {
 		return nil, err

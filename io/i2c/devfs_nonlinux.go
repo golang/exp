@@ -16,10 +16,9 @@ import (
 // can rely on local tools even though the real implementation isn't
 // available on their platform.
 type Devfs struct {
-	Dev  string
-	Addr int
+	Dev string
 }
 
-func (d *Devfs) Open() (driver.Conn, error) {
+func (d *Devfs) Open(addr int, tenbit bool) (driver.Conn, error) {
 	return nil, errors.New("not implemented on this platform")
 }

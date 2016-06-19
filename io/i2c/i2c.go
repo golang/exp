@@ -52,16 +52,19 @@ func (d *Device) Close() error {
 
 // Open opens a connection to an I2C device.
 // All devices must be closed once they are no longer in use.
-func Open(o driver.Opener) (*Device, error) {
-	conn, err := o.Open()
+// For devices that use 10-bit I2C addresses, addr can be marked
+// as a 10-bit address with TenBit.
+func Open(o driver.Opener, addr int) (*Device, error) {
+	unmasked, tenbit := resolveAddr(addr)
+	conn, err := o.Open(unmasked, tenbit)
 	if err != nil {
 		return nil, err
 	}
 	return &Device{conn: conn}, nil
 }
 
-// ResolveAddr returns whether the addr is 10-bit masked or not.
+// resolveAddr returns whether the addr is 10-bit masked or not.
 // It also returns the unmasked address.
-func ResolveAddr(addr int) (unmasked int, tenbit bool) {
+func resolveAddr(addr int) (unmasked int, tenbit bool) {
 	return addr & (tenbitMask - 1), addr&tenbitMask == tenbitMask
 }

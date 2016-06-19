@@ -5,9 +5,11 @@
 // Package driver contains interfaces to be implemented by various I2C implementations.
 package driver // import "golang.org/x/exp/io/i2c/driver"
 
-// Opener opens a connection to an I2C device.
+// Opener opens a connection to an I2C device to communicate with
+// the I2C address given. If the address is an 10-bit I2C address,
+// tenbit is true.
 type Opener interface {
-	Open() (Conn, error)
+	Open(addr int, tenbit bool) (Conn, error)
 }
 
 // Conn represents an active connection to an I2C device.

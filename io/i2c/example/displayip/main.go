@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build linux
-
 // Package main contains a program that displays the IPv4 address
 // of the machine on an a Grove-LCD RGB backlight.
 package main
@@ -21,12 +19,12 @@ const (
 )
 
 func main() {
-	d, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1", Addr: DISPLAY_RGB_ADDR})
+	d, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1"}, DISPLAY_RGB_ADDR)
 	if err != nil {
 		panic(err)
 	}
 
-	td, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1", Addr: DISPLAY_TEXT_ADDR})
+	td, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1"}, DISPLAY_TEXT_ADDR)
 	if err != nil {
 		panic(err)
 	}
