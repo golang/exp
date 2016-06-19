@@ -33,6 +33,13 @@ type Conn interface {
 	// SetDirection sets the direction of the pin.
 	SetDirection(pin int, dir Direction) error
 
+	// Map should map a virtual GPIO pin number to a physical pin number.
+	// This is also useful to configure driver implementations for boards
+	// with different GPIO pin layouts. E.g. GPIO 25 pin on a Raspberry Pi,
+	// can be represented by a different physical pin out on a different
+	// board.
+	Map(virtual, physical int)
+
 	// Close closes the connection and frees the underlying resources.
 	Close() error
 }
