@@ -4,7 +4,7 @@
 
 // Package driver contains interfaces that needs to be implemented by
 // various GPIO implementations.
-package driver
+package driver // import "golang.org/x/exp/io/gpio/driver"
 
 // Direction determines the direction of the pin. A pin could be
 // configured to be an input or an output.

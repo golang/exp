@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package gpio allows users to communicate with GPIO pins.
-package gpio
+package gpio // import "golang.org/x/exp/io/gpio"
 
 import "golang.org/x/exp/io/gpio/driver"
 
