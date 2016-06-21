@@ -296,3 +296,7 @@ func createEGLSurface(hwnd syscall.Handle, w *windowImpl) error {
 
 	return nil
 }
+
+func surfaceCreate() error {
+	return errors.New("gldriver: surface creation not implemented on windows")
+}

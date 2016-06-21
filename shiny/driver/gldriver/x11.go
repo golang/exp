@@ -9,8 +9,10 @@ package gldriver
 /*
 #cgo LDFLAGS: -lEGL -lGLESv2 -lX11
 
+#include <stdbool.h>
 #include <stdint.h>
 
+char *eglGetErrorStr();
 void startDriver();
 void processEvents();
 void makeCurrent(uintptr_t ctx);
@@ -18,6 +20,7 @@ void swapBuffers(uintptr_t ctx);
 void doCloseWindow(uintptr_t id);
 uintptr_t doNewWindow(int width, int height);
 uintptr_t doShowWindow(uintptr_t id);
+uintptr_t surfaceCreate();
 */
 import "C"
 import (
@@ -287,4 +290,11 @@ func onDeleteWindow(id uintptr) {
 
 	w.lifecycler.SetDead(true)
 	w.lifecycler.SendEvent(w)
+}
+
+func surfaceCreate() error {
+	if C.surfaceCreate() == 0 {
+		return errors.New("gldriver: surface creation failed")
+	}
+	return nil
 }

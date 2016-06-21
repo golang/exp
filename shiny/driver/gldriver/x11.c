@@ -265,3 +265,52 @@ doShowWindow(uintptr_t id) {
 	}
 	return (uintptr_t)(surf);
 }
+
+uintptr_t
+surfaceCreate() {
+	static const EGLint ctx_attribs[] = {
+		EGL_CONTEXT_CLIENT_VERSION, 3,
+		EGL_NONE
+	};
+	EGLContext ctx = eglCreateContext(e_dpy, e_config, EGL_NO_CONTEXT, ctx_attribs);
+	if (!ctx) {
+		fprintf(stderr, "surface eglCreateContext failed: %s\n", eglGetErrorStr());
+		return 0;
+	}
+
+	static const EGLint cfg_attribs[] = {
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+		EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+		EGL_BLUE_SIZE, 8,
+		EGL_GREEN_SIZE, 8,
+		EGL_RED_SIZE, 8,
+		EGL_DEPTH_SIZE, 16,
+		EGL_CONFIG_CAVEAT, EGL_NONE,
+		EGL_NONE
+	};
+	EGLConfig cfg;
+	EGLint num_configs;
+	if (!eglChooseConfig(e_dpy, cfg_attribs, &cfg, 1, &num_configs)) {
+		fprintf(stderr, "gldriver: surface eglChooseConfig failed: %s\n", eglGetErrorStr());
+		return 0;
+	}
+
+	// TODO: use the size of the monitor as a bound for texture size.
+	static const EGLint attribs[] = {
+		EGL_WIDTH, 4096,
+		EGL_HEIGHT, 3072,
+		EGL_NONE
+	};
+	EGLSurface surface = eglCreatePbufferSurface(e_dpy, cfg, attribs);
+	if (!surface) {
+		fprintf(stderr, "gldriver: surface eglCreatePbufferSurface failed: %s\n", eglGetErrorStr());
+		return 0;
+	}
+
+	if (!eglMakeCurrent(e_dpy, surface, surface, ctx)) {
+		fprintf(stderr, "gldriver: surface eglMakeCurrent failed: %s\n", eglGetErrorStr());
+		return 0;
+	}
+
+	return (uintptr_t)surface;
+}
