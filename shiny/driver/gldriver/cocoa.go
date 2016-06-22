@@ -265,11 +265,25 @@ func mouseEvent(id uintptr, x, y, dx, dy float32, ty, button int32, flags uint32
 	case C.NSMouseMoved, C.NSLeftMouseDragged, C.NSRightMouseDragged, C.NSOtherMouseDragged:
 		// No-op.
 	case C.NSScrollWheel:
+		// Note that the direction of scrolling is inverted by default
+		// on OS X by the "natural scrolling" setting. At the Cocoa
+		// level this inversion is applied to trackpads and mice behind
+		// the scenes, and the value of dy goes in the direction the OS
+		// wants scrolling to go.
+		//
+		// This means the same trackpad/mouse motion on OS X and Linux
+		// can produce wheel events in opposite directions, but the
+		// direction matches what other programs on the OS do.
+		//
+		// If we wanted to expose the phsyical device motion in the
+		// event we could use [NSEvent isDirectionInvertedFromDevice]
+		// to know if "natural scrolling" is enabled.
+		//
 		// TODO: handle horizontal scrolling
-		button := mouse.ButtonWheelDown
+		button := mouse.ButtonWheelUp
 		if dy < 0 {
 			dy = -dy
-			button = mouse.ButtonWheelUp
+			button = mouse.ButtonWheelDown
 		}
 		for delta := int(dy); delta != 0; delta-- {
 			sendWindowEvent(id, mouse.Event{
