@@ -79,11 +79,15 @@ func (w *Text) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	defer t.ReleaseFontFace(theme.FontFaceOptions{}, face)
 	m := face.Metrics()
 	ascent := m.Ascent.Ceil()
+	descent := m.Descent.Ceil()
 	height := m.Height.Ceil()
 
 	padding := t.Pixels(unit.Ems(0.5)).Ceil()
 
 	draw.Draw(dst, dst.Bounds(), t.GetPalette().Background, image.Point{}, draw.Src)
+
+	minDotY := fixed.I(dst.Bounds().Min.Y - descent)
+	maxDotY := fixed.I(dst.Bounds().Max.Y + ascent)
 
 	x0 := fixed.I(origin.X + w.Rect.Min.X + padding)
 	d := font.Drawer{
@@ -97,14 +101,17 @@ func (w *Text) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	}
 	f := &w.frame
 	for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
-		// TODO: bail out early if the paragraph or line isn't visible. For
-		// long (high) passages of text, this should save many DrawBytes calls.
 		for l := p.FirstLine(f); l != nil; l = l.Next(f) {
-			for b := l.FirstBox(f); b != nil; b = b.Next(f) {
-				d.DrawBytes(b.TrimmedText(f))
-				// TODO: adjust d.Dot.X for any ligatures?
+			if d.Dot.Y > minDotY {
+				if d.Dot.Y >= maxDotY {
+					return
+				}
+				for b := l.FirstBox(f); b != nil; b = b.Next(f) {
+					d.DrawBytes(b.TrimmedText(f))
+					// TODO: adjust d.Dot.X for any ligatures?
+				}
+				d.Dot.X = x0
 			}
-			d.Dot.X = x0
 			d.Dot.Y += fixed.I(height)
 		}
 	}
