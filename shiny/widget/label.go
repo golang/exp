@@ -40,6 +40,7 @@ func (w *Label) Measure(t *theme.Theme) {
 }
 
 func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	w.NeedsPaint = false
 	dst = dst.SubImage(w.Rect.Add(origin)).(*image.RGBA)
 	if dst.Bounds().Empty() {
 		return

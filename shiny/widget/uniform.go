@@ -42,6 +42,7 @@ func (w *Uniform) Measure(t *theme.Theme) {
 }
 
 func (w *Uniform) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	w.NeedsPaint = false
 	if w.Uniform.C == nil {
 		return
 	}

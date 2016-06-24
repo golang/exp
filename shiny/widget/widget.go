@@ -89,6 +89,19 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 		return err
 	}
 	defer w.Release()
+
+	// paintPending batches up multiple NeedsPaint observations so that we
+	// paint only once (which can be relatively expensive) even when there are
+	// multiple input events in the queue, such as from a rapidly moving mouse
+	// or from the user typing many keys.
+	//
+	// TODO: determine somehow if there's an external paint event in the queue,
+	// not just internal paint events?
+	//
+	// TODO: if every package that uses package screen should basically
+	// throttle like this, should it be provided at a lower level?
+	paintPending := false
+
 	gef := gesture.EventFilter{EventDeque: w}
 	for {
 		e := w.NextEvent()
@@ -108,9 +121,11 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 
 		case paint.Event:
 			if buf != nil {
+				root.Paint(t, buf.RGBA(), image.Point{})
 				w.Upload(image.Point{}, buf, buf.Bounds())
 			}
 			w.Publish()
+			paintPending = false
 
 		case size.Event:
 			if buf != nil {
@@ -134,10 +149,15 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 			root.Measure(t)
 			root.Wrappee().Rect = e.Bounds()
 			root.Layout(t)
-			root.Paint(t, buf.RGBA(), image.Point{})
+			// TODO: call MarkNeedsPaint?
 
 		case error:
 			return e
+		}
+
+		if !paintPending && root.Wrappee().NeedsPaint {
+			paintPending = true
+			w.Send(paint.Event{})
 		}
 	}
 }

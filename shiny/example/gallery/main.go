@@ -12,24 +12,32 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"log"
 
 	"golang.org/x/exp/shiny/driver"
+	"golang.org/x/exp/shiny/gesture"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/widget"
 	"golang.org/x/exp/shiny/widget/node"
 	"golang.org/x/exp/shiny/widget/theme"
 )
 
-var red = image.NewUniform(color.RGBA{0xff, 0x00, 0x00, 0xff})
+var uniforms = [...]*image.Uniform{
+	image.NewUniform(color.RGBA{0xbf, 0x00, 0x00, 0xff}),
+	image.NewUniform(color.RGBA{0x9f, 0x9f, 0x00, 0xff}),
+	image.NewUniform(color.RGBA{0x00, 0xbf, 0x00, 0xff}),
+	image.NewUniform(color.RGBA{0x00, 0x9f, 0x9f, 0xff}),
+	image.NewUniform(color.RGBA{0x00, 0x00, 0xbf, 0xff}),
+	image.NewUniform(color.RGBA{0x9f, 0x00, 0x9f, 0xff}),
+}
 
 // custom is a custom widget.
 type custom struct {
 	node.LeafEmbed
+	index int
 }
 
 func newCustom() *custom {
@@ -39,14 +47,23 @@ func newCustom() *custom {
 }
 
 func (w *custom) OnInputEvent(e interface{}, origin image.Point) node.EventHandled {
-	// TODO: do something more interesting.
-	fmt.Printf("%T %v\n", e, e)
+	switch e := e.(type) {
+	case gesture.Event:
+		if e.Type != gesture.TypeTap {
+			break
+		}
+		w.index++
+		if w.index == len(uniforms) {
+			w.index = 0
+		}
+		w.MarkNeedsPaint()
+	}
 	return node.Handled
 }
 
 func (w *custom) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	// TODO: do something more interesting.
-	draw.Draw(dst, w.Rect.Add(origin), red, image.Point{}, draw.Src)
+	w.NeedsPaint = false
+	draw.Draw(dst, w.Rect.Add(origin), uniforms[w.index], image.Point{}, draw.Src)
 }
 
 func main() {

@@ -106,6 +106,10 @@ type Node interface {
 	OnInputEvent(e interface{}, origin image.Point) EventHandled
 
 	// TODO: other OnXxxEvent methods?
+
+	// MarkNeedsPaint marks this node (and its ancestors) that their previous
+	// Paint calls may no longer depict their current state.
+	MarkNeedsPaint()
 }
 
 // LeafEmbed is designed to be embedded in struct types for nodes with no
@@ -122,7 +126,9 @@ func (m *LeafEmbed) Measure(t *theme.Theme) { m.MeasuredSize = image.Point{} }
 
 func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
-func (m *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {}
+func (m *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	m.NeedsPaint = false
+}
 
 func (m *LeafEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled { return NotHandled }
 
@@ -156,6 +162,7 @@ func (m *ShellEmbed) Layout(t *theme.Theme) {
 }
 
 func (m *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	m.NeedsPaint = false
 	if c := m.FirstChild; c != nil {
 		c.Wrapper.Paint(t, dst, origin.Add(m.Rect.Min))
 	}
@@ -198,6 +205,7 @@ func (m *ContainerEmbed) Layout(t *theme.Theme) {
 }
 
 func (m *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+	m.NeedsPaint = false
 	origin = origin.Add(m.Rect.Min)
 	for c := m.FirstChild; c != nil; c = c.NextSibling {
 		c.Wrapper.Paint(t, dst, origin)
@@ -268,9 +276,21 @@ type Embed struct {
 	// necessarily the same as relative to the screen's, window's or image
 	// buffer's origin.
 	Rect image.Rectangle
+
+	// NeedsPaint is whether previous Paint calls for this node (and,
+	// implicitly, its descendents) may no longer depict its current state.
+	NeedsPaint bool
 }
 
 func (m *Embed) Wrappee() *Embed { return m }
+
+func (m *Embed) MarkNeedsPaint() {
+	for ; m != nil; m = m.Parent {
+		m.NeedsPaint = true
+	}
+}
+
+// TODO: should insert and remove call MarkNeedsPaint? MarkNeedsLayout?
 
 func (m *Embed) insert(c, nextSibling Node) {
 	n := c.Wrappee()
