@@ -26,6 +26,7 @@ const (
 
 // TODO(jbd): Support interrupts.
 // TODO(jbd): Allow users to configure edge trigger type.
+// TODO(jbd): Introduce Pin type and document pin identifiers.
 
 // Open opens a connection to the GPIO device with the given driver.
 // Opened devices should be closed by calling Close.
@@ -41,17 +42,17 @@ func Open(d driver.Opener) (*Device, error) {
 }
 
 // Value returns the value for the pin. 0 for low, 1 for high values.
-func (d *Device) Value(pin int) (int, error) {
+func (d *Device) Value(pin string) (int, error) {
 	return d.conn.Value(pin)
 }
 
 // SetValue sets the value of the pin. 0 for low, 1 for high values.
-func (d *Device) SetValue(pin int, v int) error {
+func (d *Device) SetValue(pin string, v int) error {
 	return d.conn.SetValue(pin, v)
 }
 
 // SetDirection configures the direction of the pin.
-func (d *Device) SetDirection(pin int, dir Direction) error {
+func (d *Device) SetDirection(pin string, dir Direction) error {
 	return d.conn.SetDirection(pin, driver.Direction(dir))
 }
 
