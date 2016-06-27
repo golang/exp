@@ -20,7 +20,7 @@ func TestTenBit(t *testing.T) {
 	}
 
 	for _, tt := range tc {
-		unmasked, tenbit := ResolveAddr(tt.masked)
+		unmasked, tenbit := resolveAddr(tt.masked)
 		if want, got := tt.tenbitWant, tenbit; got != want {
 			t.Errorf("want address %b as 10-bit; got non 10-bit", want)
 		}
