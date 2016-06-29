@@ -57,6 +57,7 @@ func (c *devfsConn) Tx(w, r []byte) error {
 		if _, err := c.f.Write(w); err != nil {
 			return err
 		}
+		c.f.Sync()
 	}
 	if r != nil {
 		if _, err := io.ReadFull(c.f, r); err != nil {
