@@ -171,7 +171,7 @@ var shared = struct {
 	pix: make([]byte, 4*N*N),
 }
 
-func simulate(q screen.EventQueue) {
+func simulate(q screen.EventDeque) {
 	var (
 		dens, densPrev array
 		u, uPrev       array

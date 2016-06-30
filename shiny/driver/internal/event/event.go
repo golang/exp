@@ -18,7 +18,7 @@ type Deque struct {
 	front []interface{} // LIFO.
 }
 
-// NextEvent implements the screen.EventQueue interface.
+// NextEvent implements the screen.EventDeque interface.
 func (q *Deque) NextEvent() interface{} {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -43,7 +43,7 @@ func (q *Deque) NextEvent() interface{} {
 	}
 }
 
-// Send implements the screen.EventQueue interface.
+// Send implements the screen.EventDeque interface.
 func (q *Deque) Send(event interface{}) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -55,7 +55,7 @@ func (q *Deque) Send(event interface{}) {
 	q.cond.Signal()
 }
 
-// SendFirst implements the screen.EventQueue interface.
+// SendFirst implements the screen.EventDeque interface.
 func (q *Deque) SendFirst(event interface{}) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
