@@ -19,6 +19,7 @@ import (
 	"math"
 
 	"golang.org/x/exp/shiny/driver"
+	"golang.org/x/exp/shiny/imageutil"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/key"
@@ -85,8 +86,11 @@ func main() {
 				}
 
 			case paint.Event:
-				w.Fill(sz.Bounds(), blue0, screen.Src)
-				w.Fill(sz.Bounds().Inset(10), blue1, screen.Src)
+				const inset = 10
+				for _, r := range imageutil.Border(sz.Bounds(), inset) {
+					w.Fill(r, blue0, screen.Src)
+				}
+				w.Fill(sz.Bounds().Inset(inset), blue1, screen.Src)
 				w.Upload(image.Point{20, 0}, b, b.Bounds())
 				w.Fill(image.Rect(50, 50, 350, 120), red, screen.Over)
 
