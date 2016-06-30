@@ -22,7 +22,7 @@ import (
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/inconsolata"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
@@ -131,9 +131,9 @@ func drawRGBA(m *image.RGBA, tp image.Point) {
 	d := font.Drawer{
 		Dst:  m,
 		Src:  image.Black,
-		Face: basicfont.Face7x13,
+		Face: inconsolata.Regular8x16,
 		Dot: fixed.Point26_6{
-			Y: basicfont.Face7x13.Metrics().Ascent,
+			Y: inconsolata.Regular8x16.Metrics().Ascent,
 		},
 	}
 	d.DrawString(fmt.Sprint(tp))

@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/inconsolata"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -89,12 +89,16 @@ var (
 	Default *Theme
 )
 
-// Note that a basicfont.Face is stateless and safe to use concurrently, so
-// defaultFontFaceCatalog.ReleaseFontFace can be a no-op.
+// Note that a *basicfont.Face such as inconsolata.Regular8x16 is stateless and
+// safe to use concurrently, so defaultFontFaceCatalog.ReleaseFontFace can be a
+// no-op.
 
 type defaultFontFaceCatalog struct{}
 
-func (defaultFontFaceCatalog) AcquireFontFace(FontFaceOptions) font.Face  { return basicfont.Face7x13 }
+func (defaultFontFaceCatalog) AcquireFontFace(FontFaceOptions) font.Face {
+	return inconsolata.Regular8x16
+}
+
 func (defaultFontFaceCatalog) ReleaseFontFace(FontFaceOptions, font.Face) {}
 
 // Theme is used for measuring, laying out and painting widgets. It consists of
