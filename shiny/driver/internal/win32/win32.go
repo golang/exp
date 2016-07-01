@@ -172,12 +172,17 @@ func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (l
 	}
 
 	switch uMsg {
-	case _WM_MOUSEMOVE, _WM_MOUSEWHEEL:
+	case _WM_MOUSEMOVE:
 		e.Direction = mouse.DirNone
 	case _WM_LBUTTONDOWN, _WM_MBUTTONDOWN, _WM_RBUTTONDOWN:
 		e.Direction = mouse.DirPress
 	case _WM_LBUTTONUP, _WM_MBUTTONUP, _WM_RBUTTONUP:
 		e.Direction = mouse.DirRelease
+	case _WM_MOUSEWHEEL:
+		// TODO: On a trackpad, a scroll can be a drawn-out affair with a
+		// distinct beginning and end. Should the intermediate events be
+		// DirNone?
+		e.Direction = mouse.DirStep
 	default:
 		panic("sendMouseEvent() called on non-mouse message")
 	}
@@ -192,6 +197,7 @@ func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (l
 	case _WM_RBUTTONDOWN, _WM_RBUTTONUP:
 		e.Button = mouse.ButtonRight
 	case _WM_MOUSEWHEEL:
+		// TODO: handle horizontal scrolling
 		delta := _GET_WHEEL_DELTA_WPARAM(wParam) / _WHEEL_DELTA
 		switch {
 		case delta > 0:
