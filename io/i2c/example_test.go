@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build linux
-
 package i2c_test
 
 import (
@@ -11,7 +9,7 @@ import (
 )
 
 func ExampleOpen() {
-	d, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1", Addr: 0x39})
+	d, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1"}, 0x39)
 	if err != nil {
 		panic(err)
 	}
