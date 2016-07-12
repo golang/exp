@@ -78,6 +78,7 @@ const (
 	xkTab        = 0xff09
 	xkReturn     = 0xff0d
 	xkEscape     = 0xff1b
+	xkMultiKey   = 0xff20
 	xkHome       = 0xff50
 	xkLeft       = 0xff51
 	xkUp         = 0xff52
@@ -134,6 +135,7 @@ var nonUnicodeKeycodes = map[rune]key.Code{
 	xkEnd:        key.CodeEnd,
 	xkInsert:     key.CodeInsert,
 	xkMenu:       key.CodeRightGUI, // TODO: CodeRightGUI or CodeMenu??
+	xkMultiKey:   key.CodeCompose,
 
 	xkF1:  key.CodeF1,
 	xkF2:  key.CodeF2,
