@@ -15,6 +15,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 	"math"
 
@@ -28,6 +29,10 @@ import (
 	"golang.org/x/mobile/gl"
 )
 
+func colorPatch(c color.Color, w, h unit.Value) *widget.Sizer {
+	return widget.NewSizer(w, h, widget.NewUniform(c))
+}
+
 func main() {
 	gldriver.Main(func(s screen.Screen) {
 		t1, t2 := newTriangleGL(), newTriangleGL()
@@ -35,11 +40,11 @@ func main() {
 		defer t2.cleanup()
 
 		body := flex.NewFlex(
-			widget.NewUniform(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
+			colorPatch(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
 			widget.WithLayoutData(t1.w, flex.LayoutData{Grow: 1, Align: flex.AlignItemStretch}),
-			widget.NewUniform(colornames.Blue, unit.Pixels(50), unit.Pixels(50)),
+			colorPatch(colornames.Blue, unit.Pixels(50), unit.Pixels(50)),
 			widget.WithLayoutData(t2.w, flex.LayoutData{MinSize: image.Point{80, 80}}),
-			widget.NewUniform(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
+			colorPatch(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
 		)
 
 		if err := widget.RunWindow(s, body, nil); err != nil {

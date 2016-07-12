@@ -33,6 +33,10 @@ import (
 
 var px = unit.Pixels
 
+func colorPatch(c color.Color, w, h unit.Value) *widget.Sizer {
+	return widget.NewSizer(w, h, widget.NewUniform(c))
+}
+
 func main() {
 	t := theme.Default
 
@@ -40,32 +44,32 @@ func main() {
 	hf := widget.NewFlow(widget.AxisHorizontal,
 		widget.NewLabel("Cyan:"),
 		widget.WithLayoutData(
-			widget.NewUniform(color.RGBA{0x00, 0x7f, 0x7f, 0xff}, px(0), px(20)),
+			colorPatch(color.RGBA{0x00, 0x7f, 0x7f, 0xff}, px(0), px(20)),
 			widget.FlowLayoutData{ExpandAlongWeight: 1},
 		),
 		widget.NewLabel("Magenta:"),
 		widget.WithLayoutData(
-			widget.NewUniform(color.RGBA{0x7f, 0x00, 0x7f, 0xff}, px(0), px(30)),
+			colorPatch(color.RGBA{0x7f, 0x00, 0x7f, 0xff}, px(0), px(30)),
 			widget.FlowLayoutData{ExpandAlongWeight: 2},
 		),
 		widget.NewLabel("Yellow:"),
 		widget.WithLayoutData(
-			widget.NewUniform(color.RGBA{0x7f, 0x7f, 0x00, 0xff}, px(0), px(40)),
+			colorPatch(color.RGBA{0x7f, 0x7f, 0x00, 0xff}, px(0), px(40)),
 			widget.FlowLayoutData{ExpandAlongWeight: 3},
 		),
 	)
 
 	vf := widget.NewFlow(widget.AxisVertical,
-		widget.NewUniform(color.RGBA{0xff, 0x00, 0x00, 0xff}, px(80), px(40)),
-		widget.NewUniform(color.RGBA{0x00, 0xff, 0x00, 0xff}, px(50), px(50)),
-		widget.NewUniform(color.RGBA{0x00, 0x00, 0xff, 0xff}, px(20), px(60)),
+		colorPatch(color.RGBA{0xff, 0x00, 0x00, 0xff}, px(80), px(40)),
+		colorPatch(color.RGBA{0x00, 0xff, 0x00, 0xff}, px(50), px(50)),
+		colorPatch(color.RGBA{0x00, 0x00, 0xff, 0xff}, px(20), px(60)),
 		widget.WithLayoutData(
 			hf,
 			widget.FlowLayoutData{ExpandAcross: true},
 		),
 		widget.NewLabel(fmt.Sprintf(
 			"The black rectangle is 1.5 inches x 1 inch when viewed at %v DPI.", t.GetDPI())),
-		widget.NewUniform(color.Black, unit.Inches(1.5), unit.Inches(1)),
+		colorPatch(color.Black, unit.Inches(1.5), unit.Inches(1)),
 	)
 
 	// Make the RGBA image.

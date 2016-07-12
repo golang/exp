@@ -19,11 +19,6 @@ import (
 // Text is a leaf widget that holds a text label.
 type Text struct {
 	node.LeafEmbed
-
-	// TODO: add NaturalWidth and NaturalHeight fields a la Uniform?
-	//
-	// Should they go in a Sizer shell widget instead?
-
 	frame   text.Frame
 	faceSet bool
 

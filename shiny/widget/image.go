@@ -16,10 +16,6 @@ import (
 
 // TODO: be able to specify the draw operator: Src instead of Over.
 
-// TODO: be able to override the natural width and height, e.g. to specify a
-// button's image in inches instead of (DPI-independent) pixels? Should that be
-// the responsibility of this widget (Image) or of a Sizer shell widget?
-
 // TODO: if the measured size differs from the actual size, specify a
 // background color (or tile-able image like a checkerboard)? Specify a
 // draw.Scaler from the golang.org/x/image/draw package? Be able to center the
