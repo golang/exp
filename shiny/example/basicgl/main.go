@@ -30,7 +30,7 @@ import (
 )
 
 func colorPatch(c color.Color, w, h unit.Value) *widget.Sizer {
-	return widget.NewSizer(w, h, widget.NewUniform(c))
+	return widget.NewSizer(w, h, widget.NewUniform(c, nil))
 }
 
 func main() {
