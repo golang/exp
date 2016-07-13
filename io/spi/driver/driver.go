@@ -11,6 +11,7 @@ const (
 	MaxSpeed
 	Order
 	Delay
+	CSChange
 )
 
 // Opener is an interface to be implemented by the SPI driver to open
@@ -34,6 +35,7 @@ type Conn interface {
 	//    Some SPI devices require a minimum amount of wait time after
 	//    each frame write. If set, Delay amount of usecs are inserted after
 	//    each write.
+	//  - CSChange, whether to leave the device's chipselect active after a Tx.
 	//
 	// SPI devices can override these values.
 	Configure(k, v int) error

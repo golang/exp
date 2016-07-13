@@ -67,6 +67,15 @@ func (d *Device) SetDelay(t time.Duration) error {
 	return d.conn.Configure(driver.Delay, int(t.Nanoseconds()/1000))
 }
 
+// SetCSChange sets whether to leave the chipselect enabled after a Tx.
+func (d *Device) SetCSChange(leaveEnabled bool) error {
+	v := 0
+	if leaveEnabled {
+		v = 1
+	}
+	return d.conn.Configure(driver.CSChange, v)
+}
+
 // Tx performs a duplex transmission to write w to the SPI device
 // and read len(r) bytes to r.
 // User should not mutate the w and r until this call returns.

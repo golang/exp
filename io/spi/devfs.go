@@ -85,11 +85,12 @@ func (d *Devfs) Open() (driver.Conn, error) {
 }
 
 type devfsConn struct {
-	f     *os.File
-	mode  uint8
-	speed uint32
-	bits  uint8
-	delay uint16
+	f        *os.File
+	mode     uint8
+	speed    uint32
+	bits     uint8
+	delay    uint16
+	csChange uint8
 }
 
 func (c *devfsConn) Configure(k, v int) error {
@@ -119,6 +120,8 @@ func (c *devfsConn) Configure(k, v int) error {
 		}
 	case driver.Delay:
 		c.delay = uint16(v)
+	case driver.CSChange:
+		c.csChange = uint8(v)
 	default:
 		return fmt.Errorf("unknown key: %v", k)
 	}
@@ -132,12 +135,13 @@ func (c *devfsConn) Tx(w, r []byte) error {
 	// TODO(jbd): len(w) == len(r)?
 	// TODO(jbd): Allow nil w.
 	p := payload{
-		tx:     uint64(uintptr(unsafe.Pointer(&w[0]))),
-		rx:     uint64(uintptr(unsafe.Pointer(&r[0]))),
-		length: uint32(len(w)),
-		speed:  c.speed,
-		delay:  c.delay,
-		bits:   c.bits,
+		tx:       uint64(uintptr(unsafe.Pointer(&w[0]))),
+		rx:       uint64(uintptr(unsafe.Pointer(&r[0]))),
+		length:   uint32(len(w)),
+		speed:    c.speed,
+		delay:    c.delay,
+		bits:     c.bits,
+		csChange: c.csChange,
 	}
 	// TODO(jbd): Read from the device and fill rx.
 	return c.ioctl(msgRequestCode(1), uintptr(unsafe.Pointer(&p)))
