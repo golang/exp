@@ -98,6 +98,16 @@ type Node interface {
 	// smaller dst images?
 	Paint(t *theme.Theme, dst *image.RGBA, origin image.Point)
 
+	// Mark adds the given marks to this node. It calls OnChildMarked on its
+	// parent if new marks were added.
+	Mark(m Marks)
+
+	// OnChildMarked handles a child being given new marks. By default, marks
+	// are propagated up the node tree towards the root. For example, a child
+	// being marked for needing paint will cause the parent being marked for
+	// needing paint.
+	OnChildMarked(child Node, newMarks Marks)
+
 	// OnInputEvent handles a key, mouse, touch or gesture event.
 	//
 	// origin is the parent widget's origin with respect to the event origin;
@@ -107,9 +117,6 @@ type Node interface {
 
 	// TODO: other OnXxxEvent methods?
 
-	// MarkNeedsPaint marks this node (and its ancestors) that their previous
-	// Paint calls may no longer depict their current state.
-	MarkNeedsPaint()
 }
 
 // LeafEmbed is designed to be embedded in struct types for nodes with no
@@ -127,8 +134,10 @@ func (m *LeafEmbed) Measure(t *theme.Theme) { m.MeasuredSize = image.Point{} }
 func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
 func (m *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	m.NeedsPaint = false
+	m.Marks.UnmarkNeedsPaint()
 }
+
+func (m *LeafEmbed) OnChildMarked(child Node, newMarks Marks) {}
 
 func (m *LeafEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled { return NotHandled }
 
@@ -162,10 +171,14 @@ func (m *ShellEmbed) Layout(t *theme.Theme) {
 }
 
 func (m *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	m.NeedsPaint = false
+	m.Marks.UnmarkNeedsPaint()
 	if c := m.FirstChild; c != nil {
 		c.Wrapper.Paint(t, dst, origin.Add(m.Rect.Min))
 	}
+}
+
+func (m *ShellEmbed) OnChildMarked(child Node, newMarks Marks) {
+	m.Mark(newMarks)
 }
 
 func (m *ShellEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled {
@@ -205,11 +218,15 @@ func (m *ContainerEmbed) Layout(t *theme.Theme) {
 }
 
 func (m *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	m.NeedsPaint = false
+	m.Marks.UnmarkNeedsPaint()
 	origin = origin.Add(m.Rect.Min)
 	for c := m.FirstChild; c != nil; c = c.NextSibling {
 		c.Wrapper.Paint(t, dst, origin)
 	}
+}
+
+func (m *ContainerEmbed) OnChildMarked(child Node, newMarks Marks) {
+	m.Mark(newMarks)
 }
 
 func (m *ContainerEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled {
@@ -277,20 +294,14 @@ type Embed struct {
 	// buffer's origin.
 	Rect image.Rectangle
 
-	// NeedsPaint is whether previous Paint calls for this node (and,
-	// implicitly, its descendents) may no longer depict its current state.
-	NeedsPaint bool
+	// Marks are a bitfield of node state, such as whether it needs measure,
+	// layout or paint.
+	Marks Marks
 }
 
 func (m *Embed) Wrappee() *Embed { return m }
 
-func (m *Embed) MarkNeedsPaint() {
-	for ; m != nil; m = m.Parent {
-		m.NeedsPaint = true
-	}
-}
-
-// TODO: should insert and remove call MarkNeedsPaint? MarkNeedsLayout?
+// TODO: should insert and remove call Mark(MarkNeedsMeasureLayout | MarkNeedsPaint)?
 
 func (m *Embed) insert(c, nextSibling Node) {
 	n := c.Wrappee()
@@ -349,3 +360,33 @@ func (m *Embed) remove(c Node) {
 	n.PrevSibling = nil
 	n.NextSibling = nil
 }
+
+func (m *Embed) Mark(marks Marks) {
+	oldMarks := m.Marks
+	m.Marks |= marks
+	changedMarks := m.Marks ^ oldMarks
+	if changedMarks != 0 && m.Parent != nil {
+		m.Parent.Wrapper.OnChildMarked(m.Wrapper, changedMarks)
+	}
+}
+
+// Marks are a bitfield of node state, such as whether it needs measure, layout
+// or paint.
+type Marks uint32
+
+const (
+	// MarkNeedsMeasureLayout marks this node as needing Measure and Layout
+	// calls.
+	MarkNeedsMeasureLayout = Marks(1 << 0)
+	// TODO: use this.
+
+	// MarkNeedsPaint marks this node as needing a Paint call.
+	MarkNeedsPaint = Marks(1 << 1)
+	// TODO: have separate notions of 'base' and 'top' paint passes.
+)
+
+func (m Marks) NeedsMeasureLayout() bool { return m&MarkNeedsMeasureLayout != 0 }
+func (m Marks) NeedsPaint() bool         { return m&MarkNeedsPaint != 0 }
+
+func (m *Marks) UnmarkNeedsMeasureLayout() { *m &^= MarkNeedsMeasureLayout }
+func (m *Marks) UnmarkNeedsPaint()         { *m &^= MarkNeedsPaint }

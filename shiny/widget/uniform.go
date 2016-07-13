@@ -30,7 +30,7 @@ func NewUniform(c color.Color) *Uniform {
 }
 
 func (w *Uniform) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.NeedsPaint = false
+	w.Marks.UnmarkNeedsPaint()
 	if w.Uniform.C == nil {
 		return
 	}

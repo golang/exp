@@ -65,7 +65,7 @@ func (w *Text) Layout(t *theme.Theme) {
 }
 
 func (w *Text) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.NeedsPaint = false
+	w.Marks.UnmarkNeedsPaint()
 	dst = dst.SubImage(w.Rect.Add(origin)).(*image.RGBA)
 	if dst.Bounds().Empty() {
 		return

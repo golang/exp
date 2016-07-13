@@ -149,13 +149,13 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 			root.Measure(t)
 			root.Wrappee().Rect = e.Bounds()
 			root.Layout(t)
-			// TODO: call MarkNeedsPaint?
+			// TODO: call Mark(node.MarkNeedsPaint)?
 
 		case error:
 			return e
 		}
 
-		if !paintPending && root.Wrappee().NeedsPaint {
+		if !paintPending && root.Wrappee().Marks.NeedsPaint() {
 			paintPending = true
 			w.Send(paint.Event{})
 		}

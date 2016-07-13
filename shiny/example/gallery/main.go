@@ -56,7 +56,7 @@ func (w *custom) OnInputEvent(e interface{}, origin image.Point) node.EventHandl
 		if w.index == len(uniforms) {
 			w.index = 0
 		}
-		w.MarkNeedsPaint()
+		w.Mark(node.MarkNeedsPaint)
 	}
 	return node.Handled
 }

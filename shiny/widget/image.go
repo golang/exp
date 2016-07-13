@@ -44,7 +44,7 @@ func (w *Image) Measure(t *theme.Theme) {
 }
 
 func (w *Image) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.NeedsPaint = false
+	w.Marks.UnmarkNeedsPaint()
 	if w.Src == nil {
 		return
 	}
