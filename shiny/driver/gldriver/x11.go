@@ -257,7 +257,7 @@ func onFocus(id uintptr, focused bool) {
 }
 
 //export onConfigure
-func onConfigure(id uintptr, x, y, width, height int32) {
+func onConfigure(id uintptr, x, y, width, height, displayWidth, displayWidthMM int32) {
 	theScreen.mu.Lock()
 	w := theScreen.windows[id]
 	theScreen.mu.Unlock()
@@ -278,14 +278,17 @@ func onConfigure(id uintptr, x, y, width, height int32) {
 	w.lifecycler.SetVisible(x+width > 0 && y+height > 0)
 	w.lifecycler.SendEvent(w)
 
+	const (
+		mmPerInch = 25.4
+		ptPerInch = 72
+	)
+	pixelsPerMM := float32(displayWidth) / float32(displayWidthMM)
 	sz := size.Event{
-		WidthPx:  int(width),
-		HeightPx: int(height),
-		WidthPt:  geom.Pt(width),
-		HeightPt: geom.Pt(height),
-		// TODO: don't assume 72 DPI. DisplayWidth and DisplayWidthMM is
-		// probably the best place to start looking.
-		PixelsPerPt: 1,
+		WidthPx:     int(width),
+		HeightPx:    int(height),
+		WidthPt:     geom.Pt(width),
+		HeightPt:    geom.Pt(height),
+		PixelsPerPt: pixelsPerMM * mmPerInch / ptPerInch,
 	}
 
 	w.szMu.Lock()
