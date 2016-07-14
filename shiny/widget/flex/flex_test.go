@@ -382,7 +382,7 @@ func TestLayout(t *testing.T) {
 	for testNum, test := range layoutTests {
 		var children []node.Node
 		for i, sz := range test.measured {
-			n := widget.NewUniform(colors[i], unit.Pixels(sz[0]), unit.Pixels(sz[1]))
+			n := widget.NewSizer(unit.Pixels(sz[0]), unit.Pixels(sz[1]), widget.NewUniform(colors[i], nil))
 			if test.layoutData != nil {
 				n.LayoutData = test.layoutData[i]
 			}
