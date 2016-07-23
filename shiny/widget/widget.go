@@ -39,6 +39,9 @@ const (
 	AxisBoth       = Axis(3) // AxisBoth equals AxisHorizontal | AxisVertical.
 )
 
+func (a Axis) Horizontal() bool { return a&AxisHorizontal != 0 }
+func (a Axis) Vertical() bool   { return a&AxisVertical != 0 }
+
 // WithLayoutData returns the given node after setting its embedded LayoutData
 // field.
 func WithLayoutData(n node.Node, layoutData interface{}) node.Node {

@@ -69,7 +69,9 @@ func main() {
 		),
 		widget.NewLabel(fmt.Sprintf(
 			"The black rectangle is 1.5 inches x 1 inch when viewed at %v DPI.", t.GetDPI())),
-		colorPatch(color.Black, unit.Inches(1.5), unit.Inches(1)),
+		widget.NewPadder(widget.AxisBoth, unit.Pixels(8),
+			colorPatch(color.Black, unit.Inches(1.5), unit.Inches(1)),
+		),
 	)
 
 	// Make the RGBA image.
