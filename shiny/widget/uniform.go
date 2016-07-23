@@ -6,7 +6,6 @@ package widget
 
 import (
 	"image"
-	"image/color"
 	"image/draw"
 
 	"golang.org/x/exp/shiny/widget/node"
@@ -17,13 +16,13 @@ import (
 // image.Uniform.
 type Uniform struct {
 	node.ShellEmbed
-	Uniform image.Uniform
+	ThemeColor theme.Color
 }
 
 // NewUniform returns a new Uniform widget of the given color.
-func NewUniform(c color.Color, inner node.Node) *Uniform {
+func NewUniform(c theme.Color, inner node.Node) *Uniform {
 	w := &Uniform{
-		Uniform: image.Uniform{c},
+		ThemeColor: c,
 	}
 	w.Wrapper = w
 	if inner != nil {
@@ -34,9 +33,9 @@ func NewUniform(c color.Color, inner node.Node) *Uniform {
 
 func (w *Uniform) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	w.Marks.UnmarkNeedsPaint()
-	if w.Uniform.C != nil {
+	if w.ThemeColor != nil {
 		// TODO: should draw.Src be draw.Over?
-		draw.Draw(dst, w.Rect.Add(origin), &w.Uniform, image.Point{}, draw.Src)
+		draw.Draw(dst, w.Rect.Add(origin), w.ThemeColor.Uniform(t), image.Point{}, draw.Src)
 	}
 	if c := w.FirstChild; c != nil {
 		c.Wrapper.Paint(t, dst, origin.Add(w.Rect.Min))

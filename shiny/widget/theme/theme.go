@@ -43,27 +43,64 @@ type FontFaceCatalog interface {
 	// TODO: add a "Metrics(FontFaceOptions) font.Metrics" method?
 }
 
-// Palette provides a theme's color palette.
+// Color is a theme-dependent color, such as "the foreground color". Combining
+// a Color with a Theme results in a color.Color in the sense of the standard
+// library's image/color package. It can also result in an *image.Uniform,
+// suitable for passing as the src argument to image/draw functions.
+type Color interface {
+	Color(*Theme) color.Color
+	Uniform(*Theme) *image.Uniform
+}
+
+// StaticColor adapts a color.Color to a theme Color.
+func StaticColor(c color.Color) Color { return staticColor{image.Uniform{c}} }
+
+type staticColor struct {
+	u image.Uniform
+}
+
+func (s staticColor) Color(*Theme) color.Color      { return s.u.C }
+func (s staticColor) Uniform(*Theme) *image.Uniform { return &s.u }
+
+// Palette provides a theme's color palette. The array is indexed by
+// PaletteIndex constants such as Accent and Foreground.
 //
-// The colors are expressed as *image.Uniform values so that they can be easily
+// The colors are expressed as image.Uniform values so that they can be easily
 // passed as the src argument to image/draw functions.
-type Palette struct {
+type Palette [PaletteLen]image.Uniform
+
+func (p *Palette) Light() *image.Uniform      { return &p[Light] }
+func (p *Palette) Neutral() *image.Uniform    { return &p[Neutral] }
+func (p *Palette) Dark() *image.Uniform       { return &p[Dark] }
+func (p *Palette) Accent() *image.Uniform     { return &p[Accent] }
+func (p *Palette) Foreground() *image.Uniform { return &p[Foreground] }
+func (p *Palette) Background() *image.Uniform { return &p[Background] }
+
+// PaletteIndex is both an integer index into a Palette array and a Color.
+type PaletteIndex int
+
+func (i PaletteIndex) Color(t *Theme) color.Color      { return t.GetPalette()[i].C }
+func (i PaletteIndex) Uniform(t *Theme) *image.Uniform { return &t.GetPalette()[i] }
+
+const (
 	// Light, Neutral and Dark are three color tones used to fill in widgets
 	// such as buttons, menu bars and panels.
-	Light   *image.Uniform
-	Neutral *image.Uniform
-	Dark    *image.Uniform
+	Light   = PaletteIndex(0)
+	Neutral = PaletteIndex(1)
+	Dark    = PaletteIndex(2)
 
 	// Accent is the color used to accentuate selections or suggestions.
-	Accent *image.Uniform
+	Accent = PaletteIndex(3)
 
 	// Foreground is the color used for text, dividers and icons.
-	Foreground *image.Uniform
+	Foreground = PaletteIndex(4)
 
 	// Background is the color used behind large blocks of text. Short,
 	// non-editable label text will typically be on the Neutral color.
-	Background *image.Uniform
-}
+	Background = PaletteIndex(5)
+
+	PaletteLen = 6
+)
 
 // DefaultDPI is the fallback value of a theme's DPI, if the underlying context
 // does not provide a DPI value.
@@ -75,12 +112,12 @@ var (
 
 	// DefaultPalette is the default theme's palette.
 	DefaultPalette = Palette{
-		Light:      &image.Uniform{C: color.RGBA{0xf5, 0xf5, 0xf5, 0xff}}, // Material Design "Grey 100".
-		Neutral:    &image.Uniform{C: color.RGBA{0xee, 0xee, 0xee, 0xff}}, // Material Design "Grey 200".
-		Dark:       &image.Uniform{C: color.RGBA{0xe0, 0xe0, 0xe0, 0xff}}, // Material Design "Grey 300".
-		Accent:     &image.Uniform{C: color.RGBA{0x21, 0x96, 0xf3, 0xff}}, // Material Design "Blue 500".
-		Foreground: &image.Uniform{C: color.RGBA{0x00, 0x00, 0x00, 0xff}}, // Material Design "Black".
-		Background: &image.Uniform{C: color.RGBA{0xff, 0xff, 0xff, 0xff}}, // Material Design "White".
+		Light:      image.Uniform{C: color.RGBA{0xf5, 0xf5, 0xf5, 0xff}}, // Material Design "Grey 100".
+		Neutral:    image.Uniform{C: color.RGBA{0xee, 0xee, 0xee, 0xff}}, // Material Design "Grey 200".
+		Dark:       image.Uniform{C: color.RGBA{0xe0, 0xe0, 0xe0, 0xff}}, // Material Design "Grey 300".
+		Accent:     image.Uniform{C: color.RGBA{0x21, 0x96, 0xf3, 0xff}}, // Material Design "Blue 500".
+		Foreground: image.Uniform{C: color.RGBA{0x00, 0x00, 0x00, 0xff}}, // Material Design "Black".
+		Background: image.Uniform{C: color.RGBA{0xff, 0xff, 0xff, 0xff}}, // Material Design "White".
 	}
 
 	// Default uses the default DPI, FontFaceCatalog and Palette.

@@ -14,6 +14,7 @@ import (
 	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/exp/shiny/widget"
 	"golang.org/x/exp/shiny/widget/node"
+	"golang.org/x/exp/shiny/widget/theme"
 )
 
 type layoutTest struct {
@@ -382,7 +383,8 @@ func TestLayout(t *testing.T) {
 	for testNum, test := range layoutTests {
 		var children []node.Node
 		for i, sz := range test.measured {
-			n := widget.NewSizer(unit.Pixels(sz[0]), unit.Pixels(sz[1]), widget.NewUniform(colors[i], nil))
+			u := widget.NewUniform(theme.StaticColor(colors[i]), nil)
+			n := widget.NewSizer(unit.Pixels(sz[0]), unit.Pixels(sz[1]), u)
 			if test.layoutData != nil {
 				n.LayoutData = test.layoutData[i]
 			}

@@ -16,7 +16,8 @@ import (
 // Label is a leaf widget that holds a text label.
 type Label struct {
 	node.LeafEmbed
-	Text string
+	Text       string
+	ThemeColor theme.Color
 }
 
 // NewLabel returns a new Label widget.
@@ -51,9 +52,14 @@ func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	m := face.Metrics()
 	ascent := m.Ascent.Ceil()
 
+	tc := w.ThemeColor
+	if tc == nil {
+		tc = theme.Foreground
+	}
+
 	d := font.Drawer{
 		Dst:  dst,
-		Src:  t.GetPalette().Foreground,
+		Src:  tc.Uniform(t),
 		Face: face,
 		Dot: fixed.Point26_6{
 			X: fixed.I(origin.X + w.Rect.Min.X),

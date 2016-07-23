@@ -80,7 +80,7 @@ func (w *Text) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 
 	padding := t.Pixels(unit.Ems(0.5)).Ceil()
 
-	draw.Draw(dst, dst.Bounds(), t.GetPalette().Background, image.Point{}, draw.Src)
+	draw.Draw(dst, dst.Bounds(), t.GetPalette().Background(), image.Point{}, draw.Src)
 
 	minDotY := fixed.I(dst.Bounds().Min.Y - descent)
 	maxDotY := fixed.I(dst.Bounds().Max.Y + ascent)
@@ -88,7 +88,7 @@ func (w *Text) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	x0 := fixed.I(origin.X + w.Rect.Min.X + padding)
 	d := font.Drawer{
 		Dst:  dst,
-		Src:  t.GetPalette().Foreground,
+		Src:  t.GetPalette().Foreground(),
 		Face: face,
 		Dot: fixed.Point26_6{
 			X: x0,

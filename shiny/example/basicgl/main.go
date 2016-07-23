@@ -25,12 +25,13 @@ import (
 	"golang.org/x/exp/shiny/widget"
 	"golang.org/x/exp/shiny/widget/flex"
 	"golang.org/x/exp/shiny/widget/glwidget"
+	"golang.org/x/exp/shiny/widget/theme"
 	"golang.org/x/image/colornames"
 	"golang.org/x/mobile/gl"
 )
 
 func colorPatch(c color.Color, w, h unit.Value) *widget.Sizer {
-	return widget.NewSizer(w, h, widget.NewUniform(c, nil))
+	return widget.NewSizer(w, h, widget.NewUniform(theme.StaticColor(c), nil))
 }
 
 func main() {

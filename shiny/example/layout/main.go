@@ -34,7 +34,7 @@ import (
 var px = unit.Pixels
 
 func colorPatch(c color.Color, w, h unit.Value) *widget.Sizer {
-	return widget.NewSizer(w, h, widget.NewUniform(c, nil))
+	return widget.NewSizer(w, h, widget.NewUniform(theme.StaticColor(c), nil))
 }
 
 func main() {
@@ -76,7 +76,7 @@ func main() {
 
 	// Make the RGBA image.
 	rgba := image.NewRGBA(image.Rect(0, 0, 640, 480))
-	draw.Draw(rgba, rgba.Bounds(), t.GetPalette().Neutral, image.Point{}, draw.Src)
+	draw.Draw(rgba, rgba.Bounds(), t.GetPalette().Neutral(), image.Point{}, draw.Src)
 
 	// Measure, layout and paint.
 	vf.Measure(t)
