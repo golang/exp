@@ -62,7 +62,7 @@ func (w *custom) OnInputEvent(e interface{}, origin image.Point) node.EventHandl
 }
 
 func (w *custom) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.NeedsPaint = false
+	w.Marks.UnmarkNeedsPaint()
 	draw.Draw(dst, w.Rect.Add(origin), uniforms[w.index], image.Point{}, draw.Src)
 }
 
