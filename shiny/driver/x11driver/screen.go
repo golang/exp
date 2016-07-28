@@ -139,7 +139,7 @@ func (s *screenImpl) run() {
 			case s.atomWMDeleteWindow:
 				if w := s.findWindow(ev.Window); w != nil {
 					w.lifecycler.SetDead(true)
-					w.lifecycler.SendEvent(w)
+					w.lifecycler.SendEvent(w, nil)
 				} else {
 					noWindowFound = true
 				}
@@ -172,7 +172,7 @@ func (s *screenImpl) run() {
 		case xproto.FocusInEvent:
 			if w := s.findWindow(ev.Event); w != nil {
 				w.lifecycler.SetFocused(true)
-				w.lifecycler.SendEvent(w)
+				w.lifecycler.SendEvent(w, nil)
 			} else {
 				noWindowFound = true
 			}
@@ -180,7 +180,7 @@ func (s *screenImpl) run() {
 		case xproto.FocusOutEvent:
 			if w := s.findWindow(ev.Event); w != nil {
 				w.lifecycler.SetFocused(false)
-				w.lifecycler.SendEvent(w)
+				w.lifecycler.SendEvent(w, nil)
 			} else {
 				noWindowFound = true
 			}
@@ -403,7 +403,7 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	s.windows[xw] = w
 	s.mu.Unlock()
 
-	w.lifecycler.SendEvent(w)
+	w.lifecycler.SendEvent(w, nil)
 
 	xproto.CreateWindow(s.xc, s.xsi.RootDepth, xw, s.xsi.Root,
 		0, 0, uint16(width), uint16(height), 0,

@@ -99,7 +99,7 @@ func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
 	// TODO: does the order of these lifecycle and size events matter? Should
 	// they really be a single, atomic event?
 	w.lifecycler.SetVisible((int(ev.X)+int(ev.Width)) > 0 && (int(ev.Y)+int(ev.Height)) > 0)
-	w.lifecycler.SendEvent(w)
+	w.lifecycler.SendEvent(w, nil)
 
 	newWidth, newHeight := int(ev.Width), int(ev.Height)
 	if w.width == newWidth && w.height == newHeight {

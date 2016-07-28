@@ -253,7 +253,7 @@ func onFocus(id uintptr, focused bool) {
 	}
 
 	w.lifecycler.SetFocused(focused)
-	w.lifecycler.SendEvent(w)
+	w.lifecycler.SendEvent(w, w.glctx)
 }
 
 //export onConfigure
@@ -276,7 +276,7 @@ func onConfigure(id uintptr, x, y, width, height, displayWidth, displayWidthMM i
 	}()
 
 	w.lifecycler.SetVisible(x+width > 0 && y+height > 0)
-	w.lifecycler.SendEvent(w)
+	w.lifecycler.SendEvent(w, w.glctx)
 
 	const (
 		mmPerInch = 25.4
@@ -309,7 +309,7 @@ func onDeleteWindow(id uintptr) {
 	}
 
 	w.lifecycler.SetDead(true)
-	w.lifecycler.SendEvent(w)
+	w.lifecycler.SendEvent(w, w.glctx)
 }
 
 func surfaceCreate() error {
