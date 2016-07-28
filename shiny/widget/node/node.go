@@ -45,7 +45,9 @@ import (
 	"image"
 
 	"golang.org/x/exp/shiny/gesture"
+	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/widget/theme"
+	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/mouse"
 )
 
@@ -88,15 +90,49 @@ type Node interface {
 	// previously been set during the parent node's layout.
 	Layout(t *theme.Theme)
 
-	// Paint paints this node (and its children) onto a destination image.
+	// Paint paints this node (and its children). Painting is split into two
+	// passes: a base pass and an effects pass. The effects pass is often a
+	// no-op, and the bulk of the work is typically done in the base pass.
 	//
-	// origin is the parent widget's origin with respect to the dst image's
+	// The base pass paints onto an *image.RGBA pixel buffer and ancestor nodes
+	// may choose to re-use the result. For example, re-painting a text widget
+	// after scrolling may copy cached buffers at different offsets, instead of
+	// painting the text's glyphs onto a fresh buffer. Similarly, animating the
+	// scale and opacity of an overlay can re-use the buffer from a previous
+	// base pass.
+	//
+	// The effects pass paints that part of the widget that can not or should
+	// not be cached. For example, the border of a text widget shouldn't move
+	// on the screen when that text widget is scrolled. The effects pass does
+	// not have a destination RGBA pixel buffer, and is limited to what a
+	// screen.Drawer provides: affine-transformed textures and uniform fills.
+	//
+	// TODO: app-specific OpenGL, if available, should be part of the effects
+	// pass. Is that exposed via the screen.Drawer or by another mechanism?
+	//
+	// The Paint method may create base pass RGBA pixel buffers, by calling
+	// ctx.Screen.NewBuffer. Many implementations won't, and instead assume
+	// that PaintBase is recursively triggered by an ancestor node such as a
+	// widget.Sheet. If it does create those RGBA pixel buffers, it is also
+	// responsible for calling PaintBase on this node (and its children). In
+	// any case, the Paint method should then paint any effects. Many widgets
+	// will neither create their own buffers nor have any effects, so their
+	// Paint methods will simply be the default implemention: do nothing except
+	// call Paint on its children. As mentioned above, the bulk of the work is
+	// typically done in PaintBase.
+	//
+	// origin is the parent widget's origin with respect to the ctx.Src2Dst
+	// transformation matrix; this node's Embed.Rect.Add(origin) will be its
+	// position and size in pre-transformed coordinate space.
+	Paint(ctx *PaintContext, origin image.Point) error
+
+	// PaintBase paints the base pass of this node (and its children) onto an
+	// RGBA pixel buffer.
+	//
+	// origin is the parent widget's origin with respect to the ctx.Dst image's
 	// origin; this node's Embed.Rect.Add(origin) will be its position and size
-	// in dst's coordinate space.
-	//
-	// TODO: add a clip rectangle? Or rely on the RGBA.SubImage method to pass
-	// smaller dst images?
-	Paint(t *theme.Theme, dst *image.RGBA, origin image.Point)
+	// in ctx.Dst's coordinate space.
+	PaintBase(ctx *PaintBaseContext, origin image.Point) error
 
 	// Mark adds the given marks to this node. It calls OnChildMarked on its
 	// parent if new marks were added.
@@ -119,6 +155,27 @@ type Node interface {
 
 }
 
+// PaintContext is the context for the Node.Paint method.
+type PaintContext struct {
+	Theme   *theme.Theme
+	Screen  screen.Screen
+	Drawer  screen.Drawer
+	Src2Dst f64.Aff3
+
+	// TODO: add a clip rectangle?
+
+	// TODO: add the DrawContext from the lifecycle event?
+}
+
+// PaintBaseContext is the context for the Node.PaintBase method.
+type PaintBaseContext struct {
+	Theme *theme.Theme
+	Dst   *image.RGBA
+
+	// TODO: add a clip rectangle? Or rely on the RGBA.SubImage method to pass
+	// smaller Dst images?
+}
+
 // LeafEmbed is designed to be embedded in struct types for nodes with no
 // children.
 type LeafEmbed struct{ Embed }
@@ -133,8 +190,14 @@ func (m *LeafEmbed) Measure(t *theme.Theme) { m.MeasuredSize = image.Point{} }
 
 func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
-func (m *LeafEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+func (m *LeafEmbed) Paint(ctx *PaintContext, origin image.Point) error {
 	m.Marks.UnmarkNeedsPaint()
+	return nil
+}
+
+func (m *LeafEmbed) PaintBase(ctx *PaintBaseContext, origin image.Point) error {
+	m.Marks.UnmarkNeedsPaintBase()
+	return nil
 }
 
 func (m *LeafEmbed) OnChildMarked(child Node, newMarks Marks) {}
@@ -170,11 +233,20 @@ func (m *ShellEmbed) Layout(t *theme.Theme) {
 	}
 }
 
-func (m *ShellEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+func (m *ShellEmbed) Paint(ctx *PaintContext, origin image.Point) error {
 	m.Marks.UnmarkNeedsPaint()
 	if c := m.FirstChild; c != nil {
-		c.Wrapper.Paint(t, dst, origin.Add(m.Rect.Min))
+		return c.Wrapper.Paint(ctx, origin.Add(m.Rect.Min))
 	}
+	return nil
+}
+
+func (m *ShellEmbed) PaintBase(ctx *PaintBaseContext, origin image.Point) error {
+	m.Marks.UnmarkNeedsPaintBase()
+	if c := m.FirstChild; c != nil {
+		return c.Wrapper.PaintBase(ctx, origin.Add(m.Rect.Min))
+	}
+	return nil
 }
 
 func (m *ShellEmbed) OnChildMarked(child Node, newMarks Marks) {
@@ -217,12 +289,26 @@ func (m *ContainerEmbed) Layout(t *theme.Theme) {
 	}
 }
 
-func (m *ContainerEmbed) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+func (m *ContainerEmbed) Paint(ctx *PaintContext, origin image.Point) error {
 	m.Marks.UnmarkNeedsPaint()
 	origin = origin.Add(m.Rect.Min)
 	for c := m.FirstChild; c != nil; c = c.NextSibling {
-		c.Wrapper.Paint(t, dst, origin)
+		if err := c.Wrapper.Paint(ctx, origin); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func (m *ContainerEmbed) PaintBase(ctx *PaintBaseContext, origin image.Point) error {
+	m.Marks.UnmarkNeedsPaintBase()
+	origin = origin.Add(m.Rect.Min)
+	for c := m.FirstChild; c != nil; c = c.NextSibling {
+		if err := c.Wrapper.PaintBase(ctx, origin); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *ContainerEmbed) OnChildMarked(child Node, newMarks Marks) {
@@ -382,11 +468,15 @@ const (
 
 	// MarkNeedsPaint marks this node as needing a Paint call.
 	MarkNeedsPaint = Marks(1 << 1)
-	// TODO: have separate notions of 'base' and 'top' paint passes.
+
+	// MarkNeedsPaintBase marks this node as needing a PaintBase call.
+	MarkNeedsPaintBase = Marks(1 << 2)
 )
 
 func (m Marks) NeedsMeasureLayout() bool { return m&MarkNeedsMeasureLayout != 0 }
 func (m Marks) NeedsPaint() bool         { return m&MarkNeedsPaint != 0 }
+func (m Marks) NeedsPaintBase() bool     { return m&MarkNeedsPaintBase != 0 }
 
 func (m *Marks) UnmarkNeedsMeasureLayout() { *m &^= MarkNeedsMeasureLayout }
 func (m *Marks) UnmarkNeedsPaint()         { *m &^= MarkNeedsPaint }
+func (m *Marks) UnmarkNeedsPaintBase()     { *m &^= MarkNeedsPaintBase }

@@ -15,6 +15,7 @@ import (
 	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/exp/shiny/widget/node"
 	"golang.org/x/exp/shiny/widget/theme"
+	"golang.org/x/image/math/f64"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/paint"
@@ -73,7 +74,6 @@ type RunWindowOptions struct {
 // A nil opts is valid and means to use the default option values.
 func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 	var (
-		buf screen.Buffer
 		nwo *screen.NewWindowOptions
 		t   *theme.Theme
 	)
@@ -81,12 +81,6 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 		nwo = &opts.NewWindowOptions
 		t = &opts.Theme
 	}
-	defer func() {
-		if buf != nil {
-			buf.Release()
-		}
-	}()
-
 	w, err := s.NewWindow(nwo)
 	if err != nil {
 		return err
@@ -115,6 +109,7 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 
 		switch e := e.(type) {
 		case lifecycle.Event:
+			// TODO: drop buffers and textures when we're not visible.
 			if e.To == lifecycle.StageDead {
 				return nil
 			}
@@ -123,23 +118,22 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 			root.OnInputEvent(e, image.Point{})
 
 		case paint.Event:
-			if buf != nil {
-				root.Paint(t, buf.RGBA(), image.Point{})
-				w.Upload(image.Point{}, buf, buf.Bounds())
+			ctx := &node.PaintContext{
+				Theme:  t,
+				Screen: s,
+				Drawer: w,
+				Src2Dst: f64.Aff3{
+					1, 0, 0,
+					0, 1, 0,
+				},
+			}
+			if err := root.Paint(ctx, image.Point{}); err != nil {
+				return err
 			}
 			w.Publish()
 			paintPending = false
 
 		case size.Event:
-			if buf != nil {
-				buf.Release()
-			}
-			var err error
-			buf, err = s.NewBuffer(e.Size())
-			if err != nil {
-				return err
-			}
-
 			if dpi := float64(e.PixelsPerPt) * unit.PointsPerInch; dpi != t.GetDPI() {
 				newT := new(theme.Theme)
 				if t != nil {

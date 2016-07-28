@@ -40,13 +40,13 @@ func main() {
 		defer t1.cleanup()
 		defer t2.cleanup()
 
-		body := flex.NewFlex(
+		body := widget.NewSheet(flex.NewFlex(
 			colorPatch(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
 			widget.WithLayoutData(t1.w, flex.LayoutData{Grow: 1, Align: flex.AlignItemStretch}),
 			colorPatch(colornames.Blue, unit.Pixels(50), unit.Pixels(50)),
 			widget.WithLayoutData(t2.w, flex.LayoutData{MinSize: image.Point{80, 80}}),
 			colorPatch(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
-		)
+		))
 
 		if err := widget.RunWindow(s, body, nil); err != nil {
 			log.Fatal(err)

@@ -57,8 +57,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		m := widget.NewImage(src, src.Bounds())
-		if err := widget.RunWindow(s, m, nil); err != nil {
+		w := widget.NewSheet(widget.NewImage(src, src.Bounds()))
+		if err := widget.RunWindow(s, w, nil); err != nil {
 			log.Fatal(err)
 		}
 	})

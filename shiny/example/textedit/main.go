@@ -25,7 +25,7 @@ import (
 func main() {
 	log.SetFlags(0)
 	driver.Main(func(s screen.Screen) {
-		w := widget.NewText(prideAndPrejudice)
+		w := widget.NewSheet(widget.NewText(prideAndPrejudice))
 		if err := widget.RunWindow(s, w, nil); err != nil {
 			log.Fatal(err)
 		}

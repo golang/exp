@@ -40,15 +40,15 @@ func (w *Label) Measure(t *theme.Theme) {
 	w.MeasuredSize.Y = m.Ascent.Ceil() + m.Descent.Ceil()
 }
 
-func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.Marks.UnmarkNeedsPaint()
-	dst = dst.SubImage(w.Rect.Add(origin)).(*image.RGBA)
+func (w *Label) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
+	w.Marks.UnmarkNeedsPaintBase()
+	dst := ctx.Dst.SubImage(w.Rect.Add(origin)).(*image.RGBA)
 	if dst.Bounds().Empty() {
-		return
+		return nil
 	}
 
-	face := t.AcquireFontFace(theme.FontFaceOptions{})
-	defer t.ReleaseFontFace(theme.FontFaceOptions{}, face)
+	face := ctx.Theme.AcquireFontFace(theme.FontFaceOptions{})
+	defer ctx.Theme.ReleaseFontFace(theme.FontFaceOptions{}, face)
 	m := face.Metrics()
 	ascent := m.Ascent.Ceil()
 
@@ -59,7 +59,7 @@ func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 
 	d := font.Drawer{
 		Dst:  dst,
-		Src:  tc.Uniform(t),
+		Src:  tc.Uniform(ctx.Theme),
 		Face: face,
 		Dot: fixed.Point26_6{
 			X: fixed.I(origin.X + w.Rect.Min.X),
@@ -67,4 +67,5 @@ func (w *Label) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 		},
 	}
 	d.DrawString(w.Text)
+	return nil
 }

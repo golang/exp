@@ -12,7 +12,6 @@ import (
 
 	"golang.org/x/exp/shiny/driver/gldriver"
 	"golang.org/x/exp/shiny/widget/node"
-	"golang.org/x/exp/shiny/widget/theme"
 	"golang.org/x/mobile/gl"
 )
 
@@ -81,14 +80,16 @@ func NewGL(drawFunc func(*GL)) *GL {
 	return w
 }
 
-func (w *GL) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
+func (w *GL) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
+	w.Marks.UnmarkNeedsPaintBase()
 	if w.Rect.Empty() {
-		return
+		return nil
 	}
-	w.dst = dst
+	w.dst = ctx.Dst
 	w.origin = origin
 	w.draw(w)
 	w.dst = nil
+	return nil
 }
 
 // Publish renders the default framebuffer of Ctx onto the area of the

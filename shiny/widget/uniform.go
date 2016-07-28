@@ -31,13 +31,15 @@ func NewUniform(c theme.Color, inner node.Node) *Uniform {
 	return w
 }
 
-func (w *Uniform) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.Marks.UnmarkNeedsPaint()
+func (w *Uniform) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
+	w.Marks.UnmarkNeedsPaintBase()
 	if w.ThemeColor != nil {
+		src := w.ThemeColor.Uniform(ctx.Theme)
 		// TODO: should draw.Src be draw.Over?
-		draw.Draw(dst, w.Rect.Add(origin), w.ThemeColor.Uniform(t), image.Point{}, draw.Src)
+		draw.Draw(ctx.Dst, w.Rect.Add(origin), src, image.Point{}, draw.Src)
 	}
 	if c := w.FirstChild; c != nil {
-		c.Wrapper.Paint(t, dst, origin.Add(w.Rect.Min))
+		return c.Wrapper.PaintBase(ctx, origin.Add(w.Rect.Min))
 	}
+	return nil
 }

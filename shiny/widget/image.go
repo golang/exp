@@ -43,10 +43,10 @@ func (w *Image) Measure(t *theme.Theme) {
 	w.MeasuredSize = w.SrcRect.Size()
 }
 
-func (w *Image) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.Marks.UnmarkNeedsPaint()
+func (w *Image) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
+	w.Marks.UnmarkNeedsPaintBase()
 	if w.Src == nil {
-		return
+		return nil
 	}
 
 	// wRect is the widget's layout rectangle, in dst's coordinate space.
@@ -57,5 +57,6 @@ func (w *Image) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
 	// upper-left corner of wRect.
 	sRect := w.SrcRect.Add(wRect.Min.Sub(w.SrcRect.Min))
 
-	draw.Draw(dst, wRect.Intersect(sRect), w.Src, w.SrcRect.Min, draw.Over)
+	draw.Draw(ctx.Dst, wRect.Intersect(sRect), w.Src, w.SrcRect.Min, draw.Over)
+	return nil
 }

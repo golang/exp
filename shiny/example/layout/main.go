@@ -28,6 +28,7 @@ import (
 
 	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/exp/shiny/widget"
+	"golang.org/x/exp/shiny/widget/node"
 	"golang.org/x/exp/shiny/widget/theme"
 )
 
@@ -82,7 +83,10 @@ func main() {
 	vf.Measure(t)
 	vf.Rect = rgba.Bounds()
 	vf.Layout(t)
-	vf.Paint(t, rgba, image.Point{})
+	vf.PaintBase(&node.PaintBaseContext{
+		Theme: t,
+		Dst:   rgba,
+	}, image.Point{})
 
 	// Encode to PNG.
 	out, err := os.Create("out.png")

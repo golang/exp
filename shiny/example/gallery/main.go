@@ -22,7 +22,6 @@ import (
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/widget"
 	"golang.org/x/exp/shiny/widget/node"
-	"golang.org/x/exp/shiny/widget/theme"
 )
 
 var uniforms = [...]*image.Uniform{
@@ -56,21 +55,22 @@ func (w *custom) OnInputEvent(e interface{}, origin image.Point) node.EventHandl
 		if w.index == len(uniforms) {
 			w.index = 0
 		}
-		w.Mark(node.MarkNeedsPaint)
+		w.Mark(node.MarkNeedsPaintBase)
 	}
 	return node.Handled
 }
 
-func (w *custom) Paint(t *theme.Theme, dst *image.RGBA, origin image.Point) {
-	w.Marks.UnmarkNeedsPaint()
-	draw.Draw(dst, w.Rect.Add(origin), uniforms[w.index], image.Point{}, draw.Src)
+func (w *custom) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
+	w.Marks.UnmarkNeedsPaintBase()
+	draw.Draw(ctx.Dst, w.Rect.Add(origin), uniforms[w.index], image.Point{}, draw.Src)
+	return nil
 }
 
 func main() {
 	log.SetFlags(0)
 	driver.Main(func(s screen.Screen) {
 		// TODO: create a bunch of standard widgets: buttons, labels, etc.
-		w := newCustom()
+		w := widget.NewSheet(newCustom())
 		if err := widget.RunWindow(s, w, nil); err != nil {
 			log.Fatal(err)
 		}
