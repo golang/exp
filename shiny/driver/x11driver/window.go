@@ -91,7 +91,18 @@ func (w *windowImpl) Scale(dr image.Rectangle, src screen.Texture, sr image.Rect
 }
 
 func (w *windowImpl) Publish() screen.PublishResult {
-	// TODO.
+	// TODO: implement a back buffer, and copy or flip that here to the front
+	// buffer.
+
+	// This sync isn't needed to flush the outgoing X11 requests. Instead, it
+	// acts as a form of flow control. Outgoing requests can be quite small on
+	// the wire, e.g. draw this texture ID (an integer) to this rectangle (four
+	// more integers), but much more expensive on the server (blending a
+	// million source and destination pixels). Without this sync, the Go X11
+	// client could easily end up sending work at a faster rate than the X11
+	// server can serve.
+	w.s.xc.Sync()
+
 	return screen.PublishResult{}
 }
 
