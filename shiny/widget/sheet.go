@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/widget/node"
+	"golang.org/x/image/math/f64"
 )
 
 // TODO: scrolling.
@@ -82,10 +83,21 @@ func (w *Sheet) Paint(ctx *node.PaintContext, origin image.Point) (retErr error)
 	}
 
 	w.tex.Upload(image.Point{}, w.buf, w.buf.Bounds())
+
+	src2dst := ctx.Src2Dst
+	translate(&src2dst,
+		float64(origin.X+w.Rect.Min.X),
+		float64(origin.Y+w.Rect.Min.Y),
+	)
 	// TODO: should draw.Over be configurable?
-	ctx.Drawer.Draw(ctx.Src2Dst, w.tex, w.tex.Bounds(), draw.Over, nil)
+	ctx.Drawer.Draw(src2dst, w.tex, w.tex.Bounds(), draw.Over, nil)
 
 	return c.Wrapper.Paint(ctx, origin.Add(w.Rect.Min))
+}
+
+func translate(a *f64.Aff3, tx, ty float64) {
+	a[2] += a[0]*tx + a[1]*ty
+	a[5] += a[3]*tx + a[4]*ty
 }
 
 func (w *Sheet) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
