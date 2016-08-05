@@ -48,6 +48,7 @@ import (
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/widget/theme"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
 )
 
@@ -144,6 +145,10 @@ type Node interface {
 	// needing paint.
 	OnChildMarked(child Node, newMarks Marks)
 
+	// OnLifecycleEvent propagates a lifecycle event to a node (and its
+	// children).
+	OnLifecycleEvent(e lifecycle.Event)
+
 	// OnInputEvent handles a key, mouse, touch or gesture event.
 	//
 	// origin is the parent widget's origin with respect to the event origin;
@@ -202,6 +207,8 @@ func (m *LeafEmbed) PaintBase(ctx *PaintBaseContext, origin image.Point) error {
 
 func (m *LeafEmbed) OnChildMarked(child Node, newMarks Marks) {}
 
+func (m *LeafEmbed) OnLifecycleEvent(e lifecycle.Event) {}
+
 func (m *LeafEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled { return NotHandled }
 
 // ShellEmbed is designed to be embedded in struct types for nodes with at most
@@ -251,6 +258,12 @@ func (m *ShellEmbed) PaintBase(ctx *PaintBaseContext, origin image.Point) error 
 
 func (m *ShellEmbed) OnChildMarked(child Node, newMarks Marks) {
 	m.Mark(newMarks)
+}
+
+func (m *ShellEmbed) OnLifecycleEvent(e lifecycle.Event) {
+	if c := m.FirstChild; c != nil {
+		c.Wrapper.OnLifecycleEvent(e)
+	}
 }
 
 func (m *ShellEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled {
@@ -313,6 +326,12 @@ func (m *ContainerEmbed) PaintBase(ctx *PaintBaseContext, origin image.Point) er
 
 func (m *ContainerEmbed) OnChildMarked(child Node, newMarks Marks) {
 	m.Mark(newMarks)
+}
+
+func (m *ContainerEmbed) OnLifecycleEvent(e lifecycle.Event) {
+	for c := m.FirstChild; c != nil; c = c.NextSibling {
+		c.Wrapper.OnLifecycleEvent(e)
+	}
 }
 
 func (m *ContainerEmbed) OnInputEvent(e interface{}, origin image.Point) EventHandled {

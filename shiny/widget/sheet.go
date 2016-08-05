@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/shiny/screen"
 	"golang.org/x/exp/shiny/widget/node"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/mobile/event/lifecycle"
 )
 
 // TODO: scrolling.
@@ -42,35 +43,38 @@ func NewSheet(inner node.Node) *Sheet {
 	return w
 }
 
+func (w *Sheet) release() {
+	if w.buf != nil {
+		w.buf.Release()
+		w.buf = nil
+	}
+	if w.tex != nil {
+		w.tex.Release()
+		w.tex = nil
+	}
+}
+
 func (w *Sheet) Paint(ctx *node.PaintContext, origin image.Point) (retErr error) {
 	w.Marks.UnmarkNeedsPaint()
 	c := w.FirstChild
 	if c == nil {
-		if w.buf != nil {
-			w.buf.Release()
-			w.buf = nil
-			w.tex.Release()
-			w.tex = nil
-		}
+		w.release()
 		return nil
 	}
 
 	fresh, size := false, w.Rect.Size()
 	if w.buf != nil && w.buf.Size() != size {
-		w.buf.Release()
-		w.buf = nil
-		w.tex.Release()
-		w.tex = nil
+		w.release()
 	}
 	if w.buf == nil {
 		w.buf, retErr = ctx.Screen.NewBuffer(size)
 		if retErr != nil {
+			w.release()
 			return retErr
 		}
 		w.tex, retErr = ctx.Screen.NewTexture(size)
 		if retErr != nil {
-			w.buf.Release()
-			w.buf = nil
+			w.release()
 			return retErr
 		}
 		fresh = true
@@ -114,4 +118,10 @@ func (w *Sheet) OnChildMarked(child node.Node, newMarks node.Marks) {
 		newMarks |= node.MarkNeedsPaint
 	}
 	w.Mark(newMarks)
+}
+
+func (w *Sheet) OnLifecycleEvent(e lifecycle.Event) {
+	if e.Crosses(lifecycle.StageVisible) == lifecycle.CrossOff {
+		w.release()
+	}
 }

@@ -109,7 +109,7 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 
 		switch e := e.(type) {
 		case lifecycle.Event:
-			// TODO: drop buffers and textures when we're not visible.
+			root.OnLifecycleEvent(e)
 			if e.To == lifecycle.StageDead {
 				return nil
 			}
