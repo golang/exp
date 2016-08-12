@@ -38,12 +38,7 @@ func NewText(text string) *Text {
 	return w
 }
 
-func (w *Text) Measure(t *theme.Theme) {
-	// TODO: implement. Should the Measure method include a width hint?
-	w.MeasuredSize = image.Point{}
-}
-
-func (w *Text) Layout(t *theme.Theme) {
+func (w *Text) setFace(t *theme.Theme) {
 	// TODO: can a theme change at runtime, or can it be set only once, at
 	// start-up?
 	if !w.faceSet {
@@ -56,12 +51,48 @@ func (w *Text) Layout(t *theme.Theme) {
 		face := t.AcquireFontFace(theme.FontFaceOptions{})
 		w.frame.SetFace(face)
 	}
+}
 
-	// TODO: should padding (and/or margin and border) be a universal concept
-	// and part of the node.Embed type instead of having each widget implement
-	// its own?
-	padding := t.Pixels(unit.Ems(0.5)).Ceil()
-	w.frame.SetMaxWidth(fixed.I(w.Rect.Dx() - 2*padding))
+// TODO: should padding (and/or margin and border) be a universal concept and
+// part of the node.Embed type instead of having each widget implement its own?
+
+func (w *Text) padding(t *theme.Theme) int {
+	return t.Pixels(unit.Ems(0.5)).Ceil()
+}
+
+func (w *Text) Measure(t *theme.Theme, widthHint, heightHint int) {
+	w.setFace(t)
+	padding := w.padding(t)
+
+	if widthHint < 0 {
+		w.frame.SetMaxWidth(0)
+		w.MeasuredSize = image.Point{
+			0, // TODO: this isn't right.
+			w.frame.Height() + 2*padding,
+		}
+		return
+	}
+
+	maxWidth := fixed.I(widthHint - 2*padding)
+	if maxWidth <= 1 {
+		maxWidth = 1
+	}
+	w.frame.SetMaxWidth(maxWidth)
+
+	w.MeasuredSize = image.Point{
+		widthHint,
+		w.frame.Height() + 2*padding,
+	}
+}
+
+func (w *Text) Layout(t *theme.Theme) {
+	w.setFace(t)
+	padding := w.padding(t)
+	maxWidth := fixed.I(w.Rect.Dx() - 2*padding)
+	if maxWidth <= 1 {
+		maxWidth = 1
+	}
+	w.frame.SetMaxWidth(maxWidth)
 }
 
 func (w *Text) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
@@ -78,7 +109,7 @@ func (w *Text) PaintBase(ctx *node.PaintBaseContext, origin image.Point) error {
 	descent := m.Descent.Ceil()
 	height := m.Height.Ceil()
 
-	padding := ctx.Theme.Pixels(unit.Ems(0.5)).Ceil()
+	padding := w.padding(ctx.Theme)
 
 	draw.Draw(dst, dst.Bounds(), ctx.Theme.GetPalette().Background(), image.Point{}, draw.Src)
 

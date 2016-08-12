@@ -36,9 +36,21 @@ func NewPadder(a Axis, margin unit.Value, inner node.Node) *Padder {
 	return w
 }
 
-func (w *Padder) Measure(t *theme.Theme) {
+func (w *Padder) Measure(t *theme.Theme, widthHint, heightHint int) {
 	margin2 := t.Pixels(w.Margin).Round() * 2
-	w.ShellEmbed.Measure(t)
+	if w.Axis.Horizontal() && widthHint >= 0 {
+		widthHint -= margin2
+		if widthHint < 0 {
+			widthHint = 0
+		}
+	}
+	if w.Axis.Vertical() && heightHint >= 0 {
+		heightHint -= margin2
+		if heightHint < 0 {
+			heightHint = 0
+		}
+	}
+	w.ShellEmbed.Measure(t, widthHint, heightHint)
 	if w.Axis.Horizontal() {
 		w.MeasuredSize.X += margin2
 	}

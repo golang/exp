@@ -39,7 +39,7 @@ func NewImage(src image.Image, srcRect image.Rectangle) *Image {
 	return w
 }
 
-func (w *Image) Measure(t *theme.Theme) {
+func (w *Image) Measure(t *theme.Theme, widthHint, heightHint int) {
 	w.MeasuredSize = w.SrcRect.Size()
 }
 

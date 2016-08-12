@@ -397,7 +397,7 @@ func TestLayout(t *testing.T) {
 		w.AlignContent = test.alignContent
 		w.Justify = test.justify
 
-		w.Measure(nil)
+		w.Measure(nil, node.NoHint, node.NoHint)
 		w.Rect = image.Rectangle{Max: test.size}
 		w.Layout(nil)
 

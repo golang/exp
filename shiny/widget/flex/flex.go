@@ -130,12 +130,13 @@ func NewFlex(children ...node.Node) *Flex {
 	return w
 }
 
-func (w *Flex) Measure(t *theme.Theme) {
+func (w *Flex) Measure(t *theme.Theme, widthHint, heightHint int) {
 	// As Measure is a bottom-up calculation of natural size, we have no
 	// hint yet as to how we should flex. So we ignore Wrap, Justify,
 	// AlignItem, AlignContent.
 	for c := w.FirstChild; c != nil; c = c.NextSibling {
-		c.Wrapper.Measure(t)
+		// TODO: pass down width/height hints?
+		c.Wrapper.Measure(t, node.NoHint, node.NoHint)
 		if d, ok := c.LayoutData.(LayoutData); ok {
 			_ = d
 			// TODO Measure

@@ -32,10 +32,10 @@ func NewSizer(naturalWidth, naturalHeight unit.Value, inner node.Node) *Sizer {
 	return w
 }
 
-func (w *Sizer) Measure(t *theme.Theme) {
+func (w *Sizer) Measure(t *theme.Theme, widthHint, heightHint int) {
 	w.MeasuredSize.X = t.Pixels(w.NaturalWidth).Round()
 	w.MeasuredSize.Y = t.Pixels(w.NaturalHeight).Round()
 	if c := w.FirstChild; c != nil {
-		c.Wrapper.Measure(t)
+		c.Wrapper.Measure(t, w.MeasuredSize.X, w.MeasuredSize.Y)
 	}
 }

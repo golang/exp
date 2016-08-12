@@ -76,11 +76,12 @@ func main() {
 	)
 
 	// Make the RGBA image.
-	rgba := image.NewRGBA(image.Rect(0, 0, 640, 480))
+	const width, height = 640, 480
+	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
 	draw.Draw(rgba, rgba.Bounds(), t.GetPalette().Neutral(), image.Point{}, draw.Src)
 
 	// Measure, layout and paint.
-	vf.Measure(t)
+	vf.Measure(t, width, height)
 	vf.Rect = rgba.Bounds()
 	vf.Layout(t)
 	vf.PaintBase(&node.PaintBaseContext{

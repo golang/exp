@@ -34,15 +34,22 @@ func NewFlow(a Axis, children ...node.Node) *Flow {
 	return w
 }
 
-func (w *Flow) Measure(t *theme.Theme) {
+func (w *Flow) Measure(t *theme.Theme, widthHint, heightHint int) {
 	if w.Axis != AxisHorizontal && w.Axis != AxisVertical {
-		w.ContainerEmbed.Measure(t)
+		w.ContainerEmbed.Measure(t, widthHint, heightHint)
 		return
+	}
+
+	if w.Axis == AxisHorizontal {
+		widthHint = node.NoHint
+	}
+	if w.Axis == AxisVertical {
+		heightHint = node.NoHint
 	}
 
 	mSize := image.Point{}
 	for c := w.FirstChild; c != nil; c = c.NextSibling {
-		c.Wrapper.Measure(t)
+		c.Wrapper.Measure(t, widthHint, heightHint)
 		if w.Axis == AxisHorizontal {
 			mSize.X += c.MeasuredSize.X
 			if mSize.Y < c.MeasuredSize.Y {

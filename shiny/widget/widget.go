@@ -143,7 +143,8 @@ func RunWindow(s screen.Screen, root node.Node, opts *RunWindowOptions) error {
 				t = newT
 			}
 
-			root.Measure(t)
+			size := e.Size()
+			root.Measure(t, size.X, size.Y)
 			root.Wrappee().Rect = e.Bounds()
 			root.Layout(t)
 			// TODO: call Mark(node.MarkNeedsPaint)?

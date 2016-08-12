@@ -29,7 +29,7 @@ func NewLabel(text string) *Label {
 	return w
 }
 
-func (w *Label) Measure(t *theme.Theme) {
+func (w *Label) Measure(t *theme.Theme, widthHint, heightHint int) {
 	face := t.AcquireFontFace(theme.FontFaceOptions{})
 	defer t.ReleaseFontFace(theme.FontFaceOptions{}, face)
 	m := face.Metrics()

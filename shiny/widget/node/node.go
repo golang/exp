@@ -31,7 +31,7 @@
 // write subtly incorrect code like:
 //
 //	for c := w.FirstChild; c != nil; c = c.NextSibling {
-//		c.Measure(t) // This should instead be c.Wrapper.Measure(t).
+//		c.Measure(etc) // This should instead be c.Wrapper.Measure(etc).
 //	}
 //
 // In any case, most programmers that want to construct a widget tree should
@@ -62,6 +62,9 @@ const (
 	Handled    = EventHandled(true)
 )
 
+// NoHint means that there is no width or height hint in a Measure call.
+const NoHint = -1
+
 // Node is a node in the widget tree.
 type Node interface {
 	// Wrappee returns the inner (embedded) type that is wrapped by this type.
@@ -83,8 +86,13 @@ type Node interface {
 	// Measure sets this node's Embed.MeasuredSize to its natural size, taking
 	// its children into account.
 	//
-	// TODO: include width / height hints, for width-in-height-out layout?
-	Measure(t *theme.Theme)
+	// Some nodes' natural height might depend on their imposed width, such as
+	// a text widget word-wrapping its contents. The caller may provide hints
+	// that the parent can override the child's natural size in the width,
+	// height or both directions. A negative value means that there is no hint.
+	// For example, a container might lay out its children to all have the same
+	// width, and could pass that width as the widthHint argument.
+	Measure(t *theme.Theme, widthHint, heightHint int)
 
 	// Layout lays out this node (and its children), setting the Embed.Rect
 	// fields of each child. This node's Embed.Rect field should have
@@ -191,7 +199,7 @@ func (m *LeafEmbed) Insert(c, nextSibling Node) {
 
 func (m *LeafEmbed) Remove(c Node) { m.remove(c) }
 
-func (m *LeafEmbed) Measure(t *theme.Theme) { m.MeasuredSize = image.Point{} }
+func (m *LeafEmbed) Measure(t *theme.Theme, widthHint, heightHint int) { m.MeasuredSize = image.Point{} }
 
 func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
@@ -224,9 +232,9 @@ func (m *ShellEmbed) Insert(c, nextSibling Node) {
 
 func (m *ShellEmbed) Remove(c Node) { m.remove(c) }
 
-func (m *ShellEmbed) Measure(t *theme.Theme) {
+func (m *ShellEmbed) Measure(t *theme.Theme, widthHint, heightHint int) {
 	if c := m.FirstChild; c != nil {
-		c.Wrapper.Measure(t)
+		c.Wrapper.Measure(t, widthHint, heightHint)
 		m.MeasuredSize = c.MeasuredSize
 	} else {
 		m.MeasuredSize = image.Point{}
@@ -281,10 +289,10 @@ func (m *ContainerEmbed) Insert(c, nextSibling Node) { m.insert(c, nextSibling) 
 
 func (m *ContainerEmbed) Remove(c Node) { m.remove(c) }
 
-func (m *ContainerEmbed) Measure(t *theme.Theme) {
+func (m *ContainerEmbed) Measure(t *theme.Theme, widthHint, heightHint int) {
 	mSize := image.Point{}
 	for c := m.FirstChild; c != nil; c = c.NextSibling {
-		c.Wrapper.Measure(t)
+		c.Wrapper.Measure(t, NoHint, NoHint)
 		if mSize.X < c.MeasuredSize.X {
 			mSize.X = c.MeasuredSize.X
 		}
