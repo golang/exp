@@ -140,7 +140,7 @@ func (w *Watcher) RemoveWatch(path string) error {
 		return errors.New(fmt.Sprintf("can't remove non-existent inotify watch for: %s", path))
 	}
 	success, errno := syscall.InotifyRmWatch(w.fd, watch.wd)
-	if success == -1 {
+	if !ok && success == -1 {
 		return os.NewSyscallError("inotify_rm_watch", errno)
 	}
 	delete(w.watches, path)
