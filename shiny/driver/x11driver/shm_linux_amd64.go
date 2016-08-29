@@ -13,12 +13,11 @@ import (
 // These constants are from /usr/include/linux/ipc.h
 const (
 	ipcPrivate = 0
-	ipcCreat   = 0x1000
 	ipcRmID    = 0
 )
 
 func shmOpen(size int) (shmid uintptr, addr unsafe.Pointer, err error) {
-	shmid, _, errno0 := syscall.RawSyscall(syscall.SYS_SHMGET, ipcPrivate, uintptr(size), ipcCreat|0600)
+	shmid, _, errno0 := syscall.RawSyscall(syscall.SYS_SHMGET, ipcPrivate, uintptr(size), 0600)
 	if errno0 != 0 {
 		return 0, unsafe.Pointer(uintptr(0)), fmt.Errorf("shmget: %v", errno0)
 	}
