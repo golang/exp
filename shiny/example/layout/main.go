@@ -46,17 +46,17 @@ func main() {
 		widget.NewLabel("Cyan:"),
 		widget.WithLayoutData(
 			colorPatch(color.RGBA{0x00, 0x7f, 0x7f, 0xff}, px(0), px(20)),
-			widget.FlowLayoutData{ExpandAlongWeight: 1},
+			widget.FlowLayoutData{AlongWeight: 1, ExpandAlong: true},
 		),
 		widget.NewLabel("Magenta:"),
 		widget.WithLayoutData(
 			colorPatch(color.RGBA{0x7f, 0x00, 0x7f, 0xff}, px(0), px(30)),
-			widget.FlowLayoutData{ExpandAlongWeight: 2},
+			widget.FlowLayoutData{AlongWeight: 2, ExpandAlong: true},
 		),
 		widget.NewLabel("Yellow:"),
 		widget.WithLayoutData(
 			colorPatch(color.RGBA{0x7f, 0x7f, 0x00, 0xff}, px(0), px(40)),
-			widget.FlowLayoutData{ExpandAlongWeight: 3},
+			widget.FlowLayoutData{AlongWeight: 3, ExpandAlong: true},
 		),
 	)
 

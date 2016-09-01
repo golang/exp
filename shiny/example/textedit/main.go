@@ -25,10 +25,13 @@ import (
 	"golang.org/x/exp/shiny/widget/theme"
 )
 
-func expand(n node.Node, expandAlongWeight int) node.Node {
+func stretch(n node.Node, alongWeight int) node.Node {
 	return widget.WithLayoutData(n, widget.FlowLayoutData{
-		ExpandAcross:      true,
-		ExpandAlongWeight: expandAlongWeight,
+		AlongWeight:  alongWeight,
+		ExpandAlong:  true,
+		ShrinkAlong:  true,
+		ExpandAcross: true,
+		ShrinkAcross: true,
 	})
 }
 
@@ -39,7 +42,7 @@ func main() {
 			widget.NewPadder(widget.AxisBoth, unit.Ems(0.5),
 				widget.NewFlow(widget.AxisHorizontal,
 					widget.NewLabel("TODO: status"),
-					expand(widget.NewSpace(), 1),
+					stretch(widget.NewSpace(), 1),
 					widget.NewLabel("TODO: Menu"),
 				),
 			),
@@ -50,10 +53,10 @@ func main() {
 		body := widget.NewText(prideAndPrejudice)
 
 		w := widget.NewFlow(widget.AxisVertical,
-			expand(widget.NewSheet(header), 0),
-			expand(widget.NewSheet(divider), 0),
+			stretch(widget.NewSheet(header), 0),
+			stretch(widget.NewSheet(divider), 0),
 			// TODO: make the body's sheet scrollable.
-			expand(widget.NewSheet(body), 1),
+			stretch(widget.NewSheet(body), 1),
 		)
 
 		if err := widget.RunWindow(s, w, nil); err != nil {

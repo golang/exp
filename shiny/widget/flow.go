@@ -71,46 +71,73 @@ func (w *Flow) Layout(t *theme.Theme) {
 		return
 	}
 
-	eaExtra, eaWeight := 0, 0
+	extra, totalExpandWeight, totalShrinkWeight := 0, 0, 0
 	if w.Axis == AxisHorizontal {
-		eaExtra = w.Rect.Dx()
+		extra = w.Rect.Dx()
 	} else {
-		eaExtra = w.Rect.Dy()
+		extra = w.Rect.Dy()
 	}
 	for c := w.FirstChild; c != nil; c = c.NextSibling {
-		if d, ok := c.LayoutData.(FlowLayoutData); ok && d.ExpandAlongWeight > 0 {
-			eaWeight += d.ExpandAlongWeight
+		if d, ok := c.LayoutData.(FlowLayoutData); ok && d.AlongWeight > 0 {
+			if d.AlongWeight <= 0 {
+				continue
+			}
+			if d.ExpandAlong {
+				totalExpandWeight += d.AlongWeight
+			}
+			if d.ShrinkAlong {
+				totalShrinkWeight += d.AlongWeight
+			}
 		}
 		if w.Axis == AxisHorizontal {
-			eaExtra -= c.MeasuredSize.X
+			extra -= c.MeasuredSize.X
 		} else {
-			eaExtra -= c.MeasuredSize.Y
+			extra -= c.MeasuredSize.Y
 		}
 	}
-	if eaExtra < 0 {
-		eaExtra = 0
+	expand, shrink, totalWeight := extra > 0, extra < 0, 0
+	if expand {
+		if totalExpandWeight == 0 {
+			expand = false
+		} else {
+			totalWeight = totalExpandWeight
+		}
+	}
+	if shrink {
+		if totalShrinkWeight == 0 {
+			shrink = false
+		} else {
+			totalWeight = totalShrinkWeight
+		}
 	}
 
 	p := image.Point{}
 	for c := w.FirstChild; c != nil; c = c.NextSibling {
 		q := p.Add(c.MeasuredSize)
 		if d, ok := c.LayoutData.(FlowLayoutData); ok {
-			if d.ExpandAlongWeight > 0 {
-				delta := eaExtra * d.ExpandAlongWeight / eaWeight
-				eaExtra -= delta
-				eaWeight -= d.ExpandAlongWeight
-				if w.Axis == AxisHorizontal {
-					q.X += delta
-				} else {
-					q.Y += delta
+			if d.AlongWeight > 0 {
+				if (expand && d.ExpandAlong) || (shrink && d.ShrinkAlong) {
+					delta := extra * d.AlongWeight / totalWeight
+					extra -= delta
+					totalWeight -= d.AlongWeight
+					if w.Axis == AxisHorizontal {
+						q.X += delta
+						if q.X < p.X {
+							q.X = p.X
+						}
+					} else {
+						q.Y += delta
+						if q.Y < p.Y {
+							q.Y = p.Y
+						}
+					}
 				}
 			}
-			if d.ExpandAcross {
-				if w.Axis == AxisHorizontal {
-					q.Y = max(q.Y, w.Rect.Dy())
-				} else {
-					q.X = max(q.X, w.Rect.Dx())
-				}
+
+			if w.Axis == AxisHorizontal {
+				q.Y = stretchAcross(q.Y, w.Rect.Dy(), d.ExpandAcross, d.ShrinkAcross)
+			} else {
+				q.X = stretchAcross(q.X, w.Rect.Dx(), d.ExpandAcross, d.ShrinkAcross)
 			}
 		}
 		c.Rect = image.Rectangle{
@@ -126,19 +153,55 @@ func (w *Flow) Layout(t *theme.Theme) {
 	}
 }
 
+func stretchAcross(child, parent int, expand, shrink bool) int {
+	if (expand && child < parent) || (shrink && child > parent) {
+		return parent
+	}
+	return child
+}
+
 // FlowLayoutData is the node LayoutData type for a Flow's children.
 type FlowLayoutData struct {
-	// ExpandAlongWeight is the relative weight for distributing any excess
-	// space along the Flow's axis. For example, if an AxisHorizontal Flow's
+	// AlongWeight is the relative weight for distributing any space surplus or
+	// deficit along the Flow's axis. For example, if an AxisHorizontal Flow's
 	// Rect width was 100 pixels greater than the sum of its children's natural
-	// widths, and three children had non-zero FlowLayoutData.ExpandAlongWeight
-	// values 6, 3 and 1, then those children's laid out widths would be larger
-	// than their natural widths by 60, 30 and 10 pixels.
-	ExpandAlongWeight int
+	// widths, and three children had non-zero FlowLayoutData.AlongWeight
+	// values 6, 3 and 1 (and their FlowLayoutData.ExpandAlong values were
+	// true) then those children's laid out widths would be larger than their
+	// natural widths by 60, 30 and 10 pixels.
+	//
+	// A negative AlongWeight is equivalent to zero.
+	AlongWeight int
 
-	// ExpandAcross is whether the child's laid out size should expand to fill
-	// the Flow's cross-axis. For example, if an AxisHorizontal Flow's Rect
-	// height was 80 pixels, any child whose FlowLayoutData.ExpandAcross was
-	// true would also be laid out with at least an 80 pixel height.
+	// ExpandAlong is whether the child's laid out size should increase along
+	// the Flow's axis, based on AlongWeight, if there is a space surplus (the
+	// children's measured size total less than the parent's size). To allow
+	// size decreases as well as increases, set ShrinkAlong.
+	ExpandAlong bool
+
+	// ShrinkAlong is whether the child's laid out size should decrease along
+	// the Flow's axis, based on AlongWeight, if there is a space deficit (the
+	// children's measured size total more than the parent's size). To allow
+	// size increases as well as decreases, set ExpandAlong.
+	ShrinkAlong bool
+
+	// ExpandAcross is whether the child's laid out size should increase along
+	// the Flow's cross-axis if there is a space surplus (the child's measured
+	// size is less than the parent's size). To allow size decreases as well as
+	// increases, set ShrinkAcross.
+	//
+	// For example, if an AxisHorizontal Flow's Rect height was 80 pixels, any
+	// child whose FlowLayoutData.ExpandAcross was true would also be laid out
+	// with at least an 80 pixel height.
 	ExpandAcross bool
+
+	// ShrinkAcross is whether the child's laid out size should decrease along
+	// the Flow's cross-axis if there is a space deficit (the child's measured
+	// size is more than the parent's size). To allow size increases as well as
+	// decreases, set ExpandAcross.
+	//
+	// For example, if an AxisHorizontal Flow's Rect height was 80 pixels, any
+	// child whose FlowLayoutData.ShrinkAcross was true would also be laid out
+	// with at most an 80 pixel height.
+	ShrinkAcross bool
 }

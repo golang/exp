@@ -22,13 +22,6 @@ import (
 	"golang.org/x/mobile/event/size"
 )
 
-func max(x, y int) int {
-	if x > y {
-		return x
-	}
-	return y
-}
-
 // Axis is zero, one or both of the horizontal and vertical axes. For example,
 // a widget may be scrollable in one of the four AxisXxx values.
 type Axis uint8
