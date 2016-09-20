@@ -125,9 +125,10 @@ equal to a previous offset, or outside the range [0, 1].
 Colors
 
 Color register values are always 32 bits, or 4 bytes. Colors in the instruction
-byte stream can be encoded more compactly, and are encoded in either 1, 2 or 4
-bytes, depending on context. For example, some opcodes are followed by a 1 byte
-color. Others by a 2 byte color.
+byte stream can be encoded more compactly, and are encoded in either 1, 2, 3 or
+4 bytes, depending on context. For example, some opcodes are followed by a 1
+byte color, others by a 2 byte color. There are two forms of 3 byte colors:
+direct and indirect.
 
 For a 1 byte encoding, byte values in the range [0, 125) encode the RGBA color
 where the red, green and blue values come from the base-5 encoding of that byte
@@ -136,17 +137,32 @@ value is 0xff. For example, the color 40ffc0ff can be encoded as 0x30, as
 decimal 48 equals 1*25 + 4*5 + 3. A byte value of 125, 126 or 127 mean the
 colors c0c0c0c0, 80808080 and 00000000 respectively. Byte values in the range
 [128, 192) mean a color from the custom palette (indexed by that byte value
-minus 128). Byte values in the range [192, 256) are reserved.
+minus 128). Byte values in the range [192, 256) mean the value of a CREG color
+register (with CREG indexed by that byte value minus 192).
 
 For a 2 byte encoding, the red, green, blue and alpha values are all 4 bit
 values. For example, the color 338800ff can be encoded as 0x38 0x0f.
 
-For a 4 byte encoding, the red, green, blue and alpha values are all 8 bit
-values. For example, the color 306607ff is simply 0x30 0x66 0x07 0xff.
+For a 3 byte direct encoding, the red, green and blue values are all 8 bit
+values. The alpha value is implicitly 255. For example, the color 306607ff can
+be encoded as 0x30 0x66 0x07.
 
-It is valid for the 2 and 4 byte encodings to yield a color value where the
-red, green or blue value is greater than the alpha value, as this may be a
-gradient. If it isn't a gradient, the subsequent rendering is undefined.
+For a 4 byte encoding, the red, green, blue and alpha values are all 8 bit
+values. For example, the color 30660780 is simply 0x30 0x66 0x07 0x80.
+
+For a 3 byte indirect encoding, the first byte is an integer value in the range
+[0, 255] (denoted T) and the second and third bytes are each a 1 byte encoded
+color (denoted C0 and C1). The resultant color's red channel value is given by:
+	RESULTANT.RED = (((255-T) * C0.RED) + (T * C1.RED) + 128) / 255
+rounded down to an integer value (the mathematical floor function), and
+likewise for the green, blue and alpha channels. For example, if the custom
+palette's third entry is a fully opaque orange, then 0x40 0x7f 0x82 encodes a
+25% percent opaque orange: a blend of 75% times fully transparent (1 byte color
+0x7f) and 25% times a fully opaque orange (1 byte color 0x82).
+
+It is valid for some encodings to yield a color value where the red, green or
+blue value is greater than the alpha value, as this may be a gradient. If it
+isn't a gradient, the subsequent rendering is undefined.
 
 
 Palettes
@@ -289,12 +305,12 @@ Metadata Identifier 1 means that the MID-specific data contains a suggested
 palette, e.g. to provide a default rendering of variable colors such as an
 emoji's skin and hair. The suggested palette is encoded in at least one byte.
 The low 6 bits of that byte form a number N. The high 2 bits denote the palette
-color format: those high 2 bits being 0, 1 or 2 mean 1, 2 or 4 byte colors (see
-above for the color encoding). A high 2 bits being 3 is reserved. The chunk
-then contains N+1 explicit colors, in that 1 byte, 2 byte or 4 byte encoding. A
-palette has exactly 64 colors, the 63-N implicit colors of the suggested
-palette are set to opaque black. A 1 byte color that refers to the custom
-palette resolves to opaque black. If this MID is not present, the suggested
+color format: those high 2 bits being 0, 1, 2 or 3 mean 1, 2, 3 (direct) or 4
+byte colors (see above for the color encoding). The chunk then contains N+1
+explicit colors, in that 1, 2, 3 or 4 byte encoding. A palette has exactly 64
+colors, the 63-N implicit colors of the suggested palette are set to opaque
+black. A 1 byte color that refers to the custom palette or a CREG color
+register resolves to opaque black. If this MID is not present, the suggested
 palette consists entirely of opaque black, as black is always fashionable.
 
 
@@ -314,30 +330,37 @@ the opcode.
 Opcodes 0x88 to 0x8e sets CREG[CSEL-ADJ] to the 2 byte encoded color following
 the opcode.
 
-Opcodes 0x90 to 0x96 sets CREG[CSEL-ADJ] to the 4 byte encoded color following
+Opcodes 0x90 to 0x96 sets CREG[CSEL-ADJ] to the 3 byte direct encoded color
+following the opcode.
+
+Opcodes 0x98 to 0x9e sets CREG[CSEL-ADJ] to the 4 byte encoded color following
 the opcode.
 
-Opcodes 0x87, 0x8f and 0x97 sets CREG[CSEL] to the 1, 2 and 4 byte encoded
-color following the opcode, and then increments CSEL by 1.
+Opcodes 0xa0 to 0xa6 sets CREG[CSEL-ADJ] to the 3 byte indirect encoded color
+following the opcode.
 
-Opcodes 0x98 to 0x9e sets NREG[NSEL-ADJ] to the real number following the
+Opcodes 0x87, 0x8f, 0x97, 0x9f and 0xa7 sets CREG[CSEL] to the 1, 2, 3
+(direct), 4 and 3 (indirect) byte encoded color, following the opcode, and then
+increments CSEL by 1.
+
+Opcodes 0xa8 to 0xae sets NREG[NSEL-ADJ] to the real number following the
 opcode.
 
-Opcodes 0xa0 to 0xa6 sets NREG[NSEL-ADJ] to the coordinate number following the
+Opcodes 0xb0 to 0xb6 sets NREG[NSEL-ADJ] to the coordinate number following the
 opcode.
 
-Opcodes 0xa8 to 0xae sets NREG[NSEL-ADJ] to the zero-to-one number following
+Opcodes 0xb8 to 0xbe sets NREG[NSEL-ADJ] to the zero-to-one number following
 the opcode.
 
-Opcode 0x9f, 0xa7 and 0xaf sets NREG[NSEL] to the real, coordinate and
+Opcode 0xaf, 0xb7 and 0xbf sets NREG[NSEL] to the real, coordinate and
 zero-to-one number following the opcode, and then increments NSEL by 1.
 
-Opcodes 0xb0 to 0xb6 switches to the drawing mode, and is followed by two
+Opcodes 0xc0 to 0xc6 switches to the drawing mode, and is followed by two
 coordinates that is the path's starting location. In effect, there is an
 implicit M (absolute moveto) op. CREG[CSEL-ADJ], either a flat color or a
 gradient, will fill the path once it is complete.
 
-Opcode 0xb7 sets the Level of Detail bounds LOD0 and LOD1 to the two real
+Opcode 0xc7 sets the Level of Detail bounds LOD0 and LOD1 to the two real
 numbers following the opcode.
 
 All other opcodes are reserved.
@@ -455,7 +478,7 @@ various sizes:
 
 The corresponding IconVG is 73 bytes:
 
-	89 49 56 47 02 0a 00 50 50 b0 b0 b0 80 58 a0 cf
+	89 49 56 47 02 0a 00 50 50 b0 b0 c0 80 58 a0 cf
 	cc 30 c1 58 58 cf cc 30 c1 58 80 91 37 33 0f 41
 	a8 a8 a8 a8 37 33 0f c1 a8 58 80 cf cc 30 41 58
 	80 58 e3 84 bc e7 78 e8 7c e7 88 e9 98 e3 80 60
@@ -473,7 +496,7 @@ The annotated version is below. Note that the IconVG viewBox ranges from -24 to
 	0a 00 50 50 b0 b0
 	Metadata chunk (5 extra bytes). MID 0 (ViewBox), (-24, -24) to (+24, +24).
 
-	b0 80 58
+	c0 80 58
 	Start path (with CREG[CSEL-0], opaque black by default); M 0 -20.
 
 	a0 cf cc 30 c1 58 58 cf cc 30 c1 58 80
@@ -496,7 +519,7 @@ The annotated version is below. Note that the IconVG viewBox ranges from -24 to
 */
 package iconvg
 
-// TODO: more examples, including using colors.
+// TODO: more examples, using multiple colors and Level of Detail.
 
 // TODO: shapes (circles, rects) and strokes? Or can we assume that authoring
 // tools will convert shapes and strokes to paths?

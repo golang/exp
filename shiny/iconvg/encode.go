@@ -124,7 +124,7 @@ func (e *Encoder) SetLOD(lod0, lod1 float32) {
 	}
 	e.lod0 = lod0
 	e.lod1 = lod1
-	e.buf = append(e.buf, 0xe7)
+	e.buf = append(e.buf, 0xc7)
 	e.buf.encodeReal(lod0)
 	e.buf.encodeReal(lod1)
 }
@@ -137,11 +137,11 @@ func (e *Encoder) StartPath(adj int, x, y float32) {
 		e.err = errStylingOpsUsedInDrawingMode
 		return
 	}
-	if adj < -6 || 0 < adj {
+	if adj < 0 || 6 < adj {
 		e.err = errInvalidSelectorAdjustment
 		return
 	}
-	e.buf = append(e.buf, uint8(0xb0-adj))
+	e.buf = append(e.buf, uint8(0xc0+adj))
 	e.buf.encodeCoordinate(x)
 	e.buf.encodeCoordinate(y)
 	e.mode = modeDrawing
