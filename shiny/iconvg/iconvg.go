@@ -13,7 +13,13 @@ import (
 
 const magic = "\x89IVG"
 
+var magicBytes = []byte(magic)
+
 var positiveInfinity = math.Float32frombits(0x7f800000)
+
+func isNaNOrInfinity(f float32) bool {
+	return math.Float32bits(f)&0x7f800000 == 0x7f800000
+}
 
 const (
 	midViewBox          = 0

@@ -16,6 +16,8 @@ var (
 	errStylingOpsUsedInDrawingMode = errors.New("iconvg: styling ops used in drawing mode")
 )
 
+// TODO: delete the NewEncoder function, and just make the zero value usable.
+
 // NewEncoder returns a new Encoder for the given Metadata.
 func NewEncoder(m Metadata) *Encoder {
 	e := &Encoder{
@@ -226,7 +228,7 @@ func (e *Encoder) flushDrawOps() {
 	}
 
 	if op := drawOps[e.drawOp]; op.nArgs == 0 {
-		e.buf = append(e.buf, op.opCodeBase)
+		e.buf = append(e.buf, op.opcodeBase)
 	} else {
 		n := len(e.drawArgs) / int(op.nArgs)
 		for i := 0; n > 0; {
@@ -234,7 +236,7 @@ func (e *Encoder) flushDrawOps() {
 			if m > int(op.maxRepCount) {
 				m = int(op.maxRepCount)
 			}
-			e.buf = append(e.buf, op.opCodeBase+uint8(m)-1)
+			e.buf = append(e.buf, op.opcodeBase+uint8(m)-1)
 
 			switch e.drawOp {
 			default:
@@ -263,7 +265,7 @@ func (e *Encoder) flushDrawOps() {
 }
 
 var drawOps = [256]struct {
-	opCodeBase  byte
+	opcodeBase  byte
 	maxRepCount uint8
 	nArgs       uint8
 }{
