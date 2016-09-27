@@ -11,6 +11,21 @@ import (
 	"golang.org/x/image/math/f32"
 )
 
+func TestEncoderZeroValue(t *testing.T) {
+	var e Encoder
+	got, err := e.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	want := []byte{
+		0x89, 0x49, 0x56, 0x47, // Magic identifier.
+		0x00, // Zero metadata chunks.
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("\ngot  %d bytes:\n% x\nwant %d bytes:\n% x", len(got), got, len(want), want)
+	}
+}
+
 // actionInfoIconVG is the IconVG encoding of the "action/info" icon from the
 // Material Design icon set.
 //
@@ -24,7 +39,8 @@ var actionInfoIconVG = []byte{
 }
 
 func TestEncodeActionInfo(t *testing.T) {
-	e := NewEncoder(Metadata{
+	var e Encoder
+	e.Reset(Metadata{
 		ViewBox: Rectangle{
 			Min: f32.Vec2{-24, -24},
 			Max: f32.Vec2{+24, +24},

@@ -26,13 +26,6 @@ const (
 	midSuggestedPalette = 1
 )
 
-type mode bool
-
-const (
-	modeStyling mode = false
-	modeDrawing mode = true
-)
-
 // Rectangle is defined by its minimum and maximum coordinates.
 type Rectangle struct {
 	Min, Max f32.Vec2

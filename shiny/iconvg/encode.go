@@ -16,18 +16,19 @@ var (
 	errStylingOpsUsedInDrawingMode = errors.New("iconvg: styling ops used in drawing mode")
 )
 
-// TODO: delete the NewEncoder function, and just make the zero value usable.
+type mode uint8
 
-// NewEncoder returns a new Encoder for the given Metadata.
-func NewEncoder(m Metadata) *Encoder {
-	e := &Encoder{
-		buf: make(buffer, 0, 1024),
-	}
-	e.Reset(m)
-	return e
-}
+const (
+	modeInitial mode = iota
+	modeStyling
+	modeDrawing
+)
 
 // Encoder is an IconVG encoder.
+//
+// The zero value is usable. Calling Reset, which is optional, sets the
+// Metadata for the subsequent encoded form. If Reset is not called before
+// other Encoder methods, the default metadata is implied.
 type Encoder struct {
 	buf      buffer
 	altBuf   buffer
@@ -49,6 +50,9 @@ func (e *Encoder) Bytes() ([]byte, error) {
 	if e.err != nil {
 		return nil, e.err
 	}
+	if e.mode == modeInitial {
+		e.appendDefaultMetadata()
+	}
 	return []byte(e.buf), nil
 }
 
@@ -57,6 +61,7 @@ func (e *Encoder) Reset(m Metadata) {
 	*e = Encoder{
 		buf:      append(e.buf[:0], magic...),
 		metadata: m,
+		mode:     modeStyling,
 		lod1:     positiveInfinity,
 	}
 
@@ -88,17 +93,44 @@ func (e *Encoder) Reset(m Metadata) {
 	}
 }
 
-func (e *Encoder) CSel() uint32              { return e.cSel }
-func (e *Encoder) NSel() uint32              { return e.nSel }
-func (e *Encoder) LOD() (lod0, lod1 float32) { return e.lod0, e.lod1 }
+func (e *Encoder) appendDefaultMetadata() {
+	e.buf = append(e.buf[:0], magic...)
+	e.buf = append(e.buf, 0x00) // There are zero metadata chunks.
+	e.mode = modeStyling
+}
+
+func (e *Encoder) CSel() uint32 {
+	if e.mode == modeInitial {
+		e.appendDefaultMetadata()
+	}
+	return e.cSel
+}
+
+func (e *Encoder) NSel() uint32 {
+	if e.mode == modeInitial {
+		e.appendDefaultMetadata()
+	}
+	return e.nSel
+}
+
+func (e *Encoder) LOD() (lod0, lod1 float32) {
+	if e.mode == modeInitial {
+		e.appendDefaultMetadata()
+	}
+	return e.lod0, e.lod1
+}
 
 func (e *Encoder) SetCSel(cSel uint32) {
 	if e.err != nil {
 		return
 	}
 	if e.mode != modeStyling {
-		e.err = errStylingOpsUsedInDrawingMode
-		return
+		if e.mode == modeInitial {
+			e.appendDefaultMetadata()
+		} else {
+			e.err = errStylingOpsUsedInDrawingMode
+			return
+		}
 	}
 	e.cSel = cSel
 	e.buf = append(e.buf, uint8(cSel&0x3f))
@@ -109,8 +141,12 @@ func (e *Encoder) SetNSel(nSel uint32) {
 		return
 	}
 	if e.mode != modeStyling {
-		e.err = errStylingOpsUsedInDrawingMode
-		return
+		if e.mode == modeInitial {
+			e.appendDefaultMetadata()
+		} else {
+			e.err = errStylingOpsUsedInDrawingMode
+			return
+		}
 	}
 	e.nSel = nSel
 	e.buf = append(e.buf, uint8((nSel&0x3f)|0x40))
@@ -121,8 +157,12 @@ func (e *Encoder) SetLOD(lod0, lod1 float32) {
 		return
 	}
 	if e.mode != modeStyling {
-		e.err = errStylingOpsUsedInDrawingMode
-		return
+		if e.mode == modeInitial {
+			e.appendDefaultMetadata()
+		} else {
+			e.err = errStylingOpsUsedInDrawingMode
+			return
+		}
 	}
 	e.lod0 = lod0
 	e.lod1 = lod1
@@ -136,8 +176,12 @@ func (e *Encoder) StartPath(adj int, x, y float32) {
 		return
 	}
 	if e.mode != modeStyling {
-		e.err = errStylingOpsUsedInDrawingMode
-		return
+		if e.mode == modeInitial {
+			e.appendDefaultMetadata()
+		} else {
+			e.err = errStylingOpsUsedInDrawingMode
+			return
+		}
 	}
 	if adj < 0 || 6 < adj {
 		e.err = errInvalidSelectorAdjustment
