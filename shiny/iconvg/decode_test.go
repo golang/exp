@@ -10,7 +10,9 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -59,6 +61,44 @@ func encodePNG(dstFilename string, src image.Image) error {
 	return closeErr
 }
 
+func decodePNG(srcFilename string) (image.Image, error) {
+	f, err := os.Open(srcFilename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return png.Decode(f)
+}
+
+func checkApproxEqual(m0, m1 image.Image) error {
+	diff := func(a, b uint32) uint32 {
+		if a < b {
+			return b - a
+		}
+		return a - b
+	}
+
+	bounds0 := m0.Bounds()
+	bounds1 := m1.Bounds()
+	if bounds0 != bounds1 {
+		return fmt.Errorf("bounds differ: got %v, want %v", bounds0, bounds1)
+	}
+	for y := bounds0.Min.Y; y < bounds0.Max.Y; y++ {
+		for x := bounds0.Min.X; x < bounds0.Max.X; x++ {
+			r0, g0, b0, a0 := m0.At(x, y).RGBA()
+			r1, g1, b1, a1 := m1.At(x, y).RGBA()
+			const D = 0xffff * 5 / 100 // Diff threshold of 5%.
+			if diff(r0, r1) > D || diff(g0, g1) > D || diff(b0, b1) > D || diff(a0, a1) > D {
+				return fmt.Errorf("at (%d, %d):\n"+
+					"got  RGBA %#04x, %#04x, %#04x, %#04x\n"+
+					"want RGBA %#04x, %#04x, %#04x, %#04x",
+					x, y, r0, g0, b0, a0, r1, g1, b1, a1)
+			}
+		}
+	}
+	return nil
+}
+
 func diffLines(t *testing.T, got, want string) {
 	gotLines := strings.Split(got, "\n")
 	wantLines := strings.Split(want, "\n")
@@ -102,7 +142,11 @@ func rasterizeASCIIArt(width int, encoded []byte) (string, error) {
 }
 
 func TestDisassembleActionInfo(t *testing.T) {
-	got, err := disassemble(actionInfoIconVG)
+	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := disassemble(ivgData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +217,11 @@ func TestDisassembleActionInfo(t *testing.T) {
 }
 
 func TestDecodeActionInfo(t *testing.T) {
-	got, err := rasterizeASCIIArt(24, actionInfoIconVG)
+	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := rasterizeASCIIArt(24, ivgData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,5 +256,49 @@ func TestDecodeActionInfo(t *testing.T) {
 	if got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 		diffLines(t, got, want)
+	}
+}
+
+func TestRasterizer(t *testing.T) {
+	testCases := []string{
+		"testdata/action-info",
+		"testdata/video-005.primitive",
+	}
+
+	for _, tc := range testCases {
+		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg")
+		if err != nil {
+			t.Errorf("%s: ReadFile: %v", tc, err)
+			continue
+		}
+		md, err := DecodeMetadata(ivgData)
+		if err != nil {
+			t.Errorf("%s: DecodeMetadata: %v", tc, err)
+			continue
+		}
+		width, height := 256, 256
+		if dx, dy := md.ViewBox.AspectRatio(); dx < dy {
+			width = int(256 * dx / dy)
+		} else {
+			height = int(256 * dy / dx)
+		}
+
+		got := image.NewRGBA(image.Rect(0, 0, width, height))
+		var z Rasterizer
+		z.SetDstImage(got, got.Bounds(), draw.Src)
+		if err := Decode(&z, ivgData, nil); err != nil {
+			t.Errorf("%s: Decode: %v", tc, err)
+			continue
+		}
+
+		want, err := decodePNG(filepath.FromSlash(tc) + ".png")
+		if err != nil {
+			t.Errorf("%s: decodePNG: %v", tc, err)
+			continue
+		}
+		if err := checkApproxEqual(got, want); err != nil {
+			t.Errorf("%s: %v", tc, err)
+			continue
+		}
 	}
 }

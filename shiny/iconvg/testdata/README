@@ -1,0 +1,18 @@
+action-info.svg comes from the Material Design icon set. See
+action/svg/production/ic_info_48px.svg in the
+github.com/google/material-design-icons repository.
+
+action-info.ivg is an IconVG version of action-info.svg. See ../doc.go for an
+annotated breakdown.
+
+action-info.png is a rendering of action-info.ivg.
+
+video-005.jpeg comes from an old version of the Go repository. See
+https://codereview.appspot.com/5758047/
+
+video-005.primitive.svg was based on running github.com/fogleman/primitive on a
+256x192 scaled version of video-005.jpeg.
+
+video-005.primitive.ivg is an IconVG version of video-005.primitive.svg.
+
+video-005.primitive.png is a rendering of video-005.primitive.ivg.

@@ -42,17 +42,21 @@ type Rasterizer struct {
 
 	metadata Metadata
 
+	lod0 float32
+	lod1 float32
+	cSel uint8
+	nSel uint8
+
 	firstStartPath  bool
 	prevSmoothType  uint8
 	prevSmoothPoint f32.Vec2
 
-	cSel uint32
-	nSel uint32
-	lod0 float32
-	lod1 float32
+	fill      image.Image
+	flatColor color.RGBA
+	flatImage image.Uniform
 
-	creg [64]color.RGBA
-	nreg [64]float32
+	cReg [64]color.RGBA
+	nReg [64]float32
 }
 
 // SetDstImage sets the Rasterizer to draw onto a destination image, given by
@@ -74,15 +78,15 @@ func (z *Rasterizer) SetDstImage(dst draw.Image, r image.Rectangle, drawOp draw.
 // Reset resets the Rasterizer for the given Metadata.
 func (z *Rasterizer) Reset(m Metadata) {
 	z.metadata = m
+	z.lod0 = 0
+	z.lod1 = positiveInfinity
+	z.cSel = 0
+	z.nSel = 0
 	z.firstStartPath = true
 	z.prevSmoothType = smoothTypeNone
 	z.prevSmoothPoint = f32.Vec2{}
-	z.cSel = 0
-	z.nSel = 0
-	z.lod0 = 0
-	z.lod1 = positiveInfinity
-	z.creg = [64]color.RGBA{}
-	z.nreg = [64]float32{}
+	z.cReg = m.Palette
+	z.nReg = [64]float32{}
 	z.recalcTransform()
 }
 
@@ -91,6 +95,28 @@ func (z *Rasterizer) recalcTransform() {
 	z.biasX = -z.metadata.ViewBox.Min[0]
 	z.scaleY = float32(z.r.Dy()) / (z.metadata.ViewBox.Max[1] - z.metadata.ViewBox.Min[1])
 	z.biasY = -z.metadata.ViewBox.Min[1]
+}
+
+func (z *Rasterizer) SetCSel(cSel uint8) { z.cSel = cSel & 0x3f }
+func (z *Rasterizer) SetNSel(nSel uint8) { z.nSel = nSel & 0x3f }
+
+func (z *Rasterizer) SetCReg(adj uint8, incr bool, c Color) {
+	z.cReg[(z.cSel-adj)&0x3f] = c.Resolve(&z.metadata.Palette, &z.cReg)
+	if incr {
+		z.cSel++
+	}
+}
+
+func (z *Rasterizer) SetNReg(adj uint8, incr bool, f float32) {
+	z.nReg[(z.nSel-adj)&0x3f] = f
+	if incr {
+		z.nSel++
+	}
+}
+
+func (z *Rasterizer) SetLOD(lod0, lod1 float32) {
+	z.lod0, z.lod1 = lod0, lod1
+	// TODO: check the LODs against z.r.Dy().
 }
 
 func (z *Rasterizer) absX(x float32) float32 { return z.scaleX * (x + z.biasX) }
@@ -126,8 +152,11 @@ func (z *Rasterizer) implicitSmoothPoint(thisSmoothType uint8) f32.Vec2 {
 	}
 }
 
-func (z *Rasterizer) StartPath(adj int, x, y float32) {
-	// TODO: note adj, use it in ClosePathEndPath.
+func (z *Rasterizer) StartPath(adj uint8, x, y float32) {
+	// TODO: gradient fills, not just flat colors.
+	z.flatColor = z.cReg[(z.cSel-adj)&0x3f]
+	z.flatImage.C = &z.flatColor
+	z.fill = &z.flatImage
 
 	z.z.Reset(z.r.Dx(), z.r.Dy())
 	if z.firstStartPath {
@@ -143,8 +172,7 @@ func (z *Rasterizer) ClosePathEndPath() {
 	if z.dst == nil {
 		return
 	}
-	// TODO: don't assume image.Opaque.
-	z.z.Draw(z.dst, z.r, image.Opaque, image.Point{})
+	z.z.Draw(z.dst, z.r, z.fill, image.Point{})
 }
 
 func (z *Rasterizer) ClosePathAbsMoveTo(x, y float32) {

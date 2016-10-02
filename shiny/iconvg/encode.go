@@ -8,12 +8,11 @@ import (
 	"errors"
 )
 
-// TODO: encode colors; opcodes for setting CREGs and NREGs.
-
 var (
-	errDrawingOpsUsedInStylingMode = errors.New("iconvg: drawing ops used in styling mode")
-	errInvalidSelectorAdjustment   = errors.New("iconvg: invalid selector adjustment")
-	errStylingOpsUsedInDrawingMode = errors.New("iconvg: styling ops used in drawing mode")
+	errDrawingOpsUsedInStylingMode   = errors.New("iconvg: drawing ops used in styling mode")
+	errInvalidSelectorAdjustment     = errors.New("iconvg: invalid selector adjustment")
+	errInvalidIncrementingAdjustment = errors.New("iconvg: invalid incrementing adjustment")
+	errStylingOpsUsedInDrawingMode   = errors.New("iconvg: styling ops used in drawing mode")
 )
 
 type mode uint8
@@ -35,14 +34,16 @@ type Encoder struct {
 	metadata Metadata
 	err      error
 
+	lod0 float32
+	lod1 float32
+	cSel uint8
+	nSel uint8
+
 	mode     mode
 	drawOp   byte
 	drawArgs []float32
 
-	cSel uint32
-	nSel uint32
-	lod0 float32
-	lod1 float32
+	scratch [12]byte
 }
 
 // Bytes returns the encoded form.
@@ -99,14 +100,14 @@ func (e *Encoder) appendDefaultMetadata() {
 	e.mode = modeStyling
 }
 
-func (e *Encoder) CSel() uint32 {
+func (e *Encoder) CSel() uint8 {
 	if e.mode == modeInitial {
 		e.appendDefaultMetadata()
 	}
 	return e.cSel
 }
 
-func (e *Encoder) NSel() uint32 {
+func (e *Encoder) NSel() uint8 {
 	if e.mode == modeInitial {
 		e.appendDefaultMetadata()
 	}
@@ -120,7 +121,7 @@ func (e *Encoder) LOD() (lod0, lod1 float32) {
 	return e.lod0, e.lod1
 }
 
-func (e *Encoder) SetCSel(cSel uint32) {
+func (e *Encoder) SetCSel(cSel uint8) {
 	if e.err != nil {
 		return
 	}
@@ -132,11 +133,11 @@ func (e *Encoder) SetCSel(cSel uint32) {
 			return
 		}
 	}
-	e.cSel = cSel
-	e.buf = append(e.buf, uint8(cSel&0x3f))
+	e.cSel = cSel & 0x3f
+	e.buf = append(e.buf, e.cSel)
 }
 
-func (e *Encoder) SetNSel(nSel uint32) {
+func (e *Encoder) SetNSel(nSel uint8) {
 	if e.err != nil {
 		return
 	}
@@ -148,8 +149,79 @@ func (e *Encoder) SetNSel(nSel uint32) {
 			return
 		}
 	}
-	e.nSel = nSel
-	e.buf = append(e.buf, uint8((nSel&0x3f)|0x40))
+	e.nSel = nSel & 0x3f
+	e.buf = append(e.buf, e.nSel|0x40)
+}
+
+func (e *Encoder) SetCReg(adj uint8, incr bool, c Color) {
+	if e.err != nil {
+		return
+	}
+	if adj < 0 || 6 < adj {
+		e.err = errInvalidSelectorAdjustment
+		return
+	}
+	if incr {
+		if adj != 0 {
+			e.err = errInvalidIncrementingAdjustment
+		}
+		adj = 7
+	}
+
+	if x, ok := encodeColor1(c); ok {
+		e.buf = append(e.buf, adj|0x80, x)
+		return
+	}
+	if x, ok := encodeColor2(c); ok {
+		e.buf = append(e.buf, adj|0x88, x[0], x[1])
+		return
+	}
+	if x, ok := encodeColor3Direct(c); ok {
+		e.buf = append(e.buf, adj|0x90, x[0], x[1], x[2])
+		return
+	}
+	if x, ok := encodeColor4(c); ok {
+		e.buf = append(e.buf, adj|0x98, x[0], x[1], x[2], x[3])
+		return
+	}
+	if x, ok := encodeColor3Indirect(c); ok {
+		e.buf = append(e.buf, adj|0xa0, x[0], x[1], x[2])
+		return
+	}
+	panic("unreachable")
+}
+
+func (e *Encoder) SetNReg(adj uint8, incr bool, f float32) {
+	if e.err != nil {
+		return
+	}
+	if adj < 0 || 6 < adj {
+		e.err = errInvalidSelectorAdjustment
+		return
+	}
+	if incr {
+		if adj != 0 {
+			e.err = errInvalidIncrementingAdjustment
+		}
+		adj = 7
+	}
+
+	// Try three different encodings and pick the shortest.
+	b := buffer(e.scratch[0:0])
+	opcode, iBest, nBest := uint8(0xa8), 0, b.encodeReal(f)
+
+	b = buffer(e.scratch[4:4])
+	if n := b.encodeCoordinate(f); n < nBest {
+		opcode, iBest, nBest = 0xb0, 4, n
+	}
+
+	b = buffer(e.scratch[8:8])
+	if n := b.encodeZeroToOne(f); n < nBest {
+		opcode, iBest, nBest = 0xb8, 8, n
+	}
+
+	e.buf = append(e.buf, adj|opcode)
+	e.buf = append(e.buf, e.scratch[iBest:iBest+nBest]...)
 }
 
 func (e *Encoder) SetLOD(lod0, lod1 float32) {
@@ -171,7 +243,7 @@ func (e *Encoder) SetLOD(lod0, lod1 float32) {
 	e.buf.encodeReal(lod1)
 }
 
-func (e *Encoder) StartPath(adj int, x, y float32) {
+func (e *Encoder) StartPath(adj uint8, x, y float32) {
 	if e.err != nil {
 		return
 	}

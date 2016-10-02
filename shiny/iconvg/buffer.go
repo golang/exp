@@ -5,10 +5,9 @@
 package iconvg
 
 import (
+	"image/color"
 	"math"
 )
-
-// TODO: decoding and encoding colors, not just numbers.
 
 // buffer holds an encoded IconVG graphic.
 //
@@ -79,6 +78,56 @@ func (b buffer) decodeZeroToOne() (f float32, n int) {
 	}
 }
 
+func (b buffer) decodeColor1() (c Color, n int) {
+	if len(b) < 1 {
+		return Color{}, 0
+	}
+	return decodeColor1(b[0]), 1
+}
+
+func (b buffer) decodeColor2() (c Color, n int) {
+	if len(b) < 2 {
+		return Color{}, 0
+	}
+	return RGBAColor(color.RGBA{
+		R: 0x11 * (b[0] >> 4),
+		G: 0x11 * (b[0] & 0x0f),
+		B: 0x11 * (b[1] >> 4),
+		A: 0x11 * (b[1] & 0x0f),
+	}), 2
+}
+
+func (b buffer) decodeColor3Direct() (c Color, n int) {
+	if len(b) < 3 {
+		return Color{}, 0
+	}
+	return RGBAColor(color.RGBA{
+		R: b[0],
+		G: b[1],
+		B: b[2],
+		A: 0xff,
+	}), 3
+}
+
+func (b buffer) decodeColor4() (c Color, n int) {
+	if len(b) < 4 {
+		return Color{}, 0
+	}
+	return RGBAColor(color.RGBA{
+		R: b[0],
+		G: b[1],
+		B: b[2],
+		A: b[3],
+	}), 4
+}
+
+func (b buffer) decodeColor3Indirect() (c Color, n int) {
+	if len(b) < 3 {
+		return Color{}, 0
+	}
+	return BlendColor(b[0], b[1], b[2]), 3
+}
+
 func (b *buffer) encodeNatural(u uint32) {
 	if u < 1<<7 {
 		u = (u << 1)
@@ -94,18 +143,19 @@ func (b *buffer) encodeNatural(u uint32) {
 	*b = append(*b, uint8(u), uint8(u>>8), uint8(u>>16), uint8(u>>24))
 }
 
-func (b *buffer) encodeReal(f float32) {
+func (b *buffer) encodeReal(f float32) int {
 	if u := uint32(f); float32(u) == f && u < 1<<14 {
 		if u < 1<<7 {
 			u = (u << 1)
 			*b = append(*b, uint8(u))
-		} else {
-			u = (u << 2) | 1
-			*b = append(*b, uint8(u), uint8(u>>8))
+			return 1
 		}
-		return
+		u = (u << 2) | 1
+		*b = append(*b, uint8(u), uint8(u>>8))
+		return 2
 	}
 	b.encode4ByteReal(f)
+	return 4
 }
 
 func (b *buffer) encode4ByteReal(f float32) {
@@ -124,32 +174,79 @@ func (b *buffer) encode4ByteReal(f float32) {
 	*b = append(*b, uint8(u), uint8(u>>8), uint8(u>>16), uint8(u>>24))
 }
 
-func (b *buffer) encodeCoordinate(f float32) {
+func (b *buffer) encodeCoordinate(f float32) int {
 	if i := int32(f); -64 <= i && i < +64 && float32(i) == f {
 		u := uint32(i + 64)
 		u = (u << 1)
 		*b = append(*b, uint8(u))
-		return
+		return 1
 	}
 	if i := int32(f * 64); -128*64 <= i && i < +128*64 && float32(i) == f*64 {
 		u := uint32(i + 128*64)
 		u = (u << 2) | 1
 		*b = append(*b, uint8(u), uint8(u>>8))
-		return
+		return 2
 	}
 	b.encode4ByteReal(f)
+	return 4
 }
 
-func (b *buffer) encodeZeroToOne(f float32) {
+func (b *buffer) encodeZeroToOne(f float32) int {
 	if u := uint32(f * 15120); float32(u) == f*15120 && u < 15120 {
 		if u%126 == 0 {
 			u = ((u / 126) << 1)
 			*b = append(*b, uint8(u))
-		} else {
-			u = (u << 2) | 1
-			*b = append(*b, uint8(u), uint8(u>>8))
+			return 1
 		}
-		return
+		u = (u << 2) | 1
+		*b = append(*b, uint8(u), uint8(u>>8))
+		return 2
 	}
 	b.encode4ByteReal(f)
+	return 4
+}
+
+func (b *buffer) encodeColor1(c Color) {
+	if x, ok := encodeColor1(c); ok {
+		*b = append(*b, x)
+		return
+	}
+	// Default to opaque black.
+	*b = append(*b, 0x00)
+}
+
+func (b *buffer) encodeColor2(c Color) {
+	if x, ok := encodeColor2(c); ok {
+		*b = append(*b, x[0], x[1])
+		return
+	}
+	// Default to opaque black.
+	*b = append(*b, 0x00, 0x0f)
+}
+
+func (b *buffer) encodeColor3Direct(c Color) {
+	if x, ok := encodeColor3Direct(c); ok {
+		*b = append(*b, x[0], x[1], x[2])
+		return
+	}
+	// Default to opaque black.
+	*b = append(*b, 0x00, 0x00, 0x00)
+}
+
+func (b *buffer) encodeColor4(c Color) {
+	if x, ok := encodeColor4(c); ok {
+		*b = append(*b, x[0], x[1], x[2], x[3])
+		return
+	}
+	// Default to opaque black.
+	*b = append(*b, 0x00, 0x00, 0x00, 0xff)
+}
+
+func (b *buffer) encodeColor3Indirect(c Color) {
+	if x, ok := encodeColor3Indirect(c); ok {
+		*b = append(*b, x[0], x[1], x[2])
+		return
+	}
+	// Default to opaque black.
+	*b = append(*b, 0x00, 0x00, 0x00)
 }

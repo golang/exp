@@ -66,7 +66,8 @@ CREG[63]) and 64 number registers (denoted NREG[0], NREG[1], ..., NREG[63]).
 Register indexing is done modulo 64, so CREG[70] is the same as CREG[6], and
 CREG[-1] is the same as CREG[63].
 
-Each CREG and NREG register is 32 bits wide, and all initial values are 0. The
+Each CREG and NREG register is 32 bits wide. The CREG registers are initialized
+to the custom palette (see below); the NREG registers are initialized to 0. The
 machine state also includes two selector registers, denoted CSEL and NSEL. They
 are effectively 6 bit integers, as they index CREG and NREG, and are also
 initialized to 0.

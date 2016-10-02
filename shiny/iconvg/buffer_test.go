@@ -5,6 +5,7 @@
 package iconvg
 
 import (
+	"image/color"
 	"math"
 	"testing"
 )
@@ -180,6 +181,150 @@ func TestEncodeZeroToOne(t *testing.T) {
 	for _, tc := range zeroToOneTestCases {
 		var b buffer
 		b.encodeZeroToOne(tc.want)
+		if got, want := string(b), string(tc.in); got != want {
+			t.Errorf("value=%v:\ngot  % x\nwant % x", tc.want, got, want)
+		}
+	}
+}
+
+var colorTestCases = []struct {
+	in     buffer
+	decode func(buffer) (Color, int)
+	encode func(*buffer, Color)
+	want   Color
+	wantN  int
+}{{
+	buffer{},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	Color{},
+	0,
+}, {
+	buffer{0x00},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	RGBAColor(color.RGBA{0x00, 0x00, 0x00, 0xff}),
+	1,
+}, {
+	buffer{0x30},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	RGBAColor(color.RGBA{0x40, 0xff, 0xc0, 0xff}),
+	1,
+}, {
+	buffer{0x7c},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	RGBAColor(color.RGBA{0xff, 0xff, 0xff, 0xff}),
+	1,
+}, {
+	buffer{0x7d},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	RGBAColor(color.RGBA{0xc0, 0xc0, 0xc0, 0xc0}),
+	1,
+}, {
+	buffer{0x7e},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	RGBAColor(color.RGBA{0x80, 0x80, 0x80, 0x80}),
+	1,
+}, {
+	buffer{0x7f},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	RGBAColor(color.RGBA{0x00, 0x00, 0x00, 0x00}),
+	1,
+}, {
+	buffer{0x80},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	PaletteIndexColor(0x00),
+	1,
+}, {
+	buffer{0xbf},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	PaletteIndexColor(0x3f),
+	1,
+}, {
+	buffer{0xc0},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	CRegColor(0x00),
+	1,
+}, {
+	buffer{0xff},
+	buffer.decodeColor1,
+	(*buffer).encodeColor1,
+	CRegColor(0x3f),
+	1,
+}, {
+	buffer{0x01},
+	buffer.decodeColor2,
+	(*buffer).encodeColor2,
+	Color{},
+	0,
+}, {
+	buffer{0x38, 0x0f},
+	buffer.decodeColor2,
+	(*buffer).encodeColor2,
+	RGBAColor(color.RGBA{0x33, 0x88, 0x00, 0xff}),
+	2,
+}, {
+	buffer{0x00, 0x02},
+	buffer.decodeColor3Direct,
+	(*buffer).encodeColor3Direct,
+	Color{},
+	0,
+}, {
+	buffer{0x30, 0x66, 0x07},
+	buffer.decodeColor3Direct,
+	(*buffer).encodeColor3Direct,
+	RGBAColor(color.RGBA{0x30, 0x66, 0x07, 0xff}),
+	3,
+}, {
+	buffer{0x00, 0x00, 0x03},
+	buffer.decodeColor4,
+	(*buffer).encodeColor4,
+	Color{},
+	0,
+}, {
+	buffer{0x30, 0x66, 0x07, 0x80},
+	buffer.decodeColor4,
+	(*buffer).encodeColor4,
+	RGBAColor(color.RGBA{0x30, 0x66, 0x07, 0x80}),
+	4,
+}, {
+	buffer{0x00, 0x04},
+	buffer.decodeColor3Indirect,
+	(*buffer).encodeColor3Indirect,
+	Color{},
+	0,
+}, {
+	buffer{0x40, 0x7f, 0x82},
+	buffer.decodeColor3Indirect,
+	(*buffer).encodeColor3Indirect,
+	BlendColor(0x40, 0x7f, 0x82),
+	3,
+}}
+
+func TestDecodeColor(t *testing.T) {
+	for _, tc := range colorTestCases {
+		got, gotN := tc.decode(tc.in)
+		if got != tc.want || gotN != tc.wantN {
+			t.Errorf("in=%x: got %v, %d, want %v, %d", tc.in, got, gotN, tc.want, tc.wantN)
+		}
+	}
+}
+
+func TestEncodeColor(t *testing.T) {
+	for _, tc := range colorTestCases {
+		if tc.wantN == 0 {
+			continue
+		}
+		var b buffer
+		tc.encode(&b, tc.want)
 		if got, want := string(b), string(tc.in); got != want {
 			t.Errorf("value=%v:\ngot  % x\nwant % x", tc.want, got, want)
 		}

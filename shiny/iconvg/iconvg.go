@@ -26,6 +26,18 @@ const (
 	midSuggestedPalette = 1
 )
 
+var gradientShapeNames = [2]string{
+	"linear",
+	"radial",
+}
+
+var gradientSpreadNames = [4]string{
+	"none",
+	"pad",
+	"reflect",
+	"repeat",
+}
+
 // Rectangle is defined by its minimum and maximum coordinates.
 type Rectangle struct {
 	Min, Max f32.Vec2

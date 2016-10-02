@@ -7,15 +7,18 @@ package iconvg
 import (
 	"bytes"
 	"errors"
+	"image/color"
 )
 
 var (
 	errInconsistentMetadataChunkLength = errors.New("iconvg: inconsistent metadata chunk length")
+	errInvalidColor                    = errors.New("iconvg: invalid color")
 	errInvalidMagicIdentifier          = errors.New("iconvg: invalid magic identifier")
 	errInvalidMetadataChunkLength      = errors.New("iconvg: invalid metadata chunk length")
 	errInvalidMetadataIdentifier       = errors.New("iconvg: invalid metadata identifier")
 	errInvalidNumber                   = errors.New("iconvg: invalid number")
 	errInvalidNumberOfMetadataChunks   = errors.New("iconvg: invalid number of metadata chunks")
+	errInvalidSuggestedPalette         = errors.New("iconvg: invalid suggested palette")
 	errInvalidViewBox                  = errors.New("iconvg: invalid view box")
 	errUnsupportedDrawingOpcode        = errors.New("iconvg: unsupported drawing opcode")
 	errUnsupportedMetadataIdentifier   = errors.New("iconvg: unsupported metadata identifier")
@@ -35,9 +38,13 @@ var midDescriptions = [...]string{
 type Destination interface {
 	Reset(m Metadata)
 
-	// TODO: styling mode ops other than StartPath.
+	SetCSel(cSel uint8)
+	SetNSel(nSel uint8)
+	SetCReg(adj uint8, incr bool, c Color)
+	SetNReg(adj uint8, incr bool, f float32)
+	SetLOD(lod0, lod1 float32)
 
-	StartPath(adj int, x, y float32)
+	StartPath(adj uint8, x, y float32)
 	ClosePathEndPath()
 	ClosePathAbsMoveTo(x, y float32)
 	ClosePathRelMoveTo(x, y float32)
@@ -176,7 +183,41 @@ func decodeMetadataChunk(p printer, m *Metadata, src buffer, opts *DecodeOptions
 		}
 
 	case midSuggestedPalette:
-		panic("TODO")
+		if len(src) == 0 {
+			return nil, errInvalidSuggestedPalette
+		}
+		length, format := 1+int(src[0]&0x3f), src[0]>>6
+		decode := buffer.decodeColor4
+		switch format {
+		case 0:
+			decode = buffer.decodeColor1
+		case 1:
+			decode = buffer.decodeColor2
+		case 2:
+			decode = buffer.decodeColor3Direct
+		}
+		if p != nil {
+			p(src[:1], "    %d palette colors, %d bytes per color\n", length, 1+format)
+		}
+		src = src[1:]
+
+		for i := 0; i < length; i++ {
+			c, n := decode(src)
+			if n == 0 {
+				return nil, errInvalidSuggestedPalette
+			}
+			rgba := c.rgba()
+			if c.typ != ColorTypeRGBA || !validAlphaPremulColor(rgba) {
+				rgba = color.RGBA{0x00, 0x00, 0x00, 0xff}
+			}
+			if p != nil {
+				p(src[:n], "    RGBA %02x%02x%02x%02x\n", rgba.R, rgba.G, rgba.B, rgba.A)
+			}
+			src = src[n:]
+			if opts == nil || opts.Palette == nil {
+				m.Palette[i] = rgba
+			}
+		}
 
 	default:
 		return nil, errUnsupportedMetadataIdentifier
@@ -198,18 +239,154 @@ type modeFunc func(dst Destination, p printer, src buffer) (modeFunc, buffer, er
 
 func decodeStyling(dst Destination, p printer, src buffer) (modeFunc, buffer, error) {
 	switch opcode := src[0]; {
+	case opcode < 0x80:
+		if opcode < 0x40 {
+			opcode &= 0x3f
+			if p != nil {
+				p(src[:1], "Set CSEL = %d\n", opcode)
+			}
+			src = src[1:]
+			if dst != nil {
+				dst.SetCSel(opcode)
+			}
+		} else {
+			opcode &= 0x3f
+			if p != nil {
+				p(src[:1], "Set NSEL = %d\n", opcode)
+			}
+			src = src[1:]
+			if dst != nil {
+				dst.SetNSel(opcode)
+			}
+		}
+		return decodeStyling, src, nil
+	case opcode < 0xa8:
+		return decodeSetCReg(dst, p, src, opcode)
 	case opcode < 0xc0:
-		panic("TODO")
+		return decodeSetNReg(dst, p, src, opcode)
 	case opcode < 0xc7:
 		return decodeStartPath(dst, p, src, opcode)
 	case opcode == 0xc7:
-		panic("TODO")
+		return decodeSetLOD(dst, p, src)
 	}
 	return nil, nil, errUnsupportedStylingOpcode
 }
 
+func decodeSetCReg(dst Destination, p printer, src buffer, opcode byte) (modeFunc, buffer, error) {
+	nBytes, directness, adj := 0, "", opcode&0x07
+	var decode func(buffer) (Color, int)
+	incr := adj == 7
+	if incr {
+		adj = 0
+	}
+
+	switch (opcode - 0x80) >> 3 {
+	case 0:
+		nBytes, directness, decode = 1, "", buffer.decodeColor1
+	case 1:
+		nBytes, directness, decode = 2, "", buffer.decodeColor2
+	case 2:
+		nBytes, directness, decode = 3, " (direct)", buffer.decodeColor3Direct
+	case 3:
+		nBytes, directness, decode = 4, "", buffer.decodeColor4
+	case 4:
+		nBytes, directness, decode = 3, " (indirect)", buffer.decodeColor3Indirect
+	}
+	if p != nil {
+		if incr {
+			p(src[:1], "Set CREG[CSEL-0] to a %d byte%s color; CSEL++\n", nBytes, directness)
+		} else {
+			p(src[:1], "Set CREG[CSEL-%d] to a %d byte%s color\n", adj, nBytes, directness)
+		}
+	}
+	src = src[1:]
+
+	c, n := decode(src)
+	if n == 0 {
+		return nil, nil, errInvalidColor
+	}
+
+	if p != nil {
+		printColor(src[:n], p, c, "")
+	}
+	src = src[n:]
+
+	if dst != nil {
+		dst.SetCReg(adj, incr, c)
+	}
+
+	return decodeStyling, src, nil
+}
+
+func printColor(src []byte, p printer, c Color, prefix string) {
+	switch c.typ {
+	case ColorTypeRGBA:
+		if rgba := c.rgba(); validAlphaPremulColor(rgba) {
+			p(src, "    %sRGBA %02x%02x%02x%02x\n", prefix, rgba.R, rgba.G, rgba.B, rgba.A)
+		} else if rgba.A == 0 && rgba.B&0x80 != 0 {
+			p(src, "    %sgradient (NSTOPS=%d, CBASE=%d, NBASE=%d, %s, %s)\n",
+				prefix,
+				rgba.R&0x3f,
+				rgba.G&0x3f,
+				rgba.B&0x3f,
+				gradientShapeNames[(rgba.B>>6)&0x01],
+				gradientSpreadNames[rgba.G>>6],
+			)
+		} else {
+			p(src, "    %snonsensical color\n", prefix)
+		}
+	case ColorTypePaletteIndex:
+		p(src, "    %scustomPalette[%d]\n", prefix, c.paletteIndex())
+	case ColorTypeCReg:
+		p(src, "    %sCREG[%d]\n", prefix, c.cReg())
+	case ColorTypeBlend:
+		t, c0, c1 := c.blend()
+		p(src[:1], "    blend %d:%d c0:c1\n", 0xff-t, t)
+		printColor(src[1:2], p, decodeColor1(c0), "    c0: ")
+		printColor(src[2:3], p, decodeColor1(c1), "    c1: ")
+	}
+}
+
+func decodeSetNReg(dst Destination, p printer, src buffer, opcode byte) (modeFunc, buffer, error) {
+	decode, typ, adj := buffer.decodeZeroToOne, "zero-to-one", opcode&0x07
+	incr := adj == 7
+	if incr {
+		adj = 0
+	}
+
+	switch (opcode - 0xa8) >> 3 {
+	case 0:
+		decode, typ = buffer.decodeReal, "real"
+	case 1:
+		decode, typ = buffer.decodeCoordinate, "coordinate"
+	}
+	if p != nil {
+		if incr {
+			p(src[:1], "Set NREG[NSEL-0] to a %s number; NSEL++\n", typ)
+		} else {
+			p(src[:1], "Set NREG[NSEL-%d] to a %s number\n", adj, typ)
+		}
+	}
+	src = src[1:]
+
+	f, n := decode(src)
+	if n == 0 {
+		return nil, nil, errInvalidNumber
+	}
+	if p != nil {
+		p(src[:n], "    %g\n", f)
+	}
+	src = src[n:]
+
+	if dst != nil {
+		dst.SetNReg(adj, incr, f)
+	}
+
+	return decodeStyling, src, nil
+}
+
 func decodeStartPath(dst Destination, p printer, src buffer, opcode byte) (modeFunc, buffer, error) {
-	adj := int(opcode & 0x07)
+	adj := opcode & 0x07
 	if p != nil {
 		p(src[:1], "Start path, filled with CREG[CSEL-%d]; M (absolute moveTo)\n", adj)
 	}
@@ -229,6 +406,27 @@ func decodeStartPath(dst Destination, p printer, src buffer, opcode byte) (modeF
 	}
 
 	return decodeDrawing, src, nil
+}
+
+func decodeSetLOD(dst Destination, p printer, src buffer) (modeFunc, buffer, error) {
+	if p != nil {
+		p(src[:1], "Set LOD\n")
+	}
+	src = src[1:]
+
+	lod0, src, err := decodeNumber(p, src, buffer.decodeReal)
+	if err != nil {
+		return nil, nil, err
+	}
+	lod1, src, err := decodeNumber(p, src, buffer.decodeReal)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if dst != nil {
+		dst.SetLOD(lod0, lod1)
+	}
+	return decodeStyling, src, nil
 }
 
 func decodeDrawing(dst Destination, p printer, src buffer) (mf modeFunc, src1 buffer, err error) {
