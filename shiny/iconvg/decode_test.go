@@ -122,26 +122,6 @@ func diffLines(t *testing.T, got, want string) {
 	}
 }
 
-func rasterizeASCIIArt(width int, encoded []byte) (string, error) {
-	dst := image.NewAlpha(image.Rect(0, 0, width, width))
-	var z Rasterizer
-	z.SetDstImage(dst, dst.Bounds(), draw.Src)
-	if err := Decode(&z, encoded, nil); err != nil {
-		return "", err
-	}
-
-	const asciiArt = ".++8"
-	buf := make([]byte, 0, width*(width+1))
-	for y := 0; y < width; y++ {
-		for x := 0; x < width; x++ {
-			a := dst.AlphaAt(x, y).A
-			buf = append(buf, asciiArt[a>>6])
-		}
-		buf = append(buf, '\n')
-	}
-	return string(buf), nil
-}
-
 func TestDisassembleActionInfo(t *testing.T) {
 	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
 	if err != nil {
@@ -209,49 +189,6 @@ func TestDisassembleActionInfo(t *testing.T) {
 		"e9            v (relative vertical lineTo)",
 		"88                +4",
 		"e1            z (closePath); end path",
-	}, "\n") + "\n"
-
-	if got != want {
-		t.Errorf("got:\n%s\nwant:\n%s", got, want)
-		diffLines(t, got, want)
-	}
-}
-
-func TestDecodeActionInfo(t *testing.T) {
-	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := rasterizeASCIIArt(24, ivgData)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want := strings.Join([]string{
-		"........................",
-		"........................",
-		"........++8888++........",
-		"......+8888888888+......",
-		".....+888888888888+.....",
-		"....+88888888888888+....",
-		"...+8888888888888888+...",
-		"...88888888..88888888...",
-		"..+88888888..88888888+..",
-		"..+888888888888888888+..",
-		"..88888888888888888888..",
-		"..888888888..888888888..",
-		"..888888888..888888888..",
-		"..888888888..888888888..",
-		"..+88888888..88888888+..",
-		"..+88888888..88888888+..",
-		"...88888888..88888888...",
-		"...+8888888888888888+...",
-		"....+88888888888888+....",
-		".....+888888888888+.....",
-		"......+8888888888+......",
-		"........++8888++........",
-		"........................",
-		"........................",
 	}, "\n") + "\n"
 
 	if got != want {
