@@ -57,14 +57,14 @@ func (c Color) Resolve(pal *Palette, cReg *[64]color.RGBA) color.RGBA {
 		return cReg[c.cReg()&0x3f]
 	}
 	t, c0, c1 := c.blend()
-	s := 255 - t
+	p, q := uint32(255-t), uint32(t)
 	rgba0 := decodeColor1(c0).Resolve(pal, cReg)
 	rgba1 := decodeColor1(c1).Resolve(pal, cReg)
 	return color.RGBA{
-		((s * rgba0.R) + (t * rgba1.R) + 128) / 255,
-		((s * rgba0.G) + (t * rgba1.G) + 128) / 255,
-		((s * rgba0.B) + (t * rgba1.B) + 128) / 255,
-		((s * rgba0.A) + (t * rgba1.A) + 128) / 255,
+		uint8(((p * uint32(rgba0.R)) + q*uint32(rgba1.R) + 128) / 255),
+		uint8(((p * uint32(rgba0.G)) + q*uint32(rgba1.G) + 128) / 255),
+		uint8(((p * uint32(rgba0.B)) + q*uint32(rgba1.B) + 128) / 255),
+		uint8(((p * uint32(rgba0.A)) + q*uint32(rgba1.A) + 128) / 255),
 	}
 }
 

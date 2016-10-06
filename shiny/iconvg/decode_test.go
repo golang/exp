@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/png"
 	"io/ioutil"
@@ -300,5 +301,19 @@ func TestRasterizer(t *testing.T) {
 			t.Errorf("%s: %v", tc, err)
 			continue
 		}
+	}
+}
+
+func TestBlendColor(t *testing.T) {
+	// This example comes from doc.go. Look for "orange" in the "Colors"
+	// section.
+	pal := Palette{
+		2: color.RGBA{0xff, 0xcc, 0x80, 0xff}, // "Material Design Orange 200".
+	}
+	cReg := [64]color.RGBA{}
+	got := BlendColor(0x40, 0x7f, 0x82).Resolve(&pal, &cReg)
+	want := color.RGBA{0x40, 0x33, 0x20, 0x40} // 25% opaque "Orange 200", alpha-premultiplied.
+	if got != want {
+		t.Errorf("\ngot  %x\nwant %x", got, want)
 	}
 }
