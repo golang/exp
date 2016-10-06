@@ -1,0 +1,380 @@
+89 49 56 47   IconVG Magic identifier
+02            Number of metadata chunks: 1
+0a            Metadata chunk length: 5
+00            Metadata Identifier: 0 (viewBox)
+40                -32
+50                -24
+c0                +32
+b0                +24
+90            Set CREG[CSEL-0] to a 3 byte (direct) color
+7c 7e 7c          RGBA 7c7e7cff
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+40                -32
+50                -24
+e6            H (absolute horizontal lineTo)
+c0                +32
+e8            V (absolute vertical lineTo)
+b0                +24
+e6            H (absolute horizontal lineTo)
+40                -32
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+0b 03 02 80       RGBA 0b030280
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 88             +8.625
+e1 9b             +27.875
+01            L (absolute lineTo), 2 reps
+e1 a3             +35.875
+a1 96             +22.625
+              L (absolute lineTo), implicit
+e1 90             +16.875
+21 64             -27.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+74 7a 7c 80       RGBA 747a7c80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 5c             -35.875
+e1 94             +20.875
+01            L (absolute lineTo), 2 reps
+21 83             +3.125
+61 65             -26.625
+              L (absolute lineTo), implicit
+21 64             -27.875
+21 66             -25.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 02 13 80       RGBA 00021380
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 78             -7.625
+21 80             +0.125
+01            L (absolute lineTo), 2 reps
+61 97             +23.375
+61 6d             -18.625
+              L (absolute lineTo), implicit
+a1 95             +21.625
+e1 83             +3.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+44 6c 80 80       RGBA 446c8080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 a1             +33.625
+a1 66             -25.375
+01            L (absolute lineTo), 2 reps
+e1 a3             +35.875
+21 82             +2.125
+              L (absolute lineTo), implicit
+21 89             +9.125
+21 64             -27.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+4a 5e 62 80       RGBA 4a5e6280
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 93             +19.125
+21 82             +2.125
+01            L (absolute lineTo), 2 reps
+21 89             +9.125
+e1 9b             +27.875
+              L (absolute lineTo), implicit
+e1 6e             -17.125
+21 82             +2.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+6a 40 1e 80       RGBA 6a401e80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 5c             -35.875
+21 71             -14.875
+01            L (absolute lineTo), 2 reps
+e1 7e             -1.125
+e1 98             +24.875
+              L (absolute lineTo), implicit
+21 5c             -35.875
+a1 98             +24.625
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 00 00 80       RGBA 00000080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 89             +9.125
+e1 6c             -19.125
+01            L (absolute lineTo), 2 reps
+e1 77             -8.125
+61 7b             -4.625
+              L (absolute lineTo), implicit
+a1 82             +2.625
+61 6b             -20.625
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+1c 08 0c 80       RGBA 1c080c80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 6c             -19.375
+e1 8b             +11.875
+01            L (absolute lineTo), 2 reps
+e1 7c             -3.125
+61 96             +22.375
+              L (absolute lineTo), implicit
+21 5f             -32.875
+61 91             +17.375
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 1e 40 80       RGBA 001e4080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 75             -10.375
+61 83             +3.375
+01            L (absolute lineTo), 2 reps
+61 6d             -18.625
+21 7b             -4.875
+              L (absolute lineTo), implicit
+a1 76             -9.375
+21 6e             -17.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+7e 63 4e 80       RGBA 7e634e80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 67             -24.125
+61 90             +16.375
+01            L (absolute lineTo), 2 reps
+21 74             -11.875
+61 82             +2.375
+              L (absolute lineTo), implicit
+21 5c             -35.875
+21 6f             -16.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+4f 6e 80 80       RGBA 4f6e8080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 92             +18.375
+61 66             -25.625
+01            L (absolute lineTo), 2 reps
+e1 67             -24.125
+21 64             -27.875
+              L (absolute lineTo), implicit
+a1 60             -31.375
+21 77             -8.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 10 1c 80       RGBA 00101c80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 81             +1.125
+61 7d             -2.625
+01            L (absolute lineTo), 2 reps
+21 9c             +28.125
+e1 66             -25.125
+              L (absolute lineTo), implicit
+61 8b             +11.375
+a1 88             +8.625
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+7e 5e 47 80       RGBA 7e5e4780
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 90             +16.375
+e1 87             +7.875
+01            L (absolute lineTo), 2 reps
+e1 99             +25.875
+a1 7f             -0.375
+              L (absolute lineTo), implicit
+a1 9e             +30.625
+21 87             +7.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+21 03 00 80       RGBA 21030080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 9e             +30.875
+e1 9b             +27.875
+01            L (absolute lineTo), 2 reps
+61 9b             +27.375
+e1 7c             -3.125
+              L (absolute lineTo), implicit
+e1 a3             +35.875
+61 80             +0.375
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+40 5f 77 80       RGBA 405f7780
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 7d             -2.625
+a1 89             +9.625
+01            L (absolute lineTo), 2 reps
+21 76             -9.875
+61 94             +20.375
+              L (absolute lineTo), implicit
+a1 76             -9.375
+21 6f             -16.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 00 00 80       RGBA 00000080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 7f             -0.125
+a1 71             -14.375
+01            L (absolute lineTo), 2 reps
+21 8b             +11.125
+21 79             -6.875
+              L (absolute lineTo), implicit
+e1 97             +23.875
+e1 75             -10.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+0c 07 0b 80       RGBA 0c070b80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 92             +18.375
+21 9b             +27.125
+01            L (absolute lineTo), 2 reps
+61 88             +8.375
+61 81             +1.375
+              L (absolute lineTo), implicit
+e1 a3             +35.875
+21 98             +24.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+7b 55 38 80       RGBA 7b553880
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 92             +18.375
+21 91             +17.125
+01            L (absolute lineTo), 2 reps
+a1 98             +24.625
+61 8b             +11.375
+              L (absolute lineTo), implicit
+61 a1             +33.375
+21 8e             +14.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+70 1b 00 80       RGBA 701b0080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 5c             -35.875
+a1 67             -24.375
+01            L (absolute lineTo), 2 reps
+61 67             -24.625
+21 64             -27.875
+              L (absolute lineTo), implicit
+a1 5e             -33.375
+a1 76             -9.375
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+80 72 5d 80       RGBA 80725d80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 84             +4.625
+61 73             -12.625
+01            L (absolute lineTo), 2 reps
+a1 7d             -2.375
+e1 7a             -5.125
+              L (absolute lineTo), implicit
+21 85             +5.125
+21 7b             -4.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 00 09 80       RGBA 00000980
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 7d             -2.375
+21 73             -12.875
+01            L (absolute lineTo), 2 reps
+e1 7a             -5.125
+61 83             +3.375
+              L (absolute lineTo), implicit
+21 79             -6.875
+e1 74             -11.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+5e 6a 72 80       RGBA 5e6a7280
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 a3             +35.875
+61 72             -13.625
+01            L (absolute lineTo), 2 reps
+61 9f             +31.375
+21 64             -27.875
+              L (absolute lineTo), implicit
+e1 94             +20.875
+61 7e             -1.625
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+29 00 00 80       RGBA 29000080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 75             -10.125
+e1 87             +7.875
+01            L (absolute lineTo), 2 reps
+e1 74             -11.125
+a1 8d             +13.625
+              L (absolute lineTo), implicit
+e1 6d             -18.125
+e1 83             +3.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 59 50 80       RGBA 00595080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+21 7f             -0.875
+61 96             +22.375
+01            L (absolute lineTo), 2 reps
+e1 81             +1.875
+e1 9b             +27.875
+              L (absolute lineTo), implicit
+a1 90             +16.625
+21 94             +20.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+11 00 00 80       RGBA 11000080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 6e             -17.125
+e1 8d             +13.875
+01            L (absolute lineTo), 2 reps
+61 68             -23.625
+21 87             +7.125
+              L (absolute lineTo), implicit
+21 6d             -18.875
+61 92             +18.375
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+5f 65 65 80       RGBA 5f656580
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 85             +5.375
+a1 72             -13.375
+01            L (absolute lineTo), 2 reps
+e1 8d             +13.875
+21 64             -27.875
+              L (absolute lineTo), implicit
+a1 8c             +12.625
+e1 73             -12.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+80 6a 58 80       RGBA 806a5880
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 94             +20.875
+e1 85             +5.875
+01            L (absolute lineTo), 2 reps
+21 8e             +14.125
+21 81             +1.125
+              L (absolute lineTo), implicit
+a1 8d             +13.625
+21 87             +7.125
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+80 70 1c 80       RGBA 80701c80
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+61 72             -13.625
+e1 9b             +27.875
+01            L (absolute lineTo), 2 reps
+21 83             +3.125
+21 95             +21.125
+              L (absolute lineTo), implicit
+e1 5c             -35.125
+e1 96             +22.875
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+53 58 56 80       RGBA 53585680
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+a1 7e             -1.375
+61 95             +21.375
+01            L (absolute lineTo), 2 reps
+21 92             +18.125
+a1 95             +21.625
+              L (absolute lineTo), implicit
+61 77             -8.625
+a1 7c             -3.375
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+00 00 00 80       RGBA 00000080
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+e1 a3             +35.875
+21 92             +18.125
+01            L (absolute lineTo), 2 reps
+a1 8a             +10.625
+61 96             +22.375
+              L (absolute lineTo), implicit
+61 97             +23.375
+e1 9b             +27.875
+e1            z (closePath); end path

@@ -488,35 +488,63 @@ The corresponding IconVG is 73 bytes:
 The annotated version is below. Note that the IconVG viewBox ranges from -24 to
 +24 while the SVG viewBox ranges from 0 to 48.
 
-	89 49 56 47
-	Magic string.
+	89 49 56 47   IconVG Magic identifier
+	02            Number of metadata chunks: 1
+	0a            Metadata chunk length: 5
+	00            Metadata Identifier: 0 (viewBox)
+	50                -24
+	50                -24
+	b0                +24
+	b0                +24
+	c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+	80                +0
+	58                -20
+	a0            C (absolute cubeTo), 1 reps
+	cf cc 30 c1       -11.049999
+	58                -20
+	58                -20
+	cf cc 30 c1       -11.049999
+	58                -20
+	80                +0
+	91            s (relative smooth cubeTo), 2 reps
+	37 33 0f 41       +8.950001
+	a8                +20
+	a8                +20
+	a8                +20
+	              s (relative smooth cubeTo), implicit
+	a8                +20
+	37 33 0f c1       -8.950001
+	a8                +20
+	58                -20
+	80            S (absolute smooth cubeTo), 1 reps
+	cf cc 30 41       +11.049999
+	58                -20
+	80                +0
+	58                -20
+	e3            z (closePath); m (relative moveTo)
+	84                +2
+	bc                +30
+	e7            h (relative horizontal lineTo)
+	78                -4
+	e8            V (absolute vertical lineTo)
+	7c                -2
+	e7            h (relative horizontal lineTo)
+	88                +4
+	e9            v (relative vertical lineTo)
+	98                +12
+	e3            z (closePath); m (relative moveTo)
+	80                +0
+	60                -16
+	e7            h (relative horizontal lineTo)
+	78                -4
+	e9            v (relative vertical lineTo)
+	78                -4
+	e7            h (relative horizontal lineTo)
+	88                +4
+	e9            v (relative vertical lineTo)
+	88                +4
+	e1            z (closePath); end path
 
-	02
-	One metadata chunk.
-
-	0a 00 50 50 b0 b0
-	Metadata chunk (5 extra bytes). MID 0 (ViewBox), (-24, -24) to (+24, +24).
-
-	c0 80 58
-	Start path (with CREG[CSEL-0], opaque black by default); M 0 -20.
-
-	a0 cf cc 30 c1 58 58 cf cc 30 c1 58 80
-	C -11.05 -20 -20 -11.05 -20 0.
-
-	91 37 33 0f 41 a8 a8 a8 a8 37 33 0f c1 a8 58
-	s 8.95 20 20 20, 20 -8.95 20 -20.
-
-	80 cf cc 30 41 58 80 58
-	S 11.05 -20 0 -20.
-
-	e3 84 bc e7 78 e8 7c e7 88 e9 98
-	z m 2 30 h -4 V -2 h 4 v 12.
-
-	e3 80 60 e7 78 e9 78 e7 88 e9 88
-	z m 0 -16 h -4 v -4 h 4 v 4.
-
-	e1
-	z; end path.
 */
 package iconvg
 

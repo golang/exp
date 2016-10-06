@@ -21,7 +21,7 @@ func TestEncoderZeroValue(t *testing.T) {
 		t.Fatalf("Bytes: %v", err)
 	}
 	want := []byte{
-		0x89, 0x49, 0x56, 0x47, // Magic identifier.
+		0x89, 0x49, 0x56, 0x47, // IconVG Magic identifier.
 		0x00, // Zero metadata chunks.
 	}
 	if !bytes.Equal(got, want) {

@@ -21,7 +21,7 @@ import (
 // disassemble returns a disassembly of an encoded IconVG graphic. Users of
 // this package aren't expected to want to do this, so it lives in a _test.go
 // file, but it can be useful for debugging.
-func disassemble(src []byte) (string, error) {
+func disassemble(src []byte) ([]byte, error) {
 	w := new(bytes.Buffer)
 	p := func(b []byte, format string, args ...interface{}) {
 		const hex = "0123456789abcdef"
@@ -38,9 +38,9 @@ func disassemble(src []byte) (string, error) {
 	}
 	m := Metadata{}
 	if err := decode(nil, p, &m, false, buffer(src), nil); err != nil {
-		return "", err
+		return nil, err
 	}
-	return w.String(), nil
+	return w.Bytes(), nil
 }
 
 var (
@@ -122,88 +122,37 @@ func diffLines(t *testing.T, got, want string) {
 	}
 }
 
-func TestDisassembleActionInfo(t *testing.T) {
-	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := disassemble(ivgData)
-	if err != nil {
-		t.Fatal(err)
-	}
+var testdataTestCases = []string{
+	"testdata/action-info",
+	"testdata/video-005.primitive",
+}
 
-	want := strings.Join([]string{
-		"89 49 56 47   Magic identifier",
-		"02            Number of metadata chunks: 1",
-		"0a            Metadata chunk length: 5",
-		"00            Metadata Identifier: 0 (viewBox)",
-		"50                -24",
-		"50                -24",
-		"b0                +24",
-		"b0                +24",
-		"c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)",
-		"80                +0",
-		"58                -20",
-		"a0            C (absolute cubeTo), 1 reps",
-		"cf cc 30 c1       -11.049999",
-		"58                -20",
-		"58                -20",
-		"cf cc 30 c1       -11.049999",
-		"58                -20",
-		"80                +0",
-		"91            s (relative smooth cubeTo), 2 reps",
-		"37 33 0f 41       +8.950001",
-		"a8                +20",
-		"a8                +20",
-		"a8                +20",
-		"              s (relative smooth cubeTo), implicit",
-		"a8                +20",
-		"37 33 0f c1       -8.950001",
-		"a8                +20",
-		"58                -20",
-		"80            S (absolute smooth cubeTo), 1 reps",
-		"cf cc 30 41       +11.049999",
-		"58                -20",
-		"80                +0",
-		"58                -20",
-		"e3            z (closePath); m (relative moveTo)",
-		"84                +2",
-		"bc                +30",
-		"e7            h (relative horizontal lineTo)",
-		"78                -4",
-		"e8            V (absolute vertical lineTo)",
-		"7c                -2",
-		"e7            h (relative horizontal lineTo)",
-		"88                +4",
-		"e9            v (relative vertical lineTo)",
-		"98                +12",
-		"e3            z (closePath); m (relative moveTo)",
-		"80                +0",
-		"60                -16",
-		"e7            h (relative horizontal lineTo)",
-		"78                -4",
-		"e9            v (relative vertical lineTo)",
-		"78                -4",
-		"e7            h (relative horizontal lineTo)",
-		"88                +4",
-		"e9            v (relative vertical lineTo)",
-		"88                +4",
-		"e1            z (closePath); end path",
-	}, "\n") + "\n"
-
-	if got != want {
-		t.Errorf("got:\n%s\nwant:\n%s", got, want)
-		diffLines(t, got, want)
+func TestDisassembly(t *testing.T) {
+	for _, tc := range testdataTestCases {
+		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg")
+		if err != nil {
+			t.Errorf("%s: ReadFile: %v", tc, err)
+			continue
+		}
+		got, err := disassemble(ivgData)
+		if err != nil {
+			t.Errorf("%s: disassemble: %v", tc, err)
+			continue
+		}
+		want, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg.disassembly")
+		if err != nil {
+			t.Errorf("%s: ReadFile: %v", tc, err)
+			continue
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			diffLines(t, string(got), string(want))
+		}
 	}
 }
 
 func TestRasterizer(t *testing.T) {
-	testCases := []string{
-		"testdata/action-info",
-		"testdata/video-005.primitive",
-	}
-
-	for _, tc := range testCases {
+	for _, tc := range testdataTestCases {
 		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg")
 		if err != nil {
 			t.Errorf("%s: ReadFile: %v", tc, err)

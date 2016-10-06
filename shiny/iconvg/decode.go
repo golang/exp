@@ -103,7 +103,7 @@ func decode(dst Destination, p printer, m *Metadata, metadataOnly bool, src buff
 		return errInvalidMagicIdentifier
 	}
 	if p != nil {
-		p(src[:len(magic)], "Magic identifier\n")
+		p(src[:len(magic)], "IconVG Magic identifier\n")
 	}
 	src = src[len(magic):]
 
