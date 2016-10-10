@@ -10,6 +10,14 @@ action-info.png is a rendering of that IconVG file.
 
 
 
+blank.ivg is a blank, square graphic.
+
+blank.ivg.disassembly is a disassembly of that IconVG file.
+
+blank.png is a rendering of that IconVG file.
+
+
+
 video-005.jpeg comes from an old version of the Go repository. See
 https://codereview.appspot.com/5758047/
 

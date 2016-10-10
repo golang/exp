@@ -14,19 +14,32 @@ import (
 	"golang.org/x/image/math/f32"
 )
 
-func TestEncoderZeroValue(t *testing.T) {
-	var e Encoder
+// overwriteTestdataFiles is set to true when adding new testdataTestCases.
+const overwriteTestdataFiles = false
+
+func testEncode(t *testing.T, e *Encoder, wantFilename string) {
 	got, err := e.Bytes()
 	if err != nil {
-		t.Fatalf("Bytes: %v", err)
+		t.Fatalf("encoding: %v", err)
 	}
-	want := []byte{
-		0x89, 0x49, 0x56, 0x47, // IconVG Magic identifier.
-		0x00, // Zero metadata chunks.
+	if overwriteTestdataFiles {
+		if err := ioutil.WriteFile(filepath.FromSlash(wantFilename), got, 0666); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		return
+	}
+	want, err := ioutil.ReadFile(filepath.FromSlash(wantFilename))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Errorf("\ngot  %d bytes:\n% x\nwant %d bytes:\n% x", len(got), got, len(want), want)
+		t.Fatalf("\ngot  %d bytes:\n% x\nwant %d bytes:\n% x", len(got), got, len(want), want)
 	}
+}
+
+func TestEncodeBlank(t *testing.T) {
+	var e Encoder
+	testEncode(t, &e, "testdata/blank.ivg")
 }
 
 func TestEncodeActionInfo(t *testing.T) {
@@ -56,17 +69,7 @@ func TestEncodeActionInfo(t *testing.T) {
 	e.RelVLineTo(4)
 	e.ClosePathEndPath()
 
-	got, err := e.Bytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	want, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Errorf("\ngot  %d bytes:\n% x\nwant %d bytes:\n% x", len(got), got, len(want), want)
-	}
+	testEncode(t, &e, "testdata/action-info.ivg")
 }
 
 var video005PrimitiveSVGData = []struct {
@@ -145,15 +148,5 @@ func TestEncodeVideo005Primitive(t *testing.T) {
 		e.ClosePathEndPath()
 	}
 
-	got, err := e.Bytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	want, err := ioutil.ReadFile(filepath.FromSlash("testdata/video-005.primitive.ivg"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Errorf("\ngot  %d bytes:\n% x\nwant %d bytes:\n% x", len(got), got, len(want), want)
-	}
+	testEncode(t, &e, "testdata/video-005.primitive.ivg")
 }

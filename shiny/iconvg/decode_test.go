@@ -48,7 +48,6 @@ var (
 	_ Destination = (*Rasterizer)(nil)
 )
 
-// encodePNG is useful for manually debugging the tests.
 func encodePNG(dstFilename string, src image.Image) error {
 	f, err := os.Create(dstFilename)
 	if err != nil {
@@ -124,6 +123,7 @@ func diffLines(t *testing.T, got, want string) {
 
 var testdataTestCases = []string{
 	"testdata/action-info",
+	"testdata/blank",
 	"testdata/video-005.primitive",
 }
 
@@ -139,7 +139,14 @@ func TestDisassembly(t *testing.T) {
 			t.Errorf("%s: disassemble: %v", tc, err)
 			continue
 		}
-		want, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg.disassembly")
+		wantFilename := filepath.FromSlash(tc) + ".ivg.disassembly"
+		if overwriteTestdataFiles {
+			if err := ioutil.WriteFile(filepath.FromSlash(wantFilename), got, 0666); err != nil {
+				t.Errorf("%s: WriteFile: %v", tc, err)
+			}
+			continue
+		}
+		want, err := ioutil.ReadFile(wantFilename)
 		if err != nil {
 			t.Errorf("%s: ReadFile: %v", tc, err)
 			continue
@@ -178,6 +185,13 @@ func TestRasterizer(t *testing.T) {
 			continue
 		}
 
+		wantFilename := filepath.FromSlash(tc) + ".png"
+		if overwriteTestdataFiles {
+			if err := encodePNG(filepath.FromSlash(wantFilename), got); err != nil {
+				t.Errorf("%s: encodePNG: %v", tc, err)
+			}
+			continue
+		}
 		want, err := decodePNG(filepath.FromSlash(tc) + ".png")
 		if err != nil {
 			t.Errorf("%s: decodePNG: %v", tc, err)
