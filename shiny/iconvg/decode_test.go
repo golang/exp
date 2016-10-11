@@ -121,34 +121,38 @@ func diffLines(t *testing.T, got, want string) {
 	}
 }
 
-var testdataTestCases = []string{
-	"testdata/action-info",
-	"testdata/blank",
-	"testdata/video-005.primitive",
+var testdataTestCases = []struct {
+	filename string
+	variants string
+}{
+	{"testdata/action-info", ""},
+	{"testdata/blank", ""},
+	{"testdata/lod-polygon", ";64"},
+	{"testdata/video-005.primitive", ""},
 }
 
 func TestDisassembly(t *testing.T) {
 	for _, tc := range testdataTestCases {
-		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg")
+		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc.filename) + ".ivg")
 		if err != nil {
-			t.Errorf("%s: ReadFile: %v", tc, err)
+			t.Errorf("%s: ReadFile: %v", tc.filename, err)
 			continue
 		}
 		got, err := disassemble(ivgData)
 		if err != nil {
-			t.Errorf("%s: disassemble: %v", tc, err)
+			t.Errorf("%s: disassemble: %v", tc.filename, err)
 			continue
 		}
-		wantFilename := filepath.FromSlash(tc) + ".ivg.disassembly"
+		wantFilename := filepath.FromSlash(tc.filename) + ".ivg.disassembly"
 		if overwriteTestdataFiles {
 			if err := ioutil.WriteFile(filepath.FromSlash(wantFilename), got, 0666); err != nil {
-				t.Errorf("%s: WriteFile: %v", tc, err)
+				t.Errorf("%s: WriteFile: %v", tc.filename, err)
 			}
 			continue
 		}
 		want, err := ioutil.ReadFile(wantFilename)
 		if err != nil {
-			t.Errorf("%s: ReadFile: %v", tc, err)
+			t.Errorf("%s: ReadFile: %v", tc.filename, err)
 			continue
 		}
 		if !bytes.Equal(got, want) {
@@ -160,46 +164,57 @@ func TestDisassembly(t *testing.T) {
 
 func TestRasterizer(t *testing.T) {
 	for _, tc := range testdataTestCases {
-		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc) + ".ivg")
+		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc.filename) + ".ivg")
 		if err != nil {
-			t.Errorf("%s: ReadFile: %v", tc, err)
+			t.Errorf("%s: ReadFile: %v", tc.filename, err)
 			continue
 		}
 		md, err := DecodeMetadata(ivgData)
 		if err != nil {
-			t.Errorf("%s: DecodeMetadata: %v", tc, err)
-			continue
-		}
-		width, height := 256, 256
-		if dx, dy := md.ViewBox.AspectRatio(); dx < dy {
-			width = int(256 * dx / dy)
-		} else {
-			height = int(256 * dy / dx)
-		}
-
-		got := image.NewRGBA(image.Rect(0, 0, width, height))
-		var z Rasterizer
-		z.SetDstImage(got, got.Bounds(), draw.Src)
-		if err := Decode(&z, ivgData, nil); err != nil {
-			t.Errorf("%s: Decode: %v", tc, err)
+			t.Errorf("%s: DecodeMetadata: %v", tc.filename, err)
 			continue
 		}
 
-		wantFilename := filepath.FromSlash(tc) + ".png"
-		if overwriteTestdataFiles {
-			if err := encodePNG(filepath.FromSlash(wantFilename), got); err != nil {
-				t.Errorf("%s: encodePNG: %v", tc, err)
+		for _, variant := range strings.Split(tc.variants, ";") {
+			length := 256
+			if variant == "64" {
+				length = 64
 			}
-			continue
-		}
-		want, err := decodePNG(filepath.FromSlash(tc) + ".png")
-		if err != nil {
-			t.Errorf("%s: decodePNG: %v", tc, err)
-			continue
-		}
-		if err := checkApproxEqual(got, want); err != nil {
-			t.Errorf("%s: %v", tc, err)
-			continue
+			width, height := length, length
+			if dx, dy := md.ViewBox.AspectRatio(); dx < dy {
+				width = int(float32(length) * dx / dy)
+			} else {
+				height = int(float32(length) * dy / dx)
+			}
+
+			got := image.NewRGBA(image.Rect(0, 0, width, height))
+			var z Rasterizer
+			z.SetDstImage(got, got.Bounds(), draw.Src)
+			if err := Decode(&z, ivgData, nil); err != nil {
+				t.Errorf("%s %q variant: Decode: %v", tc.filename, variant, err)
+				continue
+			}
+
+			wantFilename := filepath.FromSlash(tc.filename)
+			if variant != "" {
+				wantFilename += "." + variant
+			}
+			wantFilename += ".png"
+			if overwriteTestdataFiles {
+				if err := encodePNG(filepath.FromSlash(wantFilename), got); err != nil {
+					t.Errorf("%s %q variant: encodePNG: %v", tc.filename, variant, err)
+				}
+				continue
+			}
+			want, err := decodePNG(wantFilename)
+			if err != nil {
+				t.Errorf("%s %q variant: decodePNG: %v", tc.filename, variant, err)
+				continue
+			}
+			if err := checkApproxEqual(got, want); err != nil {
+				t.Errorf("%s %q variant: %v", tc.filename, variant, err)
+				continue
+			}
 		}
 	}
 }

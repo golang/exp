@@ -545,10 +545,9 @@ The annotated version is below. Note that the IconVG viewBox ranges from -24 to
 	88                +4
 	e1            z (closePath); end path
 
+There are more examples in the ./testdata directory.
 */
 package iconvg
-
-// TODO: more examples, using multiple colors and Level of Detail.
 
 // TODO: shapes (circles, rects) and strokes? Or can we assume that authoring
 // tools will convert shapes and strokes to paths?

@@ -47,6 +47,8 @@ type Rasterizer struct {
 	cSel uint8
 	nSel uint8
 
+	disabled bool
+
 	firstStartPath  bool
 	prevSmoothType  uint8
 	prevSmoothPoint f32.Vec2
@@ -116,7 +118,6 @@ func (z *Rasterizer) SetNReg(adj uint8, incr bool, f float32) {
 
 func (z *Rasterizer) SetLOD(lod0, lod1 float32) {
 	z.lod0, z.lod1 = lod0, lod1
-	// TODO: check the LODs against z.r.Dy().
 }
 
 func (z *Rasterizer) absX(x float32) float32 { return z.scaleX * (x + z.biasX) }
@@ -158,7 +159,14 @@ func (z *Rasterizer) StartPath(adj uint8, x, y float32) {
 	z.flatImage.C = &z.flatColor
 	z.fill = &z.flatImage
 
-	z.z.Reset(z.r.Dx(), z.r.Dy())
+	width, height := z.r.Dx(), z.r.Dy()
+	h := float32(height)
+	z.disabled = z.flatColor.A == 0 || !(z.lod0 <= h && h < z.lod1)
+	if z.disabled {
+		return
+	}
+
+	z.z.Reset(width, height)
 	if z.firstStartPath {
 		z.firstStartPath = false
 		z.z.DrawOp = z.drawOp
@@ -168,6 +176,9 @@ func (z *Rasterizer) StartPath(adj uint8, x, y float32) {
 }
 
 func (z *Rasterizer) ClosePathEndPath() {
+	if z.disabled {
+		return
+	}
 	z.z.ClosePath()
 	if z.dst == nil {
 		return
@@ -176,76 +187,115 @@ func (z *Rasterizer) ClosePathEndPath() {
 }
 
 func (z *Rasterizer) ClosePathAbsMoveTo(x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	z.z.ClosePath()
 	z.z.MoveTo(z.absVec2(x, y))
 }
 
 func (z *Rasterizer) ClosePathRelMoveTo(x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	z.z.ClosePath()
 	z.z.MoveTo(z.relVec2(x, y))
 }
 
 func (z *Rasterizer) AbsHLineTo(x float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	pen := z.z.Pen()
 	z.z.LineTo(f32.Vec2{z.absX(x), pen[1]})
 }
 
 func (z *Rasterizer) RelHLineTo(x float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	pen := z.z.Pen()
 	z.z.LineTo(f32.Vec2{pen[0] + z.relX(x), pen[1]})
 }
 
 func (z *Rasterizer) AbsVLineTo(y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	pen := z.z.Pen()
 	z.z.LineTo(f32.Vec2{pen[0], z.absY(y)})
 }
 
 func (z *Rasterizer) RelVLineTo(y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	pen := z.z.Pen()
 	z.z.LineTo(f32.Vec2{pen[0], pen[1] + z.relY(y)})
 }
 
 func (z *Rasterizer) AbsLineTo(x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	z.z.LineTo(z.absVec2(x, y))
 }
 
 func (z *Rasterizer) RelLineTo(x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	z.z.LineTo(z.relVec2(x, y))
 }
 
 func (z *Rasterizer) AbsSmoothQuadTo(x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeQuad
 	z.prevSmoothPoint = z.implicitSmoothPoint(smoothTypeQuad)
 	z.z.QuadTo(z.prevSmoothPoint, z.absVec2(x, y))
 }
 
 func (z *Rasterizer) RelSmoothQuadTo(x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeQuad
 	z.prevSmoothPoint = z.implicitSmoothPoint(smoothTypeQuad)
 	z.z.QuadTo(z.prevSmoothPoint, z.relVec2(x, y))
 }
 
 func (z *Rasterizer) AbsQuadTo(x1, y1, x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeQuad
 	z.prevSmoothPoint = z.absVec2(x1, y1)
 	z.z.QuadTo(z.prevSmoothPoint, z.absVec2(x, y))
 }
 
 func (z *Rasterizer) RelQuadTo(x1, y1, x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeQuad
 	z.prevSmoothPoint = z.relVec2(x1, y1)
 	z.z.QuadTo(z.prevSmoothPoint, z.relVec2(x, y))
 }
 
 func (z *Rasterizer) AbsSmoothCubeTo(x2, y2, x, y float32) {
+	if z.disabled {
+		return
+	}
 	p1 := z.implicitSmoothPoint(smoothTypeCube)
 	z.prevSmoothType = smoothTypeCube
 	z.prevSmoothPoint = z.absVec2(x2, y2)
@@ -253,6 +303,9 @@ func (z *Rasterizer) AbsSmoothCubeTo(x2, y2, x, y float32) {
 }
 
 func (z *Rasterizer) RelSmoothCubeTo(x2, y2, x, y float32) {
+	if z.disabled {
+		return
+	}
 	p1 := z.implicitSmoothPoint(smoothTypeCube)
 	z.prevSmoothType = smoothTypeCube
 	z.prevSmoothPoint = z.relVec2(x2, y2)
@@ -260,23 +313,35 @@ func (z *Rasterizer) RelSmoothCubeTo(x2, y2, x, y float32) {
 }
 
 func (z *Rasterizer) AbsCubeTo(x1, y1, x2, y2, x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeCube
 	z.prevSmoothPoint = z.absVec2(x2, y2)
 	z.z.CubeTo(z.absVec2(x1, y1), z.prevSmoothPoint, z.absVec2(x, y))
 }
 
 func (z *Rasterizer) RelCubeTo(x1, y1, x2, y2, x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeCube
 	z.prevSmoothPoint = z.relVec2(x2, y2)
 	z.z.CubeTo(z.relVec2(x1, y1), z.prevSmoothPoint, z.relVec2(x, y))
 }
 
 func (z *Rasterizer) AbsArcTo(rx, ry, xAxisRotation float32, largeArc, sweep bool, x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	// TODO: implement.
 }
 
 func (z *Rasterizer) RelArcTo(rx, ry, xAxisRotation float32, largeArc, sweep bool, x, y float32) {
+	if z.disabled {
+		return
+	}
 	z.prevSmoothType = smoothTypeNone
 	// TODO: implement.
 }
