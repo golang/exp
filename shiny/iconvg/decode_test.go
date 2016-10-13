@@ -87,7 +87,12 @@ func checkApproxEqual(m0, m1 image.Image) error {
 		for x := bounds0.Min.X; x < bounds0.Max.X; x++ {
 			r0, g0, b0, a0 := m0.At(x, y).RGBA()
 			r1, g1, b1, a1 := m1.At(x, y).RGBA()
-			const D = 0xffff * 5 / 100 // Diff threshold of 5%.
+
+			// TODO: be more principled in picking this magic threshold, other
+			// than what the difference is, in practice, in x/image/vector's
+			// fixed and floating point rasterizer?
+			const D = 0xffff * 12 / 100 // Diff threshold of 12%.
+
 			if diff(r0, r1) > D || diff(g0, g1) > D || diff(b0, b1) > D || diff(a0, a1) > D {
 				return fmt.Errorf("at (%d, %d):\n"+
 					"got  RGBA %#04x, %#04x, %#04x, %#04x\n"+
