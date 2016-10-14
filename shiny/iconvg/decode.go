@@ -485,9 +485,30 @@ func decodeDrawing(dst Destination, p printer, src buffer) (mf modeFunc, src1 bu
 			if p != nil && i != 0 {
 				p(nil, "%s, implicit\n", op)
 			}
-			src, err = decodeCoordinates(coords[:nCoords], p, src)
-			if err != nil {
-				return nil, nil, err
+			var largeArc, sweep bool
+			if op[0] != 'A' && op[0] != 'a' {
+				src, err = decodeCoordinates(coords[:nCoords], p, src)
+				if err != nil {
+					return nil, nil, err
+				}
+			} else {
+				// We have an absolute or relative arcTo.
+				src, err = decodeCoordinates(coords[:2], p, src)
+				if err != nil {
+					return nil, nil, err
+				}
+				coords[2], src, err = decodeAngle(p, src)
+				if err != nil {
+					return nil, nil, err
+				}
+				largeArc, sweep, src, err = decodeArcToFlags(p, src)
+				if err != nil {
+					return nil, nil, err
+				}
+				src, err = decodeCoordinates(coords[4:6], p, src)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
 
 			if dst == nil {
@@ -496,54 +517,27 @@ func decodeDrawing(dst Destination, p printer, src buffer) (mf modeFunc, src1 bu
 			switch op[0] {
 			case 'L':
 				dst.AbsLineTo(coords[0], coords[1])
-				continue
 			case 'l':
 				dst.RelLineTo(coords[0], coords[1])
-				continue
 			case 'T':
 				dst.AbsSmoothQuadTo(coords[0], coords[1])
-				continue
 			case 't':
 				dst.RelSmoothQuadTo(coords[0], coords[1])
-				continue
 			case 'Q':
 				dst.AbsQuadTo(coords[0], coords[1], coords[2], coords[3])
-				continue
 			case 'q':
 				dst.RelQuadTo(coords[0], coords[1], coords[2], coords[3])
-				continue
 			case 'S':
 				dst.AbsSmoothCubeTo(coords[0], coords[1], coords[2], coords[3])
-				continue
 			case 's':
 				dst.RelSmoothCubeTo(coords[0], coords[1], coords[2], coords[3])
-				continue
 			case 'C':
 				dst.AbsCubeTo(coords[0], coords[1], coords[2], coords[3], coords[4], coords[5])
-				continue
 			case 'c':
 				dst.RelCubeTo(coords[0], coords[1], coords[2], coords[3], coords[4], coords[5])
-				continue
-			}
-
-			// We have an absolute or relative arcTo.
-			src, err = decodeCoordinates(coords[:3], p, src)
-			if err != nil {
-				return nil, nil, err
-			}
-			var largeArc, sweep bool
-			largeArc, sweep, src, err = decodeArcToFlags(p, src)
-			if err != nil {
-				return nil, nil, err
-			}
-			src, err = decodeCoordinates(coords[4:6], p, src)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			if op[0] == 'A' {
+			case 'A':
 				dst.AbsArcTo(coords[0], coords[1], coords[2], largeArc, sweep, coords[4], coords[5])
-			} else {
+			case 'a':
 				dst.RelArcTo(coords[0], coords[1], coords[2], largeArc, sweep, coords[4], coords[5])
 			}
 		}
@@ -663,6 +657,17 @@ func decodeCoordinates(coords []float32, p printer, src buffer) (src1 buffer, er
 		}
 	}
 	return src, nil
+}
+
+func decodeAngle(p printer, src buffer) (float32, buffer, error) {
+	x, n := src.decodeZeroToOne()
+	if n == 0 {
+		return 0, nil, errInvalidNumber
+	}
+	if p != nil {
+		p(src[:n], "    %v × 360 degrees (%v degrees)\n", x, x*360)
+	}
+	return x, src[n:], nil
 }
 
 func decodeArcToFlags(p printer, src buffer) (bool, bool, buffer, error) {

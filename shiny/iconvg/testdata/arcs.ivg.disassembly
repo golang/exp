@@ -1,0 +1,129 @@
+89 49 56 47   IconVG Magic identifier
+00            Number of metadata chunks: 0
+81            Set CREG[CSEL-1] to a 1 byte color
+64                RGBA ff0000ff
+82            Set CREG[CSEL-2] to a 1 byte color
+78                RGBA ffff00ff
+83            Set CREG[CSEL-3] to a 1 byte color
+00                RGBA 000000ff
+84            Set CREG[CSEL-4] to a 1 byte color
+02                RGBA 000080ff
+c1            Start path, filled with CREG[CSEL-1]; M (absolute moveTo)
+6c                -10
+80                +0
+e7            h (relative horizontal lineTo)
+62                -15
+d0            a (relative arcTo), 1 reps
+9e                +15
+9e                +15
+00                0 × 360 degrees (0 degrees)
+02                0x1 (largeArc=1, sweep=0)
+9e                +15
+62                -15
+e1            z (closePath); end path
+c2            Start path, filled with CREG[CSEL-2]; M (absolute moveTo)
+64                -14
+78                -4
+e9            v (relative vertical lineTo)
+62                -15
+d0            a (relative arcTo), 1 reps
+9e                +15
+9e                +15
+00                0 × 360 degrees (0 degrees)
+00                0x0 (largeArc=0, sweep=0)
+62                -15
+9e                +15
+e1            z (closePath); end path
+c3            Start path, filled with CREG[CSEL-3]; M (absolute moveTo)
+62                -15
+bc                +30
+20            l (relative lineTo), 1 reps
+8a                +5
+81 7d             -2.5
+d0            a (relative arcTo), 1 reps
+81 82             +2.5
+81 82             +2.5
+dc                0.9166667 × 360 degrees (330 degrees)
+04                0x2 (largeArc=0, sweep=1)
+8a                +5
+81 7d             -2.5
+20            l (relative lineTo), 1 reps
+8a                +5
+81 7d             -2.5
+d0            a (relative arcTo), 1 reps
+81 82             +2.5
+8a                +5
+dc                0.9166667 × 360 degrees (330 degrees)
+04                0x2 (largeArc=0, sweep=1)
+8a                +5
+81 7d             -2.5
+20            l (relative lineTo), 1 reps
+8a                +5
+81 7d             -2.5
+d0            a (relative arcTo), 1 reps
+81 82             +2.5
+81 87             +7.5
+dc                0.9166667 × 360 degrees (330 degrees)
+04                0x2 (largeArc=0, sweep=1)
+8a                +5
+81 7d             -2.5
+20            l (relative lineTo), 1 reps
+8a                +5
+81 7d             -2.5
+d0            a (relative arcTo), 1 reps
+81 82             +2.5
+94                +10
+dc                0.9166667 × 360 degrees (330 degrees)
+04                0x2 (largeArc=0, sweep=1)
+8a                +5
+81 7d             -2.5
+20            l (relative lineTo), 1 reps
+8a                +5
+81 7d             -2.5
+e8            V (absolute vertical lineTo)
+bc                +30
+e1            z (closePath); end path
+c4            Start path, filled with CREG[CSEL-4]; M (absolute moveTo)
+94                +10
+48                -28
+d0            a (relative arcTo), 1 reps
+8c                +6
+86                +3
+00                0 × 360 degrees (0 degrees)
+00                0x0 (largeArc=0, sweep=0)
+8c                +6
+86                +3
+e1            z (closePath); end path
+c4            Start path, filled with CREG[CSEL-4]; M (absolute moveTo)
+a4                +18
+48                -28
+d0            a (relative arcTo), 1 reps
+8c                +6
+86                +3
+00                0 × 360 degrees (0 degrees)
+04                0x2 (largeArc=0, sweep=1)
+8c                +6
+86                +3
+e1            z (closePath); end path
+c4            Start path, filled with CREG[CSEL-4]; M (absolute moveTo)
+94                +10
+58                -20
+d0            a (relative arcTo), 1 reps
+8c                +6
+86                +3
+00                0 × 360 degrees (0 degrees)
+02                0x1 (largeArc=1, sweep=0)
+8c                +6
+86                +3
+e1            z (closePath); end path
+c4            Start path, filled with CREG[CSEL-4]; M (absolute moveTo)
+a4                +18
+58                -20
+d0            a (relative arcTo), 1 reps
+8c                +6
+86                +3
+00                0 × 360 degrees (0 degrees)
+06                0x3 (largeArc=1, sweep=1)
+8c                +6
+86                +3
+e1            z (closePath); end path

@@ -15,6 +15,15 @@ action-info.{lo,hi}res.png are renderings of those IconVG files.
 
 
 
+arcs.ivg is inspired by the two examples at
+https://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
+
+arcs.ivg.disassembly is a disassembly of that IconVG file.
+
+arcs.png is a rendering of that IconVG file.
+
+
+
 blank.ivg is a blank, square graphic.
 
 blank.ivg.disassembly is a disassembly of that IconVG file.

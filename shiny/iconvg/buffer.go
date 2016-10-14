@@ -191,6 +191,13 @@ func (b *buffer) encodeCoordinate(f float32) int {
 	return 4
 }
 
+func (b *buffer) encodeAngle(f float32) int {
+	// Normalize f to the range [0, 1).
+	g := float64(f)
+	g -= math.Floor(g)
+	return b.encodeZeroToOne(float32(g))
+}
+
 func (b *buffer) encodeZeroToOne(f float32) int {
 	if u := uint32(f * 15120); float32(u) == f*15120 && u < 15120 {
 		if u%126 == 0 {

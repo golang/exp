@@ -145,39 +145,37 @@ func (e *Encoder) LOD() (lod0, lod1 float32) {
 	return e.lod0, e.lod1
 }
 
-func (e *Encoder) SetCSel(cSel uint8) {
-	if e.err != nil {
+func (e *Encoder) checkModeStyling() {
+	if e.mode == modeStyling {
 		return
 	}
-	if e.mode != modeStyling {
-		if e.mode == modeInitial {
-			e.appendDefaultMetadata()
-		} else {
-			e.err = errStylingOpsUsedInDrawingMode
-			return
-		}
+	if e.mode == modeInitial {
+		e.appendDefaultMetadata()
+		return
+	}
+	e.err = errStylingOpsUsedInDrawingMode
+}
+
+func (e *Encoder) SetCSel(cSel uint8) {
+	e.checkModeStyling()
+	if e.err != nil {
+		return
 	}
 	e.cSel = cSel & 0x3f
 	e.buf = append(e.buf, e.cSel)
 }
 
 func (e *Encoder) SetNSel(nSel uint8) {
+	e.checkModeStyling()
 	if e.err != nil {
 		return
-	}
-	if e.mode != modeStyling {
-		if e.mode == modeInitial {
-			e.appendDefaultMetadata()
-		} else {
-			e.err = errStylingOpsUsedInDrawingMode
-			return
-		}
 	}
 	e.nSel = nSel & 0x3f
 	e.buf = append(e.buf, e.nSel|0x40)
 }
 
 func (e *Encoder) SetCReg(adj uint8, incr bool, c Color) {
+	e.checkModeStyling()
 	if e.err != nil {
 		return
 	}
@@ -216,6 +214,7 @@ func (e *Encoder) SetCReg(adj uint8, incr bool, c Color) {
 }
 
 func (e *Encoder) SetNReg(adj uint8, incr bool, f float32) {
+	e.checkModeStyling()
 	if e.err != nil {
 		return
 	}
@@ -249,16 +248,9 @@ func (e *Encoder) SetNReg(adj uint8, incr bool, f float32) {
 }
 
 func (e *Encoder) SetLOD(lod0, lod1 float32) {
+	e.checkModeStyling()
 	if e.err != nil {
 		return
-	}
-	if e.mode != modeStyling {
-		if e.mode == modeInitial {
-			e.appendDefaultMetadata()
-		} else {
-			e.err = errStylingOpsUsedInDrawingMode
-			return
-		}
 	}
 	e.lod0 = lod0
 	e.lod1 = lod1
@@ -268,16 +260,9 @@ func (e *Encoder) SetLOD(lod0, lod1 float32) {
 }
 
 func (e *Encoder) StartPath(adj uint8, x, y float32) {
+	e.checkModeStyling()
 	if e.err != nil {
 		return
-	}
-	if e.mode != modeStyling {
-		if e.mode == modeInitial {
-			e.appendDefaultMetadata()
-		} else {
-			e.err = errStylingOpsUsedInDrawingMode
-			return
-		}
 	}
 	if adj < 0 || 6 < adj {
 		e.err = errInvalidSelectorAdjustment
@@ -389,7 +374,7 @@ func (e *Encoder) flushDrawOps() {
 				for j := m; j > 0; j-- {
 					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+0]))
 					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+1]))
-					e.buf.encodeZeroToOne(e.drawArgs[i+2])
+					e.buf.encodeAngle(e.drawArgs[i+2])
 					e.buf.encodeNatural(uint32(e.drawArgs[i+3]))
 					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+4]))
 					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+5]))

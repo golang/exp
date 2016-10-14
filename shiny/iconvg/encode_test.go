@@ -86,6 +86,49 @@ func TestEncodeActionInfo(t *testing.T) {
 	}
 }
 
+func TestEncodeArcs(t *testing.T) {
+	var e Encoder
+
+	e.SetCReg(1, false, RGBAColor(color.RGBA{0xff, 0x00, 0x00, 0xff}))
+	e.SetCReg(2, false, RGBAColor(color.RGBA{0xff, 0xff, 0x00, 0xff}))
+	e.SetCReg(3, false, RGBAColor(color.RGBA{0x00, 0x00, 0x00, 0xff}))
+	e.SetCReg(4, false, RGBAColor(color.RGBA{0x00, 0x00, 0x80, 0xff}))
+
+	e.StartPath(1, -10, 0)
+	e.RelHLineTo(-15)
+	e.RelArcTo(15, 15, 0, true, false, 15, -15)
+	e.ClosePathEndPath()
+
+	e.StartPath(2, -14, -4)
+	e.RelVLineTo(-15)
+	e.RelArcTo(15, 15, 0, false, false, -15, 15)
+	e.ClosePathEndPath()
+
+	const thirtyDegrees = 30.0 / 360
+	e.StartPath(3, -15, 30)
+	e.RelLineTo(5.0, -2.5)
+	e.RelArcTo(2.5, 2.5, -thirtyDegrees, false, true, 5.0, -2.5)
+	e.RelLineTo(5.0, -2.5)
+	e.RelArcTo(2.5, 5.0, -thirtyDegrees, false, true, 5.0, -2.5)
+	e.RelLineTo(5.0, -2.5)
+	e.RelArcTo(2.5, 7.5, -thirtyDegrees, false, true, 5.0, -2.5)
+	e.RelLineTo(5.0, -2.5)
+	e.RelArcTo(2.5, 10.0, -thirtyDegrees, false, true, 5.0, -2.5)
+	e.RelLineTo(5.0, -2.5)
+	e.AbsVLineTo(30)
+	e.ClosePathEndPath()
+
+	for largeArc := 0; largeArc <= 1; largeArc++ {
+		for sweep := 0; sweep <= 1; sweep++ {
+			e.StartPath(4, 10+8*float32(sweep), -28+8*float32(largeArc))
+			e.RelArcTo(6, 3, 0, largeArc != 0, sweep != 0, 6, 3)
+			e.ClosePathEndPath()
+		}
+	}
+
+	testEncode(t, &e, "testdata/arcs.ivg")
+}
+
 var video005PrimitiveSVGData = []struct {
 	r, g, b uint32
 	x0, y0  int

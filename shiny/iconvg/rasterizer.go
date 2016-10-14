@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 
 	"golang.org/x/image/math/f32"
 	"golang.org/x/image/vector"
@@ -119,6 +120,9 @@ func (z *Rasterizer) SetNReg(adj uint8, incr bool, f float32) {
 func (z *Rasterizer) SetLOD(lod0, lod1 float32) {
 	z.lod0, z.lod1 = lod0, lod1
 }
+
+func (z *Rasterizer) unabsX(x float32) float32 { return x/z.scaleX - z.biasX }
+func (z *Rasterizer) unabsY(y float32) float32 { return y/z.scaleY - z.biasY }
 
 func (z *Rasterizer) absX(x float32) float32 { return z.scaleX * (x + z.biasX) }
 func (z *Rasterizer) absY(y float32) float32 { return z.scaleY * (y + z.biasY) }
@@ -335,13 +339,165 @@ func (z *Rasterizer) AbsArcTo(rx, ry, xAxisRotation float32, largeArc, sweep boo
 		return
 	}
 	z.prevSmoothType = smoothTypeNone
-	// TODO: implement.
+
+	// We follow the "Conversion from endpoint to center parameterization"
+	// algorithm as per
+	// https://www.w3.org/TR/SVG/implnote.html#ArcConversionEndpointToCenter
+
+	// There seems to be a bug in the spec's "implementation notes".
+	//
+	// Actual implementations, such as
+	//	- https://git.gnome.org/browse/librsvg/tree/rsvg-path.c
+	//	- http://svn.apache.org/repos/asf/xmlgraphics/batik/branches/svg11/sources/org/apache/batik/ext/awt/geom/ExtendedGeneralPath.java
+	//	- https://java.net/projects/svgsalamander/sources/svn/content/trunk/svg-core/src/main/java/com/kitfox/svg/pathcmd/Arc.java
+	//	- https://github.com/millermedeiros/SVGParser/blob/master/com/millermedeiros/geom/SVGArc.as
+	// do something slightly different (marked with a †).
+
+	// (†) The Abs isn't part of the spec. Neither is checking that Rx and Ry
+	// are non-zero (and non-NaN).
+	Rx := math.Abs(float64(rx))
+	Ry := math.Abs(float64(ry))
+	if !(Rx > 0 && Ry > 0) {
+		z.z.LineTo(f32.Vec2{x, y})
+		return
+	}
+
+	// We work in IconVG coordinates (e.g. from -32 to +32 by default), rather
+	// than destination image coordinates (e.g. the width of the dst image),
+	// since the rx and ry radii also need to be scaled, but their scaling
+	// factors can be different, and aren't trivial to calculate due to
+	// xAxisRotation.
+	//
+	// We convert back to destination image coordinates via absX and absY calls
+	// later, during arcSegmentTo.
+	pen := z.z.Pen()
+	x1 := float64(z.unabsX(pen[0]))
+	y1 := float64(z.unabsY(pen[1]))
+	x2 := float64(z.unabsX(x))
+	y2 := float64(z.unabsY(y))
+
+	phi := 2 * math.Pi * float64(xAxisRotation)
+
+	// Step 1: Compute (x1′, y1′)
+	halfDx := (x1 - x2) / 2
+	halfDy := (y1 - y2) / 2
+	cosPhi := math.Cos(phi)
+	sinPhi := math.Sin(phi)
+	x1Prime := +cosPhi*halfDx + sinPhi*halfDy
+	y1Prime := -sinPhi*halfDx + cosPhi*halfDy
+
+	// Step 2: Compute (cx′, cy′)
+	rxSq := Rx * Rx
+	rySq := Ry * Ry
+	x1PrimeSq := x1Prime * x1Prime
+	y1PrimeSq := y1Prime * y1Prime
+
+	// (†) Check that the radii are large enough.
+	radiiCheck := x1PrimeSq/rxSq + y1PrimeSq/rySq
+	if radiiCheck > 1 {
+		c := math.Sqrt(radiiCheck)
+		Rx *= c
+		Ry *= c
+		rxSq = Rx * Rx
+		rySq = Ry * Ry
+	}
+
+	denom := rxSq*y1PrimeSq + rySq*x1PrimeSq
+	step2 := 0.0
+	if a := rxSq*rySq/denom - 1; a > 0 {
+		step2 = math.Sqrt(a)
+	}
+	if largeArc == sweep {
+		step2 = -step2
+	}
+	cxPrime := +step2 * Rx * y1Prime / Ry
+	cyPrime := -step2 * Ry * x1Prime / Rx
+
+	// Step 3: Compute (cx, cy) from (cx′, cy′)
+	cx := +cosPhi*cxPrime - sinPhi*cyPrime + (x1+x2)/2
+	cy := +sinPhi*cxPrime + cosPhi*cyPrime + (y1+y2)/2
+
+	// Step 4: Compute θ1 and Δθ
+	ax := (+x1Prime - cxPrime) / Rx
+	ay := (+y1Prime - cyPrime) / Ry
+	bx := (-x1Prime - cxPrime) / Rx
+	by := (-y1Prime - cyPrime) / Ry
+	theta1 := angle(1, 0, ax, ay)
+	deltaTheta := angle(ax, ay, bx, by)
+	if sweep {
+		if deltaTheta < 0 {
+			deltaTheta += 2 * math.Pi
+		}
+	} else {
+		if deltaTheta > 0 {
+			deltaTheta -= 2 * math.Pi
+		}
+	}
+
+	// This ends the
+	// https://www.w3.org/TR/SVG/implnote.html#ArcConversionEndpointToCenter
+	// algorithm. What follows below is specific to this implementation.
+
+	// We approximate an arc by one or more cubic Bézier curves.
+	n := int(math.Ceil(math.Abs(deltaTheta) / (math.Pi/2 + 0.001)))
+	for i := 0; i < n; i++ {
+		z.arcSegmentTo(cx, cy,
+			theta1+deltaTheta*float64(i+0)/float64(n),
+			theta1+deltaTheta*float64(i+1)/float64(n),
+			Rx, Ry, cosPhi, sinPhi,
+		)
+	}
+}
+
+// arcSegmentTo approximates an arc by a cubic Bézier curve. The mathematical
+// formulae for the control points are the same as that used by librsvg.
+func (z *Rasterizer) arcSegmentTo(cx, cy, theta1, theta2, rx, ry, cosPhi, sinPhi float64) {
+	halfDeltaTheta := (theta2 - theta1) * 0.5
+	q := math.Sin(halfDeltaTheta * 0.5)
+	t := (8 * q * q) / (3 * math.Sin(halfDeltaTheta))
+	cos1 := math.Cos(theta1)
+	sin1 := math.Sin(theta1)
+	cos2 := math.Cos(theta2)
+	sin2 := math.Sin(theta2)
+	x1 := rx * (+cos1 - t*sin1)
+	y1 := ry * (+sin1 + t*cos1)
+	x2 := rx * (+cos2 + t*sin2)
+	y2 := ry * (+sin2 - t*cos2)
+	x3 := rx * (+cos2)
+	y3 := ry * (+sin2)
+	z.z.CubeTo(f32.Vec2{
+		z.absX(float32(cx + cosPhi*x1 - sinPhi*y1)),
+		z.absY(float32(cy + sinPhi*x1 + cosPhi*y1)),
+	}, f32.Vec2{
+		z.absX(float32(cx + cosPhi*x2 - sinPhi*y2)),
+		z.absY(float32(cy + sinPhi*x2 + cosPhi*y2)),
+	}, f32.Vec2{
+		z.absX(float32(cx + cosPhi*x3 - sinPhi*y3)),
+		z.absY(float32(cy + sinPhi*x3 + cosPhi*y3)),
+	})
 }
 
 func (z *Rasterizer) RelArcTo(rx, ry, xAxisRotation float32, largeArc, sweep bool, x, y float32) {
-	if z.disabled {
-		return
+	a := z.relVec2(x, y)
+	z.AbsArcTo(rx, ry, xAxisRotation, largeArc, sweep, a[0], a[1])
+}
+
+// angle returns the angle between the u and v vectors.
+func angle(ux, uy, vx, vy float64) float64 {
+	uNorm := math.Sqrt(ux*ux + uy*uy)
+	vNorm := math.Sqrt(vx*vx + vy*vy)
+	norm := uNorm * vNorm
+	cos := (ux*vx + uy*vy) / norm
+	ret := 0.0
+	if cos <= -1 {
+		ret = math.Pi
+	} else if cos >= +1 {
+		ret = 0
+	} else {
+		ret = math.Acos(cos)
 	}
-	z.prevSmoothType = smoothTypeNone
-	// TODO: implement.
+	if ux*vy < uy*vx {
+		return -ret
+	}
+	return +ret
 }
