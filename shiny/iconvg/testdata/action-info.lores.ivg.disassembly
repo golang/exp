@@ -1,0 +1,56 @@
+89 49 56 47   IconVG Magic identifier
+02            Number of metadata chunks: 1
+0a            Metadata chunk length: 5
+00            Metadata Identifier: 0 (viewBox)
+50                -24
+50                -24
+b0                +24
+b0                +24
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+80                +0
+58                -20
+a0            C (absolute cubeTo), 1 reps
+f5 74             -11.046875
+58                -20
+58                -20
+f5 74             -11.046875
+58                -20
+80                +0
+91            s (relative smooth cubeTo), 2 reps
+f5 88             +8.953125
+a8                +20
+a8                +20
+a8                +20
+              s (relative smooth cubeTo), implicit
+a8                +20
+0d 77             -8.953125
+a8                +20
+58                -20
+80            S (absolute smooth cubeTo), 1 reps
+0d 8b             +11.046875
+58                -20
+80                +0
+58                -20
+e3            z (closePath); m (relative moveTo)
+84                +2
+bc                +30
+e7            h (relative horizontal lineTo)
+78                -4
+e8            V (absolute vertical lineTo)
+7c                -2
+e7            h (relative horizontal lineTo)
+88                +4
+e9            v (relative vertical lineTo)
+98                +12
+e3            z (closePath); m (relative moveTo)
+80                +0
+60                -16
+e7            h (relative horizontal lineTo)
+78                -4
+e9            v (relative vertical lineTo)
+78                -4
+e7            h (relative horizontal lineTo)
+88                +4
+e9            v (relative vertical lineTo)
+88                +4
+e1            z (closePath); end path

@@ -54,33 +54,36 @@ func TestEncodeBlank(t *testing.T) {
 }
 
 func TestEncodeActionInfo(t *testing.T) {
-	var e Encoder
-	e.Reset(Metadata{
-		ViewBox: Rectangle{
-			Min: f32.Vec2{-24, -24},
-			Max: f32.Vec2{+24, +24},
-		},
-		Palette: DefaultPalette,
-	})
+	for _, res := range []string{"lores", "hires"} {
+		var e Encoder
+		e.Reset(Metadata{
+			ViewBox: Rectangle{
+				Min: f32.Vec2{-24, -24},
+				Max: f32.Vec2{+24, +24},
+			},
+			Palette: DefaultPalette,
+		})
+		e.HighResolutionCoordinates = res == "hires"
 
-	e.StartPath(0, 0, -20)
-	e.AbsCubeTo(-11.05, -20, -20, -11.05, -20, 0)
-	e.RelSmoothCubeTo(8.95, 20, 20, 20)
-	e.RelSmoothCubeTo(20, -8.95, 20, -20)
-	e.AbsSmoothCubeTo(11.05, -20, 0, -20)
-	e.ClosePathRelMoveTo(2, 30)
-	e.RelHLineTo(-4)
-	e.AbsVLineTo(-2)
-	e.RelHLineTo(4)
-	e.RelVLineTo(12)
-	e.ClosePathRelMoveTo(0, -16)
-	e.RelHLineTo(-4)
-	e.RelVLineTo(-4)
-	e.RelHLineTo(4)
-	e.RelVLineTo(4)
-	e.ClosePathEndPath()
+		e.StartPath(0, 0, -20)
+		e.AbsCubeTo(-11.05, -20, -20, -11.05, -20, 0)
+		e.RelSmoothCubeTo(8.95, 20, 20, 20)
+		e.RelSmoothCubeTo(20, -8.95, 20, -20)
+		e.AbsSmoothCubeTo(11.05, -20, 0, -20)
+		e.ClosePathRelMoveTo(2, 30)
+		e.RelHLineTo(-4)
+		e.AbsVLineTo(-2)
+		e.RelHLineTo(4)
+		e.RelVLineTo(12)
+		e.ClosePathRelMoveTo(0, -16)
+		e.RelHLineTo(-4)
+		e.RelVLineTo(-4)
+		e.RelHLineTo(4)
+		e.RelVLineTo(4)
+		e.ClosePathEndPath()
 
-	testEncode(t, &e, "testdata/action-info.ivg")
+		testEncode(t, &e, "testdata/action-info."+res+".ivg")
+	}
 }
 
 var video005PrimitiveSVGData = []struct {

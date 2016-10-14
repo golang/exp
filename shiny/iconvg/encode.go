@@ -6,6 +6,7 @@ package iconvg
 
 import (
 	"errors"
+	"math"
 )
 
 var (
@@ -29,6 +30,27 @@ const (
 // Metadata for the subsequent encoded form. If Reset is not called before
 // other Encoder methods, the default metadata is implied.
 type Encoder struct {
+	// HighResolutionCoordinates is whether the encoder should encode
+	// coordinate numbers for subsequent paths at the best possible resolution
+	// afforded by the underlying graphic format.
+	//
+	// By default (false), the encoder quantizes coordinates to 1/64th of a
+	// unit if possible (the default graphic size is 64 by 64 units, so
+	// 1/4096th of the default width or height). Each such coordinate can
+	// therefore be encoded in either 1 or 2 bytes. If true, some coordinates
+	// will be encoded in 4 bytes, giving greater accuracy but larger file
+	// sizes. On the Material Design icon set, the 950 or so icons take up
+	// around 40% more bytes (172K vs 123K) at high resolution.
+	//
+	// See the package documentation for more details on the coordinate number
+	// encoding format.
+	HighResolutionCoordinates bool
+
+	// highResolutionCoordinates is a local copy, copied during StartPath, to
+	// avoid having to specify the semantics of modifying the exported field
+	// while drawing.
+	highResolutionCoordinates bool
+
 	buf      buffer
 	altBuf   buffer
 	metadata Metadata
@@ -58,6 +80,8 @@ func (e *Encoder) Bytes() ([]byte, error) {
 }
 
 // Reset resets the Encoder for the given Metadata.
+//
+// This includes setting e.HighResolutionCoordinates to false.
 func (e *Encoder) Reset(m Metadata) {
 	*e = Encoder{
 		buf:      append(e.buf[:0], magic...),
@@ -259,6 +283,7 @@ func (e *Encoder) StartPath(adj uint8, x, y float32) {
 		e.err = errInvalidSelectorAdjustment
 		return
 	}
+	e.highResolutionCoordinates = e.HighResolutionCoordinates
 	e.buf = append(e.buf, uint8(0xc0+adj))
 	e.buf.encodeCoordinate(x)
 	e.buf.encodeCoordinate(y)
@@ -357,17 +382,17 @@ func (e *Encoder) flushDrawOps() {
 			switch e.drawOp {
 			default:
 				for j := m * int(op.nArgs); j > 0; j-- {
-					e.buf.encodeCoordinate(e.drawArgs[i])
+					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i]))
 					i++
 				}
 			case 'A', 'a':
 				for j := m; j > 0; j-- {
-					e.buf.encodeCoordinate(e.drawArgs[i+0])
-					e.buf.encodeCoordinate(e.drawArgs[i+1])
+					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+0]))
+					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+1]))
 					e.buf.encodeZeroToOne(e.drawArgs[i+2])
 					e.buf.encodeNatural(uint32(e.drawArgs[i+3]))
-					e.buf.encodeCoordinate(e.drawArgs[i+4])
-					e.buf.encodeCoordinate(e.drawArgs[i+5])
+					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+4]))
+					e.buf.encodeCoordinate(e.quantize(e.drawArgs[i+5]))
 					i += 6
 				}
 			}
@@ -378,6 +403,14 @@ func (e *Encoder) flushDrawOps() {
 
 	e.drawOp = 0x00
 	e.drawArgs = e.drawArgs[:0]
+}
+
+func (e *Encoder) quantize(coord float32) float32 {
+	if !e.highResolutionCoordinates && (-128 <= coord && coord < 128) {
+		x := math.Floor(float64(coord*64 + 0.5))
+		return float32(x) / 64
+	}
+	return coord
 }
 
 var drawOps = [256]struct {

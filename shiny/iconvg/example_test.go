@@ -16,7 +16,7 @@ import (
 )
 
 func Example() {
-	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.ivg"))
+	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.lores.ivg"))
 	if err != nil {
 		log.Fatal(err)
 	}

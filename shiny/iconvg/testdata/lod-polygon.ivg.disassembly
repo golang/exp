@@ -16,10 +16,10 @@ b8                +28
 80                +0
 01            L (absolute lineTo), 2 reps
 64                -14
-5f fd c1 41       +24.24871
+41 98             +24.25
               L (absolute lineTo), implicit
 64                -14
-5f fd c1 c1       -24.24871
+c1 67             -24.25
 e1            z (closePath); end path
 c7            Set LOD
 a0                +80
@@ -28,17 +28,17 @@ c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
 b8                +28
 80                +0
 03            L (absolute lineTo), 4 reps
-8f 70 0a 41       +8.652477
-67 09 d5 41       +26.629585
+a9 88             +8.65625
+a1 9a             +26.625
               L (absolute lineTo), implicit
-47 38 b5 c1       -22.652473
-f7 a9 83 41       +16.457985
+59 69             -22.65625
+75 90             +16.453125
               L (absolute lineTo), implicit
-47 38 b5 c1       -22.652473
-f7 a9 83 c1       -16.457985
+59 69             -22.65625
+8d 6f             -16.453125
               L (absolute lineTo), implicit
-8f 70 0a 41       +8.652477
-67 09 d5 c1       -26.629585
+a9 88             +8.65625
+61 65             -26.625
 e1            z (closePath); end path
 c7            Set LOD
 00                +0

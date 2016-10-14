@@ -130,7 +130,8 @@ var testdataTestCases = []struct {
 	filename string
 	variants string
 }{
-	{"testdata/action-info", ""},
+	{"testdata/action-info.lores", ""},
+	{"testdata/action-info.hires", ""},
 	{"testdata/blank", ""},
 	{"testdata/lod-polygon", ";64"},
 	{"testdata/video-005.primitive", ""},
