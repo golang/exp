@@ -31,14 +31,6 @@ var mdicons = flag.String("mdicons", "", "The directory on the local file system
 	"https://github.com/google/material-design-icons was checked out",
 )
 
-// subsetForDebugging is whether to generate only a very limited subset of the
-// Material Design icons. This is set to true early in the development of this
-// package, in order to minimize the size of the diffs for code review and for
-// commit.
-//
-// TODO: delete this mechanism entirely and generate the full set of icons.
-const subsetForDebugging = true
-
 // outSize is the width and height (in ideal vector space) of the generated
 // IconVG graphic, regardless of the size of the input SVG.
 const outSize = 48
@@ -64,50 +56,55 @@ var (
 )
 
 var acronyms = map[string]string{
-	"3d":         "3D",
-	"ac":         "AC",
-	"adb":        "ADB",
-	"atm":        "ATM",
-	"av":         "AV",
-	"ccw":        "CCW",
-	"cw":         "CW",
-	"din":        "DIN",
-	"dns":        "DNS",
-	"dvr":        "DVR",
-	"eta":        "ETA",
-	"ev":         "EV",
-	"gif":        "GIF",
-	"gps":        "GPS",
-	"hd":         "HD",
-	"hdmi":       "HDMI",
-	"hdr":        "HDR",
-	"http":       "HTTP",
-	"https":      "HTTPS",
-	"iphone":     "IPhone",
-	"iso":        "ISO",
-	"jpeg":       "JPEG",
-	"markunread": "MarkUnread",
-	"mms":        "MMS",
-	"nfc":        "NFC",
-	"ondemand":   "OnDemand",
-	"pdf":        "PDF",
-	"png":        "PNG",
-	"rss":        "RSS",
-	"rv":         "RV",
-	"sd":         "SD",
-	"sim":        "SIM",
-	"sip":        "SIP",
-	"sms":        "SMS",
-	"svideo":     "SVideo",
-	"textsms":    "TextSMS",
-	"toc":        "TOC",
-	"tv":         "TV",
-	"usb":        "USB",
-	"vpn":        "VPN",
-	"wb":         "WB",
-	"wc":         "WC",
-	"whatshot":   "WhatsHot",
-	"wifi":       "WiFi",
+	"3d":            "3D",
+	"ac":            "AC",
+	"adb":           "ADB",
+	"airplanemode":  "AirplaneMode",
+	"atm":           "ATM",
+	"av":            "AV",
+	"ccw":           "CCW",
+	"cw":            "CW",
+	"din":           "DIN",
+	"dns":           "DNS",
+	"dvr":           "DVR",
+	"eta":           "ETA",
+	"ev":            "EV",
+	"gif":           "GIF",
+	"gps":           "GPS",
+	"hd":            "HD",
+	"hdmi":          "HDMI",
+	"hdr":           "HDR",
+	"http":          "HTTP",
+	"https":         "HTTPS",
+	"iphone":        "IPhone",
+	"iso":           "ISO",
+	"jpeg":          "JPEG",
+	"markunread":    "MarkUnread",
+	"mms":           "MMS",
+	"nfc":           "NFC",
+	"ondemand":      "OnDemand",
+	"pdf":           "PDF",
+	"phonelink":     "PhoneLink",
+	"png":           "PNG",
+	"rss":           "RSS",
+	"rv":            "RV",
+	"sd":            "SD",
+	"sim":           "SIM",
+	"sip":           "SIP",
+	"sms":           "SMS",
+	"streetview":    "StreetView",
+	"svideo":        "SVideo",
+	"textdirection": "TextDirection",
+	"textsms":       "TextSMS",
+	"timelapse":     "TimeLapse",
+	"toc":           "TOC",
+	"tv":            "TV",
+	"usb":           "USB",
+	"vpn":           "VPN",
+	"wb":            "WB",
+	"wc":            "WC",
+	"whatshot":      "WhatsHot",
+	"wifi":          "WiFi",
 }
 
 func upperCase(s string) string {
@@ -151,9 +148,8 @@ func main() {
 	}
 
 	fmt.Fprintf(out,
-		"// In total, %d SVG bytes in %d files "+
-			"(%d PNG bytes at 24px * 24px, %d PNG bytes at 48px * 48px) "+
-			"converted to %d IconVG bytes.\n",
+		"// In total, %d SVG bytes in %d files (%d PNG bytes at 24px * 24px,\n"+
+			"// %d PNG bytes at 48px * 48px) converted to %d IconVG bytes.\n",
 		totalSVGBytes, totalFiles, totalPNG24Bytes, totalPNG48Bytes, totalIVGBytes)
 
 	if len(failures) != 0 {
@@ -202,10 +198,6 @@ func genDir(dirName string) {
 		return
 	}
 	defer f.Close()
-
-	if subsetForDebugging && dirName != "toggle" {
-		return
-	}
 
 	infos, err := f.Readdir(-1)
 	if err != nil {
@@ -296,6 +288,7 @@ type SVG struct {
 
 type Path struct {
 	D           string   `xml:"d,attr"`
+	Fill        string   `xml:"fill,attr"`
 	FillOpacity *float32 `xml:"fill-opacity,attr"`
 	Opacity     *float32 `xml:"opacity,attr"`
 }
@@ -306,19 +299,23 @@ type Circle struct {
 	R  float32 `xml:"r,attr"`
 }
 
-var skippedPaths = map[string]bool{
+var skippedPaths = map[string]string{
 	// hardware/svg/production/ic_scanner_48px.svg contains a filled white
 	// rectangle that is overwritten by the subsequent path.
 	//
 	// See https://github.com/google/material-design-icons/issues/490
-	`<path fill="#fff" d="M16 34h22v4H16z"/>`: true,
+	//
+	// Matches <path fill="#fff" d="M16 34h22v4H16z"/>
+	"M16 34h22v4H16z": "#fff",
 
 	// device/svg/production/ic_airplanemode_active_48px.svg and
 	// maps/svg/production/ic_flight_48px.svg contain a degenerate path that
 	// contains only one moveTo op.
 	//
 	// See https://github.com/google/material-design-icons/issues/491
-	`<path d="M20.36 18"/>`: true,
+	//
+	// Matches <path d="M20.36 18"/>
+	"M20.36 18": "",
 }
 
 var skippedFiles = map[[2]string]bool{
@@ -378,7 +375,7 @@ func genFile(fqSVGDirName, dirName, baseName, fileName string, size float32) err
 	adjs := map[float32]uint8{}
 
 	for _, p := range g.Paths {
-		if skippedPaths[p.D] {
+		if fill, ok := skippedPaths[p.D]; ok && fill == p.Fill {
 			continue
 		}
 		if err := genPath(&enc, &p, adjs, size, offset, g.Circles); err != nil {
