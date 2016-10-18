@@ -373,8 +373,8 @@ func (z *Rasterizer) AbsArcTo(rx, ry, xAxisRotation float32, largeArc, sweep boo
 	pen := z.z.Pen()
 	x1 := float64(z.unabsX(pen[0]))
 	y1 := float64(z.unabsY(pen[1]))
-	x2 := float64(z.unabsX(x))
-	y2 := float64(z.unabsY(y))
+	x2 := float64(x)
+	y2 := float64(y)
 
 	phi := 2 * math.Pi * float64(xAxisRotation)
 
@@ -479,7 +479,7 @@ func (z *Rasterizer) arcSegmentTo(cx, cy, theta1, theta2, rx, ry, cosPhi, sinPhi
 
 func (z *Rasterizer) RelArcTo(rx, ry, xAxisRotation float32, largeArc, sweep bool, x, y float32) {
 	a := z.relVec2(x, y)
-	z.AbsArcTo(rx, ry, xAxisRotation, largeArc, sweep, a[0], a[1])
+	z.AbsArcTo(rx, ry, xAxisRotation, largeArc, sweep, z.unabsX(a[0]), z.unabsY(a[1]))
 }
 
 // angle returns the angle between the u and v vectors.

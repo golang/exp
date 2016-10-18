@@ -134,6 +134,7 @@ var testdataTestCases = []struct {
 	{"testdata/action-info.hires", ""},
 	{"testdata/arcs", ""},
 	{"testdata/blank", ""},
+	{"testdata/favicon", ""},
 	{"testdata/lod-polygon", ";64"},
 	{"testdata/video-005.primitive", ""},
 }
