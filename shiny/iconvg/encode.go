@@ -270,8 +270,8 @@ func (e *Encoder) StartPath(adj uint8, x, y float32) {
 	}
 	e.highResolutionCoordinates = e.HighResolutionCoordinates
 	e.buf = append(e.buf, uint8(0xc0+adj))
-	e.buf.encodeCoordinate(x)
-	e.buf.encodeCoordinate(y)
+	e.buf.encodeCoordinate(e.quantize(x))
+	e.buf.encodeCoordinate(e.quantize(y))
 	e.mode = modeDrawing
 }
 
