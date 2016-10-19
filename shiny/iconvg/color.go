@@ -84,7 +84,8 @@ func CRegColor(i uint8) Color { return Color{ColorTypeCReg, color.RGBA{R: i & 0x
 //
 // To blend a Color that is not encodable as a 1 byte color, first load that
 // Color into a CREG color register, then call CRegColor to produce a Color
-// that is encodable as a 1 byte color.
+// that is encodable as a 1 byte color. See testdata/favicon.ivg for an
+// example.
 //
 // See the "Colors" section in the package documentation for details.
 func BlendColor(t, c0, c1 uint8) Color { return Color{ColorTypeBlend, color.RGBA{R: t, G: c0, B: c1}} }

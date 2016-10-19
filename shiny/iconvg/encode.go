@@ -119,7 +119,53 @@ func (e *Encoder) Reset(m Metadata) {
 	}
 
 	if mcSuggestedPalette {
-		panic("TODO: encode mcSuggestedPalette")
+		n := 63
+		for ; n >= 0 && m.Palette[n] == (color.RGBA{0x00, 0x00, 0x00, 0xff}); n-- {
+		}
+
+		// Find the shortest encoding that can represent all of m.Palette's n+1
+		// explicit colors.
+		enc1, enc2, enc3 := true, true, true
+		for _, c := range m.Palette[:n+1] {
+			if enc1 && (!is1(c.R) || !is1(c.G) || !is1(c.B) || !is1(c.A)) {
+				enc1 = false
+			}
+			if enc2 && (!is2(c.R) || !is2(c.G) || !is2(c.B) || !is2(c.A)) {
+				enc2 = false
+			}
+			if enc3 && (c.A != 0xff) {
+				enc3 = false
+			}
+		}
+
+		e.altBuf = e.altBuf[:0]
+		e.altBuf.encodeNatural(midSuggestedPalette)
+		if enc1 {
+			e.altBuf = append(e.altBuf, byte(n)|0x00)
+			for _, c := range m.Palette[:n+1] {
+				x, _ := encodeColor1(RGBAColor(c))
+				e.altBuf = append(e.altBuf, x)
+			}
+		} else if enc2 {
+			e.altBuf = append(e.altBuf, byte(n)|0x40)
+			for _, c := range m.Palette[:n+1] {
+				x, _ := encodeColor2(RGBAColor(c))
+				e.altBuf = append(e.altBuf, x[0], x[1])
+			}
+		} else if enc3 {
+			e.altBuf = append(e.altBuf, byte(n)|0x80)
+			for _, c := range m.Palette[:n+1] {
+				e.altBuf = append(e.altBuf, c.R, c.G, c.B)
+			}
+		} else {
+			e.altBuf = append(e.altBuf, byte(n)|0xc0)
+			for _, c := range m.Palette[:n+1] {
+				e.altBuf = append(e.altBuf, c.R, c.G, c.B, c.A)
+			}
+		}
+
+		e.buf.encodeNatural(uint32(len(e.altBuf)))
+		e.buf = append(e.buf, e.altBuf...)
 	}
 }
 

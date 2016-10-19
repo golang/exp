@@ -351,11 +351,37 @@ var faviconSVGData = []struct {
 }}
 
 func TestEncodeFavicon(t *testing.T) {
-	var e Encoder
+	// Set up a base color for theming the favicon, gopher blue by default.
+	pal := DefaultPalette
+	pal[0] = faviconColors[0] // color.RGBA{0x76, 0xe1, 0xfe, 0xff}
 
-	for i, c := range faviconColors[:2] {
-		e.SetCReg(uint8(i), false, RGBAColor(c))
+	var e Encoder
+	e.Reset(Metadata{
+		ViewBox: DefaultViewBox,
+		Palette: pal,
+	})
+
+	// The favicon graphic also uses a dark version of that base color. blend
+	// is 75% dark (CReg[63]) and 25% the base color (pal[0]).
+	dark := color.RGBA{0x23, 0x1d, 0x1b, 0xff}
+	blend := BlendColor(0x40, 0xff, 0x80)
+
+	// First, set CReg[63] to dark, then set CReg[63] to the blend of that dark
+	// color with pal[0].
+	e.SetCReg(1, false, RGBAColor(dark))
+	e.SetCReg(1, false, blend)
+
+	// Check that, for the suggested palette, blend resolves to the
+	// (non-themable) SVG file's faviconColors[1].
+	got := blend.Resolve(&pal, &[64]color.RGBA{
+		63: dark,
+	})
+	want := faviconColors[1]
+	if got != want {
+		t.Fatalf("Blend:\ngot  %#02x\nwant %#02x", got, want)
 	}
+
+	// Set aside the remaining, non-themable colors.
 	remainingColors := faviconColors[2:]
 
 	seenFCI2 := false

@@ -136,7 +136,7 @@ var testdataTestCases = []struct {
 	{"testdata/blank", ""},
 	{"testdata/cowbell", ""},
 	{"testdata/elliptical", ""},
-	{"testdata/favicon", ""},
+	{"testdata/favicon", ";pink"},
 	{"testdata/gradient", ""},
 	{"testdata/lod-polygon", ";64"},
 	{"testdata/video-005.primitive", ""},
@@ -198,10 +198,17 @@ func TestRasterizer(t *testing.T) {
 				height = int(float32(length) * dy / dx)
 			}
 
+			opts := &DecodeOptions{}
+			if variant == "pink" {
+				pal := DefaultPalette
+				pal[0] = color.RGBA{0xfe, 0x76, 0xea, 0xff}
+				opts.Palette = &pal
+			}
+
 			got := image.NewRGBA(image.Rect(0, 0, width, height))
 			var z Rasterizer
 			z.SetDstImage(got, got.Bounds(), draw.Src)
-			if err := Decode(&z, ivgData, nil); err != nil {
+			if err := Decode(&z, ivgData, opts); err != nil {
 				t.Errorf("%s %q variant: Decode: %v", tc.filename, variant, err)
 				continue
 			}

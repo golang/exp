@@ -1,9 +1,15 @@
 89 49 56 47   IconVG Magic identifier
-00            Number of metadata chunks: 0
-90            Set CREG[CSEL-0] to a 3 byte (direct) color
+02            Number of metadata chunks: 1
+0a            Metadata chunk length: 5
+02            Metadata Identifier: 1 (suggested palette)
+80                1 palette colors, 3 bytes per color
 76 e1 fe          RGBA 76e1feff
 91            Set CREG[CSEL-1] to a 3 byte (direct) color
-38 4e 54          RGBA 384e54ff
+23 1d 1b          RGBA 231d1bff
+a1            Set CREG[CSEL-1] to a 3 byte (indirect) color
+40                blend 191:64 c0:c1
+ff                    c0: CREG[63]
+80                    c1: customPalette[0]
 c1            Start path, filled with CREG[CSEL-1]; M (absolute moveTo)
 31 80             +0.1875
 44                -30
