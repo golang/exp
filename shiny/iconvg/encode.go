@@ -6,14 +6,17 @@ package iconvg
 
 import (
 	"errors"
+	"image/color"
 	"math"
 )
 
 var (
+	errCSELUsedAsBothGradientAndStop = errors.New("iconvg: CSEL used as both gradient and stop")
 	errDrawingOpsUsedInStylingMode   = errors.New("iconvg: drawing ops used in styling mode")
 	errInvalidSelectorAdjustment     = errors.New("iconvg: invalid selector adjustment")
 	errInvalidIncrementingAdjustment = errors.New("iconvg: invalid incrementing adjustment")
 	errStylingOpsUsedInDrawingMode   = errors.New("iconvg: styling ops used in drawing mode")
+	errTooManyGradientStops          = errors.New("iconvg: too many gradient stops")
 )
 
 type mode uint8
@@ -257,6 +260,76 @@ func (e *Encoder) SetLOD(lod0, lod1 float32) {
 	e.buf = append(e.buf, 0xc7)
 	e.buf.encodeReal(lod0)
 	e.buf.encodeReal(lod1)
+}
+
+// SetLinearGradient sets CREG[CSEL] to encode the linear gradient whose
+// geometry is defined by x1, y1, x2, y2 and colors defined by spread and
+// stops.
+//
+// The colors of the n stops are encoded at CREG[cBase+0], CREG[cBase+1], ...,
+// CREG[cBase+n-1]. Similarly, the offsets of the n stops are encoded at
+// NREG[nBase+0], NREG[nBase+1], ..., NREG[nBase+n-1]. Additional parameters
+// are stored at NREG[nBase-4], NREG[nBase-3], NREG[nBase-2] and NREG[nBase-1].
+//
+// See the package documentation for more details on the gradient encoding
+// format.
+//
+// The CSEL and NSEL selector registers maintain the same values after the
+// method returns as they had when the method was called.
+func (e *Encoder) SetLinearGradient(cBase, nBase uint8, x1, y1, x2, y2 float32, spread GradientSpread, stops []GradientStop) {
+	e.setGradient(cBase, nBase, x1, y1, x2, y2, 0x80, spread, stops)
+}
+
+// SetRadialGradient is like SetLinearGradient except that the radial
+// gradient's geometry is defined by cx, cy and r.
+func (e *Encoder) SetRadialGradient(cBase, nBase uint8, cx, cy, r float32, spread GradientSpread, stops []GradientStop) {
+	// TODO: two radii, r1 and r2, as per doc.go.
+	e.setGradient(cBase, nBase, cx, cy, 0, r, 0xc0, spread, stops)
+}
+
+func (e *Encoder) setGradient(cBase, nBase uint8, a0, a1, a2, a3 float32, bFlags uint8, spread GradientSpread, stops []GradientStop) {
+	e.checkModeStyling()
+	if e.err != nil {
+		return
+	}
+	if len(stops) > 60 {
+		e.err = errTooManyGradientStops
+		return
+	}
+	if x, y := e.cSel, e.cSel+64; (cBase <= x && x < cBase+uint8(len(stops))) ||
+		(cBase <= y && y < cBase+uint8(len(stops))) {
+		e.err = errCSELUsedAsBothGradientAndStop
+		return
+	}
+
+	oldCSel := e.cSel
+	oldNSel := e.nSel
+	cBase &= 0x3f
+	nBase &= 0x3f
+	e.SetCReg(0, false, RGBAColor(color.RGBA{
+		R: uint8(len(stops)),
+		G: cBase | uint8(spread<<6),
+		B: nBase | bFlags,
+		A: 0x00,
+	}))
+	e.SetCSel(cBase)
+	e.SetNSel(nBase)
+	e.SetNReg(4, false, a0)
+	e.SetNReg(3, false, a1)
+	e.SetNReg(2, false, a2)
+	e.SetNReg(1, false, a3)
+	for _, s := range stops {
+		r, g, b, a := s.Color.RGBA()
+		e.SetCReg(0, true, RGBAColor(color.RGBA{
+			R: uint8(r >> 8),
+			G: uint8(g >> 8),
+			B: uint8(b >> 8),
+			A: uint8(a >> 8),
+		}))
+		e.SetNReg(0, true, s.Offset)
+	}
+	e.SetCSel(oldCSel)
+	e.SetNSel(oldNSel)
 }
 
 func (e *Encoder) StartPath(adj uint8, x, y float32) {

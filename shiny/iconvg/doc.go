@@ -549,6 +549,8 @@ There are more examples in the ./testdata directory.
 */
 package iconvg
 
+// TODO: elliptical gradients, not just circular?
+
 // TODO: shapes (circles, rects) and strokes? Or can we assume that authoring
 // tools will convert shapes and strokes to paths?
 

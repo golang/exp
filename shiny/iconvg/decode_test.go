@@ -135,6 +135,7 @@ var testdataTestCases = []struct {
 	{"testdata/arcs", ""},
 	{"testdata/blank", ""},
 	{"testdata/favicon", ""},
+	{"testdata/gradient", ""},
 	{"testdata/lod-polygon", ";64"},
 	{"testdata/video-005.primitive", ""},
 }

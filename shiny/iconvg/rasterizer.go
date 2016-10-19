@@ -10,6 +10,7 @@ import (
 	"image/draw"
 	"math"
 
+	"golang.org/x/exp/shiny/iconvg/internal/gradient"
 	"golang.org/x/image/math/f32"
 	"golang.org/x/image/vector"
 )
@@ -57,9 +58,11 @@ type Rasterizer struct {
 	fill      image.Image
 	flatColor color.RGBA
 	flatImage image.Uniform
+	gradient  gradient.Gradient
 
-	cReg [64]color.RGBA
-	nReg [64]float32
+	cReg  [64]color.RGBA
+	nReg  [64]float32
+	stops [64]gradient.Stop
 }
 
 // SetDstImage sets the Rasterizer to draw onto a destination image, given by
@@ -157,15 +160,74 @@ func (z *Rasterizer) implicitSmoothPoint(thisSmoothType uint8) f32.Vec2 {
 	}
 }
 
+func (z *Rasterizer) initGradient(rgba color.RGBA) (ok bool) {
+	nStops := int(rgba.R & 0x3f)
+	cBase := int(rgba.G & 0x3f)
+	nBase := int(rgba.B & 0x3f)
+	prevN := negativeInfinity
+	for i := 0; i < nStops; i++ {
+		c := z.cReg[(cBase+i)&0x3f]
+		if !validAlphaPremulColor(c) {
+			return false
+		}
+		n := z.nReg[(nBase+i)&0x3f]
+		if !(0 <= n && n <= 1) || !(n > prevN) {
+			return false
+		}
+		prevN = n
+		z.stops[i] = gradient.Stop{
+			Offset: float64(n),
+			RGBA64: color.RGBA64{
+				R: uint16(c.R) * 0x101,
+				G: uint16(c.G) * 0x101,
+				B: uint16(c.B) * 0x101,
+				A: uint16(c.A) * 0x101,
+			},
+		}
+	}
+
+	if (rgba.B>>6)&0x01 == 0 {
+		z.gradient.InitLinear(
+			float64(z.absX(z.nReg[(nBase-4)&0x3f])),
+			float64(z.absY(z.nReg[(nBase-3)&0x3f])),
+			float64(z.absX(z.nReg[(nBase-2)&0x3f])),
+			float64(z.absY(z.nReg[(nBase-1)&0x3f])),
+			gradient.Spread(rgba.G>>6),
+			z.stops[:nStops],
+		)
+	} else {
+		// TODO: honor the r1 radius (at nBase-2), not just r2 (at nBase-1).
+		//
+		// TODO: relX can give a different scale/bias than relY. We should
+		// really use an elliptical (not circular) gradient, in gradient space
+		// (not pixel space).
+		r := z.relX(z.nReg[(nBase-1)&0x3f])
+
+		z.gradient.InitCircular(
+			float64(z.absX(z.nReg[(nBase-4)&0x3f])),
+			float64(z.absY(z.nReg[(nBase-3)&0x3f])),
+			float64(r),
+			gradient.Spread(rgba.G>>6),
+			z.stops[:nStops],
+		)
+	}
+	return true
+}
+
 func (z *Rasterizer) StartPath(adj uint8, x, y float32) {
-	// TODO: gradient fills, not just flat colors.
 	z.flatColor = z.cReg[(z.cSel-adj)&0x3f]
-	z.flatImage.C = &z.flatColor
-	z.fill = &z.flatImage
+	if validAlphaPremulColor(z.flatColor) {
+		z.flatImage.C = &z.flatColor
+		z.fill = &z.flatImage
+		z.disabled = z.flatColor.A == 0
+	} else if z.flatColor.A == 0x00 && z.flatColor.B&0x80 != 0 {
+		z.fill = &z.gradient
+		z.disabled = !z.initGradient(z.flatColor)
+	}
 
 	width, height := z.r.Dx(), z.r.Dy()
 	h := float32(height)
-	z.disabled = z.flatColor.A == 0 || !(z.lod0 <= h && h < z.lod1)
+	z.disabled = z.disabled || !(z.lod0 <= h && h < z.lod1)
 	if z.disabled {
 		return
 	}

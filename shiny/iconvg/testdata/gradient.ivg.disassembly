@@ -1,0 +1,170 @@
+89 49 56 47   IconVG Magic identifier
+00            Number of metadata chunks: 0
+98            Set CREG[CSEL-0] to a 4 byte color
+04 0a 8a 00       gradient (NSTOPS=4, CBASE=10, NBASE=10, linear, none)
+0a            Set CSEL = 10
+4a            Set NSEL = 10
+b4            Set NREG[NSEL-4] to a coordinate number
+68                -12
+b3            Set NREG[NSEL-3] to a coordinate number
+44                -30
+aa            Set NREG[NSEL-2] to a real number
+18                12
+b1            Set NREG[NSEL-1] to a coordinate number
+5c                -18
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+64                RGBA ff0000ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+00                0
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+14                RGBA 00ff00ff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+3c                0.25
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+04                RGBA 0000ffff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+78                0.5
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+00                RGBA 000000ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+02                1
+00            Set CSEL = 0
+40            Set NSEL = 0
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+44                -30
+44                -30
+e6            H (absolute horizontal lineTo)
+bc                +30
+e8            V (absolute vertical lineTo)
+5c                -18
+e6            H (absolute horizontal lineTo)
+44                -30
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+05 4a 8a 00       gradient (NSTOPS=5, CBASE=10, NBASE=10, linear, pad)
+0a            Set CSEL = 10
+4a            Set NSEL = 10
+b4            Set NREG[NSEL-4] to a coordinate number
+68                -12
+b3            Set NREG[NSEL-3] to a coordinate number
+64                -14
+aa            Set NREG[NSEL-2] to a real number
+18                12
+b1            Set NREG[NSEL-1] to a coordinate number
+7c                -2
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+18                RGBA 00ffffff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+00                0
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+7c                RGBA ffffffff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+3c                0.25
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+68                RGBA ff00ffff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+78                0.5
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+7f                RGBA 00000000
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+b4                0.75
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+78                RGBA ffff00ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+02                1
+00            Set CSEL = 0
+40            Set NSEL = 0
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+44                -30
+64                -14
+e6            H (absolute horizontal lineTo)
+bc                +30
+e8            V (absolute vertical lineTo)
+7c                -2
+e6            H (absolute horizontal lineTo)
+44                -30
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+04 8a ca 00       gradient (NSTOPS=4, CBASE=10, NBASE=10, radial, reflect)
+0a            Set CSEL = 10
+4a            Set NSEL = 10
+b4            Set NREG[NSEL-4] to a coordinate number
+70                -8
+ab            Set NREG[NSEL-3] to a real number
+10                8
+aa            Set NREG[NSEL-2] to a real number
+00                0
+a9            Set NREG[NSEL-1] to a real number
+20                16
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+64                RGBA ff0000ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+00                0
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+14                RGBA 00ff00ff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+3c                0.25
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+04                RGBA 0000ffff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+78                0.5
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+00                RGBA 000000ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+02                1
+00            Set CSEL = 0
+40            Set NSEL = 0
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+44                -30
+84                +2
+e6            H (absolute horizontal lineTo)
+bc                +30
+e8            V (absolute vertical lineTo)
+9c                +14
+e6            H (absolute horizontal lineTo)
+44                -30
+e1            z (closePath); end path
+98            Set CREG[CSEL-0] to a 4 byte color
+05 ca ca 00       gradient (NSTOPS=5, CBASE=10, NBASE=10, radial, repeat)
+0a            Set CSEL = 10
+4a            Set NSEL = 10
+b4            Set NREG[NSEL-4] to a coordinate number
+70                -8
+ab            Set NREG[NSEL-3] to a real number
+30                24
+aa            Set NREG[NSEL-2] to a real number
+00                0
+a9            Set NREG[NSEL-1] to a real number
+20                16
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+18                RGBA 00ffffff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+00                0
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+7c                RGBA ffffffff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+3c                0.25
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+68                RGBA ff00ffff
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+78                0.5
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+7f                RGBA 00000000
+bf            Set NREG[NSEL-0] to a zero-to-one number; NSEL++
+b4                0.75
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+78                RGBA ffff00ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+02                1
+00            Set CSEL = 0
+40            Set NSEL = 0
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+44                -30
+a4                +18
+e6            H (absolute horizontal lineTo)
+bc                +30
+e8            V (absolute vertical lineTo)
+bc                +30
+e6            H (absolute horizontal lineTo)
+44                -30
+e1            z (closePath); end path

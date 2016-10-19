@@ -15,7 +15,10 @@ const magic = "\x89IVG"
 
 var magicBytes = []byte(magic)
 
-var positiveInfinity = math.Float32frombits(0x7f800000)
+var (
+	negativeInfinity = math.Float32frombits(0xff800000)
+	positiveInfinity = math.Float32frombits(0x7f800000)
+)
 
 func isNaNOrInfinity(f float32) bool {
 	return math.Float32bits(f)&0x7f800000 == 0x7f800000
@@ -36,6 +39,23 @@ var gradientSpreadNames = [4]string{
 	"pad",
 	"reflect",
 	"repeat",
+}
+
+// GradientSpread is how to spread a gradient past its nominal bounds (from
+// offset being 0.0 to offset being 1.0).
+type GradientSpread uint8
+
+const (
+	GradientSpreadNone    GradientSpread = 0
+	GradientSpreadPad     GradientSpread = 1
+	GradientSpreadReflect GradientSpread = 2
+	GradientSpreadRepeat  GradientSpread = 3
+)
+
+// GradientStop is a color/offset gradient stop.
+type GradientStop struct {
+	Offset float32
+	Color  color.Color
 }
 
 // Rectangle is defined by its minimum and maximum coordinates.
