@@ -1,0 +1,79 @@
+89 49 56 47   IconVG Magic identifier
+00            Number of metadata chunks: 0
+98            Set CREG[CSEL-0] to a 4 byte color
+02 8a ca 00       gradient (NSTOPS=2, CBASE=10, NBASE=10, radial, reflect)
+0a            Set CSEL = 10
+4a            Set NSEL = 10
+ae            Set NREG[NSEL-6] to a real number
+af aa aa bc       -0.020833336
+bd            Set NREG[NSEL-5] to a zero-to-one number
+0a                0.041666668
+ac            Set NREG[NSEL-4] to a real number
+00                0
+ab            Set NREG[NSEL-3] to a real number
+8b 88 08 3d       0.03333333
+aa            Set NREG[NSEL-2] to a real number
+00                0
+b9            Set NREG[NSEL-1] to a zero-to-one number
+a0                0.6666667
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+4b                RGBA c00000ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+00                0
+87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
+03                RGBA 0000c0ff
+af            Set NREG[NSEL-0] to a real number; NSEL++
+02                1
+00            Set CSEL = 0
+40            Set NSEL = 0
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+40                -32
+40                -32
+e6            H (absolute horizontal lineTo)
+c0                +32
+e8            V (absolute vertical lineTo)
+c0                +32
+e6            H (absolute horizontal lineTo)
+40                -32
+e1            z (closePath); end path
+80            Set CREG[CSEL-0] to a 1 byte color
+7c                RGBA ffffffff
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+56                -21
+6c                -10
+02            L (absolute lineTo), 3 reps
+58                -20
+6a                -11
+              L (absolute lineTo), implicit
+5a                -19
+6c                -10
+              L (absolute lineTo), implicit
+58                -20
+6e                -9
+e1            z (closePath); end path
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+56                -21
+9c                +14
+02            L (absolute lineTo), 3 reps
+58                -20
+9a                +13
+              L (absolute lineTo), implicit
+5a                -19
+9c                +14
+              L (absolute lineTo), implicit
+58                -20
+9e                +15
+e1            z (closePath); end path
+c0            Start path, filled with CREG[CSEL-0]; M (absolute moveTo)
+92                +9
+8a                +5
+02            L (absolute lineTo), 3 reps
+94                +10
+88                +4
+              L (absolute lineTo), implicit
+96                +11
+8a                +5
+              L (absolute lineTo), implicit
+94                +10
+8c                +6
+e1            z (closePath); end path

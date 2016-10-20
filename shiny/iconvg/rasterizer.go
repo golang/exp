@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/exp/shiny/iconvg/internal/gradient"
 	"golang.org/x/image/math/f32"
+	"golang.org/x/image/math/f64"
 	"golang.org/x/image/vector"
 )
 
@@ -186,31 +187,43 @@ func (z *Rasterizer) initGradient(rgba color.RGBA) (ok bool) {
 		}
 	}
 
-	if (rgba.B>>6)&0x01 == 0 {
-		z.gradient.InitLinear(
-			float64(z.absX(z.nReg[(nBase-4)&0x3f])),
-			float64(z.absY(z.nReg[(nBase-3)&0x3f])),
-			float64(z.absX(z.nReg[(nBase-2)&0x3f])),
-			float64(z.absY(z.nReg[(nBase-1)&0x3f])),
-			gradient.Spread(rgba.G>>6),
-			z.stops[:nStops],
-		)
-	} else {
-		// TODO: honor the r1 radius (at nBase-2), not just r2 (at nBase-1).
-		//
-		// TODO: relX can give a different scale/bias than relY. We should
-		// really use an elliptical (not circular) gradient, in gradient space
-		// (not pixel space).
-		r := z.relX(z.nReg[(nBase-1)&0x3f])
+	// The affine transformation matrix in the IconVG graphic, stored in 6
+	// contiguous NREG registers, goes from graphic coordinate space (i.e. the
+	// metadata viewBox) to the gradient coordinate space. We need it to start
+	// in pixel space, not graphic coordinate space.
 
-		z.gradient.InitCircular(
-			float64(z.absX(z.nReg[(nBase-4)&0x3f])),
-			float64(z.absY(z.nReg[(nBase-3)&0x3f])),
-			float64(r),
-			gradient.Spread(rgba.G>>6),
-			z.stops[:nStops],
-		)
+	invZSX := 1 / float64(z.scaleX)
+	invZSY := 1 / float64(z.scaleY)
+	zBX := float64(z.biasX)
+	zBY := float64(z.biasY)
+
+	a := float64(z.nReg[(nBase-6)&0x3f])
+	b := float64(z.nReg[(nBase-5)&0x3f])
+	c := float64(z.nReg[(nBase-4)&0x3f])
+	d := float64(z.nReg[(nBase-3)&0x3f])
+	e := float64(z.nReg[(nBase-2)&0x3f])
+	f := float64(z.nReg[(nBase-1)&0x3f])
+
+	pix2Grad := f64.Aff3{
+		a * invZSX,
+		b * invZSY,
+		c - a*zBX - b*zBY,
+		d * invZSX,
+		e * invZSY,
+		f - d*zBX - e*zBY,
 	}
+
+	shape := gradient.ShapeLinear
+	if (rgba.B>>6)&0x01 != 0 {
+		shape = gradient.ShapeRadial
+	}
+	z.gradient.Init(
+		shape,
+		gradient.Spread(rgba.G>>6),
+		pix2Grad,
+		z.stops[:nStops],
+	)
+
 	return true
 }
 

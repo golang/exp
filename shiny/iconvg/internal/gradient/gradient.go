@@ -21,7 +21,9 @@ import (
 // the gradient.Gradient type and provide fast path code.
 //
 // Doing so requires coming up with a stable API that we'd be happy to support
-// in the long term.
+// in the long term. This would probably include an easier way to create
+// linear, circular and elliptical gradients, without having to explicitly
+// calculate the f64.Aff3 matrix.
 
 // Shape is the gradient shape.
 type Shape uint8
@@ -153,10 +155,6 @@ func AppendRanges(a []Range, stops []Stop) []Range {
 type Gradient struct {
 	Shape  Shape
 	Spread Spread
-	Ranges []Range
-
-	// First and Last are the first and last stop's colors.
-	First, Last color.RGBA64
 
 	// Pix2Grad transforms coordinates from pixel space (the arguments to the
 	// Image.At method) to gradient space. Gradient space is where a linear
@@ -168,10 +166,19 @@ type Gradient struct {
 	//
 	// For a linear gradient, the bottom row is ignored.
 	Pix2Grad f64.Aff3
+
+	Ranges []Range
+
+	// First and Last are the first and last stop's colors.
+	First, Last color.RGBA64
 }
 
-func (g *Gradient) init(spread Spread, stops []Stop) {
+// Init initializes g to a gradient whose geometry is defined by shape and
+// pix2Grad and whose colors are defined by spread and stops.
+func (g *Gradient) Init(shape Shape, spread Spread, pix2Grad f64.Aff3, stops []Stop) {
+	g.Shape = shape
 	g.Spread = spread
+	g.Pix2Grad = pix2Grad
 	g.Ranges = AppendRanges(g.Ranges[:0], stops)
 	if len(stops) == 0 {
 		g.First = color.RGBA64{}
@@ -181,50 +188,6 @@ func (g *Gradient) init(spread Spread, stops []Stop) {
 		g.Last = stops[len(stops)-1].RGBA64
 	}
 }
-
-// InitLinear initializes g to be a linear gradient from (x1, y1) to (x2, y2),
-// in pixel space. Its colors are given by spread and stops.
-func (g *Gradient) InitLinear(x1, y1, x2, y2 float64, spread Spread, stops []Stop) {
-	g.init(spread, stops)
-	g.Shape = ShapeLinear
-	dx, dy := x2-x1, y2-y1
-	// The top row [a, b, c] of the Pix2Grad matrix satisfies the three
-	// simultaneous equations:
-	//	a*(x1   ) + b*(y1   ) + c = 0   (eq #0)
-	//	a*(x1+dy) + b*(y1-dx) + c = 0   (eq #1)
-	//	a*(x1+dx) + b*(y1+dy) + c = 1   (eq #2)
-	// Subtracting equation #0 from equations #1 and #2 give:
-	//	a*(  +dy) + b*(  -dx)     = 0   (eq #3)
-	//	a*(  +dx) + b*(  +dy)     = 1   (eq #4)
-	// So that
-	//	a*(dy*dy) - b*(dy*dx)     = 0   (eq #5)
-	//	a*(dx*dx) + b*(dx*dy)     = dx  (eq #6)
-	// And that
-	//	a = dx / (dx*dx + dy*dy)        (eq #7)
-	// Equations #3 and #7 yield:
-	//	b = dy / (dx*dx + dy*dy)        (eq #8)
-	d := dx*dx + dy*dy
-	a := dx / d
-	b := dy / d
-	g.Pix2Grad = f64.Aff3{
-		a, b, -a*x1 - b*y1,
-		0, 0, 0,
-	}
-}
-
-// InitCircular initializes g to be a circular gradient centered on (cx, cy)
-// with radius r, in pixel space. Its colors are given by spread and stops.
-func (g *Gradient) InitCircular(cx, cy, r float64, spread Spread, stops []Stop) {
-	g.init(spread, stops)
-	g.Shape = ShapeRadial
-	invR := 1 / r
-	g.Pix2Grad = f64.Aff3{
-		invR, 0, -cx * invR,
-		0, invR, -cy * invR,
-	}
-}
-
-// TODO: Gradient.InitElliptical?
 
 // ColorModel satisfies the image.Image interface.
 func (g *Gradient) ColorModel() color.Model {

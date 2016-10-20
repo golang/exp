@@ -134,6 +134,8 @@ var testdataTestCases = []struct {
 	{"testdata/action-info.hires", ""},
 	{"testdata/arcs", ""},
 	{"testdata/blank", ""},
+	{"testdata/cowbell", ""},
+	{"testdata/elliptical", ""},
 	{"testdata/favicon", ""},
 	{"testdata/gradient", ""},
 	{"testdata/lod-polygon", ";64"},
@@ -165,7 +167,7 @@ func TestDisassembly(t *testing.T) {
 			continue
 		}
 		if !bytes.Equal(got, want) {
-			t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			t.Errorf("%s: got:\n%s\nwant:\n%s", tc.filename, got, want)
 			diffLines(t, string(got), string(want))
 		}
 	}

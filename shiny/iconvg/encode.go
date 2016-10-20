@@ -8,6 +8,8 @@ import (
 	"errors"
 	"image/color"
 	"math"
+
+	"golang.org/x/image/math/f32"
 )
 
 var (
@@ -262,37 +264,30 @@ func (e *Encoder) SetLOD(lod0, lod1 float32) {
 	e.buf.encodeReal(lod1)
 }
 
-// SetLinearGradient sets CREG[CSEL] to encode the linear gradient whose
-// geometry is defined by x1, y1, x2, y2 and colors defined by spread and
-// stops.
+// SetGradient sets CREG[CSEL] to encode the gradient whose colors defined by
+// spread and stops. Its geometry is either linear or radial, depending on the
+// radial argument, and the given affine transformation matrix maps from
+// graphic coordinate space defined by the metadata's viewBox (e.g. from (-32,
+// -32) to (+32, +32)) to gradient coordinate space. Gradient coordinate space
+// is where a linear gradient ranges from x=0 to x=1, and a radial gradient has
+// center (0, 0) and radius 1.
 //
 // The colors of the n stops are encoded at CREG[cBase+0], CREG[cBase+1], ...,
 // CREG[cBase+n-1]. Similarly, the offsets of the n stops are encoded at
 // NREG[nBase+0], NREG[nBase+1], ..., NREG[nBase+n-1]. Additional parameters
 // are stored at NREG[nBase-4], NREG[nBase-3], NREG[nBase-2] and NREG[nBase-1].
 //
-// See the package documentation for more details on the gradient encoding
-// format.
-//
 // The CSEL and NSEL selector registers maintain the same values after the
 // method returns as they had when the method was called.
-func (e *Encoder) SetLinearGradient(cBase, nBase uint8, x1, y1, x2, y2 float32, spread GradientSpread, stops []GradientStop) {
-	e.setGradient(cBase, nBase, x1, y1, x2, y2, 0x80, spread, stops)
-}
-
-// SetRadialGradient is like SetLinearGradient except that the radial
-// gradient's geometry is defined by cx, cy and r.
-func (e *Encoder) SetRadialGradient(cBase, nBase uint8, cx, cy, r float32, spread GradientSpread, stops []GradientStop) {
-	// TODO: two radii, r1 and r2, as per doc.go.
-	e.setGradient(cBase, nBase, cx, cy, 0, r, 0xc0, spread, stops)
-}
-
-func (e *Encoder) setGradient(cBase, nBase uint8, a0, a1, a2, a3 float32, bFlags uint8, spread GradientSpread, stops []GradientStop) {
+//
+// See the package documentation for more details on the gradient encoding
+// format and the derivation of common transformation matrices.
+func (e *Encoder) SetGradient(cBase, nBase uint8, radial bool, transform f32.Aff3, spread GradientSpread, stops []GradientStop) {
 	e.checkModeStyling()
 	if e.err != nil {
 		return
 	}
-	if len(stops) > 60 {
+	if len(stops) > 64-len(transform) {
 		e.err = errTooManyGradientStops
 		return
 	}
@@ -306,6 +301,10 @@ func (e *Encoder) setGradient(cBase, nBase uint8, a0, a1, a2, a3 float32, bFlags
 	oldNSel := e.nSel
 	cBase &= 0x3f
 	nBase &= 0x3f
+	bFlags := uint8(0x80)
+	if radial {
+		bFlags = 0xc0
+	}
 	e.SetCReg(0, false, RGBAColor(color.RGBA{
 		R: uint8(len(stops)),
 		G: cBase | uint8(spread<<6),
@@ -314,10 +313,9 @@ func (e *Encoder) setGradient(cBase, nBase uint8, a0, a1, a2, a3 float32, bFlags
 	}))
 	e.SetCSel(cBase)
 	e.SetNSel(nBase)
-	e.SetNReg(4, false, a0)
-	e.SetNReg(3, false, a1)
-	e.SetNReg(2, false, a2)
-	e.SetNReg(1, false, a3)
+	for i, v := range transform {
+		e.SetNReg(uint8(len(transform)-i), false, v)
+	}
 	for _, s := range stops {
 		r, g, b, a := s.Color.RGBA()
 		e.SetCReg(0, true, RGBAColor(color.RGBA{
@@ -330,6 +328,57 @@ func (e *Encoder) setGradient(cBase, nBase uint8, a0, a1, a2, a3 float32, bFlags
 	}
 	e.SetCSel(oldCSel)
 	e.SetNSel(oldNSel)
+}
+
+// SetLinearGradient is like SetGradient with radial=false except that the
+// transformation matrix is implicitly defined by two boundary points (x1, y1)
+// and (x2, y2).
+func (e *Encoder) SetLinearGradient(cBase, nBase uint8, x1, y1, x2, y2 float32, spread GradientSpread, stops []GradientStop) {
+	// See the package documentation's appendix for a derivation of the
+	// transformation matrix.
+	dx, dy := x2-x1, y2-y1
+	d := dx*dx + dy*dy
+	ma := dx / d
+	mb := dy / d
+	e.SetGradient(cBase, nBase, false, f32.Aff3{
+		ma, mb, -ma*x1 - mb*y1,
+		0, 0, 0,
+	}, spread, stops)
+}
+
+// SetCircularGradient is like SetGradient with radial=true except that the
+// transformation matrix is implicitly defined by a center (cx, cy) and a
+// radius vector (rx, ry) such that (cx+rx, cy+ry) is on the circle.
+func (e *Encoder) SetCircularGradient(cBase, nBase uint8, cx, cy, rx, ry float32, spread GradientSpread, stops []GradientStop) {
+	// See the package documentation's appendix for a derivation of the
+	// transformation matrix.
+	invR := float32(1 / math.Sqrt(float64(rx*rx+ry*ry)))
+	e.SetGradient(cBase, nBase, true, f32.Aff3{
+		invR, 0, -cx * invR,
+		0, invR, -cy * invR,
+	}, spread, stops)
+}
+
+// SetEllipticalGradient is like SetGradient with radial=true except that the
+// transformation matrix is implicitly defined by a center (cx, cy) and two
+// axis vectors (rx, ry) and (sx, sy) such that (cx+rx, cy+ry) and (cx+sx,
+// cy+sy) are on the ellipse.
+func (e *Encoder) SetEllipticalGradient(cBase, nBase uint8, cx, cy, rx, ry, sx, sy float32, spread GradientSpread, stops []GradientStop) {
+	// See the package documentation's appendix for a derivation of the
+	// transformation matrix.
+	invRSSR := 1 / (rx*sy - sx*ry)
+
+	ma := +sy * invRSSR
+	mb := -sx * invRSSR
+	mc := -ma*cx - mb*cy
+	md := -ry * invRSSR
+	me := +rx * invRSSR
+	mf := -md*cx - me*cy
+
+	e.SetGradient(cBase, nBase, true, f32.Aff3{
+		ma, mb, mc,
+		md, me, mf,
+	}, spread, stops)
 }
 
 func (e *Encoder) StartPath(adj uint8, x, y float32) {

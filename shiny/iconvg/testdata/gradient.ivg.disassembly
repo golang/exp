@@ -4,14 +4,18 @@
 04 0a 8a 00       gradient (NSTOPS=4, CBASE=10, NBASE=10, linear, none)
 0a            Set CSEL = 10
 4a            Set NSEL = 10
-b4            Set NREG[NSEL-4] to a coordinate number
-68                -12
-b3            Set NREG[NSEL-3] to a coordinate number
-44                -30
+ae            Set NREG[NSEL-6] to a real number
+8b 88 08 3d       0.03333333
+ad            Set NREG[NSEL-5] to a real number
+8b 88 88 3c       0.016666666
+ac            Set NREG[NSEL-4] to a real number
+6b 66 66 3f       0.9000001
+ab            Set NREG[NSEL-3] to a real number
+00                0
 aa            Set NREG[NSEL-2] to a real number
-18                12
-b1            Set NREG[NSEL-1] to a coordinate number
-5c                -18
+00                0
+a9            Set NREG[NSEL-1] to a real number
+00                0
 87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
 64                RGBA ff0000ff
 af            Set NREG[NSEL-0] to a real number; NSEL++
@@ -44,14 +48,18 @@ e1            z (closePath); end path
 05 4a 8a 00       gradient (NSTOPS=5, CBASE=10, NBASE=10, linear, pad)
 0a            Set CSEL = 10
 4a            Set NSEL = 10
-b4            Set NREG[NSEL-4] to a coordinate number
-68                -12
-b3            Set NREG[NSEL-3] to a coordinate number
-64                -14
+ae            Set NREG[NSEL-6] to a real number
+8b 88 08 3d       0.03333333
+ad            Set NREG[NSEL-5] to a real number
+8b 88 88 3c       0.016666666
+ac            Set NREG[NSEL-4] to a real number
+27 22 22 3f       0.63333344
+ab            Set NREG[NSEL-3] to a real number
+00                0
 aa            Set NREG[NSEL-2] to a real number
-18                12
-b1            Set NREG[NSEL-1] to a coordinate number
-7c                -2
+00                0
+a9            Set NREG[NSEL-1] to a real number
+00                0
 87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
 18                RGBA 00ffffff
 af            Set NREG[NSEL-0] to a real number; NSEL++
@@ -88,14 +96,18 @@ e1            z (closePath); end path
 04 8a ca 00       gradient (NSTOPS=4, CBASE=10, NBASE=10, radial, reflect)
 0a            Set CSEL = 10
 4a            Set NSEL = 10
-b4            Set NREG[NSEL-4] to a coordinate number
-70                -8
-ab            Set NREG[NSEL-3] to a real number
-10                8
-aa            Set NREG[NSEL-2] to a real number
+b6            Set NREG[NSEL-6] to a coordinate number
+11 80             0.0625
+ad            Set NREG[NSEL-5] to a real number
 00                0
-a9            Set NREG[NSEL-1] to a real number
-20                16
+bc            Set NREG[NSEL-4] to a zero-to-one number
+78                0.5
+ab            Set NREG[NSEL-3] to a real number
+00                0
+b2            Set NREG[NSEL-2] to a coordinate number
+11 80             0.0625
+b1            Set NREG[NSEL-1] to a coordinate number
+81 7f             -0.5
 87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
 64                RGBA ff0000ff
 af            Set NREG[NSEL-0] to a real number; NSEL++
@@ -128,14 +140,18 @@ e1            z (closePath); end path
 05 ca ca 00       gradient (NSTOPS=5, CBASE=10, NBASE=10, radial, repeat)
 0a            Set CSEL = 10
 4a            Set NSEL = 10
-b4            Set NREG[NSEL-4] to a coordinate number
-70                -8
-ab            Set NREG[NSEL-3] to a real number
-30                24
-aa            Set NREG[NSEL-2] to a real number
+b6            Set NREG[NSEL-6] to a coordinate number
+11 80             0.0625
+ad            Set NREG[NSEL-5] to a real number
 00                0
-a9            Set NREG[NSEL-1] to a real number
-20                16
+bc            Set NREG[NSEL-4] to a zero-to-one number
+78                0.5
+ab            Set NREG[NSEL-3] to a real number
+00                0
+b2            Set NREG[NSEL-2] to a coordinate number
+11 80             0.0625
+b1            Set NREG[NSEL-1] to a coordinate number
+81 7e             -1.5
 87            Set CREG[CSEL-0] to a 1 byte color; CSEL++
 18                RGBA 00ffffff
 af            Set NREG[NSEL-0] to a real number; NSEL++

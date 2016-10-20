@@ -98,8 +98,11 @@ The low 6 bits of the green value is the color register base, CBASE.
 The high 2 bits of the green value is how to spread the gradient past its
 nominal bounds (from offset being 0.0 to offset being 1.0). The high two bits
 being 0, 1, 2 or 3 mean none, pad, reflect and repeat respectively. None means
-extend with transparent black, the others are per SVG's
-https://www.w3.org/TR/SVG/pservers.html#LinearGradientElementSpreadMethodAttribute
+that offsets outside of the [0.0, 1.0] range map to transparent black. Pad
+means that offsets below 0.0 and above 1.0 map to the colors that 0.0 and 1.0
+would map to. Reflect means that the offset mapping is reflected start-to-end,
+end-to-start, start-to-end, etc. Repeat means that the offset mapping is
+repeated start-to-end, start-to-end, start-to-end, etc.
 
 The low 6 bits of the blue value is the number register base, NBASE.
 
@@ -108,15 +111,23 @@ The remaining bit (the 0x40 bit) of the blue value denotes the gradient shape:
 
 The gradient has NSTOPS color/offset stops. The first stop has color
 CREG[CBASE+0] and offset NREG[NBASE+0], the second stop has color CREG[CBASE+1]
-and offset NREG[NBASE+1], and so on. The gradient also uses the four numbers
-NREG[NBASE-4], NREG[NBASE-3], NREG[NBASE-2], NREG[NBASE-1].
+and offset NREG[NBASE+1], and so on.
 
-For a linear gradient, these are the x1, y1, x2 and y2 (in order) that define
-the gradient start and end, corresponding to stop offsets 0 and 1.
+The gradient also uses the six numbers from NREG[NBASE-6] to NREG[NBASE-1],
+which form an affine transformation matrix [a, b, c; d, e, f] such that
+a=NREG[NBASE-6], b=NREG[NBASE-5], c=NREG[NBASE-4], etc. This matrix maps from
+graphic coordinate space (defined by the metadata's viewBox) to gradient
+coordinate space. Gradient coordinate space is where a linear gradient ranges
+from x=0 to x=1, and a radial gradient has center (0, 0) and radius 1.
 
-For a radial gradient, these are the cx, cy, r1 and r2 (in order) that define
-the gradient center and a start and end radius, corresponding to stop offsets 0
-and 1.
+The graphic coordinate (px, py) maps to the gradient coordinate (dx, dy) by:
+
+	dx = a*px + b*py + c
+	dy = d*px + e*py + f
+
+The appendix below gives explicit formulae for the [a, b, c; d, e, f] affine
+transformation matrix for common gradient geometry, such as a linear gradient
+defined by two points.
 
 At the time a gradient is used to fill a path, it is invalid for any of the
 stop colors to itself be a gradient, or for any stop offset to be less than or
@@ -546,10 +557,103 @@ The annotated version is below. Note that the IconVG viewBox ranges from -24 to
 	e1            z (closePath); end path
 
 There are more examples in the ./testdata directory.
+
+
+Appendix - Gradient Transformation Matrices
+
+This appendix derives the affine transformation matrices [a, b, c; d, e, f] for
+linear, circular and elliptical gradients.
+
+
+Linear Gradients
+
+For a linear gradient from (x1, y1) to (x2, y2), let dx, dy = x2-x1, y2-y1. In
+gradient coordinate space, the y-coordinate is ignored, so the transformation
+matrix simplifies to [a, b, c; 0, 0, 0]. It satisfies the three simultaneous
+equations:
+
+	a*(x1   ) + b*(y1   ) + c = 0   (eq L.0)
+	a*(x1+dy) + b*(y1-dx) + c = 0   (eq L.1)
+	a*(x1+dx) + b*(y1+dy) + c = 1   (eq L.2)
+
+Subtracting equation L.0 from equations L.1 and L.2 yields:
+
+	a*dy - b*dx = 0
+	a*dx + b*dy = 1
+
+So that
+
+	a*dy*dy - b*dx*dy = 0
+	a*dx*dx + b*dx*dy = dx
+
+Overall:
+
+	a = dx / (dx*dx + dy*dy)
+	b = dy / (dx*dx + dy*dy)
+	c = -a*x1 - b*y1
+	d = 0
+	e = 0
+	f = 0
+
+
+Circular Gradients
+
+For a circular gradient with center (cx, cy) and radius vector (rx, ry), such
+that (cx+rx, cy+ry) is on the circle, let
+
+	r = math.Sqrt(rx*rx + ry*ry)
+
+The transformation matrix maps (cx, cy) to (0, 0), maps (cx+r, cy) to (1, 0)
+and maps (cx, cy+r) to (0, 1). Solving those six simultaneous equations give:
+
+	a = +1  / r
+	b = +0  / r
+	c = -cx / r
+	d = +0  / r
+	e = +1  / r
+	f = -cy / r
+
+
+Elliptical Gradients
+
+For an elliptical gradient with center (cx, cy) and axis vectors (rx, ry) and
+(sx, sy), such that (cx+rx, cx+ry) and (cx+sx, cx+sy) are on the ellipse, the
+transformation matrix satisfies the six simultaneous equations:
+
+	a*(cx   ) + b*(cy   ) + c = 0   (eq E.0)
+	a*(cx+rx) + b*(cy+ry) + c = 1   (eq E.1)
+	a*(cx+sx) + b*(cy+sy) + c = 0   (eq E.2)
+	d*(cx   ) + e*(cy   ) + f = 0   (eq E.3)
+	d*(cx+rx) + e*(cy+ry) + f = 0   (eq E.4)
+	d*(cx+sx) + e*(cy+sy) + f = 1   (eq E.5)
+
+Subtracting equation E.0 from equations E.1 and E.2 yields:
+
+	a*rx + b*ry = 1
+	a*sx + b*sy = 0
+
+Solving these two simultaneous equations yields:
+
+	a = +sy / (rx*sy - sx*ry)
+	b = -sx / (rx*sy - sx*ry)
+
+Re-arranging E.0 yields:
+
+	c = -a*cx - b*cy
+
+Similarly for d, e and f so that, overall:
+
+	a = +sy / (rx*sy - sx*ry)
+	b = -sx / (rx*sy - sx*ry)
+	c = -a*cx - b*cy
+	d = -ry / (rx*sy - sx*ry)
+	e = +rx / (rx*sy - sx*ry)
+	f = -d*cx - e*cy
+
+Note that if rx = r, ry = 0, sx = 0 and sy = r then this simplifies to the
+circular gradient transformation matrix formula, above.
 */
 package iconvg
-
-// TODO: elliptical gradients, not just circular?
 
 // TODO: shapes (circles, rects) and strokes? Or can we assume that authoring
 // tools will convert shapes and strokes to paths?

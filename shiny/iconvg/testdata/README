@@ -32,6 +32,24 @@ blank.png is a rendering of that IconVG file.
 
 
 
+cowbell.svg is an original artwork by nigeltao@golang.org.
+
+cowbell.ivg is an IconVG version of that SVG file.
+
+cowbell.ivg.disassembly is a disassembly of that IconVG file.
+
+cowbell.png is a rendering of that IconVG file.
+
+
+
+elliptical.ivg was created manually.
+
+elliptical.ivg.disassembly is a disassembly of that IconVG file.
+
+elliptical.png is a rendering of that IconVG file.
+
+
+
 favicon.svg is based on doc/gopher/favicon.svg from the Go 1.7 release, after
 using Inkscape to convert strokes and circles to paths, and saving it as an
 "Optimized SVG".
@@ -66,7 +84,7 @@ https://codereview.appspot.com/5758047/
 video-005.primitive.svg was based on running github.com/fogleman/primitive on a
 256x192 scaled version of video-005.jpeg.
 
-video-005.primitive.ivg is an IconVG version of video-005.primitive.svg.
+video-005.primitive.ivg is an IconVG version of that SVG file.
 
 video-005.primitive.ivg.disassembly is a disassembly of that IconVG file.
 
