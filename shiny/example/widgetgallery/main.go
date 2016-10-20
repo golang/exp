@@ -8,7 +8,7 @@
 // install this example program. Use "go run main.go" to run it or "go install
 // -tags=example" to install it.
 
-// Gallery demonstrates the shiny/widget package.
+// Widgetgallery exhibits the shiny/widget package's widget set.
 package main
 
 import (
