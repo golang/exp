@@ -14,17 +14,16 @@
 #import <Foundation/Foundation.h>
 #import <OpenGL/gl3.h>
 
-#define IS_MAC_SIERRA_OR_LATER (NSAppKitVersionNumber - NSAppKitVersionNumber10_11)
-
 // The variables did not exist on older OS X releases,
 // we use the old variables deprecated on macOS to define them.
-#if !IS_MAC_SIERRA_OR_LATER
+#if __MAC_OS_X_VERSION_MAX_ALLOWED < 101200
 enum
 {
     NSEventTypeScrollWheel = NSScrollWheel,
     NSEventTypeKeyDown = NSKeyDown
 };
-enum {
+enum
+{
     NSWindowStyleMaskTitled = NSTitledWindowMask,
     NSWindowStyleMaskResizable = NSResizableWindowMask,
     NSWindowStyleMaskMiniaturizable = NSMiniaturizableWindowMask,
