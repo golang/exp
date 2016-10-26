@@ -49,11 +49,6 @@ func testEncode(t *testing.T, e *Encoder, wantFilename string) {
 	}
 }
 
-func TestEncodeBlank(t *testing.T) {
-	var e Encoder
-	testEncode(t, &e, "testdata/blank.ivg")
-}
-
 func TestEncodeActionInfo(t *testing.T) {
 	for _, res := range []string{"lores", "hires"} {
 		var e Encoder
@@ -128,6 +123,11 @@ func TestEncodeArcs(t *testing.T) {
 	}
 
 	testEncode(t, &e, "testdata/arcs.ivg")
+}
+
+func TestEncodeBlank(t *testing.T) {
+	var e Encoder
+	testEncode(t, &e, "testdata/blank.ivg")
 }
 
 var cowbellGradients = []struct {
@@ -585,6 +585,42 @@ func TestEncodeGradient(t *testing.T) {
 	testEncode(t, &e, "testdata/gradient.ivg")
 }
 
+func TestEncodeLODPolygon(t *testing.T) {
+	var e Encoder
+
+	poly := func(n int) {
+		const r = 28
+		angle := 2 * math.Pi / float64(n)
+		e.StartPath(0, r, 0)
+		for i := 1; i < n; i++ {
+			e.AbsLineTo(
+				float32(r*math.Cos(angle*float64(i))),
+				float32(r*math.Sin(angle*float64(i))),
+			)
+		}
+		e.ClosePathEndPath()
+	}
+
+	e.StartPath(0, -28, -20)
+	e.AbsVLineTo(-28)
+	e.AbsHLineTo(-20)
+	e.ClosePathEndPath()
+
+	e.SetLOD(0, 80)
+	poly(3)
+
+	e.SetLOD(80, positiveInfinity)
+	poly(5)
+
+	e.SetLOD(0, positiveInfinity)
+	e.StartPath(0, +28, +20)
+	e.AbsVLineTo(+28)
+	e.AbsHLineTo(+20)
+	e.ClosePathEndPath()
+
+	testEncode(t, &e, "testdata/lod-polygon.ivg")
+}
+
 var video005PrimitiveSVGData = []struct {
 	r, g, b uint32
 	x0, y0  int
@@ -662,40 +698,4 @@ func TestEncodeVideo005Primitive(t *testing.T) {
 	}
 
 	testEncode(t, &e, "testdata/video-005.primitive.ivg")
-}
-
-func TestEncodeLODPolygon(t *testing.T) {
-	var e Encoder
-
-	poly := func(n int) {
-		const r = 28
-		angle := 2 * math.Pi / float64(n)
-		e.StartPath(0, r, 0)
-		for i := 1; i < n; i++ {
-			e.AbsLineTo(
-				float32(r*math.Cos(angle*float64(i))),
-				float32(r*math.Sin(angle*float64(i))),
-			)
-		}
-		e.ClosePathEndPath()
-	}
-
-	e.StartPath(0, -28, -20)
-	e.AbsVLineTo(-28)
-	e.AbsHLineTo(-20)
-	e.ClosePathEndPath()
-
-	e.SetLOD(0, 80)
-	poly(3)
-
-	e.SetLOD(80, positiveInfinity)
-	poly(5)
-
-	e.SetLOD(0, positiveInfinity)
-	e.StartPath(0, +28, +20)
-	e.AbsVLineTo(+28)
-	e.AbsHLineTo(+20)
-	e.ClosePathEndPath()
-
-	testEncode(t, &e, "testdata/lod-polygon.ivg")
 }
