@@ -70,7 +70,7 @@ func showWindow(w *windowImpl) {
 	}
 	w.ctx = <-retc
 	w.glctxMu.Lock()
-	w.glctx, w.worker = glctx, worker
+	w.glctx, w.worker = glctx, worker // TODO: Races with onConfigure
 	w.glctxMu.Unlock()
 	go drawLoop(w)
 }
@@ -276,7 +276,7 @@ func onConfigure(id uintptr, x, y, width, height, displayWidth, displayWidthMM i
 	}()
 
 	w.lifecycler.SetVisible(x+width > 0 && y+height > 0)
-	w.lifecycler.SendEvent(w, w.glctx)
+	w.lifecycler.SendEvent(w, w.glctx) // TODO: Races with showWindow
 
 	const (
 		mmPerInch = 25.4
