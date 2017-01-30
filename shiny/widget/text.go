@@ -27,30 +27,32 @@ type Text struct {
 }
 
 // NewText returns a new Text widget.
-func NewText(text string) *Text {
-	w := &Text{}
+func NewText(text string) (w *Text) {
+	w = &Text{}
 	w.Wrapper = w
-	if text != "" {
-		c := w.frame.NewCaret()
-		c.WriteString(text)
-		c.Close()
+	if text == "" {
+		return
 	}
-	return w
+	c := w.frame.NewCaret()
+	c.WriteString(text)
+	c.Close()
 }
 
 func (w *Text) setFace(t *theme.Theme) {
 	// TODO: can a theme change at runtime, or can it be set only once, at
 	// start-up?
-	if !w.faceSet {
-		w.faceSet = true
-		// TODO: when is face released? Should we just unconditionally call
-		// SetFace for every Measure, Layout and Paint? How do we avoid
-		// excessive re-calculation of soft returns when re-using the same
-		// logical face (as in "Times New Roman 12pt") even if using different
-		// physical font.Face values (as each Face may have its own caches)?
-		face := t.AcquireFontFace(theme.FontFaceOptions{})
-		w.frame.SetFace(face)
+	if w.faceSet {
+		return
 	}
+
+	w.faceSet = true
+	// TODO: when is face released? Should we just unconditionally call
+	// SetFace for every Measure, Layout and Paint? How do we avoid
+	// excessive re-calculation of soft returns when re-using the same
+	// logical face (as in "Times New Roman 12pt") even if using different
+	// physical font.Face values (as each Face may have its own caches)?
+	face := t.AcquireFontFace(theme.FontFaceOptions{})
+	w.frame.SetFace(face)
 }
 
 // TODO: should padding (and/or margin and border) be a universal concept and
