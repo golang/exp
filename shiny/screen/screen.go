@@ -232,7 +232,10 @@ type NewWindowOptions struct {
 	// zero value dimension.
 	Width, Height int
 
-	// TODO: fullscreen, title, icon, cursorHidden?
+	// Title specifies the window title.
+	Title string
+
+	// TODO: fullscreen, icon, cursorHidden?
 }
 
 // Uploader is something you can upload a Buffer to.

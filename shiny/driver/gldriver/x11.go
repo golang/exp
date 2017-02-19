@@ -11,6 +11,7 @@ package gldriver
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 char *eglGetErrorStr();
 void startDriver();
@@ -18,7 +19,7 @@ void processEvents();
 void makeCurrent(uintptr_t ctx);
 void swapBuffers(uintptr_t ctx);
 void doCloseWindow(uintptr_t id);
-uintptr_t doNewWindow(int width, int height);
+uintptr_t doNewWindow(int width, int height, char* title);
 uintptr_t doShowWindow(uintptr_t id);
 uintptr_t surfaceCreate();
 */
@@ -27,6 +28,7 @@ import (
 	"errors"
 	"runtime"
 	"time"
+	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/x11key"
 	"golang.org/x/exp/shiny/screen"
@@ -50,10 +52,18 @@ func init() {
 
 func newWindow(opts *screen.NewWindowOptions) (uintptr, error) {
 	width, height := optsSize(opts)
+
+	var title string
+	if opts != nil {
+		title = opts.Title
+	}
+	titlePtr := C.CString(title)
+	defer C.free(unsafe.Pointer(titlePtr))
+
 	retc := make(chan uintptr)
 	uic <- uiClosure{
 		f: func() uintptr {
-			return uintptr(C.doNewWindow(C.int(width), C.int(height)))
+			return uintptr(C.doNewWindow(C.int(width), C.int(height), titlePtr))
 		},
 		retc: retc,
 	}

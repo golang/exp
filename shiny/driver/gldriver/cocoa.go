@@ -16,12 +16,13 @@ package gldriver
 #import <Cocoa/Cocoa.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 void startDriver();
 void stopDriver();
 void makeCurrentContext(uintptr_t ctx);
 void flushContext(uintptr_t ctx);
-uintptr_t doNewWindow(int width, int height);
+uintptr_t doNewWindow(int width, int height, char* title);
 void doShowWindow(uintptr_t id);
 void doCloseWindow(uintptr_t id);
 uint64_t threadID();
@@ -33,6 +34,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"unsafe"
 
 	"golang.org/x/exp/shiny/driver/internal/lifecycler"
 	"golang.org/x/exp/shiny/screen"
@@ -62,7 +64,15 @@ func init() {
 
 func newWindow(opts *screen.NewWindowOptions) (uintptr, error) {
 	width, height := optsSize(opts)
-	return uintptr(C.doNewWindow(C.int(width), C.int(height))), nil
+
+	var title string
+	if opts != nil {
+		title = opts.Title
+	}
+	titlePtr := C.CString(title)
+	defer C.free(unsafe.Pointer(titlePtr))
+
+	return uintptr(C.doNewWindow(C.int(width), C.int(height), titlePtr)), nil
 }
 
 func initWindow(w *windowImpl) {
