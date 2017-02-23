@@ -71,7 +71,11 @@ func main() {
 	driver.Main(func(s screen.Screen) {
 		// TODO: create a bunch of standard widgets: buttons, labels, etc.
 		w := widget.NewSheet(newCustom())
-		if err := widget.RunWindow(s, w, nil); err != nil {
+		if err := widget.RunWindow(s, w, &widget.RunWindowOptions{
+			NewWindowOptions: screen.NewWindowOptions{
+				Title: "WidgetGallery Shiny Example",
+			},
+		}); err != nil {
 			log.Fatal(err)
 		}
 	})

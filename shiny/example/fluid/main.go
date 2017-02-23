@@ -48,7 +48,9 @@ const (
 
 func main() {
 	driver.Main(func(s screen.Screen) {
-		w, err := s.NewWindow(nil)
+		w, err := s.NewWindow(&screen.NewWindowOptions{
+			Title: "Fluid Shiny Example",
+		})
 		if err != nil {
 			log.Fatal(err)
 		}

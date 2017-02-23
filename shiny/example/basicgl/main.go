@@ -48,7 +48,11 @@ func main() {
 			colorPatch(colornames.Green, unit.Pixels(50), unit.Pixels(50)),
 		))
 
-		if err := widget.RunWindow(s, body, nil); err != nil {
+		if err := widget.RunWindow(s, body, &widget.RunWindowOptions{
+			NewWindowOptions: screen.NewWindowOptions{
+				Title: "BasicGL Shiny Example",
+			},
+		}); err != nil {
 			log.Fatal(err)
 		}
 	})

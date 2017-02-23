@@ -39,7 +39,9 @@ func main() {
 	board := NewBoard(9, *scale)
 
 	driver.Main(func(s screen.Screen) {
-		w, err := s.NewWindow(nil)
+		w, err := s.NewWindow(&screen.NewWindowOptions{
+			Title: "Goban Shiny Example",
+		})
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -58,7 +58,11 @@ func main() {
 			log.Fatal(err)
 		}
 		w := widget.NewSheet(widget.NewImage(src, src.Bounds()))
-		if err := widget.RunWindow(s, w, nil); err != nil {
+		if err := widget.RunWindow(s, w, &widget.RunWindowOptions{
+			NewWindowOptions: screen.NewWindowOptions{
+				Title: "ImageView Shiny Example",
+			},
+		}); err != nil {
 			log.Fatal(err)
 		}
 	})

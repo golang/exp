@@ -59,7 +59,11 @@ func main() {
 			stretch(widget.NewSheet(body), 1),
 		)
 
-		if err := widget.RunWindow(s, w, nil); err != nil {
+		if err := widget.RunWindow(s, w, &widget.RunWindowOptions{
+			NewWindowOptions: screen.NewWindowOptions{
+				Title: "TextEdit Shiny Example",
+			},
+		}); err != nil {
 			log.Fatal(err)
 		}
 	})
