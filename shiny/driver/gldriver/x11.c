@@ -10,9 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+Atom net_wm_name;
 Atom utf8_string;
 Atom wm_delete_window;
-Atom wm_name;
 Atom wm_protocols;
 Atom wm_take_focus;
 
@@ -131,9 +131,9 @@ startDriver() {
 		exit(1);
 	}
 
+	net_wm_name = XInternAtom(x_dpy, "_NET_WM_NAME", False);
 	utf8_string = XInternAtom(x_dpy, "UTF8_STRING", False);
 	wm_delete_window = XInternAtom(x_dpy, "WM_DELETE_WINDOW", False);
-	wm_name = XInternAtom(x_dpy, "WM_NAME", False);
 	wm_protocols = XInternAtom(x_dpy, "WM_PROTOCOLS", False);
 	wm_take_focus = XInternAtom(x_dpy, "WM_TAKE_FOCUS", False);
 
@@ -260,7 +260,7 @@ doNewWindow(int width, int height, char* title, int title_len) {
 	XSetWMProtocols(x_dpy, win, atoms, 2);
 
 	XSetStandardProperties(x_dpy, win, "", "App", None, (char **)NULL, 0, &sizehints);
-	XChangeProperty(x_dpy, win, wm_name, utf8_string, 8, PropModeReplace, title, title_len);
+	XChangeProperty(x_dpy, win, net_wm_name, utf8_string, 8, PropModeReplace, title, title_len);
 
 	return win;
 }
