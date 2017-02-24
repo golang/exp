@@ -66,11 +66,7 @@ func newWindow(opts *screen.NewWindowOptions) (syscall.Handle, error) {
 	if err != nil {
 		return 0, err
 	}
-	var title string
-	if opts != nil {
-		title = opts.Title
-	}
-	windowTitle, err := syscall.UTF16PtrFromString(title)
+	title, err := syscall.UTF16PtrFromString(opts.GetTitle())
 	if err != nil {
 		return 0, err
 	}
@@ -84,7 +80,7 @@ func newWindow(opts *screen.NewWindowOptions) (syscall.Handle, error) {
 		}
 	}
 	hwnd, err := _CreateWindowEx(0,
-		wcname, windowTitle,
+		wcname, title,
 		_WS_OVERLAPPEDWINDOW,
 		_CW_USEDEFAULT, _CW_USEDEFAULT,
 		int32(w), int32(h),

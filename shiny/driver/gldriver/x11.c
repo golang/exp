@@ -231,7 +231,7 @@ doCloseWindow(uintptr_t id) {
 }
 
 uintptr_t
-doNewWindow(int width, int height, char* title) {
+doNewWindow(int width, int height, char* title, int title_len) {
 	XSetWindowAttributes attr;
 	attr.colormap = x_colormap;
 	attr.event_mask =
@@ -260,7 +260,7 @@ doNewWindow(int width, int height, char* title) {
 	XSetWMProtocols(x_dpy, win, atoms, 2);
 
 	XSetStandardProperties(x_dpy, win, "", "App", None, (char **)NULL, 0, &sizehints);
-	XChangeProperty(x_dpy, win, wm_name, utf8_string, 8, PropModeReplace, title, strlen(title));
+	XChangeProperty(x_dpy, win, wm_name, utf8_string, 8, PropModeReplace, title, title_len);
 
 	return win;
 }

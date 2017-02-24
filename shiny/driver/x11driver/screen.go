@@ -423,10 +423,7 @@ func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, er
 	)
 	s.setProperty(xw, s.atomWMProtocols, s.atomWMDeleteWindow, s.atomWMTakeFocus)
 
-	var title []byte
-	if opts != nil {
-		title = []byte(opts.Title)
-	}
+	title := []byte(opts.GetTitle())
 	xproto.ChangeProperty(s.xc, xproto.PropModeReplace, xw, xproto.AtomWmName, s.atomUTF8String, 8, uint32(len(title)), title)
 
 	xproto.CreateGC(s.xc, xg, xproto.Drawable(xw), 0, nil)

@@ -53,17 +53,13 @@ func init() {
 func newWindow(opts *screen.NewWindowOptions) (uintptr, error) {
 	width, height := optsSize(opts)
 
-	var title string
-	if opts != nil {
-		title = opts.Title
-	}
-	titlePtr := C.CString(title)
-	defer C.free(unsafe.Pointer(titlePtr))
+	title := C.CString(opts.GetTitle())
+	defer C.free(unsafe.Pointer(title))
 
 	retc := make(chan uintptr)
 	uic <- uiClosure{
 		f: func() uintptr {
-			return uintptr(C.doNewWindow(C.int(width), C.int(height), titlePtr))
+			return uintptr(C.doNewWindow(C.int(width), C.int(height), title, C.int(len(title))))
 		},
 		retc: retc,
 	}
