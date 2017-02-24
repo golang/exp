@@ -279,7 +279,10 @@ func onConfigure(id uintptr, x, y, width, height, displayWidth, displayWidthMM i
 	// logic'?
 	go func() {
 		w.glctxMu.Lock()
-		w.glctx.Viewport(0, 0, int(width), int(height))
+		// Force a w.glctx.Viewport call.
+		//
+		// TODO: is this racy? See also the TODO immediately above.
+		w.backBufferBound = false
 		w.glctxMu.Unlock()
 	}()
 

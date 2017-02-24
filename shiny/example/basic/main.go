@@ -32,6 +32,7 @@ var (
 	blue0    = color.RGBA{0x00, 0x00, 0x1f, 0xff}
 	blue1    = color.RGBA{0x00, 0x00, 0x3f, 0xff}
 	darkGray = color.RGBA{0x3f, 0x3f, 0x3f, 0xff}
+	green    = color.RGBA{0x00, 0x7f, 0x00, 0x7f}
 	red      = color.RGBA{0x7f, 0x00, 0x00, 0x7f}
 	yellow   = color.RGBA{0x3f, 0x3f, 0x00, 0x3f}
 
@@ -49,20 +50,30 @@ func main() {
 		}
 		defer w.Release()
 
-		winSize := image.Point{256, 256}
-		b, err := s.NewBuffer(winSize)
+		size0 := image.Point{256, 256}
+		b, err := s.NewBuffer(size0)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer b.Release()
 		drawGradient(b.RGBA())
 
-		t, err := s.NewTexture(winSize)
+		t0, err := s.NewTexture(size0)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer t.Release()
-		t.Upload(image.Point{}, b, b.Bounds())
+		defer t0.Release()
+		t0.Upload(image.Point{}, b, b.Bounds())
+
+		size1 := image.Point{32, 20}
+		t1, err := s.NewTexture(size1)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer t1.Release()
+		t1.Fill(t1.Bounds(), green, screen.Src)
+		t1.Fill(t1.Bounds().Inset(2), red, screen.Over)
+		t1.Fill(t1.Bounds().Inset(4), red, screen.Src)
 
 		var sz size.Event
 		for {
@@ -102,28 +113,31 @@ func main() {
 				// their different effects.
 				op := screen.Over
 				// op = screen.Src
-				tRect := t.Bounds()
-				// tRect = image.Rect(16, 0, 240, 100)
+				t0Rect := t0.Bounds()
+				// t0Rect = image.Rect(16, 0, 240, 100)
 
-				// Draw the texture t twice, as a 1:1 copy and under the
+				// Draw the texture t0 twice, as a 1:1 copy and under the
 				// transform src2dst.
-				w.Copy(image.Point{150, 100}, t, tRect, op, nil)
+				w.Copy(image.Point{150, 100}, t0, t0Rect, op, nil)
 				src2dst := f64.Aff3{
 					+0.5 * cos30, -1.0 * sin30, 100,
 					+0.5 * sin30, +1.0 * cos30, 200,
 				}
-				w.Draw(src2dst, t, tRect, op, nil)
-				w.DrawUniform(src2dst, yellow, tRect.Inset(30), screen.Over, nil)
+				w.Draw(src2dst, t0, t0Rect, op, nil)
+				w.DrawUniform(src2dst, yellow, t0Rect.Inset(30), screen.Over, nil)
 
-				// Draw crosses at the transformed corners of tRect.
-				for _, sx := range []int{tRect.Min.X, tRect.Max.X} {
-					for _, sy := range []int{tRect.Min.Y, tRect.Max.Y} {
+				// Draw crosses at the transformed corners of t0Rect.
+				for _, sx := range []int{t0Rect.Min.X, t0Rect.Max.X} {
+					for _, sy := range []int{t0Rect.Min.Y, t0Rect.Max.Y} {
 						dx := int(src2dst[0]*float64(sx) + src2dst[1]*float64(sy) + src2dst[2])
 						dy := int(src2dst[3]*float64(sx) + src2dst[4]*float64(sy) + src2dst[5])
 						w.Fill(image.Rect(dx-0, dy-1, dx+1, dy+2), darkGray, screen.Src)
 						w.Fill(image.Rect(dx-1, dy-0, dx+2, dy+1), darkGray, screen.Src)
 					}
 				}
+
+				// Draw t1.
+				w.Copy(image.Point{400, 50}, t1, t1.Bounds(), screen.Src, nil)
 
 				w.Publish()
 
