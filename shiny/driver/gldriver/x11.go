@@ -42,6 +42,8 @@ import (
 
 const useLifecycler = true
 
+const handleSizeEventsAtChannelReceive = true
+
 var theKeysyms x11key.KeysymTable
 
 func init() {
@@ -274,18 +276,6 @@ func onConfigure(id uintptr, x, y, width, height, displayWidth, displayWidthMM i
 		return
 	}
 
-	// TODO: should this really be done on the receiving end of the w.Events()
-	// channel, in the same goroutine as other GL calls in the app's 'business
-	// logic'?
-	go func() {
-		w.glctxMu.Lock()
-		// Force a w.glctx.Viewport call.
-		//
-		// TODO: is this racy? See also the TODO immediately above.
-		w.backBufferBound = false
-		w.glctxMu.Unlock()
-	}()
-
 	w.lifecycler.SetVisible(x+width > 0 && y+height > 0)
 	w.lifecycler.SendEvent(w, w.glctx)
 
@@ -294,19 +284,13 @@ func onConfigure(id uintptr, x, y, width, height, displayWidth, displayWidthMM i
 		ptPerInch = 72
 	)
 	pixelsPerMM := float32(displayWidth) / float32(displayWidthMM)
-	sz := size.Event{
+	w.Send(size.Event{
 		WidthPx:     int(width),
 		HeightPx:    int(height),
 		WidthPt:     geom.Pt(width),
 		HeightPt:    geom.Pt(height),
 		PixelsPerPt: pixelsPerMM * mmPerInch / ptPerInch,
-	}
-
-	w.szMu.Lock()
-	w.sz = sz
-	w.szMu.Unlock()
-
-	w.Send(sz)
+	})
 }
 
 //export onDeleteWindow

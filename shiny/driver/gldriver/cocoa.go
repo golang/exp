@@ -48,6 +48,9 @@ import (
 
 const useLifecycler = true
 
+// TODO: change this to true, after manual testing on OS X.
+const handleSizeEventsAtChannelReceive = false
+
 var initThreadID C.uint64_t
 
 func init() {
@@ -193,9 +196,11 @@ func setGeom(id uintptr, ppp float32, widthPx, heightPx int) {
 		PixelsPerPt: ppp,
 	}
 
-	w.szMu.Lock()
-	w.sz = sz
-	w.szMu.Unlock()
+	if !handleSizeEventsAtChannelReceive {
+		w.szMu.Lock()
+		w.sz = sz
+		w.szMu.Unlock()
+	}
 
 	w.Send(sz)
 }

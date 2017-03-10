@@ -65,6 +65,22 @@ type windowImpl struct {
 	sz   size.Event
 }
 
+// NextEvent implements the screen.EventDeque interface.
+func (w *windowImpl) NextEvent() interface{} {
+	e := w.Deque.NextEvent()
+	if handleSizeEventsAtChannelReceive {
+		if sz, ok := e.(size.Event); ok {
+			w.glctxMu.Lock()
+			w.backBufferBound = false
+			w.szMu.Lock()
+			w.sz = sz
+			w.szMu.Unlock()
+			w.glctxMu.Unlock()
+		}
+	}
+	return e
+}
+
 func (w *windowImpl) Release() {
 	// There are two ways a window can be closed: the Operating System or
 	// Desktop Environment can initiate (e.g. in response to a user clicking a
