@@ -1,13 +1,15 @@
-This subrepository holds experimental and deprecated (in the "old"
+# exp
+
+This subrepository holds experimental and deprecated (in the `old`
 directory) packages.
 
-The idea for this subrepository originated as the "pkg/exp" directory
+The idea for this subrepository originated as the `pkg/exp` directory
 of the main repository, but its presence there made it unavailable
 to users of the binary downloads of the Go installation. The
-subrepository has therefore been created to make it possible to "go
-get" these packages.
+subrepository has therefore been created to make it possible to `go
+get` these packages.
 
-Warning: Packages here are experimental and unreliable. Some may
+**Warning:** Packages here are experimental and unreliable. Some may
 one day be promoted to the main repository or other subrepository,
 or they may be modified arbitrarily or even disappear altogether.
 
