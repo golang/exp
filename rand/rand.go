@@ -139,7 +139,6 @@ func (r *Rand) Intn(n int) int {
 
 // Float64 returns, as a float64, a pseudo-random number in [0.0,1.0).
 func (r *Rand) Float64() float64 {
-	return float64(r.Uint64n(1<<53)) / (1 << 53)
 	// There is one bug in the value stream: r.Int63() may be so close
 	// to 1<<63 that the division rounds up to 1.0, and we've guaranteed
 	// that the result is always less than 1.0.
