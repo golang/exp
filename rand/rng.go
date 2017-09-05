@@ -18,7 +18,6 @@ import "math/bits"
 // as found in the software available at http://www.pcg-random.org/.
 // It has period 2^128 with 128 bits of state, producing 64-bit values.
 // Is state is represented by two uint64 words.
-
 type PCGSource struct {
 	low  uint64
 	high uint64
