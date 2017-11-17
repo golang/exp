@@ -22,10 +22,10 @@ func TestTenBit(t *testing.T) {
 	for _, tt := range tc {
 		unmasked, tenbit := resolveAddr(tt.masked)
 		if want, got := tt.tenbitWant, tenbit; got != want {
-			t.Errorf("want address %b as 10-bit; got non 10-bit", want)
+			t.Errorf("want address %x as 10-bit; got non 10-bit", tt.masked)
 		}
 		if want, got := tt.addrWant, unmasked; got != want {
-			t.Errorf("want address %b; got %b", want, got)
+			t.Errorf("want address %v; got %v", want, got)
 		}
 	}
 }
