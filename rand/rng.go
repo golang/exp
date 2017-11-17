@@ -4,8 +4,6 @@
 
 package rand
 
-import "math/bits"
-
 // PCGSource is an implementation of a 64-bit permuted congruential
 // generator as defined in
 //
@@ -42,14 +40,6 @@ const (
 func (pcg *PCGSource) Seed(seed uint64) {
 	pcg.low = seed
 	pcg.high = seed // TODO: What is right?
-}
-
-// Uint64 returns a pseudo-random 64-bit unsigned integer as a uint64.
-func (pcg *PCGSource) Uint64() uint64 {
-	pcg.multiply()
-	pcg.add()
-	// XOR high and low 64 bits together and rotate right by high 6 bits of state.
-	return bits.RotateLeft64(pcg.high^pcg.low, -int(pcg.high>>58))
 }
 
 func (pcg *PCGSource) add() {
