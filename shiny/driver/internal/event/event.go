@@ -29,12 +29,14 @@ func (q *Deque) NextEvent() interface{} {
 	for {
 		if n := len(q.front); n > 0 {
 			e := q.front[n-1]
+			q.front[n-1] = nil
 			q.front = q.front[:n-1]
 			return e
 		}
 
 		if n := len(q.back); n > 0 {
 			e := q.back[0]
+			q.back[0] = nil
 			q.back = q.back[1:]
 			return e
 		}
