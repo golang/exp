@@ -164,7 +164,7 @@ func (b *buffer) encode4ByteReal(f float32) {
 	// Round the fractional bits (the low 23 bits) to the nearest multiple of
 	// 4, being careful not to overflow into the upper bits.
 	v := u & 0x007fffff
-	if v < 0x007fffffe {
+	if v < 0x007ffffe {
 		v += 2
 	}
 	u = (u & 0xff800000) | v
