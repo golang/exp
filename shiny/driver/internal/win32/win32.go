@@ -170,8 +170,11 @@ func sendSize(hwnd syscall.Handle) {
 }
 
 func sendClose(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
+	// TODO(ktye): DefWindowProc calls DestroyWindow by default.
+	// To intercept destruction of the window, return 0 and call
+	// DestroyWindow when appropriate.
 	LifecycleEvent(hwnd, lifecycle.StageDead)
-	return 0
+	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
 }
 
 func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
