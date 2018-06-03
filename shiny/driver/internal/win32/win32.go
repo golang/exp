@@ -116,10 +116,7 @@ func Show(hwnd syscall.Handle) {
 }
 
 func Release(hwnd syscall.Handle) {
-	// TODO(andlabs): check for errors from this?
-	// TODO(andlabs): remove unsafe
-	_DestroyWindow(hwnd)
-	// TODO(andlabs): what happens if we're still painting?
+	SendMessage(hwnd, _WM_CLOSE, 0, 0)
 }
 
 func sendFocus(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
