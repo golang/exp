@@ -108,7 +108,7 @@ func Open(filename string) (*ReaderAt, error) {
 	if err != nil {
 		return nil, err
 	}
-	data := (*[1 << 30]byte)(unsafe.Pointer(ptr))[:size]
+	data := (*[maxBytes]byte)(unsafe.Pointer(ptr))[:size]
 
 	r := &ReaderAt{data: data}
 	if debug {
