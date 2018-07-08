@@ -3,6 +3,11 @@
 // license that can be found in the LICENSE file.
 
 // Package spi allows users to read from and write to an SPI device.
+//
+// Deprecated
+//
+// This package is not maintained anymore. An actively supported cross-platform
+// alternative is https://periph.io/.
 package spi // import "golang.org/x/exp/io/spi"
 
 import (
