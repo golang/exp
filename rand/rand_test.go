@@ -449,6 +449,14 @@ func TestReadSeedReset(t *testing.T) {
 	}
 }
 
+func TestShuffleSmall(t *testing.T) {
+	// Check that Shuffle allows n=0 and n=1, but that swap is never called for them.
+	r := New(NewSource(1))
+	for n := 0; n <= 1; n++ {
+		r.Shuffle(n, func(i, j int) { t.Fatalf("swap called, n=%d i=%d j=%d", n, i, j) })
+	}
+}
+
 // Benchmarks
 
 func BenchmarkSource(b *testing.B) {
@@ -517,6 +525,30 @@ func BenchmarkPerm30(b *testing.B) {
 	r := New(NewSource(1))
 	for n := b.N; n > 0; n-- {
 		r.Perm(30)
+	}
+}
+
+func BenchmarkPerm30ViaShuffle(b *testing.B) {
+	r := New(NewSource(1))
+	for n := b.N; n > 0; n-- {
+		p := make([]int, 30)
+		for i := range p {
+			p[i] = i
+		}
+		r.Shuffle(30, func(i, j int) { p[i], p[j] = p[j], p[i] })
+	}
+}
+
+// BenchmarkShuffleOverhead uses a minimal swap function
+// to measure just the shuffling overhead.
+func BenchmarkShuffleOverhead(b *testing.B) {
+	r := New(NewSource(1))
+	for n := b.N; n > 0; n-- {
+		r.Shuffle(52, func(i, j int) {
+			if i < 0 || i >= 52 || j < 0 || j >= 52 {
+				b.Fatalf("bad swap(%d, %d)", i, j)
+			}
+		})
 	}
 }
 

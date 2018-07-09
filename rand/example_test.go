@@ -7,6 +7,7 @@ package rand_test
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"golang.org/x/exp/rand"
@@ -99,4 +100,35 @@ func Example_rand() {
 	// Int63n(10)  4                    6                    0
 	// Uint64n(10) 2                    9                    4
 	// Perm        [1 3 4 0 2]          [2 4 0 3 1]          [3 2 0 4 1]
+}
+
+func ExampleShuffle() {
+	words := strings.Fields("ink runs from the corners of my mouth")
+	rand.Shuffle(len(words), func(i, j int) {
+		words[i], words[j] = words[j], words[i]
+	})
+	fmt.Println(words)
+
+	// Output:
+	// [ink corners of from mouth runs the my]
+}
+
+func ExampleShuffle_slicesInUnison() {
+	numbers := []byte("12345")
+	letters := []byte("ABCDE")
+	// Shuffle numbers, swapping corresponding entries in letters at the same time.
+	rand.Shuffle(len(numbers), func(i, j int) {
+		numbers[i], numbers[j] = numbers[j], numbers[i]
+		letters[i], letters[j] = letters[j], letters[i]
+	})
+	for i := range numbers {
+		fmt.Printf("%c: %c\n", letters[i], numbers[i])
+	}
+
+	// Output:
+	// D: 4
+	// A: 1
+	// E: 5
+	// B: 2
+	// C: 3
 }
