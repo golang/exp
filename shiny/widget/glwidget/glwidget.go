@@ -62,7 +62,7 @@ func NewGL(drawFunc func(*GL)) *GL {
 	w.tex = w.Ctx.CreateTexture()
 	w.Ctx.BindTexture(gl.TEXTURE_2D, w.tex)
 
-	w.Ctx.TexImage2D(gl.TEXTURE_2D, 0, maxWidth, maxHeight, gl.RGBA, gl.UNSIGNED_BYTE, nil)
+	w.Ctx.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, maxWidth, maxHeight, gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	w.Ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 	w.Ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	w.Ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
