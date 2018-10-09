@@ -2,40 +2,40 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package xerrors_test
+package errors_test
 
 import (
 	"fmt"
 	"testing"
 
-	"golang.org/x/exp/xerrors"
+	"golang.org/x/exp/errors"
 )
 
 func TestNewEqual(t *testing.T) {
 	// Different allocations should not be equal.
-	if xerrors.New("abc") == xerrors.New("abc") {
+	if errors.New("abc") == errors.New("abc") {
 		t.Errorf(`New("abc") == New("abc")`)
 	}
-	if xerrors.New("abc") == xerrors.New("xyz") {
+	if errors.New("abc") == errors.New("xyz") {
 		t.Errorf(`New("abc") == New("xyz")`)
 	}
 
 	// Same allocation should be equal to itself (not crash).
-	err := xerrors.New("jkl")
+	err := errors.New("jkl")
 	if err != err {
 		t.Errorf(`err != err`)
 	}
 }
 
 func TestErrorMethod(t *testing.T) {
-	err := xerrors.New("abc")
+	err := errors.New("abc")
 	if err.Error() != "abc" {
 		t.Errorf(`New("abc").Error() = %q, want %q`, err.Error(), "abc")
 	}
 }
 
 func ExampleNew() {
-	err := xerrors.New("emit macho dwarf: elf header corrupted")
+	err := errors.New("emit macho dwarf: elf header corrupted")
 	if err != nil {
 		fmt.Print(err)
 	}
