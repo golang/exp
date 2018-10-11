@@ -7,11 +7,58 @@ package fmt_test
 import (
 	"io"
 	"os"
+	"path"
+	"reflect"
 	"testing"
 
 	"golang.org/x/exp/errors"
 	"golang.org/x/exp/errors/fmt"
 )
+
+func TestErrorf(t *testing.T) {
+	chained := &wrapped{"chained", nil}
+
+	chain := func(s ...string) []string { return s }
+	testCases := []struct {
+		got  error
+		want []string
+	}{{
+		fmt.Errorf("foo: %s", "simple"),
+		chain("foo: simple"),
+	}, {
+		fmt.Errorf("foo: %v", "simple"),
+		chain("foo: simple"),
+	}, {
+		fmt.Errorf("%s failed: %v", "foo", chained),
+		chain("foo failed", "chained/somefile.go:123"),
+	}, {
+		fmt.Errorf("foo: %s", chained),
+		chain("foo", "chained/somefile.go:123"),
+	}, {
+		fmt.Errorf("foo: %v", chained),
+		chain("foo", "chained/somefile.go:123"),
+	}, {
+		fmt.Errorf("foo: %-12s", chained),
+		chain("foo: chained     "), // no dice with special formatting
+	}, {
+		fmt.Errorf("foo: %+v", chained),
+		chain("foo: chained\n    somefile.go:123"), // ditto
+	}}
+	for _, tc := range testCases {
+		t.Run(path.Join(tc.want...), func(t *testing.T) {
+			got := errToParts(tc.got)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("Format:\n got: %#v\nwant: %#v", got, tc.want)
+			}
+
+			gotStr := tc.got.Error()
+			wantStr := fmt.Sprint(tc.got)
+			if gotStr != wantStr {
+				t.Errorf("Error:\n got: %#v\nwant: %#v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestErrorFormatter(t *testing.T) {
 	var (
@@ -260,3 +307,33 @@ func (e fmtTwiceErr) GoString() string {
 type panicValue struct{}
 
 func (panicValue) String() string { panic("panic") }
+
+func errToParts(err error) (a []string) {
+	for err != nil {
+		f, ok := err.(errors.Formatter)
+		if !ok {
+			a = append(a, err.Error())
+			break
+		}
+		var p testPrinter
+		err = f.Format(&p)
+		a = append(a, string(p))
+	}
+	return a
+
+}
+
+type testPrinter string
+
+func (p *testPrinter) Print(a ...interface{}) {
+	*p += testPrinter(fmt.Sprint(a...))
+}
+
+func (p *testPrinter) Printf(format string, a ...interface{}) {
+	*p += testPrinter(fmt.Sprintf(format, a...))
+}
+
+func (p *testPrinter) Detail() bool {
+	*p += "/"
+	return true
+}

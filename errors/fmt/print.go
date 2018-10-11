@@ -5,7 +5,6 @@
 package fmt
 
 import (
-	"errors"
 	"io"
 	"os"
 	"reflect"
@@ -209,7 +208,7 @@ func Sprintf(format string, a ...interface{}) string {
 // Errorf formats according to a format specifier and returns the string
 // as a value that satisfies error.
 func Errorf(format string, a ...interface{}) error {
-	return errors.New(Sprintf(format, a...))
+	return errorf(format, a)
 }
 
 // These routines do not take a format string

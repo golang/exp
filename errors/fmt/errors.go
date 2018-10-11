@@ -5,12 +5,61 @@
 package fmt
 
 import (
+	"strings"
+
 	"golang.org/x/exp/errors"
 )
 
 // fmtError formats err according to verb, writing to p.
 // If it cannot handle the error, it does no formatting
 // and returns false.
+func errorf(format string, a []interface{}) error {
+	err := lastError(format, a)
+	if err == nil {
+		return errors.New(Sprintf(format, a...))
+	}
+
+	// TODO: this is not entirely correct. The error value could be
+	// printed elsewhere in format if it mixes numbered with unnumbered
+	// substitutions. With relatively small changes to doPrintf we can
+	// have it optionally ignore extra arguments and pass the argument
+	// list in its entirety.
+	format = format[:len(format)-len(": %s")]
+	return &withChain{Sprintf(format, a[:len(a)-1]...), err}
+}
+
+func lastError(format string, a []interface{}) error {
+	if !strings.HasSuffix(format, ": %s") && !strings.HasSuffix(format, ": %v") {
+		return nil
+	}
+
+	if len(a) == 0 {
+		return nil
+	}
+
+	err, ok := a[len(a)-1].(error)
+	if !ok {
+		return nil
+	}
+
+	return err
+}
+
+type withChain struct {
+	// TODO: add frame information
+	msg string
+	err error
+}
+
+func (e *withChain) Error() string {
+	return Sprint(e)
+}
+
+func (e *withChain) Format(p errors.Printer) (next error) {
+	p.Print(e.msg)
+	return e.err
+}
+
 func fmtError(p *pp, verb rune, err error) (handled bool) {
 	var (
 		sep = ": " // separator before next error
