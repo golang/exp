@@ -73,6 +73,9 @@ func TestErrorFormatter(t *testing.T) {
 			&wrapped{"and another\none", nil}}
 		fallback  = &wrapped{"fallback", os.ErrNotExist}
 		oldAndNew = &wrapped{"new style", formatError("old style")}
+		opaque    = &wrapped{"outer",
+			errors.Opaque(&wrapped{"mid",
+				&wrapped{"inner", nil}})}
 	)
 	testCases := []struct {
 		err  error
@@ -93,21 +96,21 @@ func TestErrorFormatter(t *testing.T) {
 	}, {
 		err: elephant,
 		fmt: "%+v",
-		want: `can't adumbrate elephant
-    somefile.go:123
---- out of peanuts
-    the elephant is on strike
-    and the 12 monkeys
-    are laughing`,
+		want: "can't adumbrate elephant" +
+			"\n    somefile.go:123" +
+			"\n--- out of peanuts" +
+			"\n    the elephant is on strike" +
+			"\n    and the 12 monkeys" +
+			"\n    are laughing",
 	}, {
 		err: transition,
 		fmt: "%+v",
-		want: `elephant still on strike
-    somefile.go:123
---- out of peanuts
-    the elephant is on strike
-    and the 12 monkeys
-    are laughing`,
+		want: "elephant still on strike" +
+			"\n    somefile.go:123" +
+			"\n--- out of peanuts" +
+			"\n    the elephant is on strike" +
+			"\n    and the 12 monkeys" +
+			"\n    are laughing",
 	}, {
 		err:  simple,
 		fmt:  "%#v",
@@ -124,6 +127,19 @@ func TestErrorFormatter(t *testing.T) {
 		err:  fallback,
 		fmt:  "%+v",
 		want: "fallback\n    somefile.go:123\n--- file does not exist",
+	}, {
+		err:  opaque,
+		fmt:  "%s",
+		want: "outer: mid: inner",
+	}, {
+		err: opaque,
+		fmt: "%+v",
+		want: "outer" +
+			"\n    somefile.go:123" +
+			"\n--- mid" +
+			"\n    somefile.go:123" +
+			"\n--- inner" +
+			"\n    somefile.go:123",
 	}, {
 		err:  oldAndNew,
 		fmt:  "%v",
