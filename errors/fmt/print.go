@@ -207,6 +207,9 @@ func Sprintf(format string, a ...interface{}) string {
 
 // Errorf formats according to a format specifier and returns the string
 // as a value that satisfies error.
+//
+// The returned error includes the file and line number of the caller
+// when formatted with additional detail enabled.
 func Errorf(format string, a ...interface{}) error {
 	return errorf(format, a)
 }

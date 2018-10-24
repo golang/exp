@@ -9,6 +9,9 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 
 	"golang.org/x/exp/errors"
@@ -17,35 +20,39 @@ import (
 
 func TestErrorf(t *testing.T) {
 	chained := &wrapped{"chained", nil}
-
-	chain := func(s ...string) []string { return s }
+	chain := func(s ...string) (a []string) {
+		for _, s := range s {
+			a = append(a, cleanPath(s))
+		}
+		return a
+	}
 	testCases := []struct {
 		got  error
 		want []string
 	}{{
-		fmt.Errorf("foo: %s", "simple"),
-		chain("foo: simple"),
+		fmt.Errorf("nounwrap: %s", "simple"),
+		chain(`nounwrap: simple/path.TestErrorf/path.go:xxx`),
 	}, {
-		fmt.Errorf("foo: %v", "simple"),
-		chain("foo: simple"),
+		fmt.Errorf("nounwrap: %v", "simple"),
+		chain(`nounwrap: simple/path.TestErrorf/path.go:xxx`),
 	}, {
 		fmt.Errorf("%s failed: %v", "foo", chained),
-		chain("foo failed", "chained/somefile.go:123"),
+		chain("wraps:foo failed/path.TestErrorf/path.go:xxx",
+			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("foo: %s", chained),
-		chain("foo", "chained/somefile.go:123"),
+		fmt.Errorf("wraps: %s", chained),
+		chain("wraps:wraps/path.TestErrorf/path.go:xxx",
+			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("foo: %v", chained),
-		chain("foo", "chained/somefile.go:123"),
+		fmt.Errorf("wrapv: %v", chained),
+		chain("wraps:wrapv/path.TestErrorf/path.go:xxx",
+			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("foo: %-12s", chained),
-		chain("foo: chained     "), // no dice with special formatting
-	}, {
-		fmt.Errorf("foo: %+v", chained),
-		chain("foo: chained\n    somefile.go:123"), // ditto
+		fmt.Errorf("not wrapped: %+v", chained),
+		chain("not wrapped: chained somefile.go:123/path.TestErrorf/path.go:xxx"),
 	}}
-	for _, tc := range testCases {
-		t.Run(path.Join(tc.want...), func(t *testing.T) {
+	for i, tc := range testCases {
+		t.Run(strconv.Itoa(i)+"/"+path.Join(tc.want...), func(t *testing.T) {
 			got := errToParts(tc.got)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("Format:\n got: %#v\nwant: %#v", got, tc.want)
@@ -324,32 +331,48 @@ type panicValue struct{}
 
 func (panicValue) String() string { panic("panic") }
 
+var rePath = regexp.MustCompile(`( [^ ]*)fmt.*test\.`)
+var reLine = regexp.MustCompile(":[0-9]*$")
+
+func cleanPath(s string) string {
+	s = rePath.ReplaceAllString(s, "/path.")
+	s = reLine.ReplaceAllString(s, ":xxx")
+	s = strings.Replace(s, "\n   ", "", -1)
+	s = strings.Replace(s, " /", "/", -1)
+	return s
+}
+
 func errToParts(err error) (a []string) {
 	for err != nil {
+		var p testPrinter
+		if _, ok := err.(errors.Wrapper); ok {
+			p.str += "wraps:"
+		}
 		f, ok := err.(errors.Formatter)
 		if !ok {
 			a = append(a, err.Error())
 			break
 		}
-		var p testPrinter
 		err = f.Format(&p)
-		a = append(a, string(p))
+		a = append(a, cleanPath(p.str))
 	}
 	return a
 
 }
 
-type testPrinter string
+type testPrinter struct {
+	str string
+}
 
 func (p *testPrinter) Print(a ...interface{}) {
-	*p += testPrinter(fmt.Sprint(a...))
+	p.str += fmt.Sprint(a...)
 }
 
 func (p *testPrinter) Printf(format string, a ...interface{}) {
-	*p += testPrinter(fmt.Sprintf(format, a...))
+	p.str += fmt.Sprintf(format, a...)
 }
 
 func (p *testPrinter) Detail() bool {
-	*p += "/"
+	p.str += " /"
 	return true
 }
