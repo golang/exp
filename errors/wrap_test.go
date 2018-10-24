@@ -128,7 +128,7 @@ func TestOpaque(t *testing.T) {
 	}
 
 	got = fmt.Errorf("foo: %+v", errors.Opaque(errorD{}))
-	want = "foo: errorD\n    detail"
+	want = "foo: errorD:\n    detail"
 	if got.Error() != want {
 		t.Errorf("error with Format: got %v; want %v", got, want)
 	}

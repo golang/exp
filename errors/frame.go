@@ -50,7 +50,7 @@ func (f Frame) Format(p Printer) {
 			p.Printf("%s\n    ", function)
 		}
 		if file != "" {
-			p.Printf("%s:%d", file, line)
+			p.Printf("%s:%d\n", file, line)
 		}
 	}
 }

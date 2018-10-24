@@ -5,6 +5,7 @@
 package fmt
 
 import (
+	"bytes"
 	"strings"
 
 	"golang.org/x/exp/errors"
@@ -87,8 +88,8 @@ func (e *withChain) Unwrap() error {
 
 func fmtError(p *pp, verb rune, err error) (handled bool) {
 	var (
-		sep = ": " // separator before next error
-		w   = p    // print buffer where error text is written
+		sep = " " // separator before next error
+		w   = p   // print buffer where error text is written
 	)
 	switch {
 	// Note that this switch must match the preference order
@@ -156,7 +157,15 @@ loop:
 		if err == nil {
 			break
 		}
+		if !w.fmt.inDetail || !p.fmt.plusV {
+			w.buf.WriteByte(':')
+		}
+		// Strip last newline of detail.
+		if bytes.HasSuffix([]byte(w.buf), detailSep) {
+			w.buf = w.buf[:len(w.buf)-len(detailSep)]
+		}
 		w.buf.WriteString(sep)
+		w.fmt.inDetail = false
 	}
 
 	if w != p {
@@ -165,9 +174,10 @@ loop:
 	return true
 }
 
+var detailSep = []byte("\n    ")
+
 // errPPState wraps a pp to implement State with indentation. It is used
 // for errors implementing fmt.Formatter.
-
 type errPPState pp
 
 func (p *errPPState) Width() (wid int, ok bool)      { return (*pp)(p).Width() }
@@ -181,7 +191,7 @@ func (p *errPPState) Write(b []byte) (n int, err error) {
 			for i, c := range b {
 				if c == '\n' {
 					p.buf.Write(b[k:i])
-					p.buf.Write([]byte("\n    "))
+					p.buf.Write(detailSep)
 					k = i + 1
 				}
 			}
@@ -215,8 +225,11 @@ func (p *errPP) Printf(format string, args ...interface{}) {
 }
 
 func (p *errPP) Detail() bool {
-	p.fmt.indent = p.fmt.plusV
+	inDetail := p.fmt.inDetail
 	p.fmt.inDetail = true
-	(*errPPState)(p).Write([]byte("\n"))
+	p.fmt.indent = p.fmt.plusV
+	if p.fmt.plusV && !inDetail {
+		(*errPPState)(p).Write([]byte(":\n"))
+	}
 	return p.fmt.plusV
 }

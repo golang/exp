@@ -49,7 +49,7 @@ func TestErrorf(t *testing.T) {
 			"chained/somefile.go:xxx"),
 	}, {
 		fmt.Errorf("not wrapped: %+v", chained),
-		chain("not wrapped: chained somefile.go:123/path.TestErrorf/path.go:xxx"),
+		chain("not wrapped: chained: somefile.go:123/path.TestErrorf/path.go:xxx"),
 	}}
 	for i, tc := range testCases {
 		t.Run(strconv.Itoa(i)+"/"+path.Join(tc.want...), func(t *testing.T) {
@@ -80,7 +80,10 @@ func TestErrorFormatter(t *testing.T) {
 			&wrapped{"and another\none", nil}}
 		fallback  = &wrapped{"fallback", os.ErrNotExist}
 		oldAndNew = &wrapped{"new style", formatError("old style")}
-		opaque    = &wrapped{"outer",
+		framed    = &withFrameAndMore{
+			frame: errors.Caller(0),
+		}
+		opaque = &wrapped{"outer",
 			errors.Opaque(&wrapped{"mid",
 				&wrapped{"inner", nil}})}
 	)
@@ -97,24 +100,29 @@ func TestErrorFormatter(t *testing.T) {
 		fmt:  "%s",
 		want: "can't adumbrate elephant: out of peanuts",
 	}, {
-		err:  simple,
-		fmt:  "%+v",
-		want: "simple\n    somefile.go:123",
+		err:  &wrapped{"a", &wrapped{"b", &wrapped{"c", nil}}},
+		fmt:  "%s",
+		want: "a: b: c",
+	}, {
+		err: simple,
+		fmt: "%+v",
+		want: "simple:" +
+			"\n    somefile.go:123",
 	}, {
 		err: elephant,
 		fmt: "%+v",
-		want: "can't adumbrate elephant" +
+		want: "can't adumbrate elephant:" +
 			"\n    somefile.go:123" +
-			"\n--- out of peanuts" +
+			"\n--- out of peanuts:" +
 			"\n    the elephant is on strike" +
 			"\n    and the 12 monkeys" +
 			"\n    are laughing",
 	}, {
 		err: transition,
 		fmt: "%+v",
-		want: "elephant still on strike" +
+		want: "elephant still on strike:" +
 			"\n    somefile.go:123" +
-			"\n--- out of peanuts" +
+			"\n--- out of peanuts:" +
 			"\n    the elephant is on strike" +
 			"\n    and the 12 monkeys" +
 			"\n    are laughing",
@@ -122,6 +130,13 @@ func TestErrorFormatter(t *testing.T) {
 		err:  simple,
 		fmt:  "%#v",
 		want: "&fmt_test.wrapped{msg:\"simple\", err:error(nil)}",
+	}, {
+		err: framed,
+		fmt: "%+v",
+		want: "something:" +
+			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
+			"\n        /Users/mpvl/dev/go/text/src/golang.org/x/exp/errors/fmt/errors_test.go:84" +
+			"\n    something more",
 	}, {
 		err:  fmtTwice("Hello World!"),
 		fmt:  "%#v",
@@ -131,9 +146,12 @@ func TestErrorFormatter(t *testing.T) {
 		fmt:  "%s",
 		want: "fallback: file does not exist",
 	}, {
-		err:  fallback,
-		fmt:  "%+v",
-		want: "fallback\n    somefile.go:123\n--- file does not exist",
+		err: fallback,
+		fmt: "%+v",
+		// Note: no colon after the last error, as there are no details.
+		want: "fallback:" +
+			"\n    somefile.go:123" +
+			"\n--- file does not exist",
 	}, {
 		err:  opaque,
 		fmt:  "%s",
@@ -141,11 +159,11 @@ func TestErrorFormatter(t *testing.T) {
 	}, {
 		err: opaque,
 		fmt: "%+v",
-		want: "outer" +
+		want: "outer:" +
 			"\n    somefile.go:123" +
-			"\n--- mid" +
+			"\n--- mid:" +
 			"\n    somefile.go:123" +
-			"\n--- inner" +
+			"\n--- inner:" +
 			"\n    somefile.go:123",
 	}, {
 		err:  oldAndNew,
@@ -159,16 +177,22 @@ func TestErrorFormatter(t *testing.T) {
 		err: oldAndNew,
 		fmt: "%+v",
 		// Note the extra indentation.
-		want: "new style\n    somefile.go:123\n--- old style\n    otherfile.go:456",
+		// Colon for old style error is rendered by the fmt.Formatter
+		// implementation of the old-style error.
+		want: "new style:" +
+			"\n    somefile.go:123" +
+			"\n--- old style:" +
+			"\n    otherfile.go:456",
 	}, {
 		err:  simple,
 		fmt:  "%-12s",
 		want: "simple      ",
 	}, {
 		// Don't use formatting flags for detailed view.
-		err:  simple,
-		fmt:  "%+12v",
-		want: "simple\n    somefile.go:123",
+		err: simple,
+		fmt: "%+12v",
+		want: "simple:" +
+			"\n    somefile.go:123",
 	}, {
 		err:  elephant,
 		fmt:  "%+50s",
@@ -186,9 +210,11 @@ func TestErrorFormatter(t *testing.T) {
 		fmt:  "% x",
 		want: "73 69 6d 70 6c 65",
 	}, {
-		err:  newline,
-		fmt:  "%s",
-		want: "msg with\nnewline: and another\none",
+		err: newline,
+		fmt: "%s",
+		want: "msg with" +
+			"\nnewline: and another" +
+			"\none",
 	}, {
 		err:  nil,
 		fmt:  "%+v",
@@ -277,6 +303,21 @@ func (detailed) Format(p errors.Printer) (next error) {
 	return nil
 }
 
+type withFrameAndMore struct {
+	frame errors.Frame
+}
+
+func (e *withFrameAndMore) Error() string { return fmt.Sprint(e) }
+
+func (e *withFrameAndMore) Format(p errors.Printer) (next error) {
+	p.Print("something")
+	if p.Detail() {
+		e.frame.Format(p)
+		p.Print("something more")
+	}
+	return nil
+}
+
 // formatError is an error implementing Format instead of errors.Formatter.
 // The implementation mimics the implementation of github.com/pkg/errors,
 // including that
@@ -290,7 +331,7 @@ func (e formatError) Format(s fmt.State, verb rune) {
 	case 'v':
 		if s.Flag('+') {
 			io.WriteString(s, string(e))
-			fmt.Fprintf(s, "\n%s", "otherfile.go:456")
+			fmt.Fprintf(s, ":\n%s", "otherfile.go:456")
 			return
 		}
 		fallthrough
@@ -332,7 +373,7 @@ type panicValue struct{}
 func (panicValue) String() string { panic("panic") }
 
 var rePath = regexp.MustCompile(`( [^ ]*)fmt.*test\.`)
-var reLine = regexp.MustCompile(":[0-9]*$")
+var reLine = regexp.MustCompile(":[0-9]*\n?$")
 
 func cleanPath(s string) string {
 	s = rePath.ReplaceAllString(s, "/path.")
