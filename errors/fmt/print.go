@@ -205,15 +205,6 @@ func Sprintf(format string, a ...interface{}) string {
 	return s
 }
 
-// Errorf formats according to a format specifier and returns the string
-// as a value that satisfies error.
-//
-// The returned error includes the file and line number of the caller
-// when formatted with additional detail enabled.
-func Errorf(format string, a ...interface{}) error {
-	return errorf(format, a)
-}
-
 // These routines do not take a format string
 
 // Fprint formats using the default formats for its operands and writes to w.

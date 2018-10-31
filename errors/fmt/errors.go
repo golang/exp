@@ -9,15 +9,18 @@ import (
 	"strings"
 
 	"golang.org/x/exp/errors"
+	"golang.org/x/exp/errors/internal"
 )
 
-// fmtError formats err according to verb, writing to p.
-// If it cannot handle the error, it does no formatting
-// and returns false.
-func errorf(format string, a []interface{}) error {
+// Errorf formats according to a format specifier and returns the string
+// as a value that satisfies error.
+//
+// The returned error includes the file and line number of the caller
+// when formatted with additional detail enabled.
+func Errorf(format string, a ...interface{}) error {
 	err := lastError(format, a)
 	if err == nil {
-		return &simpleErr{Sprintf(format, a...), errors.Caller(2)}
+		return &simpleErr{Sprintf(format, a...), errors.Caller(1)}
 	}
 
 	// TODO: this is not entirely correct. The error value could be
@@ -26,10 +29,13 @@ func errorf(format string, a []interface{}) error {
 	// have it optionally ignore extra arguments and pass the argument
 	// list in its entirety.
 	format = format[:len(format)-len(": %s")]
+	if !internal.EnableTrace {
+		return &withChain{msg: Sprintf(format, a[:len(a)-1]...), err: err}
+	}
 	return &withChain{
 		msg:   Sprintf(format, a[:len(a)-1]...),
 		err:   err,
-		frame: errors.Caller(2),
+		frame: errors.Caller(1),
 	}
 }
 
