@@ -43,7 +43,10 @@ func Unwrap(err error) error {
 	return u.Unwrap()
 }
 
-// Is returns true if any error in err's chain is equal to target.
+// Is returns true if any error in err's chain matches target.
+//
+// An error is considered to match a target if it is equal to that target or if
+// it implements an Is method such that Is(target) returns true.
 func Is(err, target error) bool {
 	if target == nil {
 		return err == target
@@ -52,6 +55,12 @@ func Is(err, target error) bool {
 		if err == target {
 			return true
 		}
+		if x, ok := err.(interface{ Is(error) bool }); ok && x.Is(target) {
+			return true
+		}
+		// TODO: consider supporing target.Is(err). This would allow
+		// user-definable predicates, but also may allow for coping with sloppy
+		// APIs, thereby making it easier to get away with them.
 		if err = Unwrap(err); err == nil {
 			return false
 		}
@@ -59,9 +68,12 @@ func Is(err, target error) bool {
 }
 
 // As finds the first error in err's chain that matches a type to which target
-// points, and if so, sets the target to its value and reports success.
+// points, and if so, sets the target to its value and reports success. An error
+// matches a type if it is of the same type, or if it has an As method such that
+// As(target) returns true. As will panic if target is nil or not a pointer.
 //
-// As will panic if target is nil.
+// The As method should set the target to its value and report success if err
+// matches the type to which target points and report success.
 func As(err error, target interface{}) bool {
 	if target == nil {
 		panic("errors: target cannot be nil")
@@ -74,6 +86,9 @@ func As(err error, target interface{}) bool {
 	for {
 		if reflect.TypeOf(err) == targetType {
 			reflect.ValueOf(target).Elem().Set(reflect.ValueOf(err))
+			return true
+		}
+		if x, ok := err.(interface{ As(interface{}) bool }); ok && x.As(target) {
 			return true
 		}
 		if err = Unwrap(err); err == nil {
