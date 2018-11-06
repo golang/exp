@@ -113,7 +113,7 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "can't adumbrate elephant:" +
 			"\n    somefile.go:123" +
-			"\n--- out of peanuts:" +
+			"\n  - out of peanuts:" +
 			"\n    the elephant is on strike" +
 			"\n    and the 12 monkeys" +
 			"\n    are laughing",
@@ -122,7 +122,7 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "elephant still on strike:" +
 			"\n    somefile.go:123" +
-			"\n--- out of peanuts:" +
+			"\n  - out of peanuts:" +
 			"\n    the elephant is on strike" +
 			"\n    and the 12 monkeys" +
 			"\n    are laughing",
@@ -151,7 +151,7 @@ func TestErrorFormatter(t *testing.T) {
 		// Note: no colon after the last error, as there are no details.
 		want: "fallback:" +
 			"\n    somefile.go:123" +
-			"\n--- file does not exist",
+			"\n  - file does not exist",
 	}, {
 		err:  opaque,
 		fmt:  "%s",
@@ -161,9 +161,9 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "outer:" +
 			"\n    somefile.go:123" +
-			"\n--- mid:" +
+			"\n  - mid:" +
 			"\n    somefile.go:123" +
-			"\n--- inner:" +
+			"\n  - inner:" +
 			"\n    somefile.go:123",
 	}, {
 		err:  oldAndNew,
@@ -181,7 +181,7 @@ func TestErrorFormatter(t *testing.T) {
 		// implementation of the old-style error.
 		want: "new style:" +
 			"\n    somefile.go:123" +
-			"\n--- old style:" +
+			"\n  - old style:" +
 			"\n    otherfile.go:456",
 	}, {
 		err:  simple,

@@ -31,10 +31,10 @@ func Example_formatting() {
 	// foo:
 	//     golang.org/x/exp/errors/fmt_test.foo
 	//         golang.org/x/exp/errors/fmt/format_example_test.go:17
-	// --- bar(nameserver 139):
+	//   - bar(nameserver 139):
 	//     golang.org/x/exp/errors/fmt_test.bar
 	//         golang.org/x/exp/errors/fmt/format_example_test.go:16
-	// --- baz flopped:
+	//   - baz flopped:
 	//     golang.org/x/exp/errors/fmt_test.baz
 	//         golang.org/x/exp/errors/fmt/format_example_test.go:15
 }

@@ -104,7 +104,7 @@ func fmtError(p *pp, verb rune, err error) (handled bool) {
 		return false
 
 	case p.fmt.plusV:
-		sep = "\n--- "
+		sep = "\n  - "
 		w.fmt.fmtFlags = fmtFlags{plusV: p.fmt.plusV} // only keep detail flag
 
 		// The width or precision of a detailed view could be the number of
