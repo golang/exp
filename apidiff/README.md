@@ -198,10 +198,10 @@ var V u1
 type u2 int
 var V u2
 ```
-Here, even though `u1` and `u2` are unexported, they are still _exposed_ by the
-API: their exported fields and methods are visible to clients, so they are part
-of the API. But since the name `u1` is not visible to clients, it can 
-be changed compatibly.
+Here, even though `u1` and `u2` are unexported, their exported fields and
+methods are visible to clients, so they are part of the API. But since the name
+`u1` is not visible to clients, it can be changed compatibly. We say that `u1`
+and `u2` are _exposed_: a type is exposed if a client package can declare variables of that type.
 
 We will say that an old defined type _corresponds_ to a new one if they have the
 same name, or one can be renamed to the other without otherwise changing the
@@ -225,11 +225,11 @@ We can now present the definition of compatibility used by `apidiff`.
 ### Package Compatibility
 
 > A new package is compatible with an old one if:
-1. Each exported name in the old package's scope also appears in the new
-package's scope, and the object (constant, variable, function or type) denoted
-by that name in the old package is compatible with the object denoted by the
-name in the new package, and
-2. For every exposed type that implements an exposed interface in the old package,
+>1. Each exported name in the old package's scope also appears in the new
+>package's scope, and the object (constant, variable, function or type) denoted
+>by that name in the old package is compatible with the object denoted by the
+>name in the new package, and
+>2. For every exposed type that implements an exposed interface in the old package,
 > its corresponding type should implement the corresponding interface in the new package.
 >
 >Otherwise the packages are incompatible.
@@ -279,7 +279,7 @@ const C = 2
 var a [C]int = [1]int{} // fails with new because [2]int and [1]int are different types
 ```
 Changes to constant values are rare, and determining whether they are compatible
-are not is better left to the user, so the tool reports them.
+or not is better left to the user, so the tool reports them.
 
 #### Variables
 
