@@ -362,10 +362,10 @@ type T = struct { X, Y int }
 ```
 ### Type Literal Compatibility
 
-Only four kinds of types can differ compatibly: defined types, structs,
-interfaces and channels. We only consider the compatibility of the last three
-when they are the underlying type of a defined type. See "Compatibility, Types
-and Names" for a rationale.
+Only five kinds of types can differ compatibly: defined types, structs,
+interfaces, channels and numeric types. We only consider the compatibility of
+the last four when they are the underlying type of a defined type. See
+"Compatibility, Types and Names" for a rationale.
 
 We justify the compatibility rules by enumerating all the ways a type
 can be used, and by showing that the allowed changes cannot break any code that
@@ -382,7 +382,7 @@ Any type can also be used in a type assertion or conversion. The changes we allo
 below may affect the run-time behavior of these operations, but they cannot affect
 whether they compile. The only such breaking change would be to change
 the type `T` in an assertion `x.T` so that it no longer implements the interface
-type of `x`; but the rules for interfaces below will disallow that.
+type of `x`; but the rules for interfaces below disallow that.
 
 > A new type is compatible with an old one if and only if they correspond, or
 > one of the cases below applies.
@@ -481,6 +481,55 @@ literal, select a field, use a value of the struct as a map key, or compare two
 values for equality. The first clause ensures that struct literals compile; the
 second, that selections compile; and the third, that equality expressions and
 map index expressions compile.
+
+#### Numeric Types
+
+> A new numeric type is compatible with an old one if and only if they are
+> both unsigned integers, both signed integers, both floats or both complex
+> types, and the new one is at least as large as the old on both 32-bit and
+> 64-bit architectures.
+
+Other than in assignments, numeric types appear in arithmetic and comparison
+expressions. Since all arithmetic operations but shifts (see below) require that
+operand types be identical, and by assumption the old and new types underly
+defined types (see "Compatibility, Types and Names," below), there is no way for
+client code to write an arithmetic expression that compiles with operands of the
+old type but not the new.
+
+Numeric types can also appear in type switches and type assertions. Again, since
+the old and new types underly defined types, type switches and type assertions
+that compiled using the old defined type will continue to compile with the new
+defined type.
+
+Going from an unsigned to a signed integer type is an incompatible change for
+the sole reason that only an unsigned type can appear as the right operand of a
+shift. If this rule is relaxed, then changes from an unsigned type to a larger
+signed type would be compatible. See [this
+issue](https://github.com/golang/go/issues/19113).
+
+Only integer types can be used in bitwise and shift operations, and for indexing
+slices and arrays. That is why switching from an integer to a floating-point
+type--even one that can represent all values of the integer type--is an
+incompatible change.
+
+
+Conversions from floating-point to complex types or vice versa are not permitted
+(the predeclared functions real, imag, and complex must be used instead). To
+prevent valid floating-point or complex conversions from becoming invalid,
+changing a floating-point type to a complex type or vice versa is considered an
+incompatible change.
+
+Although conversions between any two integer types are valid, assigning a
+constant value to a variable of integer type that is too small to represent the
+constant is not permitted. That is why the only compatible changes are to
+a new type whose values are a superset of the old. The requirement that the new
+set of values must include the old on both 32-bit and 64-bit machines allows
+conversions from `int32` to `int` and from `int` to `int64`, but not the other
+direction; and similarly for `uint`.
+
+Changing a type to or from `uintptr` is considered an incompatible change. Since
+its size is not specified, there is no way to know whether the new type's values
+are a superset of the old type's.
 
 ## Whole-Package Compatibility
 
