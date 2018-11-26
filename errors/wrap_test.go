@@ -14,10 +14,10 @@ import (
 
 func TestIs(t *testing.T) {
 	err1 := errors.New("1")
-	erra := fmt.Errorf("wrap 2: %v", err1)
-	errb := fmt.Errorf("wrap 3: %v", erra)
+	erra := fmt.Errorf("wrap 2: %w", err1)
+	errb := fmt.Errorf("wrap 3: %w", erra)
 	erro := errors.Opaque(err1)
-	errco := fmt.Errorf("opaque: %v", erro)
+	errco := fmt.Errorf("opaque: %w", erro)
 
 	err3 := errors.New("3")
 
@@ -89,7 +89,7 @@ func TestAs(t *testing.T) {
 		target interface{}
 		match  bool
 	}{{
-		fmt.Errorf("pittied the fool: %v", errorT{}),
+		fmt.Errorf("pittied the fool: %w", errorT{}),
 		&errT,
 		true,
 	}, {
@@ -144,7 +144,7 @@ func TestAs(t *testing.T) {
 
 func TestUnwrap(t *testing.T) {
 	err1 := errors.New("1")
-	erra := fmt.Errorf("wrap 2: %v", err1)
+	erra := fmt.Errorf("wrap 2: %w", err1)
 	erro := errors.Opaque(err1)
 
 	testCases := []struct {
@@ -155,10 +155,10 @@ func TestUnwrap(t *testing.T) {
 		{wrapped{nil}, nil},
 		{err1, nil},
 		{erra, err1},
-		{fmt.Errorf("wrap 3: %v", erra), erra},
+		{fmt.Errorf("wrap 3: %w", erra), erra},
 
 		{erro, nil},
-		{fmt.Errorf("opaque: %v", erro), erro},
+		{fmt.Errorf("opaque: %w", erro), erro},
 	}
 	for _, tc := range testCases {
 		if got := errors.Unwrap(tc.err); got != tc.want {

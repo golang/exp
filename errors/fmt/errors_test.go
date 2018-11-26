@@ -30,6 +30,12 @@ func TestErrorf(t *testing.T) {
 		got  error
 		want []string
 	}{{
+		fmt.Errorf("no args"),
+		chain("no args/path.TestErrorf/path.go:xxx"),
+	}, {
+		fmt.Errorf("no args: %s"),
+		chain("no args: %!s(MISSING)/path.TestErrorf/path.go:xxx"),
+	}, {
 		fmt.Errorf("nounwrap: %s", "simple"),
 		chain(`nounwrap: simple/path.TestErrorf/path.go:xxx`),
 	}, {
@@ -37,15 +43,23 @@ func TestErrorf(t *testing.T) {
 		chain(`nounwrap: simple/path.TestErrorf/path.go:xxx`),
 	}, {
 		fmt.Errorf("%s failed: %v", "foo", chained),
+		chain("foo failed/path.TestErrorf/path.go:xxx",
+			"chained/somefile.go:xxx"),
+	}, {
+		fmt.Errorf("no wrap: %s", chained),
+		chain("no wrap/path.TestErrorf/path.go:xxx",
+			"chained/somefile.go:xxx"),
+	}, {
+		fmt.Errorf("%s failed: %w", "foo", chained),
 		chain("wraps:foo failed/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("wraps: %s", chained),
-		chain("wraps:wraps/path.TestErrorf/path.go:xxx",
+		fmt.Errorf("nowrapv: %v", chained),
+		chain("nowrapv/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("wrapv: %v", chained),
-		chain("wraps:wrapv/path.TestErrorf/path.go:xxx",
+		fmt.Errorf("wrapw: %w", chained),
+		chain("wraps:wrapw/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
 		fmt.Errorf("not wrapped: %+v", chained),
@@ -135,7 +149,7 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "something:" +
 			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
-			"\n        /Users/mpvl/dev/go/text/src/golang.org/x/exp/errors/fmt/errors_test.go:84" +
+			"\n        /Users/mpvl/dev/go/text/src/golang.org/x/exp/errors/fmt/errors_test.go:98" +
 			"\n    something more",
 	}, {
 		err:  fmtTwice("Hello World!"),
@@ -386,7 +400,7 @@ func cleanPath(s string) string {
 func errToParts(err error) (a []string) {
 	for err != nil {
 		var p testPrinter
-		if _, ok := err.(errors.Wrapper); ok {
+		if errors.Unwrap(err) != nil {
 			p.str += "wraps:"
 		}
 		f, ok := err.(errors.Formatter)
