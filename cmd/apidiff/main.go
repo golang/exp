@@ -12,7 +12,10 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-var exportDataOutfile = flag.String("w", "", "file for export data")
+var (
+	exportDataOutfile = flag.String("w", "", "file for export data")
+	incompatibleOnly  = flag.Bool("incompatible", false, "display only incompatible changes")
+)
 
 func main() {
 	flag.Usage = func() {
@@ -43,7 +46,13 @@ func main() {
 		newpkg := mustLoadOrRead(flag.Arg(1))
 
 		report := apidiff.Changes(oldpkg, newpkg)
-		if err := report.Text(os.Stdout); err != nil {
+		var err error
+		if *incompatibleOnly {
+			err = report.TextIncompatible(os.Stdout)
+		} else {
+			err = report.Text(os.Stdout)
+		}
+		if err != nil {
 			die("writing report: %v", err)
 		}
 	}

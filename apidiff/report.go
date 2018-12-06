@@ -20,32 +20,31 @@ func (r Report) String() string {
 }
 
 func (r Report) Text(w io.Writer) error {
-	var err error
+	if err := r.TextIncompatible(w); err != nil {
+		return err
+	}
+	return r.TextCompatible(w)
+}
 
-	write := func(s string) {
-		if err == nil {
-			_, err = io.WriteString(w, s)
+func (r Report) TextIncompatible(w io.Writer) error {
+	return r.writeMessages(w, "Incompatible changes:", r.Incompatible)
+}
+
+func (r Report) TextCompatible(w io.Writer) error {
+	return r.writeMessages(w, "Compatible changes:", r.Compatible)
+}
+
+func (r Report) writeMessages(w io.Writer, header string, msgs []string) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "%s\n", header); err != nil {
+		return err
+	}
+	for _, m := range msgs {
+		if _, err := fmt.Fprintf(w, "- %s\n", m); err != nil {
+			return err
 		}
 	}
-
-	writeslice := func(ss []string) {
-		for _, s := range ss {
-			write("- ")
-			write(s)
-			write("\n")
-		}
-	}
-
-	if len(r.Incompatible) > 0 {
-		write("Incompatible changes:\n")
-		writeslice(r.Incompatible)
-	}
-	if len(r.Compatible) > 0 {
-		if len(r.Incompatible) > 0 {
-			write("\n")
-		}
-		write("Compatible changes:\n")
-		writeslice(r.Compatible)
-	}
-	return err
+	return nil
 }
