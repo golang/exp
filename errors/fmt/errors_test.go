@@ -232,6 +232,23 @@ func TestErrorFormatter(t *testing.T) {
 			"\nnewline: and another" +
 			"\none",
 	}, {
+		err:  spurious(""),
+		fmt:  "%s",
+		want: "spurious",
+	}, {
+		err:  spurious(""),
+		fmt:  "%+v",
+		want: "spurious",
+	}, {
+		err:  spurious("extra"),
+		fmt:  "%s",
+		want: "spurious",
+	}, {
+		err: spurious("extra"),
+		fmt: "%+v",
+		want: "spurious:\n" +
+			"    extra",
+	}, {
 		err:  nil,
 		fmt:  "%+v",
 		want: "<nil>",
@@ -340,6 +357,21 @@ func (e *withFrameAndMore) Format(p errors.Printer) (next error) {
 	if p.Detail() {
 		e.frame.Format(p)
 		p.Print("something more")
+	}
+	return nil
+}
+
+type spurious string
+
+func (e spurious) Error() string { return fmt.Sprint(e) }
+
+func (e spurious) Format(p errors.Printer) (next error) {
+	p.Print("spurious")
+	p.Detail() // Call detail even if we don't print anything
+	if e == "" {
+		p.Print()
+	} else {
+		p.Print("\n", string(e)) // print extraneous leading newline
 	}
 	return nil
 }

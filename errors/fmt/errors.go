@@ -201,7 +201,18 @@ func (p *errPPState) Flag(c int) bool                { return (*pp)(p).Flag(c) }
 func (p *errPPState) Write(b []byte) (n int, err error) {
 	if !p.fmt.inDetail || p.fmt.plusV {
 		k := 0
+		if len(b) == 0 {
+			return 0, nil
+		}
 		if p.fmt.indent {
+			if p.fmt.needNewline {
+				p.fmt.needNewline = false
+				p.buf.WriteByte(':')
+				p.buf.Write(detailSep)
+				if b[0] == '\n' {
+					b = b[1:]
+				}
+			}
 			for i, c := range b {
 				if c == '\n' {
 					p.buf.Write(b[k:i])
@@ -243,7 +254,7 @@ func (p *errPP) Detail() bool {
 	p.fmt.inDetail = true
 	p.fmt.indent = p.fmt.plusV
 	if p.fmt.plusV && !inDetail {
-		(*errPPState)(p).Write([]byte(":\n"))
+		p.fmt.needNewline = true
 	}
 	return p.fmt.plusV
 }
