@@ -25,9 +25,9 @@ type noWrapper struct {
 	error
 }
 
-func (e noWrapper) Format(p Printer) (next error) {
+func (e noWrapper) FormatError(p Printer) (next error) {
 	if f, ok := e.error.(Formatter); ok {
-		return f.Format(p)
+		return f.FormatError(p)
 	}
 	p.Print(e.error)
 	return nil

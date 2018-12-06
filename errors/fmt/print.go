@@ -5,6 +5,7 @@
 package fmt
 
 import (
+	gofmt "fmt"
 	"io"
 	"os"
 	"reflect"
@@ -31,44 +32,31 @@ const (
 	invReflectString  = "<invalid reflect.Value>"
 )
 
+// These interface need to be aliases so that implementations can be used
+// for different implementations.
+
 // State represents the printer state passed to custom formatters.
 // It provides access to the io.Writer interface plus information about
 // the flags and options for the operand's format specifier.
-type State interface {
-	// Write is the function to call to emit formatted output to be printed.
-	Write(b []byte) (n int, err error)
-	// Width returns the value of the width option and whether it has been set.
-	Width() (wid int, ok bool)
-	// Precision returns the value of the precision option and whether it has been set.
-	Precision() (prec int, ok bool)
-
-	// Flag reports whether the flag c, a character, has been set.
-	Flag(c int) bool
-}
+type State = gofmt.State
 
 // Formatter is the interface implemented by values with a custom formatter.
 // The implementation of Format may call Sprint(f) or Fprint(f) etc.
 // to generate its output.
-type Formatter interface {
-	Format(f State, c rune)
-}
+type Formatter = gofmt.Formatter
 
 // Stringer is implemented by any value that has a String method,
 // which defines the ``native'' format for that value.
 // The String method is used to print values passed as an operand
 // to any format that accepts a string or to an unformatted printer
 // such as Print.
-type Stringer interface {
-	String() string
-}
+type Stringer = gofmt.Stringer
 
 // GoStringer is implemented by any value that has a GoString method,
 // which defines the Go syntax for that value.
 // The GoString method is used to print values passed as an operand
 // to a %#v format.
-type GoStringer interface {
-	GoString() string
-}
+type GoStringer = gofmt.GoStringer
 
 // Use simple []byte instead of bytes.Buffer to avoid large dependency.
 type buffer []byte
@@ -556,17 +544,17 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 	if p.erroring {
 		return
 	}
-	// Is it a Formatter?
-	if formatter, ok := p.arg.(Formatter); ok {
+	switch x := p.arg.(type) {
+	case Formatter:
 		handled = true
 		defer p.catchPanic(p.arg, verb)
-		formatter.Format(p, verb)
+		x.Format(p, verb)
 		return
-	}
-	if err, ok := p.arg.(error); ok {
+
+	case error:
 		handled = true
 		defer p.catchPanic(p.arg, verb)
-		return fmtError(p, verb, err)
+		return fmtError(p, verb, x)
 	}
 
 	// If we're doing Go syntax and the argument knows how to supply it, take care of it now.

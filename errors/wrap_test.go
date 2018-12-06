@@ -189,7 +189,7 @@ type errorD struct{}
 
 func (errorD) Error() string { return "errorD" }
 
-func (errorD) Format(p errors.Printer) error {
+func (errorD) FormatError(p errors.Printer) error {
 	p.Print("errorD")
 	p.Detail()
 	p.Print("detail")

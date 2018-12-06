@@ -74,7 +74,7 @@ func (e *noWrapError) Error() string {
 	return Sprint(e)
 }
 
-func (e *noWrapError) Format(p errors.Printer) (next error) {
+func (e *noWrapError) FormatError(p errors.Printer) (next error) {
 	p.Print(e.msg)
 	e.frame.Format(p)
 	return e.err
@@ -90,7 +90,7 @@ func (e *wrapError) Error() string {
 	return Sprint(e)
 }
 
-func (e *wrapError) Format(p errors.Printer) (next error) {
+func (e *wrapError) FormatError(p errors.Printer) (next error) {
 	p.Print(e.msg)
 	e.frame.Format(p)
 	return e.err
@@ -148,16 +148,8 @@ loop:
 		w.fmt.inDetail = false
 		switch v := err.(type) {
 		case errors.Formatter:
-			err = v.Format((*errPP)(w))
-		// TODO: This case is for supporting old error implementations.
-		// It may eventually disappear.
-		case interface{ FormatError(errors.Printer) error }:
 			err = v.FormatError((*errPP)(w))
 		case Formatter:
-			// Discard verb, but keep the flags. Discarding the verb prevents
-			// nested quoting and other unwanted behavior. Preserving flags
-			// recursively signals a request for detail, if interpreted as %+v.
-			w.fmt.fmtFlags = p.fmt.fmtFlags
 			if w.fmt.plusV {
 				v.Format((*errPPState)(w), 'v') // indent new lines
 			} else {

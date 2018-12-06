@@ -28,7 +28,7 @@ func (e *errorString) Error() string {
 	return e.s
 }
 
-func (e *errorString) Format(p Printer) (next error) {
+func (e *errorString) FormatError(p Printer) (next error) {
 	p.Print(e.s)
 	e.frame.Format(p)
 	return nil

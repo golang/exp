@@ -88,9 +88,8 @@ func TestErrorFormatter(t *testing.T) {
 			"can't adumbrate elephant",
 			detailed{},
 		}
-		transition = &wrapped2{"elephant still on strike", detailed{}}
-		nonascii   = &wrapped{"café", nil}
-		newline    = &wrapped{"msg with\nnewline",
+		nonascii = &wrapped{"café", nil}
+		newline  = &wrapped{"msg with\nnewline",
 			&wrapped{"and another\none", nil}}
 		fallback  = &wrapped{"fallback", os.ErrNotExist}
 		oldAndNew = &wrapped{"new style", formatError("old style")}
@@ -133,15 +132,6 @@ func TestErrorFormatter(t *testing.T) {
 			"\n    and the 12 monkeys" +
 			"\n    are laughing",
 	}, {
-		err: transition,
-		fmt: "%+v",
-		want: "elephant still on strike:" +
-			"\n    somefile.go:123" +
-			"\n  - out of peanuts:" +
-			"\n    the elephant is on strike" +
-			"\n    and the 12 monkeys" +
-			"\n    are laughing",
-	}, {
 		err:  simple,
 		fmt:  "%#v",
 		want: "&fmt_test.wrapped{msg:\"simple\", err:error(nil)}",
@@ -150,7 +140,7 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "something:" +
 			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
-			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:98" +
+			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:97" +
 			"\n    something more",
 		regexp: true,
 	}, {
@@ -311,21 +301,7 @@ type wrapped struct {
 
 func (e wrapped) Error() string { return "should call Format" }
 
-func (e wrapped) Format(p errors.Printer) (next error) {
-	p.Print(e.msg)
-	p.Detail()
-	p.Print("somefile.go:123")
-	return e.err
-}
-
-type wrapped2 struct {
-	msg string
-	err error
-}
-
-func (e wrapped2) Error() string { return "should call Format" }
-
-func (e wrapped2) FormatError(p errors.Printer) (next error) {
+func (e wrapped) FormatError(p errors.Printer) (next error) {
 	p.Print(e.msg)
 	p.Detail()
 	p.Print("somefile.go:123")
@@ -338,7 +314,7 @@ type detailed struct{}
 
 func (e detailed) Error() string { return fmt.Sprint(e) }
 
-func (detailed) Format(p errors.Printer) (next error) {
+func (detailed) FormatError(p errors.Printer) (next error) {
 	p.Printf("out of %s", "peanuts")
 	p.Detail()
 	p.Print("the elephant is on strike\n")
@@ -352,7 +328,7 @@ type withFrameAndMore struct {
 
 func (e *withFrameAndMore) Error() string { return fmt.Sprint(e) }
 
-func (e *withFrameAndMore) Format(p errors.Printer) (next error) {
+func (e *withFrameAndMore) FormatError(p errors.Printer) (next error) {
 	p.Print("something")
 	if p.Detail() {
 		e.frame.Format(p)
@@ -365,7 +341,7 @@ type spurious string
 
 func (e spurious) Error() string { return fmt.Sprint(e) }
 
-func (e spurious) Format(p errors.Printer) (next error) {
+func (e spurious) FormatError(p errors.Printer) (next error) {
 	p.Print("spurious")
 	p.Detail() // Call detail even if we don't print anything
 	if e == "" {
@@ -415,7 +391,7 @@ func fmtTwice(format string, a ...interface{}) error {
 
 func (e fmtTwiceErr) Error() string { return fmt.Sprint(e) }
 
-func (e fmtTwiceErr) Format(p errors.Printer) (next error) {
+func (e fmtTwiceErr) FormatError(p errors.Printer) (next error) {
 	p.Printf(e.format, e.args...)
 	p.Print("/")
 	p.Printf(e.format, e.args...)
@@ -452,7 +428,7 @@ func errToParts(err error) (a []string) {
 			a = append(a, err.Error())
 			break
 		}
-		err = f.Format(&p)
+		err = f.FormatError(&p)
 		a = append(a, cleanPath(p.str))
 	}
 	return a

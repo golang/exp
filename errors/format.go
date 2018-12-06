@@ -6,9 +6,11 @@ package errors
 
 // A Formatter formats error messages.
 type Formatter interface {
-	// Format prints the receiver's first error and returns the next error in
+	error
+
+	// FormatError prints the receiver's first error and returns the next error in
 	// the error chain, if any.
-	Format(p Printer) (next error)
+	FormatError(p Printer) (next error)
 }
 
 // A Printer formats error messages.
