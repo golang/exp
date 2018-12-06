@@ -102,9 +102,10 @@ func TestErrorFormatter(t *testing.T) {
 				&wrapped{"inner", nil}})}
 	)
 	testCases := []struct {
-		err  error
-		fmt  string
-		want string
+		err    error
+		fmt    string
+		want   string
+		regexp bool
 	}{{
 		err:  simple,
 		fmt:  "%s",
@@ -149,8 +150,9 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "something:" +
 			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
-			"\n        /Users/mpvl/dev/go/text/src/golang.org/x/exp/errors/fmt/errors_test.go:98" +
+			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:98" +
 			"\n    something more",
+		regexp: true,
 	}, {
 		err:  fmtTwice("Hello World!"),
 		fmt:  "%#v",
@@ -266,7 +268,17 @@ func TestErrorFormatter(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d/%s", i, tc.fmt), func(t *testing.T) {
 			got := fmt.Sprintf(tc.fmt, tc.err)
-			if got != tc.want {
+			var ok bool
+			if tc.regexp {
+				var err error
+				ok, err = regexp.MatchString(tc.want, got)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				ok = got == tc.want
+			}
+			if !ok {
 				t.Errorf("\n got: %q\nwant: %q", got, tc.want)
 			}
 		})
