@@ -1,3 +1,4 @@
+// Command apidiff determines whether two versions of a package are compatible
 package main
 
 import (
@@ -21,10 +22,10 @@ func main() {
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, "usage:\n")
-		fmt.Fprintf(w, "%s OLD NEW\n", os.Args[0])
+		fmt.Fprintf(w, "apidiff OLD NEW\n")
 		fmt.Fprintf(w, "   compares OLD and NEW package APIs\n")
 		fmt.Fprintf(w, "   where OLD and NEW are either import paths or files of export data\n")
-		fmt.Fprintf(w, "%s -w FILE IMPORT_PATH\n", os.Args[0])
+		fmt.Fprintf(w, "apidiff -w FILE IMPORT_PATH\n")
 		fmt.Fprintf(w, "   writes export data of the package at IMPORT_PATH to FILE\n")
 		flag.PrintDefaults()
 	}
