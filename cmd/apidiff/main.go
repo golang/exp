@@ -27,6 +27,12 @@ func main() {
 		fmt.Fprintf(w, "   where OLD and NEW are either import paths or files of export data\n")
 		fmt.Fprintf(w, "apidiff -w FILE IMPORT_PATH\n")
 		fmt.Fprintf(w, "   writes export data of the package at IMPORT_PATH to FILE\n")
+		fmt.Fprintf(w, "   NOTE: In a GOPATH-less environment, this option consults the\n")
+		fmt.Fprintf(w, "   module cache by default, unless used in the directory that\n")
+		fmt.Fprintf(w, "   contains the go.mod module definition that IMPORT_PATH belongs\n")
+		fmt.Fprintf(w, "   to. In most cases users want the latter behavior, so be sure\n")
+		fmt.Fprintf(w, "   to cd to the exact directory which contains the module\n")
+		fmt.Fprintf(w, "   definition of IMPORT_PATH.\n")
 		flag.PrintDefaults()
 	}
 
