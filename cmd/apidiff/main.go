@@ -92,6 +92,9 @@ func loadPackage(importPath string) (*packages.Package, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(pkgs) == 0 {
+		return nil, fmt.Errorf("found no packages for import %s", importPath)
+	}
 	if len(pkgs[0].Errors) > 0 {
 		return nil, pkgs[0].Errors[0]
 	}
