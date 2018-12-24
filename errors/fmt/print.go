@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"sync"
 	"unicode/utf8"
+
+	"golang.org/x/exp/errors"
 )
 
 // Strings for use with buffer.WriteString.
@@ -545,6 +547,11 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 		return
 	}
 	switch x := p.arg.(type) {
+	case errors.Formatter:
+		handled = true
+		defer p.catchPanic(p.arg, verb)
+		return fmtError(p, verb, x)
+
 	case Formatter:
 		handled = true
 		defer p.catchPanic(p.arg, verb)

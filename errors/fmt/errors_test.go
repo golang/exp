@@ -5,6 +5,7 @@
 package fmt_test
 
 import (
+	gofmt "fmt"
 	"io"
 	"os"
 	"path"
@@ -140,7 +141,7 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "something:" +
 			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
-			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:97" +
+			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:98" +
 			"\n    something more",
 		regexp: true,
 	}, {
@@ -271,6 +272,20 @@ func TestErrorFormatter(t *testing.T) {
 		err:  fmtTwice("%o %s", panicValue{}, "ok"),
 		fmt:  "%s",
 		want: "{} ok/{} ok",
+	}, {
+		err: adapted{"adapted", nil},
+		fmt: "%+v",
+		want: "adapted:" +
+			"\n    detail",
+	}, {
+		err: adapted{"outer", adapted{"mid", adapted{"inner", nil}}},
+		fmt: "%+v",
+		want: "outer:" +
+			"\n    detail" +
+			"\n  - mid:" +
+			"\n    detail" +
+			"\n  - inner:" +
+			"\n    detail",
 	}}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d/%s", i, tc.fmt), func(t *testing.T) {
@@ -286,6 +301,37 @@ func TestErrorFormatter(t *testing.T) {
 				ok = got == tc.want
 			}
 			if !ok {
+				t.Errorf("\n got: %q\nwant: %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAdaptor(t *testing.T) {
+	testCases := []struct {
+		err    error
+		fmt    string
+		want   string
+		regexp bool
+	}{{
+		err: adapted{"adapted", nil},
+		fmt: "%+v",
+		want: "adapted:" +
+			"\n    detail",
+	}, {
+		err: adapted{"outer", adapted{"mid", adapted{"inner", nil}}},
+		fmt: "%+v",
+		want: "outer:" +
+			"\n    detail" +
+			"\n  - mid:" +
+			"\n    detail" +
+			"\n  - inner:" +
+			"\n    detail",
+	}}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d/%s", i, tc.fmt), func(t *testing.T) {
+			got := gofmt.Sprintf(tc.fmt, tc.err)
+			if got != tc.want {
 				t.Errorf("\n got: %q\nwant: %q", got, tc.want)
 			}
 		})
@@ -341,6 +387,10 @@ type spurious string
 
 func (e spurious) Error() string { return fmt.Sprint(e) }
 
+func (e spurious) Format(fmt.State, rune) {
+	panic("should never be called by one of the tests")
+}
+
 func (e spurious) FormatError(p errors.Printer) (next error) {
 	p.Print("spurious")
 	p.Detail() // Call detail even if we don't print anything
@@ -352,9 +402,26 @@ func (e spurious) FormatError(p errors.Printer) (next error) {
 	return nil
 }
 
+type adapted struct {
+	msg string
+	err error
+}
+
+func (e adapted) Error() string { return string(e.msg) }
+
+func (e adapted) Format(s fmt.State, verb rune) {
+	fmt.FormatError(s, verb, e)
+}
+
+func (e adapted) FormatError(p errors.Printer) error {
+	p.Print(e.msg)
+	p.Detail()
+	p.Print("detail")
+	return e.err
+}
+
 // formatError is an error implementing Format instead of errors.Formatter.
-// The implementation mimics the implementation of github.com/pkg/errors,
-// including that
+// The implementation mimics the implementation of github.com/pkg/errors.
 type formatError string
 
 func (e formatError) Error() string { return string(e) }
