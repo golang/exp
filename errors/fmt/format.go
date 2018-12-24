@@ -37,7 +37,6 @@ type fmtFlags struct {
 
 	// error-related flags.
 	inDetail    bool
-	indent      bool
 	needNewline bool
 }
 

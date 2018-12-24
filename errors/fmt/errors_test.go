@@ -223,6 +223,21 @@ func TestErrorFormatter(t *testing.T) {
 			"\nnewline: and another" +
 			"\none",
 	}, {
+		err: newline,
+		fmt: "%+v",
+		want: "msg with" +
+			"\n    newline:" +
+			"\n    somefile.go:123" +
+			"\n  - and another" +
+			"\n    one:" +
+			"\n    somefile.go:123",
+	}, {
+		err: wrapped{"", wrapped{"inner message", nil}},
+		fmt: "%+v",
+		want: "somefile.go:123" +
+			"\n  - inner message:" +
+			"\n    somefile.go:123",
+	}, {
 		err:  spurious(""),
 		fmt:  "%s",
 		want: "spurious",

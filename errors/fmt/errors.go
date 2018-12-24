@@ -192,28 +192,27 @@ func (p *errPPState) Flag(c int) bool                { return (*pp)(p).Flag(c) }
 
 func (p *errPPState) Write(b []byte) (n int, err error) {
 	if !p.fmt.inDetail || p.fmt.plusV {
-		k := 0
 		if len(b) == 0 {
 			return 0, nil
 		}
-		if p.fmt.indent {
-			if p.fmt.needNewline {
-				p.fmt.needNewline = false
-				p.buf.WriteByte(':')
-				p.buf.Write(detailSep)
-				if b[0] == '\n' {
-					b = b[1:]
-				}
+		if p.fmt.inDetail && p.fmt.needNewline {
+			p.fmt.needNewline = false
+			p.buf.WriteByte(':')
+			p.buf.Write(detailSep)
+			if b[0] == '\n' {
+				b = b[1:]
 			}
-			for i, c := range b {
-				if c == '\n' {
-					p.buf.Write(b[k:i])
-					p.buf.Write(detailSep)
-					k = i + 1
-				}
+		}
+		k := 0
+		for i, c := range b {
+			if c == '\n' {
+				p.buf.Write(b[k:i])
+				p.buf.Write(detailSep)
+				k = i + 1
 			}
 		}
 		p.buf.Write(b[k:])
+		p.fmt.needNewline = !p.fmt.inDetail
 	}
 	return len(b), nil
 }
@@ -223,7 +222,7 @@ type errPP pp
 
 func (p *errPP) Print(args ...interface{}) {
 	if !p.fmt.inDetail || p.fmt.plusV {
-		if p.fmt.indent {
+		if p.fmt.plusV {
 			Fprint((*errPPState)(p), args...)
 		} else {
 			(*pp)(p).doPrint(args)
@@ -233,7 +232,7 @@ func (p *errPP) Print(args ...interface{}) {
 
 func (p *errPP) Printf(format string, args ...interface{}) {
 	if !p.fmt.inDetail || p.fmt.plusV {
-		if p.fmt.indent {
+		if p.fmt.plusV {
 			Fprintf((*errPPState)(p), format, args...)
 		} else {
 			(*pp)(p).doPrintf(format, args)
@@ -242,11 +241,6 @@ func (p *errPP) Printf(format string, args ...interface{}) {
 }
 
 func (p *errPP) Detail() bool {
-	inDetail := p.fmt.inDetail
 	p.fmt.inDetail = true
-	p.fmt.indent = p.fmt.plusV
-	if p.fmt.plusV && !inDetail {
-		p.fmt.needNewline = true
-	}
 	return p.fmt.plusV
 }
