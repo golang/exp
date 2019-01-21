@@ -15,7 +15,6 @@ import (
 // Errorf formats according to a format specifier and returns the string as a
 // value that satisfies error.
 //
-
 // The returned error includes the file and line number of the caller when
 // formatted with additional detail enabled. If the last argument is an error
 // the returned error's Format method will return it if the format string ends
