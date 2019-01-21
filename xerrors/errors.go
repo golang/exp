@@ -8,7 +8,7 @@
 //   https://go.googlesource.com/proposal/+/master/design/go2draft.md
 //
 // This is an EXPERIMENTAL package, and may change in arbitrary ways without notice.
-package errors
+package xerrors
 
 // errorString is a trivial implementation of error.
 type errorString struct {

@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package errors_test
+package xerrors_test
 
 import (
 	"bytes"
-	fmtcore "fmt"
+	"fmt"
 	"math/big"
 	"testing"
 
-	"golang.org/x/exp/errors"
-	"golang.org/x/exp/errors/fmt"
-	"golang.org/x/exp/errors/internal"
+	"golang.org/x/exp/xerrors"
+	"golang.org/x/exp/xerrors/internal"
 )
 
 type myType struct{}
@@ -22,7 +21,7 @@ func (myType) Format(s fmt.State, v rune) {
 }
 
 func BenchmarkErrorf(b *testing.B) {
-	err := errors.New("foo")
+	err := xerrors.New("foo")
 	// pi := big.NewFloat(3.14) // Something expensive.
 	num := big.NewInt(5)
 	args := func(a ...interface{}) []interface{} { return a }
@@ -40,7 +39,7 @@ func BenchmarkErrorf(b *testing.B) {
 		b.Run(bc.name, func(b *testing.B) {
 			b.Run("ExpWithTrace", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					fmt.Errorf(bc.format, bc.args...)
+					xerrors.Errorf(bc.format, bc.args...)
 				}
 			})
 			b.Run("ExpNoTrace", func(b *testing.B) {
@@ -48,12 +47,12 @@ func BenchmarkErrorf(b *testing.B) {
 				defer func() { internal.EnableTrace = true }()
 
 				for i := 0; i < b.N; i++ {
-					fmt.Errorf(bc.format, bc.args...)
+					xerrors.Errorf(bc.format, bc.args...)
 				}
 			})
 			b.Run("Core", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					fmtcore.Errorf(bc.format, bc.args...)
+					fmt.Errorf(bc.format, bc.args...)
 				}
 			})
 		})

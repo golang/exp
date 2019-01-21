@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package errors_test
+package xerrors_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
-	"golang.org/x/exp/errors"
-	"golang.org/x/exp/errors/fmt"
+	"golang.org/x/exp/xerrors"
 )
 
 func TestIs(t *testing.T) {
-	err1 := errors.New("1")
-	erra := fmt.Errorf("wrap 2: %w", err1)
-	errb := fmt.Errorf("wrap 3: %w", erra)
-	erro := errors.Opaque(err1)
-	errco := fmt.Errorf("opaque: %w", erro)
-
-	err3 := errors.New("3")
+	err1 := xerrors.New("1")
+	erra := xerrors.Errorf("wrap 2: %w", err1)
+	errb := xerrors.Errorf("wrap 3: %w", erra)
+	erro := xerrors.Opaque(err1)
+	errco := xerrors.Errorf("opaque: %w", erro)
+	err3 := xerrors.New("3")
 
 	poser := &poser{"either 1 or 3", func(err error) bool {
 		return err == err1 || err == err3
@@ -50,7 +49,7 @@ func TestIs(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			if got := errors.Is(tc.err, tc.target); got != tc.match {
+			if got := xerrors.Is(tc.err, tc.target); got != tc.match {
 				t.Errorf("Is(%v, %v) = %v, want %v", tc.err, tc.target, got, tc.match)
 			}
 		})
@@ -89,7 +88,7 @@ func TestAs(t *testing.T) {
 		target interface{}
 		match  bool
 	}{{
-		fmt.Errorf("pittied the fool: %w", errorT{}),
+		xerrors.Errorf("pittied the fool: %w", errorT{}),
 		&errT,
 		true,
 	}, {
@@ -97,7 +96,7 @@ func TestAs(t *testing.T) {
 		&errP,
 		true,
 	}, {
-		errors.Opaque(errT),
+		xerrors.Opaque(errT),
 		&errT,
 		false,
 	}, {
@@ -128,7 +127,7 @@ func TestAs(t *testing.T) {
 	for _, tc := range testCases {
 		name := fmt.Sprintf("As(Errorf(..., %v), %v)", tc.err, tc.target)
 		t.Run(name, func(t *testing.T) {
-			match := errors.As(tc.err, tc.target)
+			match := xerrors.As(tc.err, tc.target)
 			if match != tc.match {
 				t.Fatalf("match: got %v; want %v", match, tc.match)
 			}
@@ -143,9 +142,9 @@ func TestAs(t *testing.T) {
 }
 
 func TestUnwrap(t *testing.T) {
-	err1 := errors.New("1")
-	erra := fmt.Errorf("wrap 2: %w", err1)
-	erro := errors.Opaque(err1)
+	err1 := xerrors.New("1")
+	erra := xerrors.Errorf("wrap 2: %w", err1)
+	erro := xerrors.Opaque(err1)
 
 	testCases := []struct {
 		err  error
@@ -155,26 +154,26 @@ func TestUnwrap(t *testing.T) {
 		{wrapped{nil}, nil},
 		{err1, nil},
 		{erra, err1},
-		{fmt.Errorf("wrap 3: %w", erra), erra},
+		{xerrors.Errorf("wrap 3: %w", erra), erra},
 
 		{erro, nil},
-		{fmt.Errorf("opaque: %w", erro), erro},
+		{xerrors.Errorf("opaque: %w", erro), erro},
 	}
 	for _, tc := range testCases {
-		if got := errors.Unwrap(tc.err); got != tc.want {
+		if got := xerrors.Unwrap(tc.err); got != tc.want {
 			t.Errorf("Unwrap(%v) = %v, want %v", tc.err, got, tc.want)
 		}
 	}
 }
 
 func TestOpaque(t *testing.T) {
-	got := fmt.Errorf("foo: %v", errors.Opaque(errorT{}))
+	got := xerrors.Errorf("foo: %v", xerrors.Opaque(errorT{}))
 	want := "foo: errorT"
 	if got.Error() != want {
 		t.Errorf("error without Format: got %v; want %v", got, want)
 	}
 
-	got = fmt.Errorf("foo: %v", errors.Opaque(errorD{}))
+	got = xerrors.Errorf("foo: %v", xerrors.Opaque(errorD{}))
 	want = "foo: errorD"
 	if got.Error() != want {
 		t.Errorf("error with Format: got %v; want %v", got, want)
@@ -189,7 +188,7 @@ type errorD struct{}
 
 func (errorD) Error() string { return "errorD" }
 
-func (errorD) FormatError(p errors.Printer) error {
+func (errorD) FormatError(p xerrors.Printer) error {
 	p.Print("errorD")
 	p.Detail()
 	p.Print("detail")

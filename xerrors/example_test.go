@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package errors_test
+package xerrors_test
 
 import (
 	"fmt"
 	"os"
 	"time"
 
-	"golang.org/x/exp/errors"
+	"golang.org/x/exp/xerrors"
 )
 
 // MyError is an error implementation that includes a time and message.
@@ -40,7 +40,7 @@ func ExampleAs() {
 	_, err := os.Open("non-existing")
 	if err != nil {
 		var pathError *os.PathError
-		if errors.As(err, &pathError) {
+		if xerrors.As(err, &pathError) {
 			fmt.Println("Failed at path:", pathError.Path)
 		}
 	}

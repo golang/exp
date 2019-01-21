@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package fmt_test
+package xerrors_test
 
 import (
-	gofmt "fmt"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -15,8 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/exp/errors"
-	"golang.org/x/exp/errors/fmt"
+	"golang.org/x/exp/xerrors"
 )
 
 func TestErrorf(t *testing.T) {
@@ -31,39 +30,39 @@ func TestErrorf(t *testing.T) {
 		got  error
 		want []string
 	}{{
-		fmt.Errorf("no args"),
+		xerrors.Errorf("no args"),
 		chain("no args/path.TestErrorf/path.go:xxx"),
 	}, {
-		fmt.Errorf("no args: %s"),
+		xerrors.Errorf("no args: %s"),
 		chain("no args: %!s(MISSING)/path.TestErrorf/path.go:xxx"),
 	}, {
-		fmt.Errorf("nounwrap: %s", "simple"),
+		xerrors.Errorf("nounwrap: %s", "simple"),
 		chain(`nounwrap: simple/path.TestErrorf/path.go:xxx`),
 	}, {
-		fmt.Errorf("nounwrap: %v", "simple"),
+		xerrors.Errorf("nounwrap: %v", "simple"),
 		chain(`nounwrap: simple/path.TestErrorf/path.go:xxx`),
 	}, {
-		fmt.Errorf("%s failed: %v", "foo", chained),
+		xerrors.Errorf("%s failed: %v", "foo", chained),
 		chain("foo failed/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("no wrap: %s", chained),
+		xerrors.Errorf("no wrap: %s", chained),
 		chain("no wrap/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("%s failed: %w", "foo", chained),
+		xerrors.Errorf("%s failed: %w", "foo", chained),
 		chain("wraps:foo failed/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("nowrapv: %v", chained),
+		xerrors.Errorf("nowrapv: %v", chained),
 		chain("nowrapv/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("wrapw: %w", chained),
+		xerrors.Errorf("wrapw: %w", chained),
 		chain("wraps:wrapw/path.TestErrorf/path.go:xxx",
 			"chained/somefile.go:xxx"),
 	}, {
-		fmt.Errorf("not wrapped: %+v", chained),
+		xerrors.Errorf("not wrapped: %+v", chained),
 		chain("not wrapped: chained: somefile.go:123/path.TestErrorf/path.go:xxx"),
 	}}
 	for i, tc := range testCases {
@@ -95,10 +94,10 @@ func TestErrorFormatter(t *testing.T) {
 		fallback  = &wrapped{"fallback", os.ErrNotExist}
 		oldAndNew = &wrapped{"new style", formatError("old style")}
 		framed    = &withFrameAndMore{
-			frame: errors.Caller(0),
+			frame: xerrors.Caller(0),
 		}
 		opaque = &wrapped{"outer",
-			errors.Opaque(&wrapped{"mid",
+			xerrors.Opaque(&wrapped{"mid",
 				&wrapped{"inner", nil}})}
 	)
 	testCases := []struct {
@@ -135,13 +134,13 @@ func TestErrorFormatter(t *testing.T) {
 	}, {
 		err:  simple,
 		fmt:  "%#v",
-		want: "&fmt_test.wrapped{msg:\"simple\", err:error(nil)}",
+		want: "&xerrors_test.wrapped{msg:\"simple\", err:error(nil)}",
 	}, {
 		err: framed,
 		fmt: "%+v",
 		want: "something:" +
-			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
-			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:98" +
+			"\n    golang.org/x/exp/xerrors_test.TestErrorFormatter" +
+			"\n        .+/golang.org/x/exp/xerrors/fmt_test.go:98" +
 			"\n    something more",
 		regexp: true,
 	}, {
@@ -265,20 +264,20 @@ func TestErrorFormatter(t *testing.T) {
 	}, {
 		err:  simple,
 		fmt:  "%T",
-		want: "*fmt_test.wrapped",
+		want: "*xerrors_test.wrapped",
 	}, {
 		err:  simple,
 		fmt:  "%🤪",
-		want: "%!🤪(*fmt_test.wrapped=&{simple <nil>})",
+		want: "%!🤪(*xerrors_test.wrapped=&{simple <nil>})",
 	}, {
 		err:  formatError("use fmt.Formatter"),
 		fmt:  "%#v",
 		want: "use fmt.Formatter",
 	}, {
-		err: wrapped{"using errors.Formatter",
+		err: wrapped{"using xerrors.Formatter",
 			formatError("use fmt.Formatter")},
 		fmt:  "%#v",
-		want: "fmt_test.wrapped{msg:\"using errors.Formatter\", err:\"use fmt.Formatter\"}",
+		want: "xerrors_test.wrapped{msg:\"using xerrors.Formatter\", err:\"use fmt.Formatter\"}",
 	}, {
 		err:  fmtTwice("%s %s", "ok", panicValue{}),
 		fmt:  "%s",
@@ -345,7 +344,7 @@ func TestAdaptor(t *testing.T) {
 	}}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d/%s", i, tc.fmt), func(t *testing.T) {
-			got := gofmt.Sprintf(tc.fmt, tc.err)
+			got := fmt.Sprintf(tc.fmt, tc.err)
 			if got != tc.want {
 				t.Errorf("\n got: %q\nwant: %q", got, tc.want)
 			}
@@ -353,7 +352,7 @@ func TestAdaptor(t *testing.T) {
 	}
 }
 
-var _ errors.Formatter = wrapped{}
+var _ xerrors.Formatter = wrapped{}
 
 type wrapped struct {
 	msg string
@@ -362,20 +361,20 @@ type wrapped struct {
 
 func (e wrapped) Error() string { return "should call Format" }
 
-func (e wrapped) FormatError(p errors.Printer) (next error) {
+func (e wrapped) FormatError(p xerrors.Printer) (next error) {
 	p.Print(e.msg)
 	p.Detail()
 	p.Print("somefile.go:123")
 	return e.err
 }
 
-var _ errors.Formatter = detailed{}
+var _ xerrors.Formatter = detailed{}
 
 type detailed struct{}
 
 func (e detailed) Error() string { return fmt.Sprint(e) }
 
-func (detailed) FormatError(p errors.Printer) (next error) {
+func (detailed) FormatError(p xerrors.Printer) (next error) {
 	p.Printf("out of %s", "peanuts")
 	p.Detail()
 	p.Print("the elephant is on strike\n")
@@ -384,12 +383,12 @@ func (detailed) FormatError(p errors.Printer) (next error) {
 }
 
 type withFrameAndMore struct {
-	frame errors.Frame
+	frame xerrors.Frame
 }
 
 func (e *withFrameAndMore) Error() string { return fmt.Sprint(e) }
 
-func (e *withFrameAndMore) FormatError(p errors.Printer) (next error) {
+func (e *withFrameAndMore) FormatError(p xerrors.Printer) (next error) {
 	p.Print("something")
 	if p.Detail() {
 		e.frame.Format(p)
@@ -406,7 +405,7 @@ func (e spurious) Format(fmt.State, rune) {
 	panic("should never be called by one of the tests")
 }
 
-func (e spurious) FormatError(p errors.Printer) (next error) {
+func (e spurious) FormatError(p xerrors.Printer) (next error) {
 	p.Print("spurious")
 	p.Detail() // Call detail even if we don't print anything
 	if e == "" {
@@ -425,17 +424,17 @@ type adapted struct {
 func (e adapted) Error() string { return string(e.msg) }
 
 func (e adapted) Format(s fmt.State, verb rune) {
-	fmt.FormatError(s, verb, e)
+	xerrors.FormatError(s, verb, e)
 }
 
-func (e adapted) FormatError(p errors.Printer) error {
+func (e adapted) FormatError(p xerrors.Printer) error {
 	p.Print(e.msg)
 	p.Detail()
 	p.Print("detail")
 	return e.err
 }
 
-// formatError is an error implementing Format instead of errors.Formatter.
+// formatError is an error implementing Format instead of xerrors.Formatter.
 // The implementation mimics the implementation of github.com/pkg/errors.
 type formatError string
 
@@ -473,7 +472,7 @@ func fmtTwice(format string, a ...interface{}) error {
 
 func (e fmtTwiceErr) Error() string { return fmt.Sprint(e) }
 
-func (e fmtTwiceErr) FormatError(p errors.Printer) (next error) {
+func (e fmtTwiceErr) FormatError(p xerrors.Printer) (next error) {
 	p.Printf(e.format, e.args...)
 	p.Print("/")
 	p.Printf(e.format, e.args...)
@@ -488,7 +487,7 @@ type panicValue struct{}
 
 func (panicValue) String() string { panic("panic") }
 
-var rePath = regexp.MustCompile(`( [^ ]*)fmt.*test\.`)
+var rePath = regexp.MustCompile(`( [^ ]*)xerrors.*test\.`)
 var reLine = regexp.MustCompile(":[0-9]*\n?$")
 
 func cleanPath(s string) string {
@@ -502,10 +501,10 @@ func cleanPath(s string) string {
 func errToParts(err error) (a []string) {
 	for err != nil {
 		var p testPrinter
-		if errors.Unwrap(err) != nil {
+		if xerrors.Unwrap(err) != nil {
 			p.str += "wraps:"
 		}
-		f, ok := err.(errors.Formatter)
+		f, ok := err.(xerrors.Formatter)
 		if !ok {
 			a = append(a, err.Error())
 			break

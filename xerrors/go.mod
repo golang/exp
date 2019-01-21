@@ -1,1 +1,1 @@
-module golang.org/x/exp/errors
+module golang.org/x/exp/xerrors
