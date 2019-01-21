@@ -5,6 +5,7 @@
 package xerrors
 
 import (
+	"fmt"
 	"strings"
 
 	"golang.org/x/exp/xerrors/internal"
@@ -21,8 +22,9 @@ import (
 // with an Unwrap method returning it.
 func Errorf(format string, a ...interface{}) error {
 	err, wrap := lastError(format, a)
+	format = formatPlusW(format)
 	if err == nil {
-		return &noWrapError{Sprintf(format, a...), nil, Caller(1)}
+		return &noWrapError{fmt.Sprintf(format, a...), nil, Caller(1)}
 	}
 
 	// TODO: this is not entirely correct. The error value could be
@@ -30,7 +32,7 @@ func Errorf(format string, a ...interface{}) error {
 	// substitutions. With relatively small changes to doPrintf we can
 	// have it optionally ignore extra arguments and pass the argument
 	// list in its entirety.
-	msg := Sprintf(format[:len(format)-len(": %s")], a[:len(a)-1]...)
+	msg := fmt.Sprintf(format[:len(format)-len(": %s")], a[:len(a)-1]...)
 	frame := Frame{}
 	if internal.EnableTrace {
 		frame = Caller(1)
@@ -39,6 +41,11 @@ func Errorf(format string, a ...interface{}) error {
 		return &wrapError{msg, err, frame}
 	}
 	return &noWrapError{msg, err, frame}
+}
+
+// formatPlusW is used to avoid the vet check that will barf at %w.
+func formatPlusW(s string) string {
+	return s
 }
 
 func lastError(format string, a []interface{}) (err error, wrap bool) {
@@ -68,8 +75,10 @@ type noWrapError struct {
 }
 
 func (e *noWrapError) Error() string {
-	return Sprint(e)
+	return fmt.Sprint(e)
 }
+
+func (e *noWrapError) Format(s fmt.State, v rune) { FormatError(s, v, e) }
 
 func (e *noWrapError) FormatError(p Printer) (next error) {
 	p.Print(e.msg)
@@ -84,8 +93,10 @@ type wrapError struct {
 }
 
 func (e *wrapError) Error() string {
-	return Sprint(e)
+	return fmt.Sprint(e)
 }
+
+func (e *wrapError) Format(s fmt.State, v rune) { FormatError(s, v, e) }
 
 func (e *wrapError) FormatError(p Printer) (next error) {
 	p.Print(e.msg)

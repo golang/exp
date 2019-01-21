@@ -7,107 +7,146 @@ package xerrors
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"reflect"
+	"strconv"
 )
 
-func fmtError(p *pp, verb rune, err error) (handled bool) {
+// FormatError calls the FormatError method of err with a errors.Printer
+// configured according to s and verb and writes the result to s.
+func FormatError(s fmt.State, verb rune, f Formatter) {
+	// Assuming this function is only called from the Format method, and given
+	// that FormatError takes precedence over Format, it cannot be called from
+	// any package that supports errors.Formatter. It is therefore safe to
+	// disregard that State may be a specific printer implementation and use one
+	// of our choice instead.
+
+	// limitations: does not support printing error as Go struct.
+
 	var (
-		sep = " " // separator before next error
-		w   = p   // print buffer where error text is written
+		sep    = " " // separator before next error
+		p      = &state{State: s}
+		direct = true
 	)
-	switch {
+
+	var err error = f
+
+	switch verb {
 	// Note that this switch must match the preference order
 	// for ordinary string printing (%#v before %+v, and so on).
 
-	case p.fmt.sharpV:
-		if stringer, ok := p.arg.(GoStringer); ok {
-			// Print the result of GoString unadorned.
-			p.fmt.fmtS(stringer.GoString())
-			return true
+	case 'v':
+		if s.Flag('#') {
+			if stringer, ok := err.(fmt.GoStringer); ok {
+				io.WriteString(&p.buf, stringer.GoString())
+				goto exit
+			}
+			// proceed as if it were %v
+		} else if s.Flag('+') {
+			p.printDetail = true
+			sep = "\n  - "
 		}
-		return false
-
-	case p.fmt.plusV:
-		sep = "\n  - "
-		w.fmt.fmtFlags = fmtFlags{plusV: p.fmt.plusV} // only keep detail flag
-
-		// The width or precision of a detailed view could be the number of
-		// errors to print from a list.
-
-	default:
+	case 's':
+	case 'q', 'x', 'X':
 		// Use an intermediate buffer in the rare cases that precision,
 		// truncation, or one of the alternative verbs (q, x, and X) are
 		// specified.
-		switch verb {
-		case 's', 'v':
-			if (!w.fmt.widPresent || w.fmt.wid == 0) && !w.fmt.precPresent {
-				break
-			}
-			fallthrough
-		case 'q', 'x', 'X':
-			w = newPrinter()
-			defer w.free()
+		direct = false
+
+	default:
+		p.buf.WriteString("%!")
+		p.buf.WriteRune(verb)
+		p.buf.WriteByte('(')
+		switch {
+		case err != nil:
+			p.buf.WriteString(reflect.TypeOf(f).String())
 		default:
-			w.badVerb(verb)
-			return true
+			p.buf.WriteString("<nil>")
 		}
+		p.buf.WriteByte(')')
+		io.Copy(s, &p.buf)
+		return
 	}
 
 loop:
 	for {
-		w.fmt.inDetail = false
+		p.inDetail = false
+
 		switch v := err.(type) {
 		case Formatter:
-			err = v.FormatError((*errPP)(w))
+			err = v.FormatError((*printer)(p))
 		case fmt.Formatter:
-			if w.fmt.plusV {
-				v.Format((*errPPState)(w), 'v') // indent new lines
-			} else {
-				v.Format(w, 'v') // do not indent new lines
-			}
+			v.Format(p, 'v')
 			break loop
 		default:
-			w.fmtString(v.Error(), 's')
+			io.WriteString(&p.buf, v.Error())
 			break loop
 		}
 		if err == nil {
 			break
 		}
-		if !w.fmt.inDetail || !p.fmt.plusV {
-			w.buf.WriteByte(':')
+		if !p.inDetail || !p.printDetail {
+			p.buf.WriteByte(':')
 		}
 		// Strip last newline of detail.
-		if bytes.HasSuffix([]byte(w.buf), detailSep) {
-			w.buf = w.buf[:len(w.buf)-len(detailSep)]
+		if bytes.HasSuffix(p.buf.Bytes(), detailSep) {
+			p.buf.Truncate(p.buf.Len() - len(detailSep))
 		}
-		w.buf.WriteString(sep)
-		w.fmt.inDetail = false
+		p.buf.WriteString(sep)
+		p.inDetail = false
 	}
 
-	if w != p {
-		p.fmtString(string(w.buf), verb)
+exit:
+	width, okW := s.Width()
+	prec, okP := s.Precision()
+
+	if !direct || (okW && width > 0) || okP {
+		// Construct format string from State s.
+		format := []byte{'%'}
+		if s.Flag('-') {
+			format = append(format, '-')
+		}
+		if s.Flag('+') {
+			format = append(format, '+')
+		}
+		if s.Flag(' ') {
+			format = append(format, ' ')
+		}
+		if okW {
+			format = strconv.AppendInt(format, int64(width), 10)
+		}
+		if okP {
+			format = append(format, '.')
+			format = strconv.AppendInt(format, int64(prec), 10)
+		}
+		format = append(format, string(verb)...)
+		fmt.Fprintf(s, string(format), p.buf.String())
+	} else {
+		io.Copy(s, &p.buf)
 	}
-	return true
 }
 
 var detailSep = []byte("\n    ")
 
-// errPPState wraps a pp to implement State with indentation. It is used
-// for errors implementing fmt.Formatter.
-type errPPState pp
+// state tracks error printing state. It implements fmt.State.
+type state struct {
+	fmt.State
+	buf bytes.Buffer
 
-func (p *errPPState) Width() (wid int, ok bool)      { return (*pp)(p).Width() }
-func (p *errPPState) Precision() (prec int, ok bool) { return (*pp)(p).Precision() }
-func (p *errPPState) Flag(c int) bool                { return (*pp)(p).Flag(c) }
+	printDetail bool
+	inDetail    bool
+	needNewline bool
+}
 
-func (p *errPPState) Write(b []byte) (n int, err error) {
-	if !p.fmt.inDetail || p.fmt.plusV {
+func (s *state) Write(b []byte) (n int, err error) {
+	if s.printDetail {
 		if len(b) == 0 {
 			return 0, nil
 		}
-		if p.fmt.inDetail && p.fmt.needNewline {
-			p.fmt.needNewline = false
-			p.buf.WriteByte(':')
-			p.buf.Write(detailSep)
+		if s.inDetail && s.needNewline {
+			s.needNewline = false
+			s.buf.WriteByte(':')
+			s.buf.Write(detailSep)
 			if b[0] == '\n' {
 				b = b[1:]
 			}
@@ -115,41 +154,35 @@ func (p *errPPState) Write(b []byte) (n int, err error) {
 		k := 0
 		for i, c := range b {
 			if c == '\n' {
-				p.buf.Write(b[k:i])
-				p.buf.Write(detailSep)
+				s.buf.Write(b[k:i])
+				s.buf.Write(detailSep)
 				k = i + 1
 			}
 		}
-		p.buf.Write(b[k:])
-		p.fmt.needNewline = !p.fmt.inDetail
+		s.buf.Write(b[k:])
+		s.needNewline = !s.inDetail
+	} else if !s.inDetail {
+		s.buf.Write(b)
 	}
 	return len(b), nil
 }
 
-// errPP wraps a pp to implement a Printer.
-type errPP pp
+// printer wraps a state to implement an xerrors.Printer.
+type printer state
 
-func (p *errPP) Print(args ...interface{}) {
-	if !p.fmt.inDetail || p.fmt.plusV {
-		if p.fmt.plusV {
-			Fprint((*errPPState)(p), args...)
-		} else {
-			(*pp)(p).doPrint(args)
-		}
+func (s *printer) Print(args ...interface{}) {
+	if !s.inDetail || s.printDetail {
+		fmt.Fprint((*state)(s), args...)
 	}
 }
 
-func (p *errPP) Printf(format string, args ...interface{}) {
-	if !p.fmt.inDetail || p.fmt.plusV {
-		if p.fmt.plusV {
-			Fprintf((*errPPState)(p), format, args...)
-		} else {
-			(*pp)(p).doPrintf(format, args)
-		}
+func (s *printer) Printf(format string, args ...interface{}) {
+	if !s.inDetail || s.printDetail {
+		fmt.Fprintf((*state)(s), format, args...)
 	}
 }
 
-func (p *errPP) Detail() bool {
-	p.fmt.inDetail = true
-	return p.fmt.plusV
+func (s *printer) Detail() bool {
+	s.inDetail = true
+	return s.printDetail
 }

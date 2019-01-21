@@ -104,7 +104,7 @@ func TestAs(t *testing.T) {
 		&errP,
 		false,
 	}, {
-		wrapped{nil},
+		errWrap{nil},
 		&errT,
 		false,
 	}, {
@@ -151,7 +151,7 @@ func TestUnwrap(t *testing.T) {
 		want error
 	}{
 		{nil, nil},
-		{wrapped{nil}, nil},
+		{errWrap{nil}, nil},
 		{err1, nil},
 		{erra, err1},
 		{xerrors.Errorf("wrap 3: %w", erra), erra},
@@ -167,15 +167,15 @@ func TestUnwrap(t *testing.T) {
 }
 
 func TestOpaque(t *testing.T) {
-	got := xerrors.Errorf("foo: %v", xerrors.Opaque(errorT{}))
+	got := fmt.Sprintf("%v", xerrors.Errorf("foo: %v", xerrors.Opaque(errorT{})))
 	want := "foo: errorT"
-	if got.Error() != want {
+	if got != want {
 		t.Errorf("error without Format: got %v; want %v", got, want)
 	}
 
-	got = xerrors.Errorf("foo: %v", xerrors.Opaque(errorD{}))
+	got = fmt.Sprintf("%v", xerrors.Errorf("foo: %v", xerrors.Opaque(errorD{})))
 	want = "foo: errorD"
-	if got.Error() != want {
+	if got != want {
 		t.Errorf("error with Format: got %v; want %v", got, want)
 	}
 }
@@ -195,8 +195,8 @@ func (errorD) FormatError(p xerrors.Printer) error {
 	return nil
 }
 
-type wrapped struct{ error }
+type errWrap struct{ error }
 
-func (wrapped) Error() string { return "wrapped" }
+func (errWrap) Error() string { return "wrapped" }
 
-func (wrapped) Unwrap() error { return nil }
+func (errWrap) Unwrap() error { return nil }

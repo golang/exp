@@ -132,15 +132,11 @@ func TestErrorFormatter(t *testing.T) {
 			"\n    and the 12 monkeys" +
 			"\n    are laughing",
 	}, {
-		err:  simple,
-		fmt:  "%#v",
-		want: "&xerrors_test.wrapped{msg:\"simple\", err:error(nil)}",
-	}, {
 		err: framed,
 		fmt: "%+v",
 		want: "something:" +
 			"\n    golang.org/x/exp/xerrors_test.TestErrorFormatter" +
-			"\n        .+/golang.org/x/exp/xerrors/fmt_test.go:98" +
+			"\n        .+/golang.org/x/exp/xerrors/fmt_test.go:97" +
 			"\n    something more",
 		regexp: true,
 	}, {
@@ -231,7 +227,7 @@ func TestErrorFormatter(t *testing.T) {
 			"\n    one:" +
 			"\n    somefile.go:123",
 	}, {
-		err: wrapped{"", wrapped{"inner message", nil}},
+		err: &wrapped{"", &wrapped{"inner message", nil}},
 		fmt: "%+v",
 		want: "somefile.go:123" +
 			"\n  - inner message:" +
@@ -268,16 +264,13 @@ func TestErrorFormatter(t *testing.T) {
 	}, {
 		err:  simple,
 		fmt:  "%🤪",
-		want: "%!🤪(*xerrors_test.wrapped=&{simple <nil>})",
+		want: "%!🤪(*xerrors_test.wrapped)",
+		// For 1.13:
+		//  want: "%!🤪(*xerrors_test.wrapped=&{simple <nil>})",
 	}, {
 		err:  formatError("use fmt.Formatter"),
 		fmt:  "%#v",
 		want: "use fmt.Formatter",
-	}, {
-		err: wrapped{"using xerrors.Formatter",
-			formatError("use fmt.Formatter")},
-		fmt:  "%#v",
-		want: "xerrors_test.wrapped{msg:\"using xerrors.Formatter\", err:\"use fmt.Formatter\"}",
 	}, {
 		err:  fmtTwice("%s %s", "ok", panicValue{}),
 		fmt:  "%s",
@@ -361,6 +354,10 @@ type wrapped struct {
 
 func (e wrapped) Error() string { return "should call Format" }
 
+func (e wrapped) Format(s fmt.State, verb rune) {
+	xerrors.FormatError(s, verb, &e)
+}
+
 func (e wrapped) FormatError(p xerrors.Printer) (next error) {
 	p.Print(e.msg)
 	p.Detail()
@@ -388,6 +385,10 @@ type withFrameAndMore struct {
 
 func (e *withFrameAndMore) Error() string { return fmt.Sprint(e) }
 
+func (e *withFrameAndMore) Format(s fmt.State, v rune) {
+	xerrors.FormatError(s, v, e)
+}
+
 func (e *withFrameAndMore) FormatError(p xerrors.Printer) (next error) {
 	p.Print("something")
 	if p.Detail() {
@@ -401,8 +402,9 @@ type spurious string
 
 func (e spurious) Error() string { return fmt.Sprint(e) }
 
-func (e spurious) Format(fmt.State, rune) {
-	panic("should never be called by one of the tests")
+// move to 1_12 test file
+func (e spurious) Format(s fmt.State, verb rune) {
+	xerrors.FormatError(s, verb, e)
 }
 
 func (e spurious) FormatError(p xerrors.Printer) (next error) {
@@ -471,6 +473,10 @@ func fmtTwice(format string, a ...interface{}) error {
 }
 
 func (e fmtTwiceErr) Error() string { return fmt.Sprint(e) }
+
+func (e fmtTwiceErr) Format(s fmt.State, verb rune) {
+	xerrors.FormatError(s, verb, e)
+}
 
 func (e fmtTwiceErr) FormatError(p xerrors.Printer) (next error) {
 	p.Printf(e.format, e.args...)
