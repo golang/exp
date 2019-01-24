@@ -14,7 +14,7 @@ import (
 
 // FormatError calls the FormatError method of err with a errors.Printer
 // configured according to s and verb and writes the result to s.
-func FormatError(s fmt.State, verb rune, f Formatter) {
+func FormatError(f Formatter, s fmt.State, verb rune) {
 	// Assuming this function is only called from the Format method, and given
 	// that FormatError takes precedence over Format, it cannot be called from
 	// any package that supports errors.Formatter. It is therefore safe to

@@ -355,7 +355,7 @@ type wrapped struct {
 func (e wrapped) Error() string { return "should call Format" }
 
 func (e wrapped) Format(s fmt.State, verb rune) {
-	xerrors.FormatError(s, verb, &e)
+	xerrors.FormatError(&e, s, verb)
 }
 
 func (e wrapped) FormatError(p xerrors.Printer) (next error) {
@@ -386,7 +386,7 @@ type withFrameAndMore struct {
 func (e *withFrameAndMore) Error() string { return fmt.Sprint(e) }
 
 func (e *withFrameAndMore) Format(s fmt.State, v rune) {
-	xerrors.FormatError(s, v, e)
+	xerrors.FormatError(e, s, v)
 }
 
 func (e *withFrameAndMore) FormatError(p xerrors.Printer) (next error) {
@@ -404,7 +404,7 @@ func (e spurious) Error() string { return fmt.Sprint(e) }
 
 // move to 1_12 test file
 func (e spurious) Format(s fmt.State, verb rune) {
-	xerrors.FormatError(s, verb, e)
+	xerrors.FormatError(e, s, verb)
 }
 
 func (e spurious) FormatError(p xerrors.Printer) (next error) {
@@ -426,7 +426,7 @@ type adapted struct {
 func (e adapted) Error() string { return string(e.msg) }
 
 func (e adapted) Format(s fmt.State, verb rune) {
-	xerrors.FormatError(s, verb, e)
+	xerrors.FormatError(e, s, verb)
 }
 
 func (e adapted) FormatError(p xerrors.Printer) error {
@@ -475,7 +475,7 @@ func fmtTwice(format string, a ...interface{}) error {
 func (e fmtTwiceErr) Error() string { return fmt.Sprint(e) }
 
 func (e fmtTwiceErr) Format(s fmt.State, verb rune) {
-	xerrors.FormatError(s, verb, e)
+	xerrors.FormatError(e, s, verb)
 }
 
 func (e fmtTwiceErr) FormatError(p xerrors.Printer) (next error) {

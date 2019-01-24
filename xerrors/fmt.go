@@ -78,7 +78,7 @@ func (e *noWrapError) Error() string {
 	return fmt.Sprint(e)
 }
 
-func (e *noWrapError) Format(s fmt.State, v rune) { FormatError(s, v, e) }
+func (e *noWrapError) Format(s fmt.State, v rune) { FormatError(e, s, v) }
 
 func (e *noWrapError) FormatError(p Printer) (next error) {
 	p.Print(e.msg)
@@ -96,7 +96,7 @@ func (e *wrapError) Error() string {
 	return fmt.Sprint(e)
 }
 
-func (e *wrapError) Format(s fmt.State, v rune) { FormatError(s, v, e) }
+func (e *wrapError) Format(s fmt.State, v rune) { FormatError(e, s, v) }
 
 func (e *wrapError) FormatError(p Printer) (next error) {
 	p.Print(e.msg)
