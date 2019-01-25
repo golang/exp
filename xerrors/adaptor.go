@@ -12,8 +12,8 @@ import (
 	"strconv"
 )
 
-// FormatError calls the FormatError method of err with a errors.Printer
-// configured according to s and verb and writes the result to s.
+// FormatError calls the FormatError method of f with an errors.Printer
+// configured according to s and verb, and writes the result to s.
 func FormatError(f Formatter, s fmt.State, verb rune) {
 	// Assuming this function is only called from the Format method, and given
 	// that FormatError takes precedence over Format, it cannot be called from

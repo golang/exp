@@ -41,8 +41,8 @@ func (f Frame) location() (function, file string, line int) {
 }
 
 // Format prints the stack as error detail.
-// It should be called from an error's Format implementation,
-// before printing any other error detail.
+// It should be called from an error's Format implementation
+// after printing any other error detail.
 func (f Frame) Format(p Printer) {
 	if p.Detail() {
 		function, file, line := f.location()

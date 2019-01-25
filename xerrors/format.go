@@ -16,7 +16,7 @@ type Formatter interface {
 // A Printer formats error messages.
 //
 // The most common implementation of Printer is the one provided by package fmt
-// during Printf. Localization packages such as golang.org/x/text/message
+// during Printf (as of Go 1.13). Localization packages such as golang.org/x/text/message
 // typically provide their own implementations.
 type Printer interface {
 	// Print appends args to the message output.
