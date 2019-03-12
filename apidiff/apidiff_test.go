@@ -26,11 +26,11 @@ func TestChanges(t *testing.T) {
 	sort.Strings(wanti)
 	sort.Strings(wantc)
 
-	oldpkg, err := load("old", dir)
+	oldpkg, err := load("apidiff/old", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	newpkg, err := load("new", dir)
+	newpkg, err := load("apidiff/new", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,8 +56,15 @@ func splitIntoPackages(t *testing.T, dir string) (incompatibles, compatibles []s
 	}
 	defer f.Close()
 
-	oldd := filepath.Join(dir, "src/old")
-	newd := filepath.Join(dir, "src/new")
+	if err := os.MkdirAll(filepath.Join(dir, "src", "apidiff"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(dir, "src", "apidiff", "go.mod"), []byte("module apidiff\n"), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	oldd := filepath.Join(dir, "src/apidiff/old")
+	newd := filepath.Join(dir, "src/apidiff/new")
 	if err := os.MkdirAll(oldd, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -112,6 +119,7 @@ func load(importPath, goPath string) (*packages.Package, error) {
 	}
 	if goPath != "" {
 		cfg.Env = append(os.Environ(), "GOPATH="+goPath)
+		cfg.Dir = filepath.Join(goPath, "src", filepath.FromSlash(importPath))
 	}
 	pkgs, err := packages.Load(cfg, importPath)
 	if err != nil {
