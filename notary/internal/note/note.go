@@ -381,6 +381,26 @@ func GenerateKey(rand io.Reader, name string) (skey, vkey string, err error) {
 	return skey, vkey, nil
 }
 
+// NewVerifierFromEd25519PublicKey constructs a new verifier from a notary name
+// and a golang.org/x/crypto/ed25519 public key.
+func NewVerifierFromEd25519PublicKey(name string, pub ed25519.PublicKey) (Verifier, error) {
+	if len(pub) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("invalid public key size %d, expected %d", len(pub), ed25519.PublicKeySize)
+	}
+
+	pubkey := append([]byte{algEd25519}, pub...)
+	hash := keyHash(name, pubkey)
+
+	v := &verifier{
+		name: name,
+		hash: uint32(hash),
+		verify: func(msg, sig []byte) bool {
+			return ed25519.Verify(pub, msg, sig)
+		},
+	}
+	return v, nil
+}
+
 // A Notaries is a collection of known notary keys.
 type Notaries interface {
 	// Verifier returns the Verifier associated with the notary key

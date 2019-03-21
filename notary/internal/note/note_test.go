@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"testing/iotest"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 func TestNewVerifier(t *testing.T) {
@@ -76,22 +78,7 @@ func TestNewSigner(t *testing.T) {
 	}
 }
 
-func TestGenerateKey(t *testing.T) {
-	// Generate key pair, make sure it is all self-consistent.
-	const Name = "EnochRoot"
-	skey, vkey, err := GenerateKey(rand.Reader, Name)
-	if err != nil {
-		t.Fatalf("GenerateKey: %v", err)
-	}
-	signer, err := NewSigner(skey)
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
-	verifier, err := NewVerifier(vkey)
-	if err != nil {
-		t.Fatalf("NewVerifier: %v", err)
-	}
-
+func testSignerAndVerifier(t *testing.T, Name string, signer Signer, verifier Verifier) {
 	if name := signer.Name(); name != Name {
 		t.Errorf("signer.Name() = %q, want %q", name, Name)
 	}
@@ -116,12 +103,88 @@ func TestGenerateKey(t *testing.T) {
 	if verifier.Verify(msg, sig) {
 		t.Fatalf("verifier.Verify succceeded on corrupt signature")
 	}
+	sig[0]--
+	msg[0]++
+	if verifier.Verify(msg, sig) {
+		t.Fatalf("verifier.Verify succceeded on corrupt message")
+	}
+}
+
+func TestGenerateKey(t *testing.T) {
+	// Generate key pair, make sure it is all self-consistent.
+	const Name = "EnochRoot"
+
+	skey, vkey, err := GenerateKey(rand.Reader, Name)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	signer, err := NewSigner(skey)
+	if err != nil {
+		t.Fatalf("NewSigner: %v", err)
+	}
+	verifier, err := NewVerifier(vkey)
+	if err != nil {
+		t.Fatalf("NewVerifier: %v", err)
+	}
+
+	testSignerAndVerifier(t, Name, signer, verifier)
 
 	// Check that GenerateKey returns error from rand reader.
 	_, _, err = GenerateKey(iotest.TimeoutReader(iotest.OneByteReader(rand.Reader)), Name)
 	if err == nil {
 		t.Fatalf("GenerateKey succeeded with error-returning rand reader")
 	}
+}
+
+func TestFromEd25519(t *testing.T) {
+	const Name = "EnochRoot"
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	signer, err := newSignerFromEd25519Seed(Name, priv.Seed())
+	if err != nil {
+		t.Fatalf("newSignerFromEd25519Seed: %v", err)
+	}
+	verifier, err := NewVerifierFromEd25519PublicKey(Name, pub)
+	if err != nil {
+		t.Fatalf("NewVerifierFromEd25519PublicKey: %v", err)
+	}
+
+	testSignerAndVerifier(t, Name, signer, verifier)
+
+	// Check that wrong key sizes return errors.
+	_, err = newSignerFromEd25519Seed(Name, priv)
+	if err == nil {
+		t.Errorf("newSignerFromEd25519Seed succeeded with a seed of the wrong size")
+	}
+	_, err = NewVerifierFromEd25519PublicKey(Name, pub[:len(pub)-1])
+	if err == nil {
+		t.Errorf("NewVerifierFromEd25519PublicKey succeeded with a seed of the wrong size")
+	}
+}
+
+// newSignerFromEd25519Seed constructs a new signer from a notary name and a
+// golang.org/x/crypto/ed25519 private key seed.
+func newSignerFromEd25519Seed(name string, seed []byte) (Signer, error) {
+	if len(seed) != ed25519.SeedSize {
+		return nil, errors.New("invalid seed size")
+	}
+	priv := ed25519.NewKeyFromSeed(seed)
+	pub := priv[32:]
+
+	pubkey := append([]byte{algEd25519}, pub...)
+	hash := keyHash(name, pubkey)
+
+	s := &signer{
+		name: name,
+		hash: uint32(hash),
+		sign: func(msg []byte) ([]byte, error) {
+			return ed25519.Sign(priv, msg), nil
+		},
+	}
+	return s, nil
 }
 
 func TestSign(t *testing.T) {
