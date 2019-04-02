@@ -152,7 +152,7 @@ func checkGoSum(data []byte, verifierURL string, thr tlog.HashReader) {
 			continue
 		}
 		if !bytes.Equal(data, ldata) {
-			log.Printf("%s@%s: different data from lookup and record:\n%s\n%s", hex.Dump(ldata), hex.Dump(data))
+			log.Printf("%s@%s: different data from lookup and record:\n%s\n%s", f1[0], f1[1], hex.Dump(ldata), hex.Dump(data))
 			continue
 		}
 

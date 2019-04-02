@@ -88,7 +88,7 @@ func tileHash(data []byte) Hash {
 		return h
 	}
 	n := len(data) / 2
-	return hashNode(tileHash(data[:n]), tileHash(data[n:]))
+	return NodeHash(tileHash(data[:n]), tileHash(data[n:]))
 }
 
 // NewTiles returns the coordinates of the tiles of height h ≥ 1
@@ -364,7 +364,7 @@ func (r *tileHashReader) ReadHashes(indexes []int64) ([]Hash, error) {
 		if err != nil {
 			return nil, err
 		}
-		th = hashNode(h, th)
+		th = NodeHash(h, th)
 	}
 	if th != r.tree.Hash {
 		// The tiles do not support the tree hash.

@@ -95,8 +95,8 @@ func RecordHash(data []byte) Hash {
 	return h1
 }
 
-// hashNode returns the hash for an interior tree node with the given left and right hashes.
-func hashNode(left, right Hash) Hash {
+// NodeHash returns the hash for an interior tree node with the given left and right hashes.
+func NodeHash(left, right Hash) Hash {
 	// SHA256(0x01 || left || right)
 	// https://tools.ietf.org/html/rfc6962#section-2.1
 	// We use a stack buffer to assemble the hash input
@@ -215,7 +215,7 @@ func StoredHashesForRecordHash(n int64, h Hash, r HashReader) ([]Hash, error) {
 
 	// Build new hashes.
 	for i := 0; i < m; i++ {
-		h = hashNode(old[m-1-i], h)
+		h = NodeHash(old[m-1-i], h)
 		hashes = append(hashes, h)
 	}
 	return hashes, nil
@@ -305,7 +305,7 @@ func subTreeHash(lo, hi int64, hashes []Hash) (Hash, []Hash) {
 	// Reconstruct hash.
 	h := hashes[numTree-1]
 	for i := numTree - 2; i >= 0; i-- {
-		h = hashNode(hashes[i], h)
+		h = NodeHash(hashes[i], h)
 	}
 	return h, hashes[numTree:]
 }
@@ -437,13 +437,13 @@ func runRecordProof(p RecordProof, lo, hi, n int64, leafHash Hash) (Hash, error)
 		if err != nil {
 			return Hash{}, err
 		}
-		return hashNode(th, p[len(p)-1]), nil
+		return NodeHash(th, p[len(p)-1]), nil
 	} else {
 		th, err := runRecordProof(p[:len(p)-1], lo+k, hi, n, leafHash)
 		if err != nil {
 			return Hash{}, err
 		}
-		return hashNode(p[len(p)-1], th), nil
+		return NodeHash(p[len(p)-1], th), nil
 	}
 }
 
@@ -590,12 +590,12 @@ func runTreeProof(p TreeProof, lo, hi, n int64, old Hash) (Hash, Hash, error) {
 		if err != nil {
 			return Hash{}, Hash{}, err
 		}
-		return oh, hashNode(th, p[len(p)-1]), nil
+		return oh, NodeHash(th, p[len(p)-1]), nil
 	} else {
 		oh, th, err := runTreeProof(p[:len(p)-1], lo+k, hi, n, old)
 		if err != nil {
 			return Hash{}, Hash{}, err
 		}
-		return hashNode(p[len(p)-1], oh), hashNode(p[len(p)-1], th), nil
+		return NodeHash(p[len(p)-1], oh), NodeHash(p[len(p)-1], th), nil
 	}
 }
