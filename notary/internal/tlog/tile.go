@@ -299,8 +299,7 @@ func (r *tileHashReader) ReadHashes(indexes []int64) ([]Hash, error) {
 	// the parents are being fetched anyway.
 	indexTileOrder := make([]int, len(indexes))
 	for i, x := range indexes {
-		level, n := SplitStoredHashIndex(x)
-		if n<<uint(level) >= r.tree.N {
+		if x >= StoredHashIndex(0, r.tree.N) {
 			return nil, fmt.Errorf("indexes not in tree")
 		}
 

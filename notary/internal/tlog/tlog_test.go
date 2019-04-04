@@ -166,6 +166,11 @@ func TestTree(t *testing.T) {
 			}
 		}
 
+		// Check that ReadHashes will give an error if the index is not in the tree.
+		if _, err := thr.ReadHashes([]int64{(i + 1) * 2}); err == nil {
+			t.Fatalf("TileHashReader(%d).ReadHashes(%d) for index not in tree <nil>, want err", i, i+1)
+		}
+
 		// Check that tree proofs work, for all trees so far, using TileReader.
 		// To prove a tree that way, all you have to do is compute and verify its hash.
 		for j := int64(0); j <= i; j++ {
