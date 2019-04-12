@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// A Tree is a tree description signed by a notary.
+// A Tree is a tree description, to be signed by a go.sum database server.
 type Tree struct {
 	N    int64
 	Hash Hash
@@ -23,7 +23,7 @@ type Tree struct {
 //
 // The encoded form is three lines, each ending in a newline (U+000A):
 //
-//	go notary tree
+//	go.sum database tree
 //	N
 //	Hash
 //
@@ -32,19 +32,19 @@ type Tree struct {
 // A future backwards-compatible encoding may add additional lines,
 // which the parser can ignore.
 // A future backwards-incompatible encoding would use a different
-// first line (for example, "go notary tree v2").
+// first line (for example, "go.sum database tree v2").
 func FormatTree(tree Tree) []byte {
-	return []byte(fmt.Sprintf("go notary tree\n%d\n%s\n", tree.N, tree.Hash))
+	return []byte(fmt.Sprintf("go.sum database tree\n%d\n%s\n", tree.N, tree.Hash))
 }
 
 var errMalformedTree = errors.New("malformed tree note")
-var treePrefix = []byte("go notary tree\n")
+var treePrefix = []byte("go.sum database tree\n")
 
 // ParseTree parses a tree root description.
 func ParseTree(text []byte) (tree Tree, err error) {
 	// The message looks like:
 	//
-	//	go notary tree
+	//	go.sum database tree
 	//	2
 	//	nND/nri/U0xuHUrYSy0HtMeal2vzD9V4k/BO79C+QeI=
 	//

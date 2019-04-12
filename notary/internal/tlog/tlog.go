@@ -3,9 +3,9 @@
 // license that can be found in the LICENSE file.
 
 // Package tlog implements a tamper-evident log
-// used in the Go module notary.
+// used in the Go module go.sum database server.
 //
-// This package is part of a DRAFT of what the Go module notary will look like.
+// This package is part of a DRAFT of what the go.sum database server will look like.
 // Do not assume the details here are final!
 //
 // This package follows the design of Certificate Transparency (RFC 6962)
@@ -210,7 +210,7 @@ func StoredHashesForRecordHash(n int64, h Hash, r HashReader) ([]Hash, error) {
 		return nil, err
 	}
 	if len(old) != len(indexes) {
-		return nil, fmt.Errorf("notary: ReadHashes(%d indexes) = %d hashes", len(indexes), len(old))
+		return nil, fmt.Errorf("tlog: ReadHashes(%d indexes) = %d hashes", len(indexes), len(old))
 	}
 
 	// Build new hashes.
@@ -253,11 +253,11 @@ func TreeHash(n int64, r HashReader) (Hash, error) {
 		return Hash{}, err
 	}
 	if len(hashes) != len(indexes) {
-		return Hash{}, fmt.Errorf("notary: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
+		return Hash{}, fmt.Errorf("tlog: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
 	}
 	hash, hashes := subTreeHash(0, n, hashes)
 	if len(hashes) != 0 {
-		panic("notary: bad index math in TreeHash")
+		panic("tlog: bad index math in TreeHash")
 	}
 	return hash, nil
 }
@@ -271,7 +271,7 @@ func subTreeIndex(lo, hi int64, need []int64) []int64 {
 	for lo < hi {
 		k, level := maxpow2(hi - lo + 1)
 		if lo&(k-1) != 0 {
-			panic("notary: bad math in subTreeIndex")
+			panic("tlog: bad math in subTreeIndex")
 		}
 		need = append(need, StoredHashIndex(level, lo>>uint(level)))
 		lo += k
@@ -292,14 +292,14 @@ func subTreeHash(lo, hi int64, hashes []Hash) (Hash, []Hash) {
 	for lo < hi {
 		k, _ := maxpow2(hi - lo + 1)
 		if lo&(k-1) != 0 || lo >= hi {
-			panic("notary: bad math in subTreeHash")
+			panic("tlog: bad math in subTreeHash")
 		}
 		numTree++
 		lo += k
 	}
 
 	if len(hashes) < numTree {
-		panic("notary: bad index math in subTreeHash")
+		panic("tlog: bad index math in subTreeHash")
 	}
 
 	// Reconstruct hash.
@@ -317,7 +317,7 @@ type RecordProof []Hash
 // ProveRecord returns the proof that the tree of size t contains the record with index n.
 func ProveRecord(t, n int64, r HashReader) (RecordProof, error) {
 	if t < 0 || n < 0 || n >= t {
-		return nil, fmt.Errorf("notary: invalid inputs in ProveRecord")
+		return nil, fmt.Errorf("tlog: invalid inputs in ProveRecord")
 	}
 	indexes := leafProofIndex(0, t, n, nil)
 	if len(indexes) == 0 {
@@ -328,12 +328,12 @@ func ProveRecord(t, n int64, r HashReader) (RecordProof, error) {
 		return nil, err
 	}
 	if len(hashes) != len(indexes) {
-		return nil, fmt.Errorf("notary: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
+		return nil, fmt.Errorf("tlog: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
 	}
 
 	p, hashes := leafProof(0, t, n, hashes)
 	if len(hashes) != 0 {
-		panic("notary: bad index math in ProveRecord")
+		panic("tlog: bad index math in ProveRecord")
 	}
 	return p, nil
 }
@@ -345,7 +345,7 @@ func ProveRecord(t, n int64, r HashReader) (RecordProof, error) {
 func leafProofIndex(lo, hi, n int64, need []int64) []int64 {
 	// See leafProof below for commentary.
 	if !(lo <= n && n < hi) {
-		panic("notary: bad math in leafProofIndex")
+		panic("tlog: bad math in leafProofIndex")
 	}
 	if lo+1 == hi {
 		return need
@@ -366,7 +366,7 @@ func leafProofIndex(lo, hi, n int64, need []int64) []int64 {
 func leafProof(lo, hi, n int64, hashes []Hash) (RecordProof, []Hash) {
 	// We must have lo <= n < hi or else the code here has a bug.
 	if !(lo <= n && n < hi) {
-		panic("notary: bad math in leafProof")
+		panic("tlog: bad math in leafProof")
 	}
 
 	if lo+1 == hi { // n == lo
@@ -397,7 +397,7 @@ var errProofFailed = errors.New("invalid transparency proof")
 // with hash th has an n'th record with hash h.
 func CheckRecord(p RecordProof, t int64, th Hash, n int64, h Hash) error {
 	if t < 0 || n < 0 || n >= t {
-		return fmt.Errorf("notary: invalid inputs in CheckRecord")
+		return fmt.Errorf("tlog: invalid inputs in CheckRecord")
 	}
 	th2, err := runRecordProof(p, 0, t, n, h)
 	if err != nil {
@@ -415,7 +415,7 @@ func CheckRecord(p RecordProof, t int64, th Hash, n int64, h Hash) error {
 func runRecordProof(p RecordProof, lo, hi, n int64, leafHash Hash) (Hash, error) {
 	// We must have lo <= n < hi or else the code here has a bug.
 	if !(lo <= n && n < hi) {
-		panic("notary: bad math in runRecordProof")
+		panic("tlog: bad math in runRecordProof")
 	}
 
 	if lo+1 == hi { // m == lo
@@ -456,7 +456,7 @@ type TreeProof []Hash
 // as a prefix all the records from the tree of smaller size n.
 func ProveTree(t, n int64, h HashReader) (TreeProof, error) {
 	if t < 1 || n < 1 || n > t {
-		return nil, fmt.Errorf("notary: invalid inputs in ProveTree")
+		return nil, fmt.Errorf("tlog: invalid inputs in ProveTree")
 	}
 	indexes := treeProofIndex(0, t, n, nil)
 	if len(indexes) == 0 {
@@ -467,12 +467,12 @@ func ProveTree(t, n int64, h HashReader) (TreeProof, error) {
 		return nil, err
 	}
 	if len(hashes) != len(indexes) {
-		return nil, fmt.Errorf("notary: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
+		return nil, fmt.Errorf("tlog: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
 	}
 
 	p, hashes := treeProof(0, t, n, hashes)
 	if len(hashes) != 0 {
-		panic("notary: bad index math in ProveTree")
+		panic("tlog: bad index math in ProveTree")
 	}
 	return p, nil
 }
@@ -483,7 +483,7 @@ func ProveTree(t, n int64, h HashReader) (TreeProof, error) {
 func treeProofIndex(lo, hi, n int64, need []int64) []int64 {
 	// See treeProof below for commentary.
 	if !(lo < n && n <= hi) {
-		panic("notary: bad math in treeProofIndex")
+		panic("tlog: bad math in treeProofIndex")
 	}
 
 	if n == hi {
@@ -509,7 +509,7 @@ func treeProofIndex(lo, hi, n int64, need []int64) []int64 {
 func treeProof(lo, hi, n int64, hashes []Hash) (TreeProof, []Hash) {
 	// We must have lo < n <= hi or else the code here has a bug.
 	if !(lo < n && n <= hi) {
-		panic("notary: bad math in treeProof")
+		panic("tlog: bad math in treeProof")
 	}
 
 	// Reached common ground.
@@ -543,7 +543,7 @@ func treeProof(lo, hi, n int64, hashes []Hash) (TreeProof, []Hash) {
 // contains as a prefix the tree of size n with hash h.
 func CheckTree(p TreeProof, t int64, th Hash, n int64, h Hash) error {
 	if t < 1 || n < 1 || n > t {
-		return fmt.Errorf("notary: invalid inputs in CheckTree")
+		return fmt.Errorf("tlog: invalid inputs in CheckTree")
 	}
 	h2, th2, err := runTreeProof(p, 0, t, n, h)
 	if err != nil {
@@ -562,7 +562,7 @@ func CheckTree(p TreeProof, t int64, th Hash, n int64, h Hash) error {
 func runTreeProof(p TreeProof, lo, hi, n int64, old Hash) (Hash, Hash, error) {
 	// We must have lo < n <= hi or else the code here has a bug.
 	if !(lo < n && n <= hi) {
-		panic("notary: bad math in runTreeProof")
+		panic("tlog: bad math in runTreeProof")
 	}
 
 	// Reached common ground.

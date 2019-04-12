@@ -12,7 +12,7 @@ import (
 func TestFormatTree(t *testing.T) {
 	n := int64(123456789012)
 	h := RecordHash([]byte("hello world"))
-	golden := "go notary tree\n123456789012\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBb0=\n"
+	golden := "go.sum database tree\n123456789012\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBb0=\n"
 	b := FormatTree(Tree{n, h})
 	if string(b) != golden {
 		t.Errorf("FormatTree(...) = %q, want %q", b, golden)
@@ -20,7 +20,7 @@ func TestFormatTree(t *testing.T) {
 }
 
 func TestParseTree(t *testing.T) {
-	in := "go notary tree\n123456789012\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBb0=\n"
+	in := "go.sum database tree\n123456789012\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBb0=\n"
 	goldH := RecordHash([]byte("hello world"))
 	goldN := int64(123456789012)
 	tree, err := ParseTree([]byte(in))
@@ -31,8 +31,8 @@ func TestParseTree(t *testing.T) {
 	// Check invalid trees.
 	var badTrees = []string{
 		"not-" + in,
-		"go notary tree\n0xabcdef\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBb0=\n",
-		"go notary tree\n123456789012\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBTOOBIG=\n",
+		"go.sum database tree\n0xabcdef\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBb0=\n",
+		"go.sum database tree\n123456789012\nTszzRgjTG6xce+z2AG31kAXYKBgQVtCSCE40HmuwBTOOBIG=\n",
 	}
 	for _, bad := range badTrees {
 		_, err := ParseTree([]byte(bad))

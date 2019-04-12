@@ -138,7 +138,7 @@ func ReadTileData(t Tile, r HashReader) ([]byte, error) {
 		return nil, err
 	}
 	if len(hashes) != len(indexes) {
-		return nil, fmt.Errorf("notary: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
+		return nil, fmt.Errorf("tlog: ReadHashes(%d indexes) = %d hashes", len(indexes), len(hashes))
 	}
 
 	tile := make([]byte, size*HashSize)
@@ -216,7 +216,7 @@ func (e *badPathError) Error() string {
 	return fmt.Sprintf("malformed tile path %q", e.path)
 }
 
-// A TileReader reads tiles from a notary's log.
+// A TileReader reads tiles from a go.sum database log.
 type TileReader interface {
 	// Height returns the height of the available tiles.
 	Height() int
