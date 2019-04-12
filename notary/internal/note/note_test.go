@@ -165,7 +165,7 @@ func TestFromEd25519(t *testing.T) {
 	}
 }
 
-// newSignerFromEd25519Seed constructs a new signer from a notary name and a
+// newSignerFromEd25519Seed constructs a new signer from a verifier name and a
 // golang.org/x/crypto/ed25519 private key seed.
 func newSignerFromEd25519Seed(name string, seed []byte) (Signer, error) {
 	if len(seed) != ed25519.SeedSize {
@@ -247,7 +247,7 @@ then you don't know what your problem is.
 	}
 }
 
-func TestNotaryList(t *testing.T) {
+func TestVerifierList(t *testing.T) {
 	peterKey := "PeterNeumann+c74f20a3+ARpc2QcUPDhMQegwxbzhKqiBfsVkmqq/LDE4izWy10TW"
 	peterVerifier, err := NewVerifier(peterKey)
 	if err != nil {
@@ -260,23 +260,23 @@ func TestNotaryList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	list := NotaryList(peterVerifier, enochVerifier, enochVerifier)
+	list := VerifierList(peterVerifier, enochVerifier, enochVerifier)
 	v, err := list.Verifier("PeterNeumann", 0xc74f20a3)
 	if v != peterVerifier || err != nil {
 		t.Fatalf("list.Verifier(peter) = %v, %v, want %v, nil", v, err, peterVerifier)
 	}
 	v, err = list.Verifier("PeterNeumann", 0xc74f20a4)
-	if v != nil || err == nil || err.Error() != "unknown notary key PeterNeumann+c74f20a4" {
-		t.Fatalf("list.Verifier(peter bad hash) = %v, %v, want nil, unknown notary key error", v, err)
+	if v != nil || err == nil || err.Error() != "unknown key PeterNeumann+c74f20a4" {
+		t.Fatalf("list.Verifier(peter bad hash) = %v, %v, want nil, unknown key error", v, err)
 	}
 
 	v, err = list.Verifier("PeterNeuman", 0xc74f20a3)
-	if v != nil || err == nil || err.Error() != "unknown notary key PeterNeuman+c74f20a3" {
-		t.Fatalf("list.Verifier(peter bad name) = %v, %v, want nil, unknown notary key error", v, err)
+	if v != nil || err == nil || err.Error() != "unknown key PeterNeuman+c74f20a3" {
+		t.Fatalf("list.Verifier(peter bad name) = %v, %v, want nil, unknown key error", v, err)
 	}
 	v, err = list.Verifier("EnochRoot", 0xaf0cfe78)
-	if v != nil || err == nil || err.Error() != "ambiguous notary key EnochRoot+af0cfe78" {
-		t.Fatalf("list.Verifier(enoch) = %v, %v, want nil, ambiguous notary key error", v, err)
+	if v != nil || err == nil || err.Error() != "ambiguous key EnochRoot+af0cfe78" {
+		t.Fatalf("list.Verifier(enoch) = %v, %v, want nil, ambiguous key error", v, err)
 	}
 }
 
@@ -325,7 +325,7 @@ then you don't know what your problem is.
 	enoch := Signature{"EnochRoot", 0xaf0cfe78, "rwz+eBzmZa0SO3NbfRGzPCpDckykFXSdeX+MNtCOXm2/5n2tiOHp+vAF1aGrQ5ovTG01oOTGwnWLox33WWd1RvMc+QQ="}
 
 	// Check one signature verified, one not.
-	n, err := Open([]byte(text+"\n"+peterSig+enochSig), NotaryList(peterVerifier))
+	n, err := Open([]byte(text+"\n"+peterSig+enochSig), VerifierList(peterVerifier))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ then you don't know what your problem is.
 	}
 
 	// Check both verified.
-	n, err = Open([]byte(text+"\n"+peterSig+enochSig), NotaryList(peterVerifier, enochVerifier))
+	n, err = Open([]byte(text+"\n"+peterSig+enochSig), VerifierList(peterVerifier, enochVerifier))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +352,7 @@ then you don't know what your problem is.
 	}
 
 	// Check both unverified.
-	n, err = Open([]byte(text+"\n"+peterSig+enochSig), NotaryList())
+	n, err = Open([]byte(text+"\n"+peterSig+enochSig), VerifierList())
 	if n != nil || err == nil {
 		t.Fatalf("Open unverified = %v, %v, want nil, error", n, err)
 	}
@@ -376,36 +376,36 @@ then you don't know what your problem is.
 	}
 
 	// Check duplicated verifier.
-	_, err = Open([]byte(text+"\n"+enochSig), NotaryList(enochVerifier, peterVerifier, enochVerifier))
-	if err == nil || err.Error() != "ambiguous notary key EnochRoot+af0cfe78" {
-		t.Fatalf("Open with duplicated verifier: err=%v, want ambiguous notary key", err)
+	_, err = Open([]byte(text+"\n"+enochSig), VerifierList(enochVerifier, peterVerifier, enochVerifier))
+	if err == nil || err.Error() != "ambiguous key EnochRoot+af0cfe78" {
+		t.Fatalf("Open with duplicated verifier: err=%v, want ambiguous key", err)
 	}
 
 	// Check unused duplicated verifier.
-	_, err = Open([]byte(text+"\n"+peterSig), NotaryList(enochVerifier, peterVerifier, enochVerifier))
+	_, err = Open([]byte(text+"\n"+peterSig), VerifierList(enochVerifier, peterVerifier, enochVerifier))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check too many signatures.
-	n, err = Open([]byte(text+"\n"+strings.Repeat(peterSig, 101)), NotaryList(peterVerifier))
+	n, err = Open([]byte(text+"\n"+strings.Repeat(peterSig, 101)), VerifierList(peterVerifier))
 	if n != nil || err == nil || err.Error() != "malformed note" {
 		t.Fatalf("Open too many verified signatures = %v, %v, want nil, malformed note error", n, err)
 	}
-	n, err = Open([]byte(text+"\n"+strings.Repeat(peterSig, 101)), NotaryList())
+	n, err = Open([]byte(text+"\n"+strings.Repeat(peterSig, 101)), VerifierList())
 	if n != nil || err == nil || err.Error() != "malformed note" {
 		t.Fatalf("Open too many verified signatures = %v, %v, want nil, malformed note error", n, err)
 	}
 
 	// Invalid signature.
-	n, err = Open([]byte(text+"\n"+peterSig[:60]+"ABCD"+peterSig[60:]), NotaryList(peterVerifier))
-	if n != nil || err == nil || err.Error() != "invalid signature for notary key PeterNeumann+c74f20a3" {
+	n, err = Open([]byte(text+"\n"+peterSig[:60]+"ABCD"+peterSig[60:]), VerifierList(peterVerifier))
+	if n != nil || err == nil || err.Error() != "invalid signature for key PeterNeumann+c74f20a3" {
 		t.Fatalf("Open too many verified signatures = %v, %v, want nil, invalid signature error", n, err)
 	}
 
 	// Duplicated verified and unverified signatures.
 	enochABCD := Signature{"EnochRoot", 0xaf0cfe78, "rwz+eBzmZa0SO3NbfRGzPCpDckykFXSdeX+MNtCOXm2/5n" + "ABCD" + "2tiOHp+vAF1aGrQ5ovTG01oOTGwnWLox33WWd1RvMc+QQ="}
-	n, err = Open([]byte(text+"\n"+peterSig+peterSig+enochSig+enochSig+enochSig[:60]+"ABCD"+enochSig[60:]), NotaryList(peterVerifier))
+	n, err = Open([]byte(text+"\n"+peterSig+peterSig+enochSig+enochSig+enochSig[:60]+"ABCD"+enochSig[60:]), VerifierList(peterVerifier))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +427,7 @@ then you don't know what your problem is.
 		text + "\n" + peterSig + "Unexpected line.\n",
 	}
 	for _, msg := range badMsgs {
-		n, err := Open([]byte(msg), NotaryList(peterVerifier))
+		n, err := Open([]byte(msg), VerifierList(peterVerifier))
 		if n != nil || err == nil || err.Error() != "malformed note" {
 			t.Fatalf("Open bad msg = %v, %v, want nil, malformed note error\nmsg:\n%s", n, err, msg)
 		}
@@ -445,14 +445,14 @@ func BenchmarkOpen(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	notaries := NotaryList(verifier)
-	notaries0 := NotaryList()
+	verifiers := VerifierList(verifier)
+	verifiers0 := VerifierList()
 
 	// Try with 0 signatures and 1 signature so we can tell how much each signature adds.
 
 	b.Run("Sig0", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := Open(msg, notaries0)
+			_, err := Open(msg, verifiers0)
 			e, ok := err.(*UnverifiedNoteError)
 			if !ok {
 				b.Fatal("expected UnverifiedNoteError")
@@ -466,7 +466,7 @@ func BenchmarkOpen(b *testing.B) {
 
 	b.Run("Sig1", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			n, err := Open(msg, notaries)
+			n, err := Open(msg, verifiers)
 			if err != nil {
 				b.Fatal(err)
 			}

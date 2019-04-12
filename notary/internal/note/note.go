@@ -2,41 +2,42 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package note defines the notes signed by the Go module notary.
+// Package note defines the notes signed by the Go module database server.
 //
-// This package is part of a DRAFT of what the Go module notary will look like.
+// This package is part of a DRAFT of what the Go module database server will look like.
 // Do not assume the details here are final!
 //
-// A note is text signed by one or more notary keys.
+// A note is text signed by one or more server keys.
 // The text should be ignored unless the note is signed by
-// a trusted notary key and the signature has been verified.
+// a trusted server key and the signature has been verified
+// using the server's public key.
 //
-// A notary key is identified by a name, typically the "host[/path]"
-// giving the base URL of the notary's transparency log.
+// A server's public key is identified by a name, typically the "host[/path]"
+// giving the base URL of the server's transparency log.
 // The syntactic restrictions on a name are that it be non-empty,
 // well-formed UTF-8 containing neither Unicode spaces nor plus (U+002B).
 //
-// A notary signs texts using public key cryptography.
-// A given notary may have multiple public keys, each
+// A Go module database server signs texts using public key cryptography.
+// A given server may have multiple public keys, each
 // identified by the first 32 bits of the SHA-256 hash of
-// the concatenation of the notary name, a newline, and
+// the concatenation of the server name, a newline, and
 // the encoded public key.
 //
 // Verifying Notes
 //
-// A Verifier allows verification of signatures by one notary public key.
-// It can report the name of the notary and the uint32 hash of the key,
+// A Verifier allows verification of signatures by one server public key.
+// It can report the name of the server and the uint32 hash of the key,
 // and it can verify a purported signature by that key.
 //
 // The standard implementation of a Verifier is constructed
 // by NewVerifier starting from a verifier key, which is a
 // plain text string of the form "<name>+<hash>+<keydata>".
 //
-// A Notaries allows looking up a Verifier by the combination
-// of notary name and key hash.
+// A Verifiers allows looking up a Verifier by the combination
+// of server name and key hash.
 //
-// The standard implementation of a Notaries is constructed
-// by NotaryList from a list of known verifiers.
+// The standard implementation of a Verifiers is constructed
+// by VerifierList from a list of known verifiers.
 //
 // A Note represents a text with one or more signatures.
 // An implementation can reject a note with too many signatures
@@ -45,14 +46,14 @@
 // A Signature represents a signature on a note, verified or not.
 //
 // The Open function takes as input a signed message
-// and a set of known notaries. It decodes and verifies
+// and a set of known verifiers. It decodes and verifies
 // the message signatures and returns a Note structure
 // containing the message text and (verified or unverified) signatures.
 //
 // Signing Notes
 //
 // A Signer allows signing a text with a given key.
-// It can report the name of the notary and the hash of the key
+// It can report the name of the server and the hash of the key
 // and can sign a raw text using that key.
 //
 // The standard implementation of a Signer is constructed
@@ -60,7 +61,7 @@
 // plain text string of the form "PRIVATE+KEY+<name>+<hash>+<keydata>".
 // Anyone with an encoded signer key can sign messages using that key,
 // so it must be kept secret. The encoding begins with the literal text
-// "PRIVATE+KEY" to avoid confusion with the public verifier key.
+// "PRIVATE+KEY" to avoid confusion with the public server key.
 //
 // The Sign function takes as input a Note and a list of Signers
 // and returns an encoded, signed message.
@@ -71,7 +72,7 @@
 // followed by a blank line (only a newline),
 // followed by one or more signature lines of this form:
 // em dash (U+2014), space (U+0020),
-// notary name, space, base64-encoded signature, newline.
+// server name, space, base64-encoded signature, newline.
 //
 // Signed notes must be valid UTF-8 and must not contain any
 // ASCII control characters (those below U+0020) other than newline.
@@ -124,12 +125,12 @@
 //	os.Stdout.Write(msg)
 //
 // The note's text is two lines, including the final newline,
-// and the text is purportedly signed by a notary named
-// "PeterNeumann". (Although notary names are canonically
+// and the text is purportedly signed by a server named
+// "PeterNeumann". (Although server names are canonically
 // base URLs, the only syntactic requirement is that they
 // not contain spaces or newlines).
 //
-// If Open is given access to a Notaries including the
+// If Open is given access to a Verifiers including the
 // Verifier for this key, then it will succeed at verifiying
 // the encoded message and returning the parsed Note:
 //
@@ -143,9 +144,9 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	notaries := note.NotaryList(verifier)
+//	verifiers := note.VerifierList(verifier)
 //
-//	n, err := note.Open([]byte(msg), notaries)
+//	n, err := note.Open([]byte(msg), verifiers)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -196,31 +197,31 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-// A Verifier verifies messages signed with a specific notary key.
+// A Verifier verifies messages signed with a specific key.
 type Verifier interface {
-	// Name returns the name of the notary.
+	// Name returns the server name associated with the key.
 	Name() string
 
-	// KeyHash returns the notary key hash.
+	// KeyHash returns the key hash.
 	KeyHash() uint32
 
 	// Verify reports whether sig is a valid signature of msg.
 	Verify(msg, sig []byte) bool
 }
 
-// A Signer signs messages using a specific notary key.
+// A Signer signs messages using a specific key.
 type Signer interface {
-	// Name returns the name of the notary.
+	// Name returns the server name associated with the key.
 	Name() string
 
-	// KeyHash returns the notary key hash.
+	// KeyHash returns the key hash.
 	KeyHash() uint32
 
 	// Sign returns a signature for the given message.
 	Sign(msg []byte) ([]byte, error)
 }
 
-// keyHash computes the key hash for the given notary name and encoded public key.
+// keyHash computes the key hash for the given server name and encoded public key.
 func keyHash(name string, key []byte) uint32 {
 	h := sha256.New()
 	h.Write([]byte(name))
@@ -365,7 +366,7 @@ func (s *signer) Name() string                    { return s.name }
 func (s *signer) KeyHash() uint32                 { return s.hash }
 func (s *signer) Sign(msg []byte) ([]byte, error) { return s.sign(msg) }
 
-// GenerateKey generates a signer and verifier key pair for a named notary.
+// GenerateKey generates a signer and verifier key pair for a named server.
 // The signer key skey is private and must be kept secret.
 func GenerateKey(rand io.Reader, name string) (skey, vkey string, err error) {
 	pub, priv, err := ed25519.GenerateKey(rand)
@@ -381,7 +382,7 @@ func GenerateKey(rand io.Reader, name string) (skey, vkey string, err error) {
 	return skey, vkey, nil
 }
 
-// NewVerifierFromEd25519PublicKey constructs a new verifier from a notary name
+// NewVerifierFromEd25519PublicKey constructs a new verifier from a server name
 // and a golang.org/x/crypto/ed25519 public key.
 func NewVerifierFromEd25519PublicKey(name string, pub ed25519.PublicKey) (Verifier, error) {
 	if len(pub) != ed25519.PublicKeySize {
@@ -401,44 +402,44 @@ func NewVerifierFromEd25519PublicKey(name string, pub ed25519.PublicKey) (Verifi
 	return v, nil
 }
 
-// A Notaries is a collection of known notary keys.
-type Notaries interface {
-	// Verifier returns the Verifier associated with the notary key
+// A Verifiers is a collection of known verifier keys.
+type Verifiers interface {
+	// Verifier returns the Verifier associated with the key
 	// identified by the name and hash.
 	// If the name, hash pair is unknown, Verifier should return
-	// an UnknownNotaryError.
+	// an UnknownVerifierError.
 	Verifier(name string, hash uint32) (Verifier, error)
 }
 
-// An UnknownNotaryError indicates that the given notary key is not known.
-// The Open function records signatures for unknown notaries as
+// An UnknownVerifierError indicates that the given key is not known.
+// The Open function records signatures without associated verifiers as
 // unverified signatures.
-type UnknownNotaryError struct {
+type UnknownVerifierError struct {
 	Name    string
 	KeyHash uint32
 }
 
-func (e *UnknownNotaryError) Error() string {
-	return fmt.Sprintf("unknown notary key %s+%08x", e.Name, e.KeyHash)
+func (e *UnknownVerifierError) Error() string {
+	return fmt.Sprintf("unknown key %s+%08x", e.Name, e.KeyHash)
 }
 
-// An ambiguousNotaryError indicates that the given name and hash
-// match multiple notary keys passed to NotaryList.
+// An ambiguousVerifierError indicates that the given name and hash
+// match multiple keys passed to VerifierList.
 // (If this happens, some malicious actor has taken control of the
 // verifier list, at which point we may as well give up entirely,
 // but we diagnose the problem instead.)
-type ambiguousNotaryError struct {
+type ambiguousVerifierError struct {
 	name string
 	hash uint32
 }
 
-func (e *ambiguousNotaryError) Error() string {
-	return fmt.Sprintf("ambiguous notary key %s+%08x", e.name, e.hash)
+func (e *ambiguousVerifierError) Error() string {
+	return fmt.Sprintf("ambiguous key %s+%08x", e.name, e.hash)
 }
 
-// NotaryList returns a Notaries implementation that uses the given list of verifiers.
-func NotaryList(list ...Verifier) Notaries {
-	m := make(notaryMap)
+// VerifierList returns a Verifiers implementation that uses the given list of verifiers.
+func VerifierList(list ...Verifier) Verifiers {
+	m := make(verifierMap)
 	for _, v := range list {
 		k := nameHash{v.Name(), v.KeyHash()}
 		m[k] = append(m[k], v)
@@ -451,15 +452,15 @@ type nameHash struct {
 	hash uint32
 }
 
-type notaryMap map[nameHash][]Verifier
+type verifierMap map[nameHash][]Verifier
 
-func (m notaryMap) Verifier(name string, hash uint32) (Verifier, error) {
+func (m verifierMap) Verifier(name string, hash uint32) (Verifier, error) {
 	v, ok := m[nameHash{name, hash}]
 	if !ok {
-		return nil, &UnknownNotaryError{name, hash}
+		return nil, &UnknownVerifierError{name, hash}
 	}
 	if len(v) > 1 {
-		return nil, &ambiguousNotaryError{name, hash}
+		return nil, &ambiguousVerifierError{name, hash}
 	}
 	return v[0], nil
 }
@@ -474,7 +475,7 @@ type Note struct {
 // A Signature is a single signature found in a note.
 type Signature struct {
 	// Name and Hash give the name and key hash
-	// for the notary key that generated the signature.
+	// for the key that generated the signature.
 	Name string
 	Hash uint32
 
@@ -492,7 +493,7 @@ func (e *UnverifiedNoteError) Error() string {
 	return "note has no verifiable signatures"
 }
 
-// An InvalidSignatureError indicates that the given notary key was known
+// An InvalidSignatureError indicates that the given key was known
 // and the associated Verifier rejected the signature.
 type InvalidSignatureError struct {
 	Name string
@@ -500,7 +501,7 @@ type InvalidSignatureError struct {
 }
 
 func (e *InvalidSignatureError) Error() string {
-	return fmt.Sprintf("invalid signature for notary key %s+%08x", e.Name, e.Hash)
+	return fmt.Sprintf("invalid signature for key %s+%08x", e.Name, e.Hash)
 }
 
 var (
@@ -511,21 +512,21 @@ var (
 	sigPrefix = []byte("— ")
 )
 
-// Open opens and parses the message msg, checking signatures of the known notaries.
+// Open opens and parses the message msg, checking signatures from the known verifiers.
 //
 // For each signature in the message, Open calls known.Verifier to find a verifier.
 // If known.Verifier returns a verifier and the verifier accepts the signature,
 // Open records the signature in the returned note's Sigs field.
 // If known.Verifier returns a verifier but the verifier rejects the signature,
 // Open returns an InvalidSignatureError.
-// If known.Verifier returns an UnknownNotaryError,
+// If known.Verifier returns an UnknownVerifierError,
 // Open records the signature in the returned note's UnverifiedSigs field.
 // If known.Verifier returns any other error, Open returns that error.
 //
 // If no known verifier has signed an otherwise valid note,
 // Open returns an UnverifiedNoteError.
 // In this case, the unverified note can be fetched from inside the error.
-func Open(msg []byte, known Notaries) (*Note, error) {
+func Open(msg []byte, known Verifiers) (*Note, error) {
 	// Must have valid UTF-8 with no non-newline ASCII control characters.
 	for i := 0; i < len(msg); {
 		r, size := utf8.DecodeRune(msg[i:])
@@ -582,7 +583,7 @@ func Open(msg []byte, known Notaries) (*Note, error) {
 		}
 
 		v, err := known.Verifier(name, hash)
-		if _, ok := err.(*UnknownNotaryError); ok {
+		if _, ok := err.(*UnknownVerifierError); ok {
 			// Drop repeated identical unverified signatures.
 			if seenUnverified[string(line)] {
 				continue
@@ -619,7 +620,7 @@ func Open(msg []byte, known Notaries) (*Note, error) {
 // Sign signs the note with the given signers and returns the encoded message.
 // The new signatures from signers are listed in the encoded message after
 // the existing signatures already present in n.Sigs.
-// If any signer uses the same notary key as an existing signature,
+// If any signer uses the same key as an existing signature,
 // the existing signature is elided from the output.
 func Sign(n *Note, signers ...Signer) ([]byte, error) {
 	var buf bytes.Buffer

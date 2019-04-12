@@ -67,7 +67,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	treeNote, err := note.Open(msg, note.NotaryList(verifier))
+	treeNote, err := note.Open(msg, note.VerifierList(verifier))
 	if err != nil {
 		log.Fatalf("reading note: %v\nnote:\n%s", err, msg)
 	}

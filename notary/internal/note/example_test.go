@@ -49,9 +49,9 @@ func ExampleOpen() {
 		fmt.Println(err)
 		return
 	}
-	notaries := note.NotaryList(verifier)
+	verifiers := note.VerifierList(verifier)
 
-	n, err := note.Open(msg, notaries)
+	n, err := note.Open(msg, verifiers)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -91,9 +91,9 @@ func ExampleSign_add_signatures() {
 		fmt.Println(err)
 		return
 	}
-	notaries := note.NotaryList(verifier)
+	verifiers := note.VerifierList(verifier)
 
-	n, err := note.Open([]byte(msg), notaries)
+	n, err := note.Open([]byte(msg), verifiers)
 	if err != nil {
 		fmt.Println(err)
 		return
