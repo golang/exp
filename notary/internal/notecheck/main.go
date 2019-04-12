@@ -205,8 +205,8 @@ func (r *tileReader) Height() int {
 	return *height
 }
 
-func (r *tileReader) Reject(tile tlog.Tile) {
-	log.Printf("tile rejected: %v", tile.Path())
+func (r *tileReader) SaveTiles(tiles []tlog.Tile, data [][]byte) {
+	// no on-disk cache here
 }
 
 // TODO(rsc): Move some variant of this to package tlog
