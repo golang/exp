@@ -527,6 +527,11 @@ var (
 // Open returns an UnverifiedNoteError.
 // In this case, the unverified note can be fetched from inside the error.
 func Open(msg []byte, known Verifiers) (*Note, error) {
+	if known == nil {
+		// Treat nil Verifiers as empty list, to produce useful error instead of crash.
+		known = VerifierList()
+	}
+
 	// Must have valid UTF-8 with no non-newline ASCII control characters.
 	for i := 0; i < len(msg); {
 		r, size := utf8.DecodeRune(msg[i:])
