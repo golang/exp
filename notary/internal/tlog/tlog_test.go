@@ -238,18 +238,31 @@ var tilePaths = []struct {
 	{"tile/3/5/x123/x456/078", Tile{3, 5, 123456078, 8}},
 	{"tile/3/5/x123/x456/078.p/2", Tile{3, 5, 123456078, 2}},
 	{"tile/1/0/x003/x057/500", Tile{1, 0, 3057500, 2}},
+	{"tile/3/5/123/456/078", Tile{}},
+	{"tile/3/-1/123/456/078", Tile{}},
+	{"tile/1/data/x003/x057/500", Tile{1, -1, 3057500, 2}},
 }
 
 func TestTilePath(t *testing.T) {
 	for _, tt := range tilePaths {
-		p := tt.tile.Path()
-		if p != tt.path {
-			t.Errorf("%+v.Path() = %q, want %q", tt.tile, p, tt.path)
+		if tt.tile.H > 0 {
+			p := tt.tile.Path()
+			if p != tt.path {
+				t.Errorf("%+v.Path() = %q, want %q", tt.tile, p, tt.path)
+			}
 		}
 		tile, err := ParseTilePath(tt.path)
 		if err != nil {
+			if tt.tile.H == 0 {
+				// Expected error.
+				continue
+			}
 			t.Errorf("ParseTilePath(%q): %v", tt.path, err)
 		} else if tile != tt.tile {
+			if tt.tile.H == 0 {
+				t.Errorf("ParseTilePath(%q): expected error, got %+v", tt.path, tt.tile)
+				continue
+			}
 			t.Errorf("ParseTilePath(%q) = %+v, want %+v", tt.path, tile, tt.tile)
 		}
 	}

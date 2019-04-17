@@ -29,10 +29,14 @@ import (
 // Tile{H: 3, L: 4, N: 1234067, W: 8}'s path
 // is tile/3/4/x001/x234/067.
 // See Tile's Path method and the ParseTilePath function.
+//
+// The special level L=-1 holds raw record data instead of hashes.
+// In this case, the level encodes into a tile path as the path element
+// "data" instead of "-1".
 type Tile struct {
 	H int   // height of tile (1 ≤ H ≤ 30)
-	L int   // level in tiling (1 ≤ H ≤ 63)
-	N int64 // number within level (unbounded)
+	L int   // level in tiling (-1 ≤ L ≤ 63)
+	N int64 // number within level (0 ≤ N, unbounded)
 	W int   // width of tile (1 ≤ W ≤ 2**H; 2**H is complete tile)
 }
 
@@ -168,7 +172,13 @@ func (t Tile) Path() string {
 	if t.W != 1<<uint(t.H) {
 		pStr = fmt.Sprintf(".p/%d", t.W)
 	}
-	return fmt.Sprintf("tile/%d/%d/%s%s", t.H, t.L, nStr, pStr)
+	var L string
+	if t.L == -1 {
+		L = "data"
+	} else {
+		L = fmt.Sprintf("%d", t.L)
+	}
+	return fmt.Sprintf("tile/%d/%s/%s%s", t.H, L, nStr, pStr)
 }
 
 // ParseTilePath parses a tile coordinate path.
@@ -178,6 +188,11 @@ func ParseTilePath(path string) (Tile, error) {
 		return Tile{}, &badPathError{path}
 	}
 	h, err1 := strconv.Atoi(f[1])
+	isData := false
+	if f[2] == "data" {
+		isData = true
+		f[2] = "0"
+	}
 	l, err2 := strconv.Atoi(f[2])
 	if err1 != nil || err2 != nil || h < 1 || l < 0 || h > 30 {
 		return Tile{}, &badPathError{path}
@@ -200,6 +215,9 @@ func ParseTilePath(path string) (Tile, error) {
 			return Tile{}, &badPathError{path}
 		}
 		n = n*pathBase + int64(nn)
+	}
+	if isData {
+		l = -1
 	}
 	t := Tile{H: h, L: l, N: n, W: w}
 	if path != t.Path() {
