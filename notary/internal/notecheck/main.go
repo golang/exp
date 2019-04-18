@@ -41,7 +41,7 @@ func usage() {
 	os.Exit(2)
 }
 
-var height = flag.Int("h", 2, "tile height")
+var height = flag.Int("h", 8, "tile height")
 var vflag = flag.Bool("v", false, "enable verbose output")
 var url = flag.String("u", "", "url to notary (overriding name)")
 
