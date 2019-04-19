@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package noteweb serves the notary web endpoints from a notary database.
-package noteweb
+// Package sumweb implements the HTTP protocols for serving a go.sum database.
+package sumweb
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"golang.org/x/exp/notary/internal/tlog"
 )
 
-// Server is a connection to a notary server.
+// Server is a connection to a go.sum database server.
 type Server interface {
 	// NewContext returns the context to use for the request r.
 	NewContext(r *http.Request) (context.Context, error)
@@ -35,8 +35,8 @@ type Server interface {
 	ReadTileData(ctx context.Context, t tlog.Tile) ([]byte, error)
 }
 
-// Handler is the notary endpoint handler,
-// which should be used for the paths listed in Paths.
+// Handler is the go.sum database server handler,
+// which should be invoked to serve the paths listed in Paths.
 // The client is responsible for initializing Server.
 type Handler struct {
 	Server Server
@@ -44,10 +44,10 @@ type Handler struct {
 
 // Paths are the URL paths for which Handler should be invoked.
 //
-// Typically a client will do:
+// Typically a server will do:
 //
-//	handler := &noteweb.Handler{Server: srv}
-//	for _, path := range noteweb.Paths {
+//	handler := &sumweb.Handler{Server: srv}
+//	for _, path := range sumweb.Paths {
 //		http.HandleFunc(path, handler)
 //	}
 //
