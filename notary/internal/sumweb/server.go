@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package sumweb implements the HTTP protocols for serving a go.sum database.
+// Package sumweb implements the HTTP protocols for serving or accessing a go.sum database.
 package sumweb
 
 import (
@@ -15,7 +15,9 @@ import (
 	"golang.org/x/exp/notary/internal/tlog"
 )
 
-// Server is a connection to a go.sum database server.
+// A Server provides the external operations
+// (underlying database access and so on)
+// needed to implement the HTTP server Handler.
 type Server interface {
 	// NewContext returns the context to use for the request r.
 	NewContext(r *http.Request) (context.Context, error)
@@ -35,9 +37,9 @@ type Server interface {
 	ReadTileData(ctx context.Context, t tlog.Tile) ([]byte, error)
 }
 
-// Handler is the go.sum database server handler,
+// A Handler is the go.sum database server handler,
 // which should be invoked to serve the paths listed in Paths.
-// The client is responsible for initializing Server.
+// The calling code is responsible for initializing Server.
 type Handler struct {
 	Server Server
 }
