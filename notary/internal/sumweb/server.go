@@ -76,6 +76,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid module@version syntax", http.StatusBadRequest)
 			return
 		}
+		// TODO(rsc): Decide whether to !-decode here.
 		id, err := h.Server.FindKey(ctx, mod)
 		if err != nil {
 			reportError(w, r, err)
