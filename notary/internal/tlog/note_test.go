@@ -54,3 +54,64 @@ func TestParseTree(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatRecord(t *testing.T) {
+	id := int64(123456789012)
+	text := "hello, world\n"
+	golden := "123456789012\nhello, world\n\n"
+	msg, err := FormatRecord(id, []byte(text))
+	if err != nil {
+		t.Fatalf("FormatRecord: %v", err)
+	}
+	if string(msg) != golden {
+		t.Fatalf("FormatRecord(...) = %q, want %q", msg, golden)
+	}
+
+	var badTexts = []string{
+		"",
+		"hello\nworld",
+		"hello\n\nworld\n",
+		"hello\x01world\n",
+	}
+	for _, bad := range badTexts {
+		msg, err := FormatRecord(id, []byte(bad))
+		if err == nil {
+			t.Errorf("FormatRecord(id, %q) = %q, want error", bad, msg)
+		}
+	}
+}
+
+func TestParseRecord(t *testing.T) {
+	in := "123456789012\nhello, world\n\njunk on end\x01\xff"
+	goldID := int64(123456789012)
+	goldText := "hello, world\n"
+	goldRest := "junk on end\x01\xff"
+	id, text, rest, err := ParseRecord([]byte(in))
+	if id != goldID || string(text) != goldText || string(rest) != goldRest || err != nil {
+		t.Fatalf("ParseRecord(%q) = %d, %q, %q, %v, want %d, %q, %q, nil", in, id, text, rest, err, goldID, goldText, goldRest)
+	}
+
+	in = "123456789012\nhello, world\n\n"
+	id, text, rest, err = ParseRecord([]byte(in))
+	if id != goldID || string(text) != goldText || len(rest) != 0 || err != nil {
+		t.Fatalf("ParseRecord(%q) = %d, %q, %q, %v, want %d, %q, %q, nil", in, id, text, rest, err, goldID, goldText, "")
+	}
+	if rest == nil {
+		t.Fatalf("ParseRecord(%q): rest = []byte(nil), want []byte{}", in)
+	}
+
+	// Check invalid records.
+	var badRecords = []string{
+		"not-" + in,
+		"123\nhello\x01world\n\n",
+		"123\nhello\xffworld\n\n",
+		"123\nhello world\n",
+		"0x123\nhello world\n\n",
+	}
+	for _, bad := range badRecords {
+		id, text, rest, err := ParseRecord([]byte(bad))
+		if err == nil {
+			t.Fatalf("ParseRecord(%q) = %d, %q, %q, nil, want error", in, id, text, rest)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // A Tree is a tree description, to be signed by a go.sum database server.
@@ -67,4 +68,68 @@ func ParseTree(text []byte) (tree Tree, err error) {
 	var hash Hash
 	copy(hash[:], h)
 	return Tree{n, hash}, nil
+}
+
+var errMalformedRecord = errors.New("malformed record data")
+
+// FormatRecord formats a record for serving to a client
+// in a lookup response or data tile.
+//
+// The encoded form is the record ID as a single number,
+// then the text of the record, and then a terminating blank line.
+// Record text must be valid UTF-8 and must not contain any ASCII control
+// characters (those below U+0020) other than newline (U+000A).
+// It must end in a terminating newline and not contain any blank lines.
+func FormatRecord(id int64, text []byte) (msg []byte, err error) {
+	if !isValidRecordText(text) {
+		return nil, errMalformedRecord
+	}
+	msg = []byte(fmt.Sprintf("%d\n", id))
+	msg = append(msg, text...)
+	msg = append(msg, '\n')
+	return msg, nil
+}
+
+// isValidRecordText reports whether text is syntactically valid record text.
+func isValidRecordText(text []byte) bool {
+	var last rune
+	for i := 0; i < len(text); {
+		r, size := utf8.DecodeRune(text[i:])
+		if r < 0x20 && r != '\n' || r == utf8.RuneError && size == 1 || last == '\n' && r == '\n' {
+			return false
+		}
+		i += size
+		last = r
+	}
+	if last != '\n' {
+		return false
+	}
+	return true
+}
+
+// ParseRecord parses a record description at the start of text,
+// stopping immediately after the terminating blank line.
+// It returns the record id, the record text, and the remainder of text.
+func ParseRecord(msg []byte) (id int64, text, rest []byte, err error) {
+	// Leading record id.
+	i := bytes.IndexByte(msg, '\n')
+	if i < 0 {
+		return 0, nil, nil, errMalformedRecord
+	}
+	id, err = strconv.ParseInt(string(msg[:i]), 10, 64)
+	if err != nil {
+		return 0, nil, nil, errMalformedRecord
+	}
+	msg = msg[i+1:]
+
+	// Record text.
+	i = bytes.Index(msg, []byte("\n\n"))
+	if i < 0 {
+		return 0, nil, nil, errMalformedRecord
+	}
+	text, rest = msg[:i+1], msg[i+2:]
+	if !isValidRecordText(text) {
+		return 0, nil, nil, errMalformedRecord
+	}
+	return id, text, rest, nil
 }
