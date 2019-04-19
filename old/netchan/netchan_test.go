@@ -6,6 +6,7 @@ package netchan
 
 import (
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -231,6 +232,9 @@ func TestExportHangup(t *testing.T) {
 // Test hanging up the send side of an import.
 // TODO: test hanging up the receive side of an import.
 func TestImportHangup(t *testing.T) {
+	if os.Getenv("GO_BUILDER_NAME") != "" {
+		t.Skipf("skipping test with data race on builders; see https://golang.org/issue/31575")
+	}
 	exp, imp := pair(t)
 	ech := make(chan int)
 	err := exp.Export("exportedRecv", ech, Recv)
