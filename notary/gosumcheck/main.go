@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Notecheck checks a go.sum file against a notary.
+// Gosumcheck checks a go.sum file against a go.sum database server.
 //
 // WARNING! This program is meant as a proof of concept demo and
 // should not be used in production scripts.
@@ -12,7 +12,7 @@
 //
 // Usage:
 //
-//	notecheck [-h H] [-k key] [-u url] [-v] go.sum
+//	gosumcheck [-h H] [-k key] [-u url] [-v] go.sum
 //
 // The -h flag changes the tile height (default 8).
 //
@@ -21,8 +21,8 @@
 // The -u flag overrides the URL of the server.
 //
 // The -v flag enables verbose output.
-// In particular, it causes notecheck to print all URLs fetched
-// from the server and how long each took.
+// In particular, it causes gosumcheck to report
+// the URL and elapsed time for each server request.
 //
 package main
 
@@ -42,14 +42,14 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: notecheck [-h H] [-k notary-key] [-u url] [-v] go.sum...\n")
+	fmt.Fprintf(os.Stderr, "usage: gosumcheck [-h H] [-k key] [-u url] [-v] go.sum...\n")
 	os.Exit(2)
 }
 
 var (
 	height = flag.Int("h", 8, "tile height")
-	vkey   = flag.String("k", "rsc-goog.appspot.com+eecb1dec+AbTy1QXWdqYd1TTpuaUqsk6u7p+n4AqLiLB8SBwoB831", "notary key") // TODO: Replace with real key.
-	url    = flag.String("u", "", "url to notary (overriding name)")
+	vkey   = flag.String("k", "rsc-goog.appspot.com+eecb1dec+AbTy1QXWdqYd1TTpuaUqsk6u7p+n4AqLiLB8SBwoB831", "key") // TODO: Replace with real key.
+	url    = flag.String("u", "", "url to server (overriding name)")
 	vflag  = flag.Bool("v", false, "enable verbose output")
 )
 
