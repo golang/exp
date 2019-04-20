@@ -4,12 +4,6 @@
 
 // Gosumcheck checks a go.sum file against a go.sum database server.
 //
-// WARNING! This program is meant as a proof of concept demo and
-// should not be used in production scripts.
-// It does not set an exit status to report whether the
-// checksums matched, and it does not filter the go.sum
-// according to the $GONOVERIFY environment variable.
-//
 // Usage:
 //
 //	gosumcheck [-h H] [-k key] [-u url] [-v] go.sum
@@ -18,11 +12,22 @@
 //
 // The -k flag changes the go.sum database server key.
 //
-// The -u flag overrides the URL of the server.
+// The -u flag overrides the URL of the server (usually set from the key name).
 //
 // The -v flag enables verbose output.
 // In particular, it causes gosumcheck to report
 // the URL and elapsed time for each server request.
+//
+// WARNING! WARNING! WARNING!
+//
+// Gosumcheck is meant as a proof of concept demo and should not be
+// used in production scripts or continuous integration testing.
+// It does not cache any downloaded information from run to run,
+// making it expensive and also keeping it from detecting server
+// misbehavior or successful HTTPS man-in-the-middle timeline forks.
+//
+// To discourage misuse in automated settings, gosumcheck does not
+// set any exit status to report whether any problems were found.
 //
 package main
 
@@ -34,6 +39,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -65,7 +71,20 @@ func main() {
 
 	conn := sumweb.NewConn(new(client))
 
-	for _, arg := range flag.Args()[1:] {
+	// Look in environment explicitly, so that if 'go env' is old and
+	// doesn't know about GONOVERIFY, we at least get anything
+	// set in the environment.
+	env := os.Getenv("GONOVERIFY")
+	if env == "" {
+		out, err := exec.Command("go", "env", "GONOVERIFY").CombinedOutput()
+		if err != nil {
+			log.Fatalf("go env GONOVERIFY: %v\n%s", err, out)
+		}
+		env = strings.TrimSpace(string(out))
+	}
+	conn.SetGONOVERIFY(env)
+
+	for _, arg := range flag.Args() {
 		data, err := ioutil.ReadFile(arg)
 		if err != nil {
 			log.Fatal(err)
@@ -96,7 +115,12 @@ func checkGoSum(conn *sumweb.Conn, name string, data []byte) {
 
 			dbLines, err := conn.Lookup(f[0], f[1])
 			if err != nil {
-				errs[i] = err.Error()
+				if err == sumweb.ErrGONOVERIFY {
+					errs[i] = fmt.Sprintf("%s@%s: %v", f[0], f[1], err)
+				} else {
+					// Otherwise Lookup properly adds the prefix itself.
+					errs[i] = err.Error()
+				}
 				return
 			}
 			hashAlgPrefix := f[0] + " " + f[1] + " " + f[2][:strings.Index(f[2], ":")+1]

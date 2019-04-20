@@ -154,6 +154,40 @@ func TestConnFork(t *testing.T) {
 	}
 }
 
+func TestConnGONOVERIFY(t *testing.T) {
+	tc := newTestClient(t)
+	tc.conn.Lookup("rsc.io/sampler", "v1.3.0") // initialize before we turn off network
+	tc.getOK = false
+	tc.conn.SetGONOVERIFY("p,*/q")
+
+	ok := []string{
+		"abc",
+		"a/p",
+		"pq",
+		"q",
+		"n/o/p/q",
+	}
+	skip := []string{
+		"p",
+		"p/x",
+		"x/q",
+		"x/q/z",
+	}
+
+	for _, path := range ok {
+		_, err := tc.conn.Lookup(path, "v1.0.0")
+		if err == ErrGONOVERIFY {
+			t.Errorf("Lookup(%q): ErrGONOVERIFY, wanted failed actual lookup", path)
+		}
+	}
+	for _, path := range skip {
+		_, err := tc.conn.Lookup(path, "v1.0.0")
+		if err != ErrGONOVERIFY {
+			t.Errorf("Lookup(%q): %v, wanted ErrGONOVERIFY", path, err)
+		}
+	}
+}
+
 // A testClient is a self-contained client-side testing environment.
 type testClient struct {
 	t          *testing.T // active test

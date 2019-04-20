@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 	"sync"
 
@@ -82,6 +83,7 @@ type Conn struct {
 	verifiers  note.Verifiers // accepted verifiers (just one, but Verifiers for note.Open)
 	tileReader tileReader
 	tileHeight int
+	noverify   []string
 
 	record    parCache // cache of record lookup, keyed by path@vers
 	tileCache parCache // cache of tile from client.ReadCache, keyed by tile
@@ -159,8 +161,59 @@ func (c *Conn) SetTileHeight(height int) {
 	c.tileHeight = height
 }
 
+// SetGONOVERIFY sets the list of comma-separated GONOVERIFY patterns for the Conn.
+// For any module path matching one of the patterns,
+// Lookup will return ErrGONOVERIFY.
+// Any call to SetGONOVERIFY must happen before the first call to Lookup.
+func (c *Conn) SetGONOVERIFY(list string) {
+	c.noverify = nil
+	for _, glob := range strings.Split(list, ",") {
+		if glob != "" {
+			c.noverify = append(c.noverify, glob)
+		}
+	}
+}
+
+// ErrGONOVERIFY is returned by Lookup for paths that match
+// a pattern listed in the GONOVERIFY list (set by SetGONOVERIFY,
+// usually from the environment variable).
+var ErrGONOVERIFY = errors.New("skipped (listed in GONOVERIFY)")
+
+func (c *Conn) skip(target string) bool {
+	for _, glob := range c.noverify {
+		// A glob with N+1 path elements (N slashes) needs to be matched
+		// against the first N+1 path elements of target,
+		// which end just before the N+1'th slash.
+		n := strings.Count(glob, "/")
+		prefix := target
+		// Walk target, counting slashes, truncating at the N+1'th slash.
+		for i := 0; i < len(target); i++ {
+			if target[i] == '/' {
+				if n == 0 {
+					prefix = target[:i]
+					break
+				}
+				n--
+			}
+		}
+		if n > 0 {
+			// Not enough prefix elements.
+			continue
+		}
+		matched, _ := path.Match(glob, prefix)
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
 // Lookup returns the go.sum lines for the given module path and version.
 func (c *Conn) Lookup(path, vers string) (lines []string, err error) {
+	if c.skip(path) {
+		return nil, ErrGONOVERIFY
+	}
+
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("%s@%s: %v", path, vers, err)
