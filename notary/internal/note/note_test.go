@@ -7,7 +7,6 @@ package note
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -147,21 +146,21 @@ func TestFromEd25519(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newSignerFromEd25519Seed: %v", err)
 	}
-	verifier, err := NewVerifierFromEd25519PublicKey(Name, pub)
+	vkey, err := NewEd25519VerifierKey(Name, pub)
 	if err != nil {
-		t.Fatalf("NewVerifierFromEd25519PublicKey: %v", err)
+		t.Fatalf("NewEd25519VerifierKey: %v", err)
+	}
+	verifier, err := NewVerifier(vkey)
+	if err != nil {
+		t.Fatalf("NewVerifier: %v", err)
 	}
 
 	testSignerAndVerifier(t, Name, signer, verifier)
 
 	// Check that wrong key sizes return errors.
-	_, err = newSignerFromEd25519Seed(Name, priv)
+	_, err = NewEd25519VerifierKey(Name, pub[:len(pub)-1])
 	if err == nil {
-		t.Errorf("newSignerFromEd25519Seed succeeded with a seed of the wrong size")
-	}
-	_, err = NewVerifierFromEd25519PublicKey(Name, pub[:len(pub)-1])
-	if err == nil {
-		t.Errorf("NewVerifierFromEd25519PublicKey succeeded with a seed of the wrong size")
+		t.Errorf("NewEd25519VerifierKey succeeded with a seed of the wrong size")
 	}
 }
 
@@ -296,10 +295,6 @@ type errSigner struct {
 
 func (e *errSigner) Sign([]byte) ([]byte, error) {
 	return nil, errSurprise
-}
-
-func fmtSig(s Signature) string {
-	return fmt.Sprintf("{%q %#08x %s}", s.Name, s.Hash, s.Base64)
 }
 
 func TestOpen(t *testing.T) {

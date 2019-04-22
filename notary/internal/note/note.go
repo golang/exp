@@ -382,24 +382,18 @@ func GenerateKey(rand io.Reader, name string) (skey, vkey string, err error) {
 	return skey, vkey, nil
 }
 
-// NewVerifierFromEd25519PublicKey constructs a new verifier from a server name
-// and a golang.org/x/crypto/ed25519 public key.
-func NewVerifierFromEd25519PublicKey(name string, pub ed25519.PublicKey) (Verifier, error) {
-	if len(pub) != ed25519.PublicKeySize {
-		return nil, fmt.Errorf("invalid public key size %d, expected %d", len(pub), ed25519.PublicKeySize)
+// NewEd25519VerifierKey returns an encoded verifier key using the given name
+// and Ed25519 public key.
+func NewEd25519VerifierKey(name string, key ed25519.PublicKey) (string, error) {
+	if len(key) != ed25519.PublicKeySize {
+		return "", fmt.Errorf("invalid public key size %d, expected %d", len(key), ed25519.PublicKeySize)
 	}
 
-	pubkey := append([]byte{algEd25519}, pub...)
+	pubkey := append([]byte{algEd25519}, key...)
 	hash := keyHash(name, pubkey)
 
-	v := &verifier{
-		name: name,
-		hash: uint32(hash),
-		verify: func(msg, sig []byte) bool {
-			return ed25519.Verify(pub, msg, sig)
-		},
-	}
-	return v, nil
+	b64Key := base64.StdEncoding.EncodeToString(pubkey)
+	return fmt.Sprintf("%s+%08x+%s", name, hash, b64Key), nil
 }
 
 // A Verifiers is a collection of known verifier keys.
