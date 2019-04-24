@@ -154,11 +154,11 @@ func TestConnFork(t *testing.T) {
 	}
 }
 
-func TestConnGONOVERIFY(t *testing.T) {
+func TestConnGONOSUMDB(t *testing.T) {
 	tc := newTestClient(t)
 	tc.conn.Lookup("rsc.io/sampler", "v1.3.0") // initialize before we turn off network
 	tc.getOK = false
-	tc.conn.SetGONOVERIFY("p,*/q")
+	tc.conn.SetGONOSUMDB("p,*/q")
 
 	ok := []string{
 		"abc",
@@ -176,14 +176,14 @@ func TestConnGONOVERIFY(t *testing.T) {
 
 	for _, path := range ok {
 		_, err := tc.conn.Lookup(path, "v1.0.0")
-		if err == ErrGONOVERIFY {
-			t.Errorf("Lookup(%q): ErrGONOVERIFY, wanted failed actual lookup", path)
+		if err == ErrGONOSUMDB {
+			t.Errorf("Lookup(%q): ErrGONOSUMDB, wanted failed actual lookup", path)
 		}
 	}
 	for _, path := range skip {
 		_, err := tc.conn.Lookup(path, "v1.0.0")
-		if err != ErrGONOVERIFY {
-			t.Errorf("Lookup(%q): %v, wanted ErrGONOVERIFY", path, err)
+		if err != ErrGONOSUMDB {
+			t.Errorf("Lookup(%q): %v, wanted ErrGONOSUMDB", path, err)
 		}
 	}
 }

@@ -72,17 +72,17 @@ func main() {
 	conn := sumweb.NewConn(new(client))
 
 	// Look in environment explicitly, so that if 'go env' is old and
-	// doesn't know about GONOVERIFY, we at least get anything
+	// doesn't know about GONOSUMDB, we at least get anything
 	// set in the environment.
-	env := os.Getenv("GONOVERIFY")
+	env := os.Getenv("GONOSUMDB")
 	if env == "" {
-		out, err := exec.Command("go", "env", "GONOVERIFY").CombinedOutput()
+		out, err := exec.Command("go", "env", "GONOSUMDB").CombinedOutput()
 		if err != nil {
-			log.Fatalf("go env GONOVERIFY: %v\n%s", err, out)
+			log.Fatalf("go env GONOSUMDB: %v\n%s", err, out)
 		}
 		env = strings.TrimSpace(string(out))
 	}
-	conn.SetGONOVERIFY(env)
+	conn.SetGONOSUMDB(env)
 
 	for _, arg := range flag.Args() {
 		data, err := ioutil.ReadFile(arg)
@@ -115,7 +115,7 @@ func checkGoSum(conn *sumweb.Conn, name string, data []byte) {
 
 			dbLines, err := conn.Lookup(f[0], f[1])
 			if err != nil {
-				if err == sumweb.ErrGONOVERIFY {
+				if err == sumweb.ErrGONOSUMDB {
 					errs[i] = fmt.Sprintf("%s@%s: %v", f[0], f[1], err)
 				} else {
 					// Otherwise Lookup properly adds the prefix itself.

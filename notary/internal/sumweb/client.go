@@ -161,11 +161,11 @@ func (c *Conn) SetTileHeight(height int) {
 	c.tileHeight = height
 }
 
-// SetGONOVERIFY sets the list of comma-separated GONOVERIFY patterns for the Conn.
+// SetGONOSUMDB sets the list of comma-separated GONOSUMDB patterns for the Conn.
 // For any module path matching one of the patterns,
-// Lookup will return ErrGONOVERIFY.
-// Any call to SetGONOVERIFY must happen before the first call to Lookup.
-func (c *Conn) SetGONOVERIFY(list string) {
+// Lookup will return ErrGONOSUMDB.
+// Any call to SetGONOSUMDB must happen before the first call to Lookup.
+func (c *Conn) SetGONOSUMDB(list string) {
 	c.noverify = nil
 	for _, glob := range strings.Split(list, ",") {
 		if glob != "" {
@@ -174,10 +174,10 @@ func (c *Conn) SetGONOVERIFY(list string) {
 	}
 }
 
-// ErrGONOVERIFY is returned by Lookup for paths that match
-// a pattern listed in the GONOVERIFY list (set by SetGONOVERIFY,
+// ErrGONOSUMDB is returned by Lookup for paths that match
+// a pattern listed in the GONOSUMDB list (set by SetGONOSUMDB,
 // usually from the environment variable).
-var ErrGONOVERIFY = errors.New("skipped (listed in GONOVERIFY)")
+var ErrGONOSUMDB = errors.New("skipped (listed in GONOSUMDB)")
 
 func (c *Conn) skip(target string) bool {
 	for _, glob := range c.noverify {
@@ -211,7 +211,7 @@ func (c *Conn) skip(target string) bool {
 // Lookup returns the go.sum lines for the given module path and version.
 func (c *Conn) Lookup(path, vers string) (lines []string, err error) {
 	if c.skip(path) {
-		return nil, ErrGONOVERIFY
+		return nil, ErrGONOSUMDB
 	}
 
 	defer func() {
