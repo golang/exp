@@ -83,7 +83,7 @@ type Conn struct {
 	verifiers  note.Verifiers // accepted verifiers (just one, but Verifiers for note.Open)
 	tileReader tileReader
 	tileHeight int
-	noverify   []string
+	nosumdb    string
 
 	record    parCache // cache of record lookup, keyed by path@vers
 	tileCache parCache // cache of tile from client.ReadCache, keyed by tile
@@ -166,12 +166,7 @@ func (c *Conn) SetTileHeight(height int) {
 // Lookup will return ErrGONOSUMDB.
 // Any call to SetGONOSUMDB must happen before the first call to Lookup.
 func (c *Conn) SetGONOSUMDB(list string) {
-	c.noverify = nil
-	for _, glob := range strings.Split(list, ",") {
-		if glob != "" {
-			c.noverify = append(c.noverify, glob)
-		}
-	}
+	c.nosumdb = list
 }
 
 // ErrGONOSUMDB is returned by Lookup for paths that match
@@ -180,7 +175,26 @@ func (c *Conn) SetGONOSUMDB(list string) {
 var ErrGONOSUMDB = errors.New("skipped (listed in GONOSUMDB)")
 
 func (c *Conn) skip(target string) bool {
-	for _, glob := range c.noverify {
+	return hasGlobsPathPrefix(c.nosumdb, target)
+}
+
+// hasGlobsPathPrefix reports whether any path prefix of target
+// matches one of the glob patterns (as defined by path.Match)
+// in the comma-separated globs list.
+// It ignores any empty or malformed patterns in the list.
+func hasGlobsPathPrefix(globs, target string) bool {
+	for globs != "" {
+		// Extract next non-empty glob in comma-separated list.
+		var glob string
+		if i := strings.Index(globs, ","); i >= 0 {
+			glob, globs = globs[:i], globs[i+1:]
+		} else {
+			glob, globs = globs, ""
+		}
+		if glob == "" {
+			continue
+		}
+
 		// A glob with N+1 path elements (N slashes) needs to be matched
 		// against the first N+1 path elements of target,
 		// which end just before the N+1'th slash.
