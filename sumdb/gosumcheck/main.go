@@ -44,7 +44,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/exp/notary/internal/sumweb"
+	"golang.org/x/exp/sumdb/internal/sumweb"
 )
 
 func usage() {

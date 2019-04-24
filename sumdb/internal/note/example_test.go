@@ -9,7 +9,7 @@ import (
 	"io"
 	"os"
 
-	"golang.org/x/exp/notary/internal/note"
+	"golang.org/x/exp/sumdb/internal/note"
 )
 
 func ExampleSign() {

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"golang.org/x/exp/notary/internal/note"
-	"golang.org/x/exp/notary/internal/tlog"
+	"golang.org/x/exp/sumdb/internal/note"
+	"golang.org/x/exp/sumdb/internal/tlog"
 )
 
 const (

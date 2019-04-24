@@ -1,4 +1,4 @@
-module golang.org/x/exp/notary
+module golang.org/x/exp/sumdb
 
 go 1.13
 

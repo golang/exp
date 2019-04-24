@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/exp/notary/internal/tlog"
+	"golang.org/x/exp/sumdb/internal/tlog"
 )
 
 // A Server provides the external operations
