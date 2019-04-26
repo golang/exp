@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/exp/sumdb/internal/note"
 	"golang.org/x/exp/sumdb/internal/tlog"
@@ -21,20 +22,22 @@ import (
 // needed to implement the HTTP client Conn.
 // The methods must be safe for concurrent use by multiple goroutines.
 type Client interface {
-	// GetURL fetches and returns the content served at the given URL.
-	// It should return an error for any non-200 HTTP response status.
-	GetURL(url string) ([]byte, error)
+	// ReadRemote reads and returns the content served at the given path
+	// on the remote database server. The path begins with "/lookup" or "/tile/".
+	// It is the implementation's responsibility to turn that path into a full URL
+	// and make the HTTP request. ReadRemote should return an error for
+	// any non-200 HTTP response status.
+	ReadRemote(path string) ([]byte, error)
 
 	// ReadConfig reads and returns the content of the named configuration file.
 	// There are only a fixed set of configuration files.
 	//
 	// "key" returns a file containing the verifier key for the server.
-	// If the file has a second line, it should be the URL of the server.
-	// Otherwise the URL is "https://" + serverName (derived from key).
-	// "key" is only ever read, not written.
 	//
 	// serverName + "/latest" returns a file containing the latest known
 	// signed tree from the server. It is read and written (using WriteConfig).
+	// To signal that the client wishes to start with an "empty" signed tree,
+	// ReadConfig can return a successful empty result (0 bytes of data).
 	ReadConfig(file string) ([]byte, error)
 
 	// WriteConfig updates the content of the named configuration file,
@@ -75,19 +78,19 @@ var ErrSecurity = errors.New("security error: misbehaving server")
 type Conn struct {
 	client Client // client-provided external world
 
+	didLookup uint32
+
 	// one-time initialized data
 	initOnce   sync.Once
 	initErr    error          // init error, if any
 	name       string         // name of accepted verifier
-	url        string         // url of server (usually https://name)
 	verifiers  note.Verifiers // accepted verifiers (just one, but Verifiers for note.Open)
 	tileReader tileReader
 	tileHeight int
 	nosumdb    string
 
 	record    parCache // cache of record lookup, keyed by path@vers
-	tileCache parCache // cache of tile from client.ReadCache, keyed by tile
-	tileFetch parCache // cache of tile from client.GetURL, keyed by tile
+	tileCache parCache // cache of c.readTile, keyed by tile
 
 	latestMu  sync.Mutex
 	latest    tlog.Tree // latest known tree head
@@ -130,18 +133,13 @@ func (c *Conn) initWork() {
 		c.initErr = err
 		return
 	}
-	lines := strings.Split(string(vkey), "\n")
-	verifier, err := note.NewVerifier(strings.TrimSpace(lines[0]))
+	verifier, err := note.NewVerifier(strings.TrimSpace(string(vkey)))
 	if err != nil {
 		c.initErr = err
 		return
 	}
 	c.verifiers = note.VerifierList(verifier)
 	c.name = verifier.Name()
-	c.url = "https://" + c.name
-	if len(lines) >= 2 && lines[1] != "" {
-		c.url = strings.TrimRight(lines[1], "/")
-	}
 
 	data, err := c.client.ReadConfig(c.name + "/latest")
 	if err != nil {
@@ -158,6 +156,12 @@ func (c *Conn) initWork() {
 // Any call to SetTileHeight must happen before the first call to Lookup.
 // If SetTileHeight is not called, the Conn defaults to tile height 8.
 func (c *Conn) SetTileHeight(height int) {
+	if atomic.LoadUint32(&c.didLookup) != 0 {
+		panic("SetTileHeight used after Lookup")
+	}
+	if c.tileHeight != 0 {
+		panic("multiple calls to SetTileHeight")
+	}
 	c.tileHeight = height
 }
 
@@ -166,6 +170,12 @@ func (c *Conn) SetTileHeight(height int) {
 // Lookup will return ErrGONOSUMDB.
 // Any call to SetGONOSUMDB must happen before the first call to Lookup.
 func (c *Conn) SetGONOSUMDB(list string) {
+	if atomic.LoadUint32(&c.didLookup) != 0 {
+		panic("SetGONOSUMDB used after Lookup")
+	}
+	if c.nosumdb != "" {
+		panic("multiple calls to SetGONOSUMDB")
+	}
 	c.nosumdb = list
 }
 
@@ -175,14 +185,14 @@ func (c *Conn) SetGONOSUMDB(list string) {
 var ErrGONOSUMDB = errors.New("skipped (listed in GONOSUMDB)")
 
 func (c *Conn) skip(target string) bool {
-	return hasGlobsPathPrefix(c.nosumdb, target)
+	return globsMatchPath(c.nosumdb, target)
 }
 
-// hasGlobsPathPrefix reports whether any path prefix of target
+// globsMatchPath reports whether any path prefix of target
 // matches one of the glob patterns (as defined by path.Match)
 // in the comma-separated globs list.
 // It ignores any empty or malformed patterns in the list.
-func hasGlobsPathPrefix(globs, target string) bool {
+func globsMatchPath(globs, target string) bool {
 	for globs != "" {
 		// Extract next non-empty glob in comma-separated list.
 		var glob string
@@ -223,7 +233,11 @@ func hasGlobsPathPrefix(globs, target string) bool {
 }
 
 // Lookup returns the go.sum lines for the given module path and version.
+// The version may end in a /go.mod suffix, in which case Lookup returns
+// the go.sum lines for the module's go.mod-only hash.
 func (c *Conn) Lookup(path, vers string) (lines []string, err error) {
+	atomic.StoreUint32(&c.didLookup, 1)
+
 	if c.skip(path) {
 		return nil, ErrGONOSUMDB
 	}
@@ -248,7 +262,7 @@ func (c *Conn) Lookup(path, vers string) (lines []string, err error) {
 		return nil, err
 	}
 	file := c.name + "/lookup/" + epath + "@" + evers
-	url := c.url + "/lookup/" + epath + "@" + evers
+	remotePath := "/lookup/" + epath + "@" + evers
 
 	// Fetch the data.
 	// The lookupCache avoids redundant ReadCache/GetURL operations
@@ -264,7 +278,7 @@ func (c *Conn) Lookup(path, vers string) (lines []string, err error) {
 		writeCache := false
 		data, err := c.client.ReadCache(file)
 		if err != nil {
-			data, err = c.client.GetURL(url)
+			data, err = c.client.ReadRemote(remotePath)
 			if err != nil {
 				return cached{nil, err}
 			}
@@ -310,9 +324,9 @@ func (c *Conn) Lookup(path, vers string) (lines []string, err error) {
 // mergeLatest merges the tree head in msg
 // with the Conn's current latest tree head,
 // ensuring the result is a consistent timeline.
-// If the result is inconsistent, mergeLatest calls c.client.Fatal
+// If the result is inconsistent, mergeLatest calls c.client.SecurityError
 // with a detailed security error message and then
-// (only if c.client.Fatal does not exit the program) returns ErrSecurity.
+// (only if c.client.SecurityError does not exit the program) returns ErrSecurity.
 // If the Conn's current latest tree head moves forward,
 // mergeLatest updates the underlying configuration file as well,
 // taking care to merge any independent updates to that configuration.
@@ -322,7 +336,7 @@ func (c *Conn) mergeLatest(msg []byte) error {
 	if err != nil {
 		return err
 	}
-	if when <= 0 {
+	if when != msgFuture {
 		// msg matched our present or was in the past.
 		// No change to our present, so no update of config file.
 		return nil
@@ -341,7 +355,7 @@ func (c *Conn) mergeLatest(msg []byte) error {
 		if err != nil {
 			return err
 		}
-		if when >= 0 {
+		if when != msgPast {
 			// msg matched our present or was from the future,
 			// and now our in-memory copy matches.
 			return nil
@@ -358,14 +372,20 @@ func (c *Conn) mergeLatest(msg []byte) error {
 	}
 }
 
+const (
+	msgPast = 1 + iota
+	msgNow
+	msgFuture
+)
+
 // mergeLatestMem is like mergeLatest but is only concerned with
 // updating the in-memory copy of the latest tree head (c.latest)
 // not the configuration file.
 // The when result explains when msg happened relative to our
 // previous idea of c.latest:
-// when == -1 means msg was from before c.latest,
-// when == 0 means msg was exactly c.latest, and
-// when == +1 means msg was from after c.latest, which has now been updated.
+// msgPast means msg was from before c.latest,
+// msgNow means msg was exactly c.latest, and
+// msgFuture means msg was from after c.latest, which has now been updated.
 func (c *Conn) mergeLatestMem(msg []byte) (when int, err error) {
 	if len(msg) == 0 {
 		// Accept empty msg as the unsigned, empty timeline.
@@ -373,9 +393,9 @@ func (c *Conn) mergeLatestMem(msg []byte) (when int, err error) {
 		latest := c.latest
 		c.latestMu.Unlock()
 		if latest.N == 0 {
-			return 0, nil
+			return msgNow, nil
 		}
-		return -1, nil
+		return msgPast, nil
 	}
 
 	note, err := note.Open(msg, c.verifiers)
@@ -402,9 +422,9 @@ func (c *Conn) mergeLatestMem(msg []byte) (when int, err error) {
 				return 0, err
 			}
 			if tree.N < latest.N {
-				return -1, nil
+				return msgPast, nil
 			}
-			return 0, nil
+			return msgNow, nil
 		}
 
 		// The tree head looks new. Check that we are on its timeline and try to move our timeline forward.
@@ -427,7 +447,7 @@ func (c *Conn) mergeLatestMem(msg []byte) (when int, err error) {
 		c.latestMu.Unlock()
 
 		if installed {
-			return +1, nil
+			return msgFuture, nil
 		}
 	}
 }
@@ -544,9 +564,9 @@ func (c *Conn) tileCacheKey(tile tlog.Tile) string {
 	return c.name + "/" + tile.Path()
 }
 
-// tileURL returns the URL for the tile.
-func (c *Conn) tileURL(tile tlog.Tile) string {
-	return c.url + "/" + tile.Path()
+// tileRemotePath returns the remote path for the tile.
+func (c *Conn) tileRemotePath(tile tlog.Tile) string {
+	return "/" + tile.Path()
 }
 
 // readTile reads a single tile, either from the on-disk cache or the server.
@@ -556,63 +576,55 @@ func (c *Conn) readTile(tile tlog.Tile) ([]byte, error) {
 		err  error
 	}
 
-	// Try the requested tile in on-disk cache.
 	result := c.tileCache.Do(tile, func() interface{} {
+		// Try the requested tile in on-disk cache.
 		data, err := c.client.ReadCache(c.tileCacheKey(tile))
-		return cached{data, err}
-	}).(cached)
-	if result.err == nil {
-		c.markTileSaved(tile)
-		return result.data, nil
-	}
+		if err == nil {
+			c.markTileSaved(tile)
+			return cached{data, nil}
+		}
 
-	// Try the full tile in on-disk cache (if requested tile not already full).
-	// We only save authenticated tiles to the on-disk cache,
-	// so rederiving the prefix is not going to cause spurious validation errors.
-	full := tile
-	full.W = 1 << tile.H
-	if tile != full {
-		result := c.tileCache.Do(full, func() interface{} {
+		// Try the full tile in on-disk cache (if requested tile not already full).
+		// We only save authenticated tiles to the on-disk cache,
+		// so the recreated prefix is equally authenticated.
+		full := tile
+		full.W = 1 << tile.H
+		if tile != full {
 			data, err := c.client.ReadCache(c.tileCacheKey(full))
-			return cached{data, err}
-		}).(cached)
-		if result.err == nil {
-			c.markTileSaved(tile) // don't save tile later; we already have full
-			return result.data[:len(result.data)/full.W*tile.W], nil
+			if err == nil {
+				c.markTileSaved(tile) // don't save tile later; we already have full
+				return cached{data[:len(data)/full.W*tile.W], nil}
+			}
 		}
-	}
 
-	// Try requested tile from server.
-	result = c.tileFetch.Do(tile, func() interface{} {
-		data, err := c.client.GetURL(c.tileURL(tile))
-		return cached{data, err}
+		// Try requested tile from server.
+		data, err = c.client.ReadRemote(c.tileRemotePath(tile))
+		if err == nil {
+			return cached{data, nil}
+		}
+
+		// Try full tile on server.
+		// If the partial tile does not exist, it should be because
+		// the tile has been completed and only the complete one
+		// is available.
+		if tile != full {
+			data, err := c.client.ReadRemote(c.tileRemotePath(full))
+			if err == nil {
+				// Note: We could save the full tile in the on-disk cache here,
+				// but we don't know if it is valid yet, and we will only find out
+				// about the partial data, not the full data. So let SaveTiles
+				// save the partial tile, and we'll just refetch the full tile later
+				// once we can validate more (or all) of it.
+				return cached{data[:len(data)/full.W*tile.W], nil}
+			}
+		}
+
+		// Nothing worked.
+		// Return the error from the server fetch for the requested (not full) tile.
+		return cached{nil, err}
 	}).(cached)
-	if result.err == nil {
-		return result.data, nil
-	}
 
-	// Try full tile on server.
-	// If the partial tile does not exist, it should be because
-	// the tile has been completed and only the complete one
-	// is available.
-	if tile != full {
-		result := c.tileFetch.Do(tile, func() interface{} {
-			data, err := c.client.GetURL(c.tileURL(full))
-			return cached{data, err}
-		}).(cached)
-		if result.err == nil {
-			// Note: We could save the full tile in the on-disk cache here,
-			// but we don't know if it is valid yet, and we will only find out
-			// about the partial data, not the full data. So let SaveTiles
-			// save the partial tile, and we'll just refetch the full tile later
-			// once we can validate more (or all) of it.
-			return result.data[:len(result.data)/full.W*tile.W], nil
-		}
-	}
-
-	// Nothing worked.
-	// Return the error from the server fetch for the requested (not full) tile.
-	return nil, result.err
+	return result.data, result.err
 }
 
 // markTileSaved records that tile is already present in the on-disk cache,
@@ -641,6 +653,10 @@ func (r *tileReader) SaveTiles(tiles []tlog.Tile, data [][]byte) {
 
 	for i, tile := range tiles {
 		if save[i] {
+			// If WriteCache fails here (out of disk space? i/o error?),
+			// c.tileSaved[tile] is still true and we will not try to write it again.
+			// Next time we run maybe we'll redownload it again and be
+			// more successful.
 			c.client.WriteCache(c.name+"/"+tile.Path(), data[i])
 		}
 	}

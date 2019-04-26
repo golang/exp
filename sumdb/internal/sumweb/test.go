@@ -80,7 +80,7 @@ func (s *TestServer) ReadRecords(ctx context.Context, id, n int64) ([][]byte, er
 	return list, nil
 }
 
-func (s *TestServer) FindKey(ctx context.Context, key string) (int64, error) {
+func (s *TestServer) Lookup(ctx context.Context, key string) (int64, error) {
 	s.mu.Lock()
 	id, ok := s.lookup[key]
 	s.mu.Unlock()

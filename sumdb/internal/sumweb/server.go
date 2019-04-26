@@ -28,9 +28,9 @@ type Server interface {
 	// ReadRecords returns the content for the n records id through id+n-1.
 	ReadRecords(ctx context.Context, id, n int64) ([][]byte, error)
 
-	// FindKey looks up a record by its associated key ("module@version"),
+	// Lookup looks up a record by its associated key ("module@version"),
 	// returning the record ID.
-	FindKey(ctx context.Context, key string) (int64, error)
+	Lookup(ctx context.Context, key string) (int64, error)
 
 	// ReadTileData reads the content of tile t.
 	// It is only invoked for hash tiles (t.L ≥ 0).
@@ -59,7 +59,7 @@ var Paths = []string{
 	"/tile/",
 }
 
-var modVerRE = regexp.MustCompile(`^[^@]+@v[0-9]+\.[0-9]+\.[0-9]+(-[^@]*)?$`)
+var modVerRE = regexp.MustCompile(`^[^@]+@v[0-9]+\.[0-9]+\.[0-9]+(-[^@]*)?(\+incompatible)?$`)
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, err := h.Server.NewContext(r)
@@ -78,8 +78,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid module@version syntax", http.StatusBadRequest)
 			return
 		}
-		// TODO(rsc): Decide whether to !-decode here.
-		id, err := h.Server.FindKey(ctx, mod)
+		i := strings.Index(mod, "@")
+		encPath, encVers := mod[:i], mod[i+1:]
+		path, err := decodePath(encPath)
+		if err != nil {
+			reportError(w, r, err)
+			return
+		}
+		vers, err := decodeVersion(encVers)
+		if err != nil {
+			reportError(w, r, err)
+			return
+		}
+		id, err := h.Server.Lookup(ctx, path+"@"+vers)
 		if err != nil {
 			reportError(w, r, err)
 			return

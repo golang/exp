@@ -53,7 +53,7 @@ func TestConnBadTiles(t *testing.T) {
 	tc := newTestClient(t)
 
 	flipBits := func() {
-		for url, data := range tc.get {
+		for url, data := range tc.remote {
 			if strings.Contains(url, "/tile/") {
 				for i := range data {
 					data[i] ^= 0x80
@@ -107,8 +107,8 @@ func TestConnFork(t *testing.T) {
 `)
 	tc2.mustLookup("rsc.io/pkg1", "v1.5.4", "rsc.io/pkg1 v1.5.4 h1:hash!=")
 
-	key := "https://" + testName + "/lookup/rsc.io/pkg1@v1.5.2"
-	tc2.get[key] = tc.get[key]
+	key := "/lookup/rsc.io/pkg1@v1.5.2"
+	tc2.remote[key] = tc.remote[key]
 	_, err := tc2.conn.Lookup("rsc.io/pkg1", "v1.5.2")
 	tc2.mustError(err, ErrSecurity.Error())
 
@@ -156,9 +156,9 @@ func TestConnFork(t *testing.T) {
 
 func TestConnGONOSUMDB(t *testing.T) {
 	tc := newTestClient(t)
+	tc.conn.SetGONOSUMDB("p,*/q")
 	tc.conn.Lookup("rsc.io/sampler", "v1.3.0") // initialize before we turn off network
 	tc.getOK = false
-	tc.conn.SetGONOSUMDB("p,*/q")
 
 	ok := []string{
 		"abc",
@@ -197,7 +197,7 @@ type testClient struct {
 	getTileOK  bool       // should tc.GetURL of tiles succeed?
 	treeSize   int64
 	hashes     []tlog.Hash
-	get        map[string][]byte
+	remote     map[string][]byte
 	signer     note.Signer
 
 	// mu protects config, cache, log, security
@@ -230,7 +230,7 @@ func newTestClient(t *testing.T) *testClient {
 		getTileOK:  true,
 		config:     make(map[string][]byte),
 		cache:      make(map[string][]byte),
-		get:        make(map[string][]byte),
+		remote:     make(map[string][]byte),
 	}
 
 	tc.config["key"] = []byte(testVerifierKey + "\n")
@@ -313,7 +313,7 @@ func (tc *testClient) fork() *testClient {
 		signer:     tc.signer,
 		config:     copyMap(tc.config),
 		cache:      copyMap(tc.cache),
-		get:        copyMap(tc.get),
+		remote:     copyMap(tc.remote),
 	}
 	tc2.newConn()
 	return tc2
@@ -355,7 +355,7 @@ func (tc *testClient) addRecord(key, data string) {
 	tc.hashes = append(tc.hashes, hashes...)
 
 	// Create lookup result.
-	tc.get["https://"+testName+"/lookup/"+key] = append(rec, tc.signTree(tc.treeSize)...)
+	tc.remote["/lookup/"+key] = append(rec, tc.signTree(tc.treeSize)...)
 
 	// Create new tiles.
 	tiles := tlog.NewTiles(tc.tileHeight, id, tc.treeSize)
@@ -364,7 +364,7 @@ func (tc *testClient) addRecord(key, data string) {
 		if err != nil {
 			tc.t.Fatal(err)
 		}
-		tc.get["https://"+testName+"/"+tile.Path()] = data
+		tc.remote["/"+tile.Path()] = data
 		// TODO delete old partial tiles
 	}
 }
@@ -383,20 +383,20 @@ func (tc *testClient) signTree(size int64) []byte {
 	return data
 }
 
-// GetURL is for tc's implementation of Client.
-func (tc *testClient) GetURL(url string) ([]byte, error) {
+// ReadRemote is for tc's implementation of Client.
+func (tc *testClient) ReadRemote(path string) ([]byte, error) {
 	// No mutex here because only the Client should be running
 	// and the Client cannot change tc.get.
 	if !tc.getOK {
-		return nil, fmt.Errorf("disallowed URL %s", url)
+		return nil, fmt.Errorf("disallowed remote read %s", path)
 	}
-	if strings.Contains(url, "/tile/") && !tc.getTileOK {
-		return nil, fmt.Errorf("disallowed Tile URL %s", url)
+	if strings.Contains(path, "/tile/") && !tc.getTileOK {
+		return nil, fmt.Errorf("disallowed remote tile read %s", path)
 	}
 
-	data, ok := tc.get[url]
+	data, ok := tc.remote[path]
 	if !ok {
-		return nil, fmt.Errorf("no URL %s", url)
+		return nil, fmt.Errorf("no remote path %s", path)
 	}
 	return data, nil
 }
