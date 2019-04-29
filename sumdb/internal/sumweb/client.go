@@ -588,7 +588,7 @@ func (c *Conn) readTile(tile tlog.Tile) ([]byte, error) {
 		// We only save authenticated tiles to the on-disk cache,
 		// so the recreated prefix is equally authenticated.
 		full := tile
-		full.W = 1 << tile.H
+		full.W = 1 << uint(tile.H)
 		if tile != full {
 			data, err := c.client.ReadCache(c.tileCacheKey(full))
 			if err == nil {
