@@ -92,6 +92,8 @@ const (
 	xkEnd        = 0xff57
 	xkInsert     = 0xff63
 	xkMenu       = 0xff67
+	xkHelp       = 0xff6a
+	xkNumLock    = 0xff7f
 	xkF1         = 0xffbe
 	xkF2         = 0xffbf
 	xkF3         = 0xffc0
@@ -108,6 +110,7 @@ const (
 	xkShiftR     = 0xffe2
 	xkControlL   = 0xffe3
 	xkControlR   = 0xffe4
+	xkCapsLock   = 0xffe5
 	xkAltL       = 0xffe9
 	xkAltR       = 0xffea
 	xkSuperL     = 0xffeb
@@ -138,6 +141,8 @@ var nonUnicodeKeycodes = map[rune]key.Code{
 	xkEnd:        key.CodeEnd,
 	xkInsert:     key.CodeInsert,
 	xkMenu:       key.CodeRightGUI, // TODO: CodeRightGUI or CodeMenu??
+	xkHelp:       key.CodeHelp,
+	xkNumLock:    key.CodeKeypadNumLock,
 	xkMultiKey:   key.CodeCompose,
 
 	xkF1:  key.CodeF1,
@@ -157,6 +162,7 @@ var nonUnicodeKeycodes = map[rune]key.Code{
 	xkShiftR:   key.CodeRightShift,
 	xkControlL: key.CodeLeftControl,
 	xkControlR: key.CodeRightControl,
+	xkCapsLock: key.CodeCapsLock,
 	xkAltL:     key.CodeLeftAlt,
 	xkAltR:     key.CodeRightAlt,
 	xkSuperL:   key.CodeLeftGUI,
