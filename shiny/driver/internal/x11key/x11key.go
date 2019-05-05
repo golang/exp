@@ -8,6 +8,8 @@
 package x11key // import "golang.org/x/exp/shiny/driver/internal/x11key"
 
 import (
+	"unicode"
+
 	"golang.org/x/mobile/event/key"
 )
 
@@ -49,10 +51,16 @@ func (t *KeysymTable) Lookup(detail uint8, state uint16) (rune, key.Code) {
 		// TODO: distinguish the regular '2' key and number-pad '2' key (with
 		// Num-Lock).
 		c = asciiKeycodes[unshifted]
+		if state&LockMask != 0 {
+			r = unicode.ToUpper(r)
+		}
 	} else if nuk := nonUnicodeKeycodes[unshifted]; nuk != key.CodeUnknown {
 		r, c = -1, nuk
 	} else if uk, isUnicode := keysymCodePoints[r]; isUnicode {
 		r = uk
+		if state&LockMask != 0 {
+			r = unicode.ToUpper(r)
+		}
 	}
 
 	return r, c
