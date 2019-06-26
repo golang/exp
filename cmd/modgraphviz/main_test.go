@@ -14,9 +14,8 @@ func TestRun(t *testing.T) {
 test.com/A test.com/B@v1.2.3
 test.com/B test.com/C@v4.5.6
 `))
-	out := bytes.Buffer{}
-
-	if err := Run(in, &out); err != nil {
+	graph, err := convert(in)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -25,7 +24,7 @@ test.com/B test.com/C@v4.5.6
 	"test.com/B" -> "test.com/C@v4.5.6"
 }
 `
-	if out.String() != want {
-		t.Fatalf("\ngot: %s\nwant: %s", out.String(), want)
+	if string(graph) != want {
+		t.Fatalf("\ngot: %s\nwant: %s", string(graph), want)
 	}
 }
