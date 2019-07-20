@@ -71,6 +71,7 @@ func modgraphviz(in io.Reader, out io.Writer) error {
 	}
 
 	fmt.Fprintf(out, "digraph gomodgraph {\n")
+	fmt.Fprintf(out, "\tnode [ shape=rectangle fontsize=12 ]\n")
 	out.Write(graph.edgesAsDOT())
 	for _, n := range graph.mvsPicked {
 		fmt.Fprintf(out, "\t%q [style = filled, fillcolor = green]\n", n)
@@ -152,7 +153,6 @@ func convert(r io.Reader) (*graph, error) {
 
 	// Make this function deterministic.
 	sort.Strings(g.mvsPicked)
-
 	return &g, nil
 }
 

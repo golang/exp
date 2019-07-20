@@ -23,6 +23,7 @@ test.com/B@v1.0.0 test.com/C@v4.5.6
 
 	gotGraph := string(out.Bytes())
 	wantGraph := `digraph gomodgraph {
+	node [ shape=rectangle fontsize=12 ]
 	"test.com/A@v1.0.0" -> "test.com/B@v1.2.3"
 	"test.com/B@v1.0.0" -> "test.com/C@v4.5.6"
 	"test.com/A@v1.0.0" [style = filled, fillcolor = green]
