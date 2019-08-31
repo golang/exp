@@ -115,6 +115,7 @@ func newScreenImpl(xc *xgb.Conn) (*screenImpl, error) {
 }
 
 func (s *screenImpl) run() {
+	keyboardChanged := false
 	for {
 		ev, err := s.xc.WaitForEvent()
 		if err != nil {
@@ -190,6 +191,10 @@ func (s *screenImpl) run() {
 			}
 
 		case xproto.KeyPressEvent:
+			if keyboardChanged {
+				keyboardChanged = false
+				s.initKeyboardMapping()
+			}
 			if w := s.findWindow(ev.Event); w != nil {
 				w.handleKey(ev.Detail, ev.State, key.DirPress)
 			} else {
@@ -197,6 +202,10 @@ func (s *screenImpl) run() {
 			}
 
 		case xproto.KeyReleaseEvent:
+			if keyboardChanged {
+				keyboardChanged = false
+				s.initKeyboardMapping()
+			}
 			if w := s.findWindow(ev.Event); w != nil {
 				w.handleKey(ev.Detail, ev.State, key.DirRelease)
 			} else {
@@ -222,6 +231,11 @@ func (s *screenImpl) run() {
 				w.handleMouse(ev.EventX, ev.EventY, 0, ev.State, mouse.DirNone)
 			} else {
 				noWindowFound = true
+			}
+
+		case xproto.MappingNotifyEvent:
+			if ev.Request == xproto.MappingModifier || ev.Request == xproto.MappingKeyboard {
+				keyboardChanged = true
 			}
 		}
 
