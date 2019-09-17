@@ -9,6 +9,7 @@ import (
 	. "fmt"
 	"io"
 	"math"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -1678,6 +1679,9 @@ var panictests = []struct {
 }
 
 func TestPanics(t *testing.T) {
+	if os.Getenv("GO_BUILDER_NAME") != "" {
+		t.Skipf("skipping broken test on builders; see https://golang.org/issue/30622")
+	}
 	for i, tt := range panictests {
 		s := Sprintf(tt.fmt, tt.in)
 		if s != tt.out {
