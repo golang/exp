@@ -1,0 +1,17 @@
+dir=dup
+base=none
+success=false
+-- .git/empty --
+empty file to mark repository root
+-- dup/go.mod --
+module example.com/dup/v2
+
+go 1.13
+-- dup/v2/go.mod --
+module example.com/dup/v2
+
+go 1.13
+-- want --
+module is defined in two locations:
+	dup/go.mod
+	dup/v2/go.mod

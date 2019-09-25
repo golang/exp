@@ -1,0 +1,16 @@
+mod=example.com/tidy
+base=v0.0.1
+success=0
+-- want --
+go.sum: one or more sums are missing.
+Run 'go mod tidy' to add missing sums.
+-- go.mod --
+module example.com/tidy
+
+go 1.12
+
+require example.com/basic v1.1.2
+-- tidy.go --
+package tidy
+
+import _ "example.com/basic/a"

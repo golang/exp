@@ -1,0 +1,21 @@
+mod=example.com/fix
+base=v1.0.0
+version=v1.1.0-incompatible-other
+release=v1.1.0
+success=false
+-- want --
+example.com/fix/bad
+-------------------
+errors in base version:
+	bad/bad.go:3:15: undeclared name: NOTYPE
+
+Incompatible changes:
+- Broken: changed from func() invalid type to func() int
+
+example.com/fix/good
+--------------------
+Incompatible changes:
+- Good: changed from func() int to func() string
+
+v1.1.0 is not a valid semantic version for this release.
+There are incompatible changes.

@@ -1,0 +1,11 @@
+mod=example.com/sub/v2
+base=v2.0.0
+-- want --
+Suggested version: v2.0.1
+-- .git/HEAD --
+-- go.mod --
+module example.com/sub/v2
+
+go 1.12
+-- sub.go --
+package sub

@@ -1,0 +1,18 @@
+mod=example.com/basic/v2
+version=v2.1.2
+base=v2.1.1
+success=false
+release=v2.1.2
+-- want --
+example.com/basic/v2/a
+----------------------
+Incompatible changes:
+- A2: removed
+
+example.com/basic/v2/b
+----------------------
+Incompatible changes:
+- package removed
+
+v2.1.2 is not a valid semantic version for this release.
+There are incompatible changes.

@@ -1,0 +1,6 @@
+mod=example.com/empty
+base=v0.0.1
+version=v0.0.2
+release=v0.0.2
+-- want --
+v0.0.2 is a valid semantic version for this release.

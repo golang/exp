@@ -1,0 +1,16 @@
+mod=example.com/basic/v2
+version=v2.1.0
+base=v2.0.1
+release=v2.1.0
+-- want --
+example.com/basic/v2/a
+----------------------
+Compatible changes:
+- A2: added
+
+example.com/basic/v2/b
+----------------------
+Compatible changes:
+- package added
+
+v2.1.0 is a valid semantic version for this release.

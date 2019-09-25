@@ -1,0 +1,14 @@
+mod=example.com/tidy
+base=v0.0.1
+success=false
+-- want --
+go.mod: requirements are incomplete.
+Run 'go mod tidy' to add missing requirements.
+-- go.mod --
+module example.com/tidy
+
+go 1.12
+-- tidy.go --
+package tidy
+
+import _ "example.com/basic/a"

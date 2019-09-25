@@ -1,0 +1,15 @@
+mod=example.com/basic
+version=v1.1.0
+base=v1.0.1
+-- want --
+example.com/basic/a
+-------------------
+Compatible changes:
+- A2: added
+
+example.com/basic/b
+-------------------
+Compatible changes:
+- package added
+
+Suggested version: v1.1.0

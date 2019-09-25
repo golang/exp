@@ -1,0 +1,9 @@
+mod=example.com/tidy
+base=v0.0.1
+success=0
+-- want --
+go.mod: go directive is missing
+-- go.mod --
+module example.com/tidy
+-- tidy.go --
+package tidy

@@ -1,0 +1,13 @@
+mod=example.com/patherrors
+dir=x
+base=none
+success=false
+-- want --
+example.com/y: module path must end with "x", since it is in subdirectory "x"
+-- .mod --
+module example.com/patherrors
+-- .git/HEAD --
+-- x/go.mod --
+module example.com/y
+
+go 1.12

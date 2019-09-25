@@ -1,0 +1,17 @@
+mod=example.com/basic/v2
+version=v2.1.2
+base=v2.1.1
+success=false
+-- want --
+example.com/basic/v2/a
+----------------------
+Incompatible changes:
+- A2: removed
+
+example.com/basic/v2/b
+----------------------
+Incompatible changes:
+- package removed
+
+Cannot suggest a release version.
+Incompatible changes were detected.

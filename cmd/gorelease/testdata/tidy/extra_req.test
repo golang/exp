@@ -1,0 +1,17 @@
+mod=example.com/tidy
+base=v0.0.1
+-- want --
+Suggested version: v0.0.2
+-- go.mod --
+module example.com/tidy
+
+go 1.12
+
+require example.com/basic v1.0.1
+-- go.sum --
+example.com/basic v1.0.1/go.mod h1:pv9xTX7lhV6R1XNYo1EcI/DQqKxDyhNTN+K1DjHW2Oo=
+golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+-- tidy.go --
+package tidy
