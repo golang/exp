@@ -6,8 +6,10 @@ import (
 	"go/types"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -26,22 +28,24 @@ func TestChanges(t *testing.T) {
 	sort.Strings(wanti)
 	sort.Strings(wantc)
 
-	oldpkg, err := load("apidiff/old", dir)
+	oldpkg, err := load(t, "apidiff/old", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	newpkg, err := load("apidiff/new", dir)
+	newpkg, err := load(t, "apidiff/new", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	report := Changes(oldpkg.Types, newpkg.Types)
 
-	if !reflect.DeepEqual(report.Incompatible, wanti) {
-		t.Errorf("incompatibles: got %v\nwant %v\n", report.Incompatible, wanti)
+	got := report.messages(false)
+	if !reflect.DeepEqual(got, wanti) {
+		t.Errorf("incompatibles: got %v\nwant %v\n", got, wanti)
 	}
-	if !reflect.DeepEqual(report.Compatible, wantc) {
-		t.Errorf("compatibles: got %v\nwant %v\n", report.Compatible, wantc)
+	got = report.messages(true)
+	if !reflect.DeepEqual(got, wantc) {
+		t.Errorf("compatibles: got %v\nwant %v\n", got, wantc)
 	}
 }
 
@@ -113,7 +117,9 @@ func splitIntoPackages(t *testing.T, dir string) (incompatibles, compatibles []s
 	return
 }
 
-func load(importPath, goPath string) (*packages.Package, error) {
+func load(t *testing.T, importPath, goPath string) (*packages.Package, error) {
+	needsGoPackages(t)
+
 	cfg := &packages.Config{
 		Mode: packages.LoadTypes,
 	}
@@ -132,7 +138,7 @@ func load(importPath, goPath string) (*packages.Package, error) {
 }
 
 func TestExportedFields(t *testing.T) {
-	pkg, err := load("golang.org/x/exp/apidiff/testdata/exported_fields", "")
+	pkg, err := load(t, "golang.org/x/exp/apidiff/testdata/exported_fields", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,3 +170,69 @@ func TestExportedFields(t *testing.T) {
 		}
 	}
 }
+
+// needsGoPackages skips t if the go/packages driver (or 'go' tool) implied by
+// the current process environment is not present in the path.
+//
+// Copied and adapted from golang.org/x/tools/internal/testenv.
+func needsGoPackages(t *testing.T) {
+	t.Helper()
+
+	tool := os.Getenv("GOPACKAGESDRIVER")
+	switch tool {
+	case "off":
+		// "off" forces go/packages to use the go command.
+		tool = "go"
+	case "":
+		if _, err := exec.LookPath("gopackagesdriver"); err == nil {
+			tool = "gopackagesdriver"
+		} else {
+			tool = "go"
+		}
+	}
+
+	needsTool(t, tool)
+}
+
+// needsTool skips t if the named tool is not present in the path.
+//
+// Copied and adapted from golang.org/x/tools/internal/testenv.
+func needsTool(t *testing.T, tool string) {
+	_, err := exec.LookPath(tool)
+	if err == nil {
+		return
+	}
+
+	t.Helper()
+	if allowMissingTool(tool) {
+		t.Skipf("skipping because %s tool not available: %v", tool, err)
+	} else {
+		t.Fatalf("%s tool not available: %v", tool, err)
+	}
+}
+
+func allowMissingTool(tool string) bool {
+	if runtime.GOOS == "android" {
+		// Android builds generally run tests on a separate machine from the build,
+		// so don't expect any external tools to be available.
+		return true
+	}
+
+	if tool == "go" && os.Getenv("GO_BUILDER_NAME") == "illumos-amd64-joyent" {
+		// Work around a misconfigured builder (see https://golang.org/issue/33950).
+		return true
+	}
+
+	// If a developer is actively working on this test, we expect them to have all
+	// of its dependencies installed. However, if it's just a dependency of some
+	// other module (for example, being run via 'go test all'), we should be more
+	// tolerant of unusual environments.
+	return !packageMainIsDevel()
+}
+
+// packageMainIsDevel reports whether the module containing package main
+// is a development version (if module information is available).
+//
+// Builds in GOPATH mode and builds that lack module information are assumed to
+// be development versions.
+var packageMainIsDevel = func() bool { return true }
