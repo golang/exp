@@ -10,5 +10,5 @@ require (
 	golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
 	golang.org/x/mod v0.1.0
 	golang.org/x/sys v0.0.0-20190412213103-97732733099d
-	golang.org/x/tools v0.0.0-20190927191325-030b2cf1153e
+	golang.org/x/tools v0.0.0-20191012152004-8de300cfc20a
 )
