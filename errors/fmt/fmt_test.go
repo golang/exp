@@ -1678,12 +1678,19 @@ var panictests = []struct {
 	{"%s", PanicF{3}, "%!s(PANIC=3)"},
 }
 
+var stripMethod = strings.NewReplacer(
+	"PANIC=String method: ", "PANIC=",
+	"PANIC=GoString method: ", "PANIC=",
+	"PANIC=Format method: ", "PANIC=",
+)
+
 func TestPanics(t *testing.T) {
 	if os.Getenv("GO_BUILDER_NAME") != "" {
 		t.Skipf("skipping broken test on builders; see https://golang.org/issue/30622")
 	}
 	for i, tt := range panictests {
 		s := Sprintf(tt.fmt, tt.in)
+		s = stripMethod.Replace(s)
 		if s != tt.out {
 			t.Errorf("%d: %q: got %q expected %q", i, tt.fmt, s, tt.out)
 		}
