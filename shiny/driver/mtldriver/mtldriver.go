@@ -71,7 +71,8 @@ func main(f func(screen.Screen)) error {
 	// TODO(dmitshur): Delete this when https://github.com/go-gl/glfw/issues/262 is resolved.
 	// Wait for first window request (or done) before entering main
 	// loop to work around https://github.com/glfw/glfw/issues/1543.
-	case newWindowCh <- <-newWindowCh:
+	case w := <-newWindowCh:
+		newWindowCh <- w
 	case <-done:
 	}
 	for {
