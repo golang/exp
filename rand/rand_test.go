@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"testing"
 	"testing/iotest"
+	"time"
 )
 
 const (
@@ -454,6 +455,34 @@ func TestShuffleSmall(t *testing.T) {
 	r := New(NewSource(1))
 	for n := 0; n <= 1; n++ {
 		r.Shuffle(n, func(i, j int) { t.Fatalf("swap called, n=%d i=%d j=%d", n, i, j) })
+	}
+}
+
+func TestPCGSourceRoundTrip(t *testing.T) {
+	var src PCGSource
+	src.Seed(uint64(time.Now().Unix()))
+
+	src.Uint64() // Step PRNG once to makes sure high and low are different.
+
+	buf, err := src.MarshalBinary()
+	if err != nil {
+		t.Errorf("unexpected error marshaling state: %v", err)
+	}
+
+	var dst PCGSource
+	// Get dst into a non-zero state.
+	dst.Seed(1)
+	for i := 0; i < 10; i++ {
+		dst.Uint64()
+	}
+
+	err = dst.UnmarshalBinary(buf)
+	if err != nil {
+		t.Errorf("unexpected error unmarshaling state: %v", err)
+	}
+
+	if dst != src {
+		t.Errorf("mismatch between generator states: got:%+v want:%+v", dst, src)
 	}
 }
 
