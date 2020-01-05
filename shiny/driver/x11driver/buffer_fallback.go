@@ -15,7 +15,7 @@ const (
 	xPutImageReqDataSize  = xPutImageReqSizeMax - xPutImageReqSizeFixed
 )
 
-type bufferFailbackImpl struct {
+type bufferFallbackImpl struct {
 	xc *xgb.Conn
 
 	buf  []byte
@@ -23,12 +23,12 @@ type bufferFailbackImpl struct {
 	size image.Point
 }
 
-func (b *bufferFailbackImpl) Release()                {}
-func (b *bufferFailbackImpl) Size() image.Point       { return b.size }
-func (b *bufferFailbackImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
-func (b *bufferFailbackImpl) RGBA() *image.RGBA       { return &b.rgba }
+func (b *bufferFallbackImpl) Release()                {}
+func (b *bufferFallbackImpl) Size() image.Point       { return b.size }
+func (b *bufferFallbackImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
+func (b *bufferFallbackImpl) RGBA() *image.RGBA       { return &b.rgba }
 
-func (b *bufferFailbackImpl) preUpload() {
+func (b *bufferFallbackImpl) preUpload() {
 	// Check that the program hasn't tried to modify the rgba field via the
 	// pointer returned by the bufferImpl.RGBA method. This check doesn't catch
 	// 100% of all cases; it simply tries to detect some invalid uses of a
@@ -41,7 +41,7 @@ func (b *bufferFailbackImpl) preUpload() {
 	swizzle.BGRA(b.buf)
 }
 
-func (b *bufferFailbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) {
+func (b *bufferFallbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) {
 	originalSRMin := sr.Min
 	sr = sr.Intersect(b.Bounds())
 	if sr.Empty() {
@@ -57,7 +57,7 @@ func (b *bufferFailbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, dept
 }
 
 // request xproto.PutImage in batches
-func (b *bufferFailbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) error {
+func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) error {
 	widthPerReq := b.size.X
 	rowPerReq := xPutImageReqDataSize / (widthPerReq * 4)
 	dataPerReq := rowPerReq * widthPerReq * 4

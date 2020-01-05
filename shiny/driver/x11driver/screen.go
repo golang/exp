@@ -294,7 +294,7 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 	// if the X11 server or connection cannot support SHM pixmaps,
 	// fall back to regular pixmaps.
 	if !s.useShm {
-		b := &bufferFailbackImpl{
+		b := &bufferFallbackImpl{
 			xc:   s.xc,
 			size: size,
 			rgba: image.RGBA{
