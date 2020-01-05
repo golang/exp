@@ -3,6 +3,7 @@ package x11driver
 import (
 	"image"
 	"log"
+	"sync"
 
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/xproto"
@@ -21,16 +22,19 @@ type bufferFallbackImpl struct {
 	buf  []byte
 	rgba image.RGBA
 	size image.Point
+
+	mu       sync.Mutex
+	nUpload  uint32
+	released bool
 }
 
-func (b *bufferFallbackImpl) Release()                {}
 func (b *bufferFallbackImpl) Size() image.Point       { return b.size }
 func (b *bufferFallbackImpl) Bounds() image.Rectangle { return image.Rectangle{Max: b.size} }
 func (b *bufferFallbackImpl) RGBA() *image.RGBA       { return &b.rgba }
 
 func (b *bufferFallbackImpl) preUpload() {
 	// Check that the program hasn't tried to modify the rgba field via the
-	// pointer returned by the bufferImpl.RGBA method. This check doesn't catch
+	// pointer returned by the bufferFallbackImpl.RGBA method. This check doesn't catch
 	// 100% of all cases; it simply tries to detect some invalid uses of a
 	// screen.Buffer such as:
 	//	*buffer.RGBA() = anotherImageRGBA
@@ -38,7 +42,37 @@ func (b *bufferFallbackImpl) preUpload() {
 		panic("x11driver: invalid Buffer.RGBA modification")
 	}
 
-	swizzle.BGRA(b.buf)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.released {
+		panic("x11driver: Buffer.Upload called after Buffer.Release")
+	}
+	if b.nUpload == 0 {
+		swizzle.BGRA(b.buf)
+	}
+	b.nUpload++
+}
+
+func (b *bufferFallbackImpl) postUpload() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.nUpload--
+	if b.nUpload != 0 {
+		return
+	}
+
+	if !b.released {
+		swizzle.BGRA(b.buf)
+	}
+}
+
+func (b *bufferFallbackImpl) Release() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.released = true
 }
 
 func (b *bufferFallbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) {
@@ -54,6 +88,8 @@ func (b *bufferFallbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, dept
 	if err != nil {
 		log.Printf("x11driver: xproto.PutImage: %v", err)
 	}
+
+	b.postUpload()
 }
 
 // request xproto.PutImage in batches
