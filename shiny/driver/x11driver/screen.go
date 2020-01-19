@@ -51,6 +51,7 @@ type screenImpl struct {
 
 	// opaqueP is a fully opaque, solid fill picture.
 	opaqueP render.Picture
+	useShm  bool
 
 	uniformMu sync.Mutex
 	uniformC  render.Color
@@ -62,8 +63,6 @@ type screenImpl struct {
 	windows         map[xproto.Window]*windowImpl
 	nPendingUploads int
 	completionKeys  []uint16
-
-	useShm bool
 }
 
 func newScreenImpl(xc *xgb.Conn, useShm bool) (*screenImpl, error) {
@@ -291,7 +290,7 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 		return nil, fmt.Errorf("x11driver: invalid buffer size %v", size)
 	}
 
-	// if the X11 server or connection cannot support SHM pixmaps,
+	// If the X11 server or connection cannot support SHM pixmaps,
 	// fall back to regular pixmaps.
 	if !s.useShm {
 		b := &bufferFallbackImpl{

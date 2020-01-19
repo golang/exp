@@ -1,3 +1,7 @@
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package x11driver
 
 import (
@@ -92,7 +96,7 @@ func (b *bufferFallbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, dept
 	b.postUpload()
 }
 
-// request xproto.PutImage in batches
+// putImage issues xproto.PutImage requests in batches.
 func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) error {
 	widthPerReq := b.size.X
 	rowPerReq := xPutImageReqDataSize / (widthPerReq * 4)
@@ -102,17 +106,14 @@ func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, de
 	start := 0
 	end := 0
 
-	var heightPerReq int
-	var data []byte
-
 	for end < len(b.buf) {
 		end = start + dataPerReq
 		if end > len(b.buf) {
 			end = len(b.buf)
 		}
 
-		data = b.buf[start:end]
-		heightPerReq = len(data) / 4 / widthPerReq
+		data := b.buf[start:end]
+		heightPerReq := len(data) / (widthPerReq * 4)
 
 		err := xproto.PutImageChecked(
 			b.xc, xproto.ImageFormatZPixmap, xd, xg,
@@ -123,7 +124,6 @@ func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, de
 			return err
 		}
 
-		// prepare next request
 		start = end
 		dstY += rowPerReq
 	}
