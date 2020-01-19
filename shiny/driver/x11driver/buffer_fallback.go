@@ -6,7 +6,6 @@ package x11driver
 
 import (
 	"image"
-	"log"
 	"sync"
 
 	"github.com/BurntSushi/xgb"
@@ -88,16 +87,13 @@ func (b *bufferFallbackImpl) upload(xd xproto.Drawable, xg xproto.Gcontext, dept
 	dp = dp.Add(sr.Min.Sub(originalSRMin))
 	b.preUpload()
 
-	err := b.putImage(xd, xg, depth, dp, sr)
-	if err != nil {
-		log.Printf("x11driver: xproto.PutImage: %v", err)
-	}
+	b.putImage(xd, xg, depth, dp, sr)
 
 	b.postUpload()
 }
 
 // putImage issues xproto.PutImage requests in batches.
-func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) error {
+func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, depth uint8, dp image.Point, sr image.Rectangle) {
 	widthPerReq := b.size.X
 	rowPerReq := xPutImageReqDataSize / (widthPerReq * 4)
 	dataPerReq := rowPerReq * widthPerReq * 4
@@ -115,18 +111,13 @@ func (b *bufferFallbackImpl) putImage(xd xproto.Drawable, xg xproto.Gcontext, de
 		data := b.buf[start:end]
 		heightPerReq := len(data) / (widthPerReq * 4)
 
-		err := xproto.PutImageChecked(
+		xproto.PutImage(
 			b.xc, xproto.ImageFormatZPixmap, xd, xg,
 			uint16(widthPerReq), uint16(heightPerReq),
 			int16(dstX), int16(dstY),
-			0, depth, data).Check()
-		if err != nil {
-			return err
-		}
+			0, depth, data)
 
 		start = end
 		dstY += rowPerReq
 	}
-
-	return nil
 }
