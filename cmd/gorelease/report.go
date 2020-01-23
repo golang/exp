@@ -23,9 +23,13 @@ type report struct {
 	modulePath string
 
 	// baseVersion is the "old" version of the module to compare against.
-	// It may be empty if there is no base version (for example, if this is
-	// the first release).
+	// It may be "none" if there is no base version (for example, if this is
+	// the first release). It may not be "".
 	baseVersion string
+
+	// baseVersionInferred is true if the base version was determined
+	// automatically (not specified with -base).
+	baseVersionInferred bool
 
 	// releaseVersion is the version of the module to release, either
 	// proposed with -version or inferred with suggestVersion.
@@ -79,6 +83,10 @@ func (r *report) Text(w io.Writer) error {
 		if err := p.Text(buf); err != nil {
 			return err
 		}
+	}
+
+	if r.baseVersionInferred {
+		fmt.Fprintf(buf, "Inferred base version: %s\n", r.baseVersion)
 	}
 
 	if len(r.diagnostics) > 0 {

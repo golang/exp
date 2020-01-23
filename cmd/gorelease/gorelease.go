@@ -42,7 +42,8 @@
 // "v2.3.4") or "none". If the version is "none", gorelease will not compare the
 // current version against any previous version; it will only validate the
 // current version. This is useful for checking the first release of a new major
-// version.
+// version. If -base is not specified, gorelease will attempt to infer a base
+// version from the -version flag and available released versions.
 //
 // -version=version: The proposed version to be released. If specified,
 // gorelease will confirm whether this version is consistent with changes made
@@ -66,6 +67,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"golang.org/x/mod/modfile"
@@ -102,12 +104,6 @@ import (
 //   the APIs are still compatible, just with a different module split).
 
 // TODO(jayconrod):
-// * Automatically detect base version if unspecified.
-//   If -version is vX.Y.(Z+1), use vX.Y.Z (with a message if it doesn't exist)
-//   If -version is vX.(Y+1).0, use vX.Y.0
-//   If -version is vX.0.0, use none
-//   If -version is a prerelease, use same base as if it were a release.
-//   If -version is not set, use latest release version or none.
 // * Allow -base to be an arbitrary revision name that resolves to a version
 //   or pseudo-version.
 // * Don't accept -version that increments minor or patch version by more than 1
@@ -176,10 +172,7 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 	if len(fs.Args()) > 0 {
 		return false, usageErrorf("no arguments allowed")
 	}
-	if baseVersion == "" {
-		return false, usageErrorf("-base flag must be specified.\nUse -base=none if there is no previous version.")
-	}
-	if baseVersion != "none" {
+	if baseVersion != "" && baseVersion != "none" {
 		if c := semver.Canonical(baseVersion); c != baseVersion {
 			return false, usageErrorf("base version %q is not a canonical semantic version", baseVersion)
 		}
@@ -189,7 +182,7 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 			return false, usageErrorf("release version %q is not a canonical semantic version", releaseVersion)
 		}
 	}
-	if baseVersion != "none" && releaseVersion != "" {
+	if baseVersion != "" && baseVersion != "none" && releaseVersion != "" {
 		if cmp := semver.Compare(baseVersion, releaseVersion); cmp == 0 {
 			return false, usageErrorf("-base and -version must be different")
 		} else if cmp > 0 {
@@ -232,6 +225,8 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 // should be set to modRoot.
 //
 // baseVersion is a previously released version of the module to compare.
+// If baseVersion is "", a base version will be detected automatically, based
+// on releaseVersion or the latest available version of the module.
 // If baseVersion is "none", no comparison will be performed, and
 // the returned report will only describe problems with the release version.
 //
@@ -267,6 +262,12 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 		panic(fmt.Sprintf("could not find version suffix in module path %q", modPath))
 	}
 
+	baseVersionInferred := baseVersion == ""
+	if baseVersionInferred {
+		if baseVersion, err = inferBaseVersion(modPath, releaseVersion); err != nil {
+			return report{}, err
+		}
+	}
 	if baseVersion != "none" {
 		if err := module.Check(modPath, baseVersion); err != nil {
 			return report{}, fmt.Errorf("can't compare major versions: base version %s does not belong to module %s", baseVersion, modPath)
@@ -388,11 +389,12 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 		return false
 	}
 	r := report{
-		modulePath:     modPath,
-		baseVersion:    baseVersion,
-		releaseVersion: releaseVersion,
-		tagPrefix:      tagPrefix,
-		diagnostics:    diagnostics,
+		modulePath:          modPath,
+		baseVersion:         baseVersion,
+		baseVersionInferred: baseVersionInferred,
+		releaseVersion:      releaseVersion,
+		tagPrefix:           tagPrefix,
+		diagnostics:         diagnostics,
 	}
 	for _, pair := range zipPackages(basePkgs, releasePkgs) {
 		basePkg, releasePkg := pair.base, pair.release
@@ -512,6 +514,85 @@ func checkModPath(modPath string) error {
 	return module.CheckPath(modPath)
 }
 
+// inferBaseVersion returns an appropriate base version if one was not
+// specified explicitly.
+//
+// If releaseVersion is not "", inferBaseVersion returns the highest available
+// release version of the module lower than releaseVersion.
+// Otherwise, inferBaseVersion returns the highest available release version.
+// Pre-release versions are not considered. If there is no available version,
+// and releaseVersion appears to be the first release version (for example,
+// "v0.1.0", "v2.0.0"), "none" is returned.
+func inferBaseVersion(modPath, releaseVersion string) (baseVersion string, err error) {
+	defer func() {
+		if err != nil {
+			err = &baseVersionError{err: err}
+		}
+	}()
+
+	versions, err := loadVersions(modPath)
+	if err != nil {
+		return "", err
+	}
+
+	for i := len(versions) - 1; i >= 0; i-- {
+		v := versions[i]
+		if semver.Prerelease(v) == "" &&
+			(releaseVersion == "" || semver.Compare(v, releaseVersion) < 0) {
+			return v, nil
+		}
+	}
+
+	if releaseVersion == "" || maybeFirstVersion(releaseVersion) {
+		return "none", nil
+	}
+	return "", fmt.Errorf("no versions found lower than %s", releaseVersion)
+}
+
+// loadVersions loads the list of versions for the given module using
+// 'go list -m -versions'. The returned versions are sorted in ascending
+// semver order.
+func loadVersions(modPath string) ([]string, error) {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpDir)
+	cmd := exec.Command("go", "list", "-m", "-versions", "--", modPath)
+	cmd.Dir = tmpDir
+	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, cleanCmdError(err)
+	}
+	versions := strings.Fields(string(out))
+	if len(versions) > 0 {
+		versions = versions[1:] // skip module path
+	}
+
+	// Sort versions defensively. 'go list -m -versions' should always returns
+	// a sorted list of versions, but it's fast and easy to sort them here, too.
+	sort.Slice(versions, func(i, j int) bool {
+		return semver.Compare(versions[i], versions[j]) < 0
+	})
+	return versions, nil
+}
+
+// maybeFirstVersion returns whether v appears to be the first version
+// of a module.
+func maybeFirstVersion(v string) bool {
+	major, minor, patch, _, _, err := parseVersion(v)
+	if err != nil {
+		return false
+	}
+	if major == "0" {
+		return minor == "0" && patch == "0" ||
+			minor == "0" && patch == "1" ||
+			minor == "1" && patch == "0"
+	}
+	return minor == "0" && patch == "0"
+}
+
 // dirMajorSuffix returns a major version suffix for a slash-separated path.
 // For example, for the path "foo/bar/v2", dirMajorSuffix would return "v2".
 // If no major version suffix is found, "" is returned.
@@ -625,7 +706,7 @@ func copyModuleToTempDir(modPath, modRoot string) (dir string, err error) {
 func downloadModule(m module.Version) (modRoot string, err error) {
 	defer func() {
 		if err != nil {
-			err = &downloadError{m: m, err: err}
+			err = &downloadError{m: m, err: cleanCmdError(err)}
 		}
 	}()
 

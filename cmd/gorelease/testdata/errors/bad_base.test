@@ -3,6 +3,6 @@ base=master
 error=true
 
 -- want --
-usage: gorelease -base=version [-version=version]
+usage: gorelease [-base=version] [-version=version]
 base version "master" is not a canonical semantic version
 For more information, run go doc golang.org/x/exp/cmd/gorelease

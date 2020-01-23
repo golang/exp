@@ -1,0 +1,6 @@
+mod=example.com/basic/v3
+version=v3.0.0-ignore
+release=v3.1.0
+error=true
+-- want --
+could not find base version: no versions found lower than v3.1.0

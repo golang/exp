@@ -1,0 +1,8 @@
+mod=example.com/basic/v3
+-- go.mod --
+module example.com/basic/v3
+
+go 1.13
+-- want --
+Inferred base version: none
+Suggested version: v3.0.0
