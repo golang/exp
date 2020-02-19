@@ -60,7 +60,7 @@ func (p *parser) parseIdentifier() *Name {
 func (p *parser) parseToken() *Token {
 	pos := p.pos
 	value := ""
-	if p.tok == scanner.String {
+	if p.tok == scanner.String || p.tok == scanner.RawString {
 		value, _ = strconv.Unquote(p.lit)
 		// Unquote may fail with an error, but only if the scanner found
 		// an illegal string in the first place. In this case the error
@@ -80,7 +80,7 @@ func (p *parser) parseTerm() (x Expression) {
 	case scanner.Ident:
 		x = p.parseIdentifier()
 
-	case scanner.String:
+	case scanner.String, scanner.RawString:
 		tok := p.parseToken()
 		x = tok
 		const ellipsis = '…' // U+2026, the horizontal ellipsis character

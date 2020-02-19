@@ -30,6 +30,8 @@ var goodGrammars = []string{
 	 La = "a" .
 	 Ti = ti .
 	 ti = "b" .`,
+
+	"Program = `\"` .",
 }
 
 var badGrammars = []string{
