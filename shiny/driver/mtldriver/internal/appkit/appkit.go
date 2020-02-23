@@ -11,7 +11,7 @@
 // It's a minimal implementation with scope limited to
 // supporting mtldriver.
 //
-// It was copied from dmitri.shuralyov.com/gpu/mtl/example/movingtriangle/internal/ns.
+// It was copied from dmitri.shuralyov.com/gpu/mtl/example/movingtriangle/internal/appkit.
 package appkit
 
 import (
