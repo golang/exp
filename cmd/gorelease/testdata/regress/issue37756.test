@@ -1,0 +1,22 @@
+# Verifies golang.org/issue/37756.
+# Packages should be compared in lexical order by package path.
+mod=example.com/issue37756
+version=v1.1.0
+base=v1.0.0
+-- want --
+example.com/issue37756/a
+------------------------
+Compatible changes:
+- A2: added
+
+example.com/issue37756/b
+------------------------
+Compatible changes:
+- B2: added
+
+example.com/issue37756/c
+------------------------
+Compatible changes:
+- C2: added
+
+Suggested version: v1.1.0

@@ -870,6 +870,13 @@ func loadPackages(modPath, modRoot, loadDir string, goModData, goSumData []byte)
 		}
 	}
 
+	// Sort the returned packages by path.
+	// packages.Load makes no guarantee about the order of returned packages.
+	// It uses 'go list -deps', which prints packages in depth-first post-order.
+	sort.Slice(pkgs, func(i, j int) bool {
+		return pkgs[i].PkgPath < pkgs[j].PkgPath
+	})
+
 	// Trim modRoot from file paths in errors.
 	prefix := modRoot + string(os.PathSeparator)
 	for _, pkg := range pkgs {
