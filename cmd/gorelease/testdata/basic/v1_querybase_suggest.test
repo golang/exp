@@ -1,0 +1,6 @@
+mod=example.com/basic
+version=v1.0.1
+base=version-1.0.1
+-- want --
+Base version: v1.0.1 (version-1.0.1)
+Suggested version: v1.0.2

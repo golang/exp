@@ -31,6 +31,9 @@ type report struct {
 	// automatically (not specified with -base).
 	baseVersionInferred bool
 
+	// baseVersionQuery is set if -base was a version query (like "latest").
+	baseVersionQuery string
+
 	// releaseVersion is the version of the module to release, either
 	// proposed with -version or inferred with suggestVersion.
 	releaseVersion string
@@ -87,6 +90,8 @@ func (r *report) Text(w io.Writer) error {
 
 	if r.baseVersionInferred {
 		fmt.Fprintf(buf, "Inferred base version: %s\n", r.baseVersion)
+	} else if r.baseVersionQuery != "" {
+		fmt.Fprintf(buf, "Base version: %s (%s)\n", r.baseVersion, r.baseVersionQuery)
 	}
 
 	if len(r.diagnostics) > 0 {

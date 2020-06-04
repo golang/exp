@@ -38,8 +38,8 @@
 // gorelease accepts the following flags:
 //
 // -base=version: The version that the current version of the module will be
-// compared against. The version must be a semantic version (for example,
-// "v2.3.4") or "none". If the version is "none", gorelease will not compare the
+// compared against. This may be a version like "v1.5.2", a version query like
+// "latest", or "none". If the version is "none", gorelease will not compare the
 // current version against any previous version; it will only validate the
 // current version. This is useful for checking the first release of a new major
 // version. If -base is not specified, gorelease will attempt to infer a base
@@ -104,33 +104,12 @@ import (
 //   the APIs are still compatible, just with a different module split).
 
 // TODO(jayconrod):
-// * Allow -base to be an arbitrary revision name that resolves to a version
-//   or pseudo-version.
-// * Don't accept -version that increments minor or patch version by more than 1
-//   or increments the minor version without zeroing the patch, compared with
-//   existing versions. Note that -base may be distant from -version,
-//   for example, when reverting an incompatible change accidentally released.
-// * Report errors when packages can't be loaded without replace / exclude.
 // * Clean up overuse of fmt.Errorf.
-// * Support -json output.
-// * Don't suggest a release tag that already exists.
-// * Suggest a minor release if dependency has been bumped by minor version.
-// * Updating go version, either in the main module or in a dependency that
-//   provides packages transitively imported by non-internal, non-test packages
-//   in the main module, should require a minor version bump.
 // * Support migration to modules after v2.x.y+incompatible. Requires comparing
 //   packages with different module paths.
 // * Error when packages import from earlier major version of same module.
 //   (this may be intentional; look for real examples first).
-// * Check that proposed prerelease will not sort below pseudo-versions.
-// * Error messages point to HTML documentation.
-// * Positional arguments should specify which packages to check. Without
-//   these, we check all non-internal packages in the module.
 // * Mechanism to suppress error messages.
-// * Check that the main module does not transitively require a newer version
-//   of itself.
-// * Invalid file names and import paths should be reported sensibly.
-//   golang.org/x/mod/zip should return structured errors for this.
 
 func main() {
 	log.SetFlags(0)
@@ -172,17 +151,12 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 	if len(fs.Args()) > 0 {
 		return false, usageErrorf("no arguments allowed")
 	}
-	if baseVersion != "" && baseVersion != "none" {
-		if c := semver.Canonical(baseVersion); c != baseVersion {
-			return false, usageErrorf("base version %q is not a canonical semantic version", baseVersion)
-		}
-	}
 	if releaseVersion != "" {
 		if c := semver.Canonical(releaseVersion); c != releaseVersion {
 			return false, usageErrorf("release version %q is not a canonical semantic version", releaseVersion)
 		}
 	}
-	if baseVersion != "" && baseVersion != "none" && releaseVersion != "" {
+	if baseVersion != "" && semver.Canonical(baseVersion) == baseVersion && releaseVersion != "" {
 		if cmp := semver.Compare(baseVersion, releaseVersion); cmp == 0 {
 			return false, usageErrorf("-base and -version must be different")
 		} else if cmp > 0 {
@@ -262,10 +236,23 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 		panic(fmt.Sprintf("could not find version suffix in module path %q", modPath))
 	}
 
+	var baseVersionQuery string
 	baseVersionInferred := baseVersion == ""
 	if baseVersionInferred {
 		if baseVersion, err = inferBaseVersion(modPath, releaseVersion); err != nil {
 			return report{}, err
+		}
+	} else if baseVersion != "none" && baseVersion != module.CanonicalVersion(baseVersion) {
+		baseVersionQuery = baseVersion
+		if baseVersion, err = queryVersion(modPath, baseVersionQuery); err != nil {
+			return report{}, err
+		}
+		if baseVersion != "none" && releaseVersion != "" && semver.Compare(baseVersion, releaseVersion) >= 0 {
+			// TODO(jayconrod): reconsider this comparison for pseudo-versions in
+			// general. A query might match different pseudo-versions over time,
+			// depending on ancestor versions, so this might start failing with
+			// no local change.
+			return report{}, fmt.Errorf("base version %s (%s) must be lower than release version %s", baseVersion, baseVersionQuery, releaseVersion)
 		}
 	}
 	if baseVersion != "none" {
@@ -392,6 +379,7 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 		modulePath:          modPath,
 		baseVersion:         baseVersion,
 		baseVersionInferred: baseVersionInferred,
+		baseVersionQuery:    baseVersionQuery,
 		releaseVersion:      releaseVersion,
 		tagPrefix:           tagPrefix,
 		diagnostics:         diagnostics,
@@ -549,6 +537,37 @@ func inferBaseVersion(modPath, releaseVersion string) (baseVersion string, err e
 	return "", fmt.Errorf("no versions found lower than %s", releaseVersion)
 }
 
+// queryVersion returns the canonical version for a given module version query.
+func queryVersion(modPath, query string) (resolved string, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("could not resolve version %s@%s: %w", modPath, query, err)
+		}
+	}()
+	if query == "upgrade" || query == "patch" {
+		return "", errors.New("query is based on requirements in main go.mod file")
+	}
+
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if rerr := os.Remove(tmpDir); rerr != nil && err == nil {
+			err = rerr
+		}
+	}()
+	arg := modPath + "@" + query
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Version}}", "--", arg)
+	cmd.Dir = tmpDir
+	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", cleanCmdError(err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // loadVersions loads the list of versions for the given module using
 // 'go list -m -versions'. The returned versions are sorted in ascending
 // semver order.
@@ -557,7 +576,11 @@ func loadVersions(modPath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpDir)
+	defer func() {
+		if rerr := os.Remove(tmpDir); rerr != nil && err == nil {
+			err = rerr
+		}
+	}()
 	cmd := exec.Command("go", "list", "-m", "-versions", "--", modPath)
 	cmd.Dir = tmpDir
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")

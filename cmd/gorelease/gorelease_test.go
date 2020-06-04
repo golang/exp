@@ -104,7 +104,7 @@ type test struct {
 	// to gorelease.
 	baseVersion string
 
-	// releaseVersion (set with version=...) is the value of the -version flag
+	// releaseVersion (set with release=...) is the value of the -version flag
 	// to pass to gorelease.
 	releaseVersion string
 
