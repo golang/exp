@@ -19,42 +19,19 @@ import (
 // report describes the differences in the public API between two versions
 // of a module.
 type report struct {
-	// modulePath is the name of the module.
-	modulePath string
+	// base contains information about the "old" module version being compared
+	// against. base.version may be "none", indicating there is no base version
+	// (for example, if this is the first release). base.version may not be "".
+	base moduleInfo
 
-	// baseVersion is the "old" version of the module to compare against.
-	// It may be "none" if there is no base version (for example, if this is
-	// the first release). It may not be "".
-	baseVersion string
-
-	// baseVersionInferred is true if the base version was determined
-	// automatically (not specified with -base).
-	baseVersionInferred bool
-
-	// baseVersionQuery is set if -base was a version query (like "latest").
-	baseVersionQuery string
-
-	// releaseVersion is the version of the module to release, either
-	// proposed with -version or inferred with suggestVersion.
-	releaseVersion string
-
-	// releaseVersionInferred is true if the release version was suggested
-	// (not specified with -version).
-	releaseVersionInferred bool
-
-	// tagPrefix is the prefix for VCS tags for this module. For example,
-	// if the module is defined in "foo/bar/v2/go.mod", tagPrefix will be
-	// "foo/bar/".
-	tagPrefix string
+	// release contains information about the version of the module to release.
+	// The version may be set explicitly with -version or suggested using
+	// suggestVersion, in which case release.versionInferred is true.
+	release moduleInfo
 
 	// packages is a list of package reports, describing the differences
 	// for individual packages, sorted by package path.
 	packages []packageReport
-
-	// diagnostics is a list of problems unrelated to the module API.
-	// For example, if go.mod is missing some requirements, that will be
-	// reported here.
-	diagnostics []string
 
 	// versionInvalid explains why the proposed or suggested version is not valid.
 	versionInvalid *versionMessage
@@ -88,29 +65,29 @@ func (r *report) Text(w io.Writer) error {
 		}
 	}
 
-	if r.baseVersionInferred {
-		fmt.Fprintf(buf, "Inferred base version: %s\n", r.baseVersion)
-	} else if r.baseVersionQuery != "" {
-		fmt.Fprintf(buf, "Base version: %s (%s)\n", r.baseVersion, r.baseVersionQuery)
+	if r.base.versionInferred {
+		fmt.Fprintf(buf, "Inferred base version: %s\n", r.base.version)
+	} else if r.base.versionQuery != "" {
+		fmt.Fprintf(buf, "Base version: %s (%s)\n", r.base.version, r.base.versionQuery)
 	}
 
-	if len(r.diagnostics) > 0 {
-		for _, d := range r.diagnostics {
+	if len(r.release.diagnostics) > 0 {
+		for _, d := range r.release.diagnostics {
 			fmt.Fprintln(buf, d)
 		}
 	} else if r.versionInvalid != nil {
 		fmt.Fprintln(buf, r.versionInvalid)
-	} else if r.releaseVersionInferred {
-		if r.tagPrefix == "" {
-			fmt.Fprintf(buf, "Suggested version: %s\n", r.releaseVersion)
+	} else if r.release.versionInferred {
+		if r.release.tagPrefix == "" {
+			fmt.Fprintf(buf, "Suggested version: %s\n", r.release.version)
 		} else {
-			fmt.Fprintf(buf, "Suggested version: %[1]s (with tag %[2]s%[1]s)\n", r.releaseVersion, r.tagPrefix)
+			fmt.Fprintf(buf, "Suggested version: %[1]s (with tag %[2]s%[1]s)\n", r.release.version, r.release.tagPrefix)
 		}
 	} else {
-		if r.tagPrefix == "" {
-			fmt.Fprintf(buf, "%s is a valid semantic version for this release.\n", r.releaseVersion)
+		if r.release.tagPrefix == "" {
+			fmt.Fprintf(buf, "%s is a valid semantic version for this release.\n", r.release.version)
 		} else {
-			fmt.Fprintf(buf, "%[1]s (with tag %[2]s%[1]s) is a valid semantic version for this release\n", r.releaseVersion, r.tagPrefix)
+			fmt.Fprintf(buf, "%[1]s (with tag %[2]s%[1]s) is a valid semantic version for this release\n", r.release.version, r.release.tagPrefix)
 		}
 	}
 
@@ -145,16 +122,16 @@ func (r *report) addPackage(p packageReport) {
 	}
 }
 
-// validateVersion checks whether r.releaseVersion is valid.
-// If r.releaseVersion is not valid, an error is returned explaining why.
-// r.releaseVersion must be set.
+// validateVersion checks whether r.release.version is valid.
+// If r.release.version is not valid, an error is returned explaining why.
+// r.release.version must be set.
 func (r *report) validateVersion() {
-	if r.releaseVersion == "" {
+	if r.release.version == "" {
 		panic("validateVersion called without version")
 	}
 	setNotValid := func(format string, args ...interface{}) {
 		r.versionInvalid = &versionMessage{
-			message: fmt.Sprintf("%s is not a valid semantic version for this release.", r.releaseVersion),
+			message: fmt.Sprintf("%s is not a valid semantic version for this release.", r.release.version),
 			reason:  fmt.Sprintf(format, args...),
 		}
 	}
@@ -169,40 +146,40 @@ func (r *report) validateVersion() {
 	// TODO(jayconrod): link to documentation for all of these errors.
 
 	// Check that the major version matches the module path.
-	_, suffix, ok := module.SplitPathVersion(r.modulePath)
+	_, suffix, ok := module.SplitPathVersion(r.release.modPath)
 	if !ok {
-		setNotValid("%s: could not find version suffix in module path", r.modulePath)
+		setNotValid("%s: could not find version suffix in module path", r.release.modPath)
 		return
 	}
 	if suffix != "" {
 		if suffix[0] != '/' && suffix[0] != '.' {
-			setNotValid("%s: unknown module path version suffix: %q", r.modulePath, suffix)
+			setNotValid("%s: unknown module path version suffix: %q", r.release.modPath, suffix)
 			return
 		}
 		pathMajor := suffix[1:]
-		major := semver.Major(r.releaseVersion)
+		major := semver.Major(r.release.version)
 		if pathMajor != major {
 			setNotValid(`The major version %s does not match the major version suffix
-in the module path: %s`, major, r.modulePath)
+in the module path: %s`, major, r.release.modPath)
 			return
 		}
-	} else if major := semver.Major(r.releaseVersion); major != "v0" && major != "v1" {
+	} else if major := semver.Major(r.release.version); major != "v0" && major != "v1" {
 		setNotValid(`The module path does not end with the major version suffix /%s,
 which is required for major versions v2 or greater.`, major)
 		return
 	}
 
 	// Check that compatible / incompatible changes are consistent.
-	if semver.Major(r.baseVersion) == "v0" {
+	if semver.Major(r.base.version) == "v0" {
 		return
 	}
 	if r.haveIncompatibleChanges {
 		setNotValid("There are incompatible changes.")
 		return
 	}
-	if r.haveCompatibleChanges && semver.MajorMinor(r.baseVersion) == semver.MajorMinor(r.releaseVersion) {
+	if r.haveCompatibleChanges && semver.MajorMinor(r.base.version) == semver.MajorMinor(r.release.version) {
 		setNotValid(`There are compatible changes, but the minor version is not incremented
-over the base version (%s).`, r.baseVersion)
+over the base version (%s).`, r.base.version)
 		return
 	}
 }
@@ -216,8 +193,8 @@ func (r *report) suggestVersion() {
 		}
 	}
 	setVersion := func(v string) {
-		r.releaseVersion = v
-		r.releaseVersionInferred = true
+		r.release.version = v
+		r.release.versionInferred = true
 	}
 
 	if r.haveReleaseErrors || r.haveBaseErrors {
@@ -226,24 +203,24 @@ func (r *report) suggestVersion() {
 	}
 
 	var major, minor, patch, pre string
-	if r.baseVersion != "none" {
+	if r.base.version != "none" {
 		var err error
-		major, minor, patch, pre, _, err = parseVersion(r.baseVersion)
+		major, minor, patch, pre, _, err = parseVersion(r.base.version)
 		if err != nil {
 			panic(fmt.Sprintf("could not parse base version: %v", err))
 		}
 	}
 
-	if r.haveIncompatibleChanges && r.baseVersion != "none" && pre == "" && major != "0" {
+	if r.haveIncompatibleChanges && r.base.version != "none" && pre == "" && major != "0" {
 		setNotValid("Incompatible changes were detected.")
 		return
 		// TODO(jayconrod): briefly explain how to prepare major version releases
 		// and link to documentation.
 	}
 
-	if r.baseVersion == "none" {
-		if _, pathMajor, ok := module.SplitPathVersion(r.modulePath); !ok {
-			panic(fmt.Sprintf("could not parse module path %q", r.modulePath))
+	if r.base.version == "none" {
+		if _, pathMajor, ok := module.SplitPathVersion(r.release.modPath); !ok {
+			panic(fmt.Sprintf("could not parse module path %q", r.release.modPath))
 		} else if pathMajor == "" {
 			setVersion("v0.1.0")
 		} else {
@@ -266,7 +243,7 @@ func (r *report) suggestVersion() {
 // isSuccessful returns true the module appears to be safe to release at the
 // proposed or suggested version.
 func (r *report) isSuccessful() bool {
-	return len(r.diagnostics) == 0 && r.versionInvalid == nil
+	return len(r.release.diagnostics) == 0 && r.versionInvalid == nil
 }
 
 type versionMessage struct {

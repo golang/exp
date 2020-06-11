@@ -112,3 +112,42 @@ func TestHasFilePathPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestTrimPathPrefix(t *testing.T) {
+	for _, test := range []struct {
+		desc, path, prefix, want string
+	}{
+		{
+			desc:   "empty_prefix",
+			path:   "a/b",
+			prefix: "",
+			want:   "a/b",
+		}, {
+			desc:   "abs_empty_prefix",
+			path:   "/a/b",
+			prefix: "",
+			want:   "/a/b",
+		}, {
+			desc:   "partial_prefix",
+			path:   "a/b",
+			prefix: "a",
+			want:   "b",
+		}, {
+			desc:   "full_prefix",
+			path:   "a/b",
+			prefix: "a/b",
+			want:   "",
+		}, {
+			desc:   "partial_component",
+			path:   "aa/b",
+			prefix: "a",
+			want:   "aa/b",
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			if got := trimPathPrefix(test.path, test.prefix); got != test.want {
+				t.Errorf("trimPathPrefix(%q, %q): got %q, want %q", test.path, test.prefix, got, test.want)
+			}
+		})
+	}
+}

@@ -70,19 +70,16 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/exp/apidiff"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 	"golang.org/x/mod/zip"
-
-	"golang.org/x/exp/apidiff"
 	"golang.org/x/tools/go/packages"
 )
 
 // IDEAS:
 // * Should we suggest versions at all or should -version be mandatory?
-// * 'gorelease path1@version1 path2@version2' should compare two arbitrary
-//   modules. Useful for comparing differences in forks.
 // * Verify downstream modules have licenses. May need an API or library
 //   for this. Be clear that we can't provide legal advice.
 // * Internal packages may be relevant to submodules (for example,
@@ -164,16 +161,29 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 		}
 	}
 
+	// Find the local module and repository root directories.
 	modRoot, err := findModuleRoot(dir)
 	if err != nil {
 		return false, err
 	}
 	repoRoot := findRepoRoot(modRoot)
-	if repoRoot == "" {
-		repoRoot = modRoot
+
+	// Load packages for the version to be released from the local directory.
+	release, err := loadLocalModule(modRoot, repoRoot, releaseVersion)
+	if err != nil {
+		return false, err
 	}
 
-	report, err := makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion)
+	// Find the base version if there is one, download it, and load packages from
+	// the module cache.
+	baseModPath := release.modPath // TODO(golang.org/issue/39666): allow different module path
+	base, err := loadDownloadedModule(baseModPath, baseVersion, releaseVersion)
+	if err != nil {
+		return false, err
+	}
+
+	// Compare packages and check for other issues.
+	report, err := makeReleaseReport(base, release)
 	if err != nil {
 		return false, err
 	}
@@ -183,123 +193,101 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 	return report.isSuccessful(), nil
 }
 
-// makeReleaseReport returns a report comparing the current version of a
-// module with a previously released version. The report notes any backward
-// compatible and incompatible changes in the module's public API. It also
-// diagnoses common problems, such as go.mod or go.sum being incomplete.
-// The report recommends or validates a release version and indicates a
-// version control tag to use (with an appropriate prefix, for modules not
-// in the repository root directory).
+type moduleInfo struct {
+	modRoot         string // module root directory
+	repoRoot        string // repository root directory (may be "")
+	modPath         string // module path
+	version         string // resolved version or "none"
+	versionQuery    string // a query like "latest" or "dev-branch", if specified
+	versionInferred bool   // true if the version was unspecified and inferred
+	modPathMajor    string // major version suffix like "/v3" or ".v2"
+	tagPrefix       string // prefix for version tags if module not in repo root
+
+	goModPath string        // file path to go.mod
+	goModData []byte        // content of go.mod
+	goSumData []byte        // content of go.sum
+	goModFile *modfile.File // parsed go.mod file
+
+	diagnostics []string            // problems not related to loading specific packages
+	pkgs        []*packages.Package // loaded packages with type information
+}
+
+// loadLocalModule loads information about a module and its packages from a
+// local directory.
 //
-// modRoot is the directory containing the module's go.mod file. It must not
-// be "".
+// modRoot is the directory containing the module's go.mod file.
 //
-// repoRoot the root directory of the version control repository containing
-// modRoot. It must not be ""; if there is no known repository, repoRoot
-// should be set to modRoot.
+// repoRoot is the root directory of the repository containing the module or "".
 //
-// baseVersion is a previously released version of the module to compare.
-// If baseVersion is "", a base version will be detected automatically, based
-// on releaseVersion or the latest available version of the module.
-// If baseVersion is "none", no comparison will be performed, and
-// the returned report will only describe problems with the release version.
-//
-// releaseVersion is the proposed version for the module in dir.
-// If releaseVersion is "", the report will suggest a release version based on
-// changes to the public API.
-func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (report, error) {
-	if !hasFilePathPrefix(modRoot, repoRoot) {
-		// runRelease should always make sure this is true.
-		return report{}, fmt.Errorf("module root %q is not in repository root %q", modRoot, repoRoot)
+// version is a proposed version for the module or "".
+func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error) {
+	if repoRoot != "" && !hasFilePathPrefix(modRoot, repoRoot) {
+		return moduleInfo{}, fmt.Errorf("module root %q is not in repository root %q", modRoot, repoRoot)
 	}
 
-	// Read the module path from the go.mod file.
-	goModPath := filepath.Join(modRoot, "go.mod")
-	goModData, err := ioutil.ReadFile(goModPath)
+	// Load the go.mod file and check the module path and go version.
+	m = moduleInfo{
+		modRoot:   modRoot,
+		repoRoot:  repoRoot,
+		version:   version,
+		goModPath: filepath.Join(modRoot, "go.mod"),
+	}
+	m.goModData, err = ioutil.ReadFile(m.goModPath)
 	if err != nil {
-		return report{}, err
+		return moduleInfo{}, err
 	}
-	modFile, err := modfile.ParseLax(goModPath, goModData, nil)
+	m.goModFile, err = modfile.ParseLax(m.goModPath, m.goModData, nil)
 	if err != nil {
-		return report{}, err
+		return moduleInfo{}, err
 	}
-	if modFile.Module == nil {
-		return report{}, fmt.Errorf("%s: module directive is missing", goModPath)
+	if m.goModFile.Module == nil {
+		return moduleInfo{}, fmt.Errorf("%s: module directive is missing", m.goModPath)
 	}
-	modPath := modFile.Module.Mod.Path
-	if err := checkModPath(modPath); err != nil {
-		return report{}, err
+	m.modPath = m.goModFile.Module.Mod.Path
+	if err := checkModPath(m.modPath); err != nil {
+		return moduleInfo{}, err
 	}
-	_, modPathMajor, ok := module.SplitPathVersion(modPath)
+	var ok bool
+	_, m.modPathMajor, ok = module.SplitPathVersion(m.modPath)
 	if !ok {
 		// we just validated the path above.
-		panic(fmt.Sprintf("could not find version suffix in module path %q", modPath))
+		panic(fmt.Sprintf("could not find version suffix in module path %q", m.modPath))
 	}
-
-	var baseVersionQuery string
-	baseVersionInferred := baseVersion == ""
-	if baseVersionInferred {
-		if baseVersion, err = inferBaseVersion(modPath, releaseVersion); err != nil {
-			return report{}, err
-		}
-	} else if baseVersion != "none" && baseVersion != module.CanonicalVersion(baseVersion) {
-		baseVersionQuery = baseVersion
-		if baseVersion, err = queryVersion(modPath, baseVersionQuery); err != nil {
-			return report{}, err
-		}
-		if baseVersion != "none" && releaseVersion != "" && semver.Compare(baseVersion, releaseVersion) >= 0 {
-			// TODO(jayconrod): reconsider this comparison for pseudo-versions in
-			// general. A query might match different pseudo-versions over time,
-			// depending on ancestor versions, so this might start failing with
-			// no local change.
-			return report{}, fmt.Errorf("base version %s (%s) must be lower than release version %s", baseVersion, baseVersionQuery, releaseVersion)
-		}
-	}
-	if baseVersion != "none" {
-		if err := module.Check(modPath, baseVersion); err != nil {
-			return report{}, fmt.Errorf("can't compare major versions: base version %s does not belong to module %s", baseVersion, modPath)
-		}
-	}
-	// releaseVersion is checked by report.validateVersion.
-
-	// Check if a go version is present in go.mod.
-	var diagnostics []string
-	if modFile.Go == nil {
-		diagnostics = append(diagnostics, "go.mod: go directive is missing")
+	if m.goModFile.Go == nil {
+		m.diagnostics = append(m.diagnostics, "go.mod: go directive is missing")
 	}
 
 	// Determine the version tag prefix for the module within the repository.
-	tagPrefix := ""
-	if modRoot != repoRoot {
-		if strings.HasPrefix(modPathMajor, ".") {
-			diagnostics = append(diagnostics, fmt.Sprintf("%s: module path starts with gopkg.in and must be declared in the root directory of the repository", modPath))
+	if repoRoot != "" && modRoot != repoRoot {
+		if strings.HasPrefix(m.modPathMajor, ".") {
+			m.diagnostics = append(m.diagnostics, fmt.Sprintf("%s: module path starts with gopkg.in and must be declared in the root directory of the repository", m.modPath))
 		} else {
 			codeDir := filepath.ToSlash(modRoot[len(repoRoot)+1:])
 			var altGoModPath string
-			if modPathMajor == "" {
+			if m.modPathMajor == "" {
 				// module has no major version suffix.
 				// codeDir must be a suffix of modPath.
 				// tagPrefix is codeDir with a trailing slash.
-				if strings.HasSuffix(modPath, "/"+codeDir) {
-					tagPrefix = codeDir + "/"
+				if strings.HasSuffix(m.modPath, "/"+codeDir) {
+					m.tagPrefix = codeDir + "/"
 				} else {
-					diagnostics = append(diagnostics, fmt.Sprintf("%s: module path must end with %[2]q, since it is in subdirectory %[2]q", modPath, codeDir))
+					m.diagnostics = append(m.diagnostics, fmt.Sprintf("%s: module path must end with %[2]q, since it is in subdirectory %[2]q", m.modPath, codeDir))
 				}
 			} else {
-				if strings.HasSuffix(modPath, "/"+codeDir) {
+				if strings.HasSuffix(m.modPath, "/"+codeDir) {
 					// module has a major version suffix and is in a major version subdirectory.
 					// codeDir must be a suffix of modPath.
 					// tagPrefix must not include the major version.
-					tagPrefix = codeDir[:len(codeDir)-len(modPathMajor)+1]
-					altGoModPath = modRoot[:len(modRoot)-len(modPathMajor)+1] + "go.mod"
-				} else if strings.HasSuffix(modPath, "/"+codeDir+modPathMajor) {
+					m.tagPrefix = codeDir[:len(codeDir)-len(m.modPathMajor)+1]
+					altGoModPath = modRoot[:len(modRoot)-len(m.modPathMajor)+1] + "go.mod"
+				} else if strings.HasSuffix(m.modPath, "/"+codeDir+m.modPathMajor) {
 					// module has a major version suffix and is not in a major version subdirectory.
 					// codeDir + modPathMajor is a suffix of modPath.
 					// tagPrefix is codeDir with a trailing slash.
-					tagPrefix = codeDir + "/"
-					altGoModPath = filepath.Join(modRoot, modPathMajor[1:], "go.mod")
+					m.tagPrefix = codeDir + "/"
+					altGoModPath = filepath.Join(modRoot, m.modPathMajor[1:], "go.mod")
 				} else {
-					diagnostics = append(diagnostics, fmt.Sprintf("%s: module path must end with %[2]q or %q, since it is in subdirectory %[2]q", modPath, codeDir, codeDir+modPathMajor))
+					m.diagnostics = append(m.diagnostics, fmt.Sprintf("%s: module path must end with %[2]q or %q, since it is in subdirectory %[2]q", m.modPath, codeDir, codeDir+m.modPathMajor))
 				}
 			}
 
@@ -307,62 +295,153 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 			// (e.g., sub/go.mod and sub/v2/go.mod). They must not be defined in both.
 			if altGoModPath != "" {
 				if data, err := ioutil.ReadFile(altGoModPath); err == nil {
-					if altModPath := modfile.ModulePath(data); modPath == altModPath {
-						goModRel, _ := filepath.Rel(repoRoot, goModPath)
+					if altModPath := modfile.ModulePath(data); m.modPath == altModPath {
+						goModRel, _ := filepath.Rel(repoRoot, m.goModPath)
 						altGoModRel, _ := filepath.Rel(repoRoot, altGoModPath)
-						diagnostics = append(diagnostics, fmt.Sprintf("module is defined in two locations:\n\t%s\n\t%s", goModRel, altGoModRel))
+						m.diagnostics = append(m.diagnostics, fmt.Sprintf("module is defined in two locations:\n\t%s\n\t%s", goModRel, altGoModRel))
 					}
 				}
 			}
 		}
 	}
 
-	// Load the base version of the module.
-	// We download it into the module cache, then create a go.mod in a temporary
-	// directory that requires it. It's important that we don't load the module
-	// as the main module so that replace and exclude directives are not applied.
-	var basePkgs []*packages.Package
-	if baseVersion != "none" {
-		baseMod := module.Version{Path: modPath, Version: baseVersion}
-		baseModRoot, err := downloadModule(baseMod)
-		if err != nil {
-			return report{}, err
+	// Load the module's packages.
+	// We pack the module into a zip file and extract it to a temporary directory
+	// as if it were published and downloaded. We'll detect any errors that would
+	// occur (for example, invalid file names). We avoid loading it as the
+	// main module.
+	tmpModRoot, err := copyModuleToTempDir(m.modPath, m.modRoot)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	defer func() {
+		if rerr := os.RemoveAll(tmpModRoot); err == nil && rerr != nil {
+			err = fmt.Errorf("removing temporary module directory: %v", rerr)
 		}
-		baseLoadDir, goModData, goSumData, err := prepareExternalDirForBase(modPath, baseVersion, baseModRoot)
-		if err != nil {
-			return report{}, err
+	}()
+	tmpLoadDir, tmpGoModData, tmpGoSumData, err := prepareLoadDir(m.goModFile, m.modPath, tmpModRoot, version, false)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	defer func() {
+		if rerr := os.RemoveAll(tmpLoadDir); err == nil && rerr != nil {
+			err = fmt.Errorf("removing temporary load directory: %v", rerr)
 		}
-		defer os.RemoveAll(baseLoadDir)
-		if basePkgs, _, err = loadPackages(modPath, baseModRoot, baseLoadDir, goModData, goSumData); err != nil {
-			return report{}, err
-		}
+	}()
+	var loadDiagnostics []string
+	m.pkgs, loadDiagnostics, err = loadPackages(m.modPath, tmpModRoot, tmpLoadDir, tmpGoModData, tmpGoSumData)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	m.diagnostics = append(m.diagnostics, loadDiagnostics...)
+
+	return m, nil
+}
+
+// loadDownloadedModule downloads a module and loads information about it and
+// its packages from the module cache.
+//
+// modPath is the module's path.
+//
+// version is the version to load. It may be "none" (indicating nothing should
+// be loaded), "" (the highest available version below max should be used), a
+// version query (to be resolved with 'go list'), or a canonical version.
+//
+// If version is "" and max is not "", available versions greater than or equal
+// to max will not be considered. Typically, loadDownloadedModule is used to
+// load the base version, and max is the release version.
+func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error) {
+	// Check the module path and version.
+	// If the version is a query, resolve it to a canonical version.
+	m = moduleInfo{modPath: modPath}
+	if err := checkModPath(modPath); err != nil {
+		return moduleInfo{}, err
 	}
 
-	// Load the release version of the module.
-	// We pack it into a zip file and extract it to a temporary directory as if
-	// it were published and downloaded. We'll detect any errors that would occur
-	// (for example, invalid file name). Again, we avoid loading it as the
-	// main module.
-	releaseModRoot, err := copyModuleToTempDir(modPath, modRoot)
-	if err != nil {
-		return report{}, err
+	var ok bool
+	_, m.modPathMajor, ok = module.SplitPathVersion(m.modPath)
+	if !ok {
+		// we just validated the path above.
+		panic(fmt.Sprintf("could not find version suffix in module path %q", m.modPath))
 	}
-	defer os.RemoveAll(releaseModRoot)
-	releaseLoadDir, goModData, goSumData, err := prepareExternalDirForRelease(modFile, modPath, releaseModRoot)
-	if err != nil {
-		return report{}, nil
+
+	if version == "none" {
+		// We don't have a base version to compare against.
+		m.version = "none"
+		return m, nil
 	}
-	releasePkgs, loadDiagnostics, err := loadPackages(modPath, releaseModRoot, releaseLoadDir, goModData, goSumData)
-	if err != nil {
-		return report{}, err
+	if version == "" {
+		// Unspecified version: use the highest version below max.
+		m.versionInferred = true
+		if m.version, err = inferBaseVersion(modPath, max); err != nil {
+			return moduleInfo{}, err
+		}
+		if m.version == "none" {
+			return m, nil
+		}
+	} else if version != module.CanonicalVersion(version) {
+		// Version query: find the real version.
+		m.versionQuery = version
+		if m.version, err = queryVersion(modPath, version); err != nil {
+			return moduleInfo{}, err
+		}
+		if m.version != "none" && max != "" && semver.Compare(m.version, max) >= 0 {
+			// TODO(jayconrod): reconsider this comparison for pseudo-versions in
+			// general. A query might match different pseudo-versions over time,
+			// depending on ancestor versions, so this might start failing with
+			// no local change.
+			return moduleInfo{}, fmt.Errorf("base version %s (%s) must be lower than release version %s", m.version, m.versionQuery, max)
+		}
+	} else {
+		// Canonical version: make sure it matches the module path.
+		if err := module.CheckPathMajor(version, m.modPathMajor); err != nil {
+			// TODO(golang.org/issue/39666): don't assume this is the base version
+			// or that we're comparing across major versions.
+			return moduleInfo{}, fmt.Errorf("can't compare major versions: base version %s does not belong to module %s", version, modPath)
+		}
+		m.version = version
 	}
-	diagnostics = append(diagnostics, loadDiagnostics...)
+
+	// Load packages.
+	v := module.Version{Path: modPath, Version: m.version}
+	if m.modRoot, err = downloadModule(v); err != nil {
+		return moduleInfo{}, err
+	}
+	tmpLoadDir, tmpGoModData, tmpGoSumData, err := prepareLoadDir(nil, modPath, m.modRoot, m.version, true)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	defer func() {
+		if rerr := os.RemoveAll(tmpLoadDir); err == nil && rerr != nil {
+			err = fmt.Errorf("removing temporary load directory: %v", err)
+		}
+	}()
+	if m.pkgs, _, err = loadPackages(modPath, m.modRoot, tmpLoadDir, tmpGoModData, tmpGoSumData); err != nil {
+		return moduleInfo{}, err
+	}
+
+	return m, nil
+}
+
+// makeReleaseReport returns a report comparing the current version of a
+// module with a previously released version. The report notes any backward
+// compatible and incompatible changes in the module's public API. It also
+// diagnoses common problems, such as go.mod or go.sum being incomplete.
+// The report recommends or validates a release version and indicates a
+// version control tag to use (with an appropriate prefix, for modules not
+// in the repository root directory).
+func makeReleaseReport(base, release moduleInfo) (report, error) {
+	if base.modPath != release.modPath {
+		// TODO(golang.org/issue/39666): allow base and release path to be different.
+		panic(fmt.Sprintf("base module path %q is different than release module path %q", base.modPath, release.modPath))
+	}
+	modPath := release.modPath
 
 	// Compare each pair of packages.
 	// Ignore internal packages.
 	// If we don't have a base version to compare against,
 	// just check the new packages for errors.
-	shouldCompare := baseVersion != "none"
+	shouldCompare := base.version != "none"
 	isInternal := func(pkgPath string) bool {
 		if !hasPathPrefix(pkgPath, modPath) {
 			panic(fmt.Sprintf("package %s not in module %s", pkgPath, modPath))
@@ -376,15 +455,10 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 		return false
 	}
 	r := report{
-		modulePath:          modPath,
-		baseVersion:         baseVersion,
-		baseVersionInferred: baseVersionInferred,
-		baseVersionQuery:    baseVersionQuery,
-		releaseVersion:      releaseVersion,
-		tagPrefix:           tagPrefix,
-		diagnostics:         diagnostics,
+		base:    base,
+		release: release,
 	}
-	for _, pair := range zipPackages(basePkgs, releasePkgs) {
+	for _, pair := range zipPackages(base.pkgs, release.pkgs) {
 		basePkg, releasePkg := pair.base, pair.release
 		switch {
 		case releasePkg == nil:
@@ -439,7 +513,7 @@ func makeReleaseReport(modRoot, repoRoot, baseVersion, releaseVersion string) (r
 		}
 	}
 
-	if releaseVersion != "" {
+	if release.version != "" {
 		r.validateVersion()
 	} else {
 		r.suggestVersion()
@@ -502,16 +576,15 @@ func checkModPath(modPath string) error {
 	return module.CheckPath(modPath)
 }
 
-// inferBaseVersion returns an appropriate base version if one was not
-// specified explicitly.
+// inferBaseVersion returns an appropriate base version if one was not specified
+// explicitly.
 //
-// If releaseVersion is not "", inferBaseVersion returns the highest available
-// release version of the module lower than releaseVersion.
-// Otherwise, inferBaseVersion returns the highest available release version.
-// Pre-release versions are not considered. If there is no available version,
-// and releaseVersion appears to be the first release version (for example,
-// "v0.1.0", "v2.0.0"), "none" is returned.
-func inferBaseVersion(modPath, releaseVersion string) (baseVersion string, err error) {
+// If max is not "", inferBaseVersion returns the highest available release
+// version of the module lower than max. Otherwise, inferBaseVersion returns the
+// highest available release version. Pre-release versions are not considered.
+// If there is no available version, and max appears to be the first release
+// version (for example, "v0.1.0", "v2.0.0"), "none" is returned.
+func inferBaseVersion(modPath, max string) (baseVersion string, err error) {
 	defer func() {
 		if err != nil {
 			err = &baseVersionError{err: err}
@@ -526,15 +599,15 @@ func inferBaseVersion(modPath, releaseVersion string) (baseVersion string, err e
 	for i := len(versions) - 1; i >= 0; i-- {
 		v := versions[i]
 		if semver.Prerelease(v) == "" &&
-			(releaseVersion == "" || semver.Compare(v, releaseVersion) < 0) {
+			(max == "" || semver.Compare(v, max) < 0) {
 			return v, nil
 		}
 	}
 
-	if releaseVersion == "" || maybeFirstVersion(releaseVersion) {
+	if max == "" || maybeFirstVersion(max) {
 		return "none", nil
 	}
-	return "", fmt.Errorf("no versions found lower than %s", releaseVersion)
+	return "", fmt.Errorf("no versions found lower than %s", max)
 }
 
 // queryVersion returns the canonical version for a given module version query.
@@ -717,7 +790,7 @@ func downloadModule(m module.Version) (modRoot string, err error) {
 	parsed := struct{ Dir, Error string }{}
 	if jsonErr := json.Unmarshal(out, &parsed); jsonErr != nil {
 		if xerr != nil {
-			return "", xerr
+			return "", cleanCmdError(xerr)
 		}
 		return "", jsonErr
 	}
@@ -725,60 +798,56 @@ func downloadModule(m module.Version) (modRoot string, err error) {
 		return "", errors.New(parsed.Error)
 	}
 	if xerr != nil {
-		return "", xerr
+		return "", cleanCmdError(xerr)
 	}
 	return parsed.Dir, nil
 }
 
-// prepareExternalDirForBase creates a temporary directory and a go.mod file
-// that requires the module at the given version. go.sum is copied if present.
-func prepareExternalDirForBase(modPath, version, modRoot string) (dir string, goModData, goSumData []byte, err error) {
-	dir, err = ioutil.TempDir("", "gorelease-base")
+// prepareLoadDir creates a temporary directory and a go.mod file that requires
+// the module being loaded. go.sum is copied if present.
+//
+// modFile is the pre-parsed go.mod file. If non-nil, its requirements and
+// go version will be copied so that incomplete and out-of-date requirements
+// may be reported later.
+//
+// modPath is the module's path.
+//
+// version is the version of the module being loaded. If must be canonical
+// for modules loaded from the cache. Otherwise, it may be empty (for example,
+// when no release version is proposed).
+//
+// cached indicates whether the module is being loaded from the module cache.
+// If true, the module can be referenced with a simple requirement.
+// If false, the module will be referenced with a local replace directive.
+func prepareLoadDir(modFile *modfile.File, modPath, modRoot, version string, cached bool) (dir string, goModData, goSumData []byte, err error) {
+	if module.Check(modPath, version) != nil {
+		// If no version is proposed or if the version isn't valid, use a fake
+		// version that matches the module's major version suffix. If the version
+		// is invalid, that will be reported elsewhere.
+		version = "v0.0.0-gorelease"
+		if _, pathMajor, _ := module.SplitPathVersion(modPath); pathMajor != "" {
+			version = pathMajor[1:] + ".0.0-gorelease"
+		}
+	}
+
+	dir, err = ioutil.TempDir("", "gorelease-load")
 	if err != nil {
 		return "", nil, nil, err
-	}
-
-	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, `module gorelease-base-module
-
-require %s %s
-`, modPath, version)
-	goModData = buf.Bytes()
-	if err := ioutil.WriteFile(filepath.Join(dir, "go.mod"), goModData, 0666); err != nil {
-		return "", nil, nil, err
-	}
-
-	goSumData, err = ioutil.ReadFile(filepath.Join(modRoot, "go.sum"))
-	if err != nil && !os.IsNotExist(err) {
-		return "", nil, nil, err
-	}
-	if err := ioutil.WriteFile(filepath.Join(dir, "go.sum"), goSumData, 0666); err != nil {
-		return "", nil, nil, err
-	}
-
-	return dir, goModData, goSumData, nil
-}
-
-// prepareExternalDirForRelease creates a temporary directory and a go.mod file
-// that requires the module and replaces it with modRoot. go.sum is copied
-// if present.
-func prepareExternalDirForRelease(modFile *modfile.File, modPath, modRoot string) (dir string, goModData, goSumData []byte, err error) {
-	dir, err = ioutil.TempDir("", "gorelease-release")
-	if err != nil {
-		return "", nil, nil, err
-	}
-
-	version := "v0.0.0-gorelease"
-	if _, pathMajor, _ := module.SplitPathVersion(modPath); pathMajor != "" {
-		version = pathMajor[1:] + ".0.0-gorelease"
 	}
 
 	f := &modfile.File{}
-	f.AddModuleStmt("gorelease-release-module")
+	f.AddModuleStmt("gorelease-load-module")
 	f.AddRequire(modPath, version)
-	f.AddReplace(modPath, version, modRoot, "")
-	for _, r := range modFile.Require {
-		f.AddRequire(r.Mod.Path, r.Mod.Version)
+	if !cached {
+		f.AddReplace(modPath, version, modRoot, "")
+	}
+	if modFile != nil {
+		if modFile.Go != nil {
+			f.AddGoStmt(modFile.Go.Version)
+		}
+		for _, r := range modFile.Require {
+			f.AddRequire(r.Mod.Path, r.Mod.Version)
+		}
 	}
 	goModData, err = f.Format()
 	if err != nil {
@@ -823,7 +892,7 @@ func loadPackages(modPath, modRoot, loadDir string, goModData, goSumData []byte)
 	cmd.Dir = loadDir
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, cleanCmdError(err)
 	}
 	var pkgPaths []string
 	for len(out) > 0 {

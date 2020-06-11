@@ -51,3 +51,17 @@ func hasFilePathPrefix(s, prefix string) bool {
 		return s[len(prefix)] == filepath.Separator && s[:len(prefix)] == prefix
 	}
 }
+
+// trimPathPrefix returns p without the leading prefix. Unlike
+// strings.TrimPrefix, the prefix will only match on slash-separted comopnent
+// boundaries, so trimPathPrefix("aa/b", "aa") returns "b", but
+// trimPathPrefix("aa/b", "a") retunrs "aa/b".
+func trimPathPrefix(p, prefix string) string {
+	if prefix == "" {
+		return p
+	}
+	if prefix == p {
+		return ""
+	}
+	return strings.TrimPrefix(p, prefix+"/")
+}
