@@ -65,10 +65,14 @@ func (r *report) Text(w io.Writer) error {
 		}
 	}
 
+	baseVersion := r.base.version
+	if r.base.modPath != r.release.modPath {
+		baseVersion = r.base.modPath + "@" + baseVersion
+	}
 	if r.base.versionInferred {
-		fmt.Fprintf(buf, "Inferred base version: %s\n", r.base.version)
+		fmt.Fprintf(buf, "Inferred base version: %s\n", baseVersion)
 	} else if r.base.versionQuery != "" {
-		fmt.Fprintf(buf, "Base version: %s (%s)\n", r.base.version, r.base.versionQuery)
+		fmt.Fprintf(buf, "Base version: %s (%s)\n", baseVersion, r.base.versionQuery)
 	}
 
 	if len(r.release.diagnostics) > 0 {
@@ -83,7 +87,7 @@ func (r *report) Text(w io.Writer) error {
 		} else {
 			fmt.Fprintf(buf, "Suggested version: %[1]s (with tag %[2]s%[1]s)\n", r.release.version, r.release.tagPrefix)
 		}
-	} else {
+	} else if r.release.version != "" && r.similarModPaths() {
 		if r.release.tagPrefix == "" {
 			fmt.Fprintf(buf, "%s is a valid semantic version for this release.\n", r.release.version)
 
@@ -175,7 +179,7 @@ which is required for major versions v2 or greater.`, major)
 	}
 
 	// Check that compatible / incompatible changes are consistent.
-	if semver.Major(r.base.version) == "v0" {
+	if semver.Major(r.base.version) == "v0" || r.base.modPath != r.release.modPath {
 		return
 	}
 	if r.haveIncompatibleChanges {
@@ -200,6 +204,11 @@ func (r *report) suggestVersion() {
 	setVersion := func(v string) {
 		r.release.version = v
 		r.release.versionInferred = true
+	}
+
+	if r.base.modPath != r.release.modPath {
+		setNotValid("Base module path is different from release.")
+		return
 	}
 
 	if r.haveReleaseErrors || r.haveBaseErrors {
@@ -243,6 +252,14 @@ func (r *report) suggestVersion() {
 		patch = incDecimal(patch)
 	}
 	setVersion(fmt.Sprintf("v%s.%s.%s", major, minor, patch))
+}
+
+// similarModPaths returns true if r.base and r.release are versions of the same
+// module or different major versions of the same module.
+func (r *report) similarModPaths() bool {
+	basePath := strings.TrimSuffix(r.base.modPath, r.base.modPathMajor)
+	releasePath := strings.TrimSuffix(r.release.modPath, r.release.modPathMajor)
+	return basePath == releasePath
 }
 
 // requirementsChanged reports whether requirements have changed from base to
