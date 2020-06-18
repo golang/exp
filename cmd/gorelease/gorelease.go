@@ -634,49 +634,6 @@ func dirMajorSuffix(path string) string {
 	return path[i-1:]
 }
 
-// hasPathPrefix reports whether the slash-separated path s
-// begins with the elements in prefix.
-// Copied from cmd/go/internal/str.HasPathPrefix.
-func hasPathPrefix(s, prefix string) bool {
-	if len(s) == len(prefix) {
-		return s == prefix
-	}
-	if prefix == "" {
-		return true
-	}
-	if len(s) > len(prefix) {
-		if prefix[len(prefix)-1] == '/' || s[len(prefix)] == '/' {
-			return s[:len(prefix)] == prefix
-		}
-	}
-	return false
-}
-
-// hasFilePathPrefix reports whether the filesystem path s
-// begins with the elements in prefix.
-// Copied from cmd/go/internal/str.HasFilePathPrefix.
-func hasFilePathPrefix(s, prefix string) bool {
-	sv := strings.ToUpper(filepath.VolumeName(s))
-	pv := strings.ToUpper(filepath.VolumeName(prefix))
-	s = s[len(sv):]
-	prefix = prefix[len(pv):]
-	switch {
-	default:
-		return false
-	case sv != pv:
-		return false
-	case len(s) == len(prefix):
-		return s == prefix
-	case prefix == "":
-		return true
-	case len(s) > len(prefix):
-		if prefix[len(prefix)-1] == filepath.Separator {
-			return strings.HasPrefix(s, prefix)
-		}
-		return s[len(prefix)] == filepath.Separator && s[:len(prefix)] == prefix
-	}
-}
-
 // copyModuleToTempDir copies module files from modRoot to a subdirectory of
 // scratchDir. Submodules, vendor directories, and irregular files are excluded.
 // An error is returned if the module contains any files or directories that
