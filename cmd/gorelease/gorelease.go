@@ -887,15 +887,16 @@ func loadPackages(modPath, modRoot, loadDir string, goModData, goSumData []byte)
 	// Report new requirements in go.mod.
 	goModPath := filepath.Join(loadDir, "go.mod")
 	loadReqs := func(data []byte) (string, error) {
-		buf := &bytes.Buffer{}
 		modFile, err := modfile.ParseLax(goModPath, data, nil)
 		if err != nil {
 			return "", err
 		}
-		for _, req := range modFile.Require {
-			fmt.Fprintf(buf, "%v\n", req.Mod)
+		lines := make([]string, len(modFile.Require))
+		for i, req := range modFile.Require {
+			lines[i] = req.Mod.String()
 		}
-		return buf.String(), nil
+		sort.Strings(lines)
+		return strings.Join(lines, "\n"), nil
 	}
 
 	oldReqs, err := loadReqs(goModData)
