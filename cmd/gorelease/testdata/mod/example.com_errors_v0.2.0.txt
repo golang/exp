@@ -10,9 +10,9 @@ const X int = 12
 -- broken/broken.go --
 package broken
 
-const X int = "no longer an int"
+const X int = Missing
 
 -- added/added.go --
 package added
 
-const X int = "not an int"
+const X int = Missing

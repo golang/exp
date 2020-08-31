@@ -8,7 +8,7 @@ success=false
 example.com/errors/added
 ------------------------
 errors in release version:
-	added/added.go:3:15: cannot convert "not an int" (untyped string constant) to int
+	added/added.go:3:15: undeclared name: Missing
 
 Compatible changes:
 - package added
@@ -16,7 +16,7 @@ Compatible changes:
 example.com/errors/broken
 -------------------------
 errors in release version:
-	broken/broken.go:3:15: cannot convert "no longer an int" (untyped string constant) to int
+	broken/broken.go:3:15: undeclared name: Missing
 
 Incompatible changes:
 - X: value changed from 12 to unknown
@@ -24,7 +24,7 @@ Incompatible changes:
 example.com/errors/deleted
 --------------------------
 errors in base version:
-	deleted/deleted.go:3:15: cannot convert "not an int" (untyped string constant) to int
+	deleted/deleted.go:3:15: undeclared name: Missing
 
 Incompatible changes:
 - package removed
@@ -32,7 +32,7 @@ Incompatible changes:
 example.com/errors/fixed
 ------------------------
 errors in base version:
-	fixed/fixed.go:3:15: cannot convert "not an int" (untyped string constant) to int
+	fixed/fixed.go:3:15: undeclared name: Missing
 
 Incompatible changes:
 - X: value changed from unknown to 12

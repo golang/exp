@@ -13,12 +13,12 @@ go 1.12
 -- fixed/fixed.go --
 package fixed
 
-const X int = "not an int"
+const X int = Missing
 
 -- deleted/deleted.go --
 package deleted
 
-const X int = "not an int"
+const X int = Missing
 
 -- broken/broken.go --
 package broken
