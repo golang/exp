@@ -761,6 +761,10 @@ func copyModuleToTempDir(modPath, modRoot string) (dir string, err error) {
 	}()
 
 	if err := zip.CreateFromDir(zipFile, m, modRoot); err != nil {
+		var e zip.FileErrorList
+		if errors.As(err, &e) {
+			return "", e
+		}
 		return "", err
 	}
 	if err := zipFile.Close(); err != nil {
