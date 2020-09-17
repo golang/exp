@@ -909,8 +909,20 @@ func loadPackages(modPath, modRoot, loadDir string, goModData, goSumData []byte)
 	// We can't just load example.com/mod/... because that might include packages
 	// in nested modules. We also can't filter packages from the output of
 	// packages.Load, since it doesn't tell us which module they came from.
+	//
+	// TODO(golang.org/issue/41456): this command fails in -mod=readonly mode
+	// if sums are missing, which they always are for downloaded modules. In
+	// Go 1.16, -mod=readonly is the default, and -mod=mod may eventually be
+	// removed, so we should avoid -mod=mod here. Lazy loading may also require
+	// changes to temporary module requirements.
+	//
+	// Instead of running this command, we should make a list of importable
+	// packages by walking the directory tree. With such a list,
+	// in prepareLoadDir, we could generate a temporary package that imports
+	// all of them, then 'go get -d' that package to ensure no requirements
+	// or sums are missing.
 	format := fmt.Sprintf(`{{if .Module}}{{if eq .Module.Path %q}}{{.ImportPath}}{{end}}{{end}}`, modPath)
-	cmd := exec.Command("go", "list", "-e", "-f", format, "--", modPath+"/...")
+	cmd := exec.Command("go", "list", "-mod=mod", "-e", "-f", format, "--", modPath+"/...")
 	cmd.Dir = loadDir
 	out, err := cmd.Output()
 	if err != nil {
