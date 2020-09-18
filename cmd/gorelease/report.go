@@ -231,13 +231,59 @@ func (r *report) suggestVersion() {
 
 	if pre != "" {
 		// suggest non-prerelease version
-	} else if r.haveCompatibleChanges || (r.haveIncompatibleChanges && major == "0") {
+	} else if r.haveCompatibleChanges || (r.haveIncompatibleChanges && major == "0") || r.requirementsChanged() {
 		minor = incDecimal(minor)
 		patch = "0"
 	} else {
 		patch = incDecimal(patch)
 	}
 	setVersion(fmt.Sprintf("v%s.%s.%s", major, minor, patch))
+}
+
+// requirementsChanged reports whether requirements have changed from base to
+// version.
+//
+// requirementsChanged reports true for,
+//   - A requirement was upgraded to a higher minor version.
+//   - A requirement was added.
+//   - The version of Go was incremented.
+//
+// It does not report true when, for example, a requirement was downgraded or
+// remove. We care more about the former since that might force dependent
+// modules that have the same dependency to upgrade.
+func (r *report) requirementsChanged() bool {
+	if r.base.goModFile == nil {
+		// There wasn't a modfile before, and now there is.
+		return true
+	}
+
+	// baseReqs is a map of module path to MajorMinor of the base module
+	// requirements.
+	baseReqs := make(map[string]string)
+	for _, r := range r.base.goModFile.Require {
+		baseReqs[r.Mod.Path] = r.Mod.Version
+	}
+
+	for _, r := range r.release.goModFile.Require {
+		if _, ok := baseReqs[r.Mod.Path]; !ok {
+			// A module@version was added to the "require" block between base
+			// and release.
+			return true
+		}
+		if semver.Compare(semver.MajorMinor(r.Mod.Version), semver.MajorMinor(baseReqs[r.Mod.Path])) > 0 {
+			// The version of r.Mod.Path increased from base to release.
+			return true
+		}
+	}
+
+	if r.release.goModFile.Go != nil && r.base.goModFile.Go != nil {
+		if r.release.goModFile.Go.Version > r.base.goModFile.Go.Version {
+			// The Go version increased from base to release.
+			return true
+		}
+	}
+
+	return false
 }
 
 // isSuccessful returns true the module appears to be safe to release at the

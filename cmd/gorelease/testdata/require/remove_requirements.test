@@ -1,0 +1,11 @@
+mod=example.com/require
+base=v0.0.1
+-- want --
+Suggested version: v0.0.2
+-- go.mod --
+module example.com/require
+
+go 1.12
+-- go.sum --
+-- require.go --
+package require

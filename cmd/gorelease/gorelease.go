@@ -438,6 +438,19 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 		return moduleInfo{}, err
 	}
 
+	// Attempt to load the mod file, if it exists.
+	m.goModPath = filepath.Join(m.modRoot, "go.mod")
+	if m.goModData, err = ioutil.ReadFile(m.goModPath); err != nil && !os.IsNotExist(err) {
+		return moduleInfo{}, fmt.Errorf("reading go.mod: %v", err)
+	}
+	if err == nil {
+		m.goModFile, err = modfile.ParseLax(m.goModPath, m.goModData, nil)
+		if err != nil {
+			return moduleInfo{}, err
+		}
+	}
+	// The modfile might not exist, leading to err != nil. That's OK - continue.
+
 	return m, nil
 }
 
