@@ -1,0 +1,10 @@
+mod=example.com/prerelease
+release=v0.0.0-2
+success=false
+-- want --
+Inferred base version: none
+Version v0.0.0-2 is lower than most pseudo-versions. Consider releasing v0.1.0-0 instead.
+-- go.mod --
+module example.com/prerelease
+
+go 1.12

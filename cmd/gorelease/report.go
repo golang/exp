@@ -86,6 +86,11 @@ func (r *report) Text(w io.Writer) error {
 	} else {
 		if r.release.tagPrefix == "" {
 			fmt.Fprintf(buf, "%s is a valid semantic version for this release.\n", r.release.version)
+
+			if semver.Compare(r.release.version, "v0.0.0-99999999999999-zzzzzzzzzzzz") < 0 {
+				fmt.Fprintf(buf, `Note: %s sorts lower in MVS than pseudo-versions, which may be
+unexpected for users. So, it may be better to choose a different suffix.`, r.release.version)
+			}
 		} else {
 			fmt.Fprintf(buf, "%[1]s (with tag %[2]s%[1]s) is a valid semantic version for this release\n", r.release.version, r.release.tagPrefix)
 		}

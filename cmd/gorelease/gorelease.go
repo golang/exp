@@ -53,6 +53,10 @@
 //
 // For more information on semantic versioning, see https://semver.org.
 //
+// Note: gorelease does not accept build metadata in releases (like
+// v1.0.0+debug). Although it is valid semver, the Go tool and other tools in
+// the ecosystem do not support it, so its use is not recommended.
+//
 // gorelease accepts the following flags:
 //
 // -base=version: The version that the current version of the module will be
@@ -167,6 +171,9 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 		return false, usageErrorf("no arguments allowed")
 	}
 	if releaseVersion != "" {
+		if semver.Build(releaseVersion) != "" {
+			return false, usageErrorf("release version %q is not a canonical semantic version: build metadata is not supported", releaseVersion)
+		}
 		if c := semver.Canonical(releaseVersion); c != releaseVersion {
 			return false, usageErrorf("release version %q is not a canonical semantic version", releaseVersion)
 		}
@@ -250,6 +257,11 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 		version:   version,
 		goModPath: filepath.Join(modRoot, "go.mod"),
 	}
+
+	if version != "" && semver.Compare(version, "v0.0.0-99999999999999-zzzzzzzzzzzz") < 0 {
+		m.diagnostics = append(m.diagnostics, fmt.Sprintf("Version %s is lower than most pseudo-versions. Consider releasing v0.1.0-0 instead.", version))
+	}
+
 	m.goModData, err = ioutil.ReadFile(m.goModPath)
 	if err != nil {
 		return moduleInfo{}, err
