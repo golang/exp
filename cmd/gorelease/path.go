@@ -52,10 +52,30 @@ func hasFilePathPrefix(s, prefix string) bool {
 	}
 }
 
+// trimFilePathPrefix returns the given filesystem path s without the leading
+// prefix.
+func trimFilePathPrefix(s, prefix string) string {
+	sv := strings.ToUpper(filepath.VolumeName(s))
+	pv := strings.ToUpper(filepath.VolumeName(prefix))
+	s = s[len(sv):]
+	prefix = prefix[len(pv):]
+
+	if !hasFilePathPrefix(s, prefix) || len(prefix) == 0 {
+		return s
+	}
+	if len(s) == len(prefix) {
+		return ""
+	}
+	if prefix[len(prefix)-1] == filepath.Separator {
+		return strings.TrimPrefix(s, prefix)
+	}
+	return s[len(prefix)+1:]
+}
+
 // trimPathPrefix returns p without the leading prefix. Unlike
-// strings.TrimPrefix, the prefix will only match on slash-separted comopnent
+// strings.TrimPrefix, the prefix will only match on slash-separted component
 // boundaries, so trimPathPrefix("aa/b", "aa") returns "b", but
-// trimPathPrefix("aa/b", "a") retunrs "aa/b".
+// trimPathPrefix("aa/b", "a") returns "aa/b".
 func trimPathPrefix(p, prefix string) string {
 	if prefix == "" {
 		return p

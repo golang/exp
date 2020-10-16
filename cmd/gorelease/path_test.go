@@ -113,6 +113,80 @@ func TestHasFilePathPrefix(t *testing.T) {
 	}
 }
 
+func TestTrimFilePathPrefix(t *testing.T) {
+	type test struct {
+		desc, path, prefix, want string
+	}
+	var tests []test
+	if runtime.GOOS == "windows" {
+		tests = []test{
+			// Note: these two cases in which the result preserves the leading \
+			// don't come up in reality in gorelease. That's because prefix is
+			// always far to the right of the path parts (ex github.com/foo/bar
+			// in C:\Users\foo\AppData\Local\Temp\...\github.com\foo\bar).
+			{
+				desc:   "empty_prefix",
+				path:   `c:\a\b`,
+				prefix: "",
+				want:   `\a\b`,
+			}, {
+				desc:   "partial_component",
+				path:   `c:\aa\b`,
+				prefix: `c:\a`,
+				want:   `\aa\b`,
+			},
+
+			{
+				desc:   "drive_prefix",
+				path:   `c:\a\b`,
+				prefix: `c:\`,
+				want:   `a\b`,
+			}, {
+				desc:   "partial_prefix",
+				path:   `c:\a\b`,
+				prefix: `c:\a`,
+				want:   `b`,
+			}, {
+				desc:   "full_prefix",
+				path:   `c:\a\b`,
+				prefix: `c:\a\b`,
+				want:   "",
+			},
+		}
+	} else {
+		tests = []test{
+			{
+				desc:   "empty_prefix",
+				path:   "/a/b",
+				prefix: "",
+				want:   "/a/b",
+			}, {
+				desc:   "partial_prefix",
+				path:   "/a/b",
+				prefix: "/a",
+				want:   "b",
+			}, {
+				desc:   "full_prefix",
+				path:   "/a/b",
+				prefix: "/a/b",
+				want:   "",
+			}, {
+				desc:   "partial_component",
+				path:   "/aa/b",
+				prefix: "/a",
+				want:   "/aa/b",
+			},
+		}
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			if got := trimFilePathPrefix(test.path, test.prefix); got != test.want {
+				t.Errorf("hasFilePathPrefix(%q, %q): got %v, want %v", test.path, test.prefix, got, test.want)
+			}
+		})
+	}
+}
+
 func TestTrimPathPrefix(t *testing.T) {
 	for _, test := range []struct {
 		desc, path, prefix, want string
