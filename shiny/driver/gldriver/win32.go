@@ -89,6 +89,12 @@ func showWindow(w *windowImpl) {
 
 func closeWindow(id uintptr) {} // TODO
 
+func setTitle(id uintptr, title string) {
+	if err := win32.SetWindowTitle(syscall.Handle(id), title); err != nil {
+		panic(err) // TODO(BenLubar)
+	}
+}
+
 func drawLoop(w *windowImpl) {
 	runtime.LockOSThread()
 
