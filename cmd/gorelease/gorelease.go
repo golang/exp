@@ -242,14 +242,15 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 }
 
 type moduleInfo struct {
-	modRoot         string // module root directory
-	repoRoot        string // repository root directory (may be "")
-	modPath         string // module path in go.mod
-	version         string // resolved version or "none"
-	versionQuery    string // a query like "latest" or "dev-branch", if specified
-	versionInferred bool   // true if the version was unspecified and inferred
-	modPathMajor    string // major version suffix like "/v3" or ".v2"
-	tagPrefix       string // prefix for version tags if module not in repo root
+	modRoot                  string // module root directory
+	repoRoot                 string // repository root directory (may be "")
+	modPath                  string // module path in go.mod
+	version                  string // resolved version or "none"
+	versionQuery             string // a query like "latest" or "dev-branch", if specified
+	versionInferred          bool   // true if the version was unspecified and inferred
+	highestTransitiveVersion string // version of the highest transitive self-dependency (cycle)
+	modPathMajor             string // major version suffix like "/v3" or ".v2"
+	tagPrefix                string // prefix for version tags if module not in repo root
 
 	goModPath string        // file path to go.mod
 	goModData []byte        // content of go.mod
@@ -390,6 +391,19 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 
 	m.diagnostics = append(m.diagnostics, prepareDiagnostics...)
 	m.diagnostics = append(m.diagnostics, loadDiagnostics...)
+
+	highestVersion, err := findSelectedVersion(tmpLoadDir, m.modPath)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+
+	if highestVersion != "" {
+		// A version of the module is included in the transitive dependencies.
+		// Add it to the moduleInfo so that the release report stage can use it
+		// in verifying the version or suggestion a new version, depending on
+		// whether the user provided a version already.
+		m.highestTransitiveVersion = highestVersion
+	}
 
 	return m, nil
 }
@@ -1201,4 +1215,19 @@ func zipPackages(baseModPath string, basePkgs []*packages.Package, releaseModPat
 		pairs = append(pairs, pair)
 	}
 	return pairs
+}
+
+// findSelectedVersion returns the highest version of the given modPath at
+// modDir, if a module cycle exists. modDir should be a writable directory
+// containing the go.mod for modPath.
+//
+// If no module cycle exists, it returns empty string.
+func findSelectedVersion(modDir, modPath string) (latestVersion string, err error) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Version}}", "--", modPath)
+	cmd.Dir = modDir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", cleanCmdError(err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }

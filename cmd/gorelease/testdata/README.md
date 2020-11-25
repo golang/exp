@@ -33,7 +33,7 @@ are:
 * `mod`: sets the module path. Must be specified together with `version`. Copies
   the content of a module out of the test proxy into a temporary directory
   where `gorelease` is run.
-* `version`: specified together with `mod`. sets the version to retreive from
+* `version`: specified together with `mod`, it sets the version to retrieve from
   the test proxy.
 * `base`: the value of the `-base` flag passed to `gorelease`.
 * `release`: the value of the `-version` flag passed to `gorelease`.

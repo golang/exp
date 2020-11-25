@@ -191,6 +191,11 @@ which is required for major versions v2 or greater.`, major)
 over the base version (%s).`, r.base.version)
 		return
 	}
+
+	if r.release.highestTransitiveVersion != "" && semver.Compare(r.release.highestTransitiveVersion, r.release.version) > 0 {
+		setNotValid(`Module indirectly depends on a higher version of itself (%s).
+		`, r.release.highestTransitiveVersion)
+	}
 }
 
 // suggestReleaseVersion suggests a new version consistent with observed
@@ -219,8 +224,14 @@ func (r *report) suggestReleaseVersion() {
 
 	var major, minor, patch, pre string
 	if r.base.version != "none" {
+		minVersion := r.base.version
+		if r.release.highestTransitiveVersion != "" && semver.Compare(r.release.highestTransitiveVersion, minVersion) > 0 {
+			setNotValid("Module indirectly depends on a higher version of itself (%s) than the base version (%s).", r.release.highestTransitiveVersion, r.base.version)
+			return
+		}
+
 		var err error
-		major, minor, patch, pre, _, err = parseVersion(r.base.version)
+		major, minor, patch, pre, _, err = parseVersion(minVersion)
 		if err != nil {
 			panic(fmt.Sprintf("could not parse base version: %v", err))
 		}
@@ -253,6 +264,7 @@ func (r *report) suggestReleaseVersion() {
 		patch = incDecimal(patch)
 	}
 	setVersion(fmt.Sprintf("v%s.%s.%s", major, minor, patch))
+	return
 }
 
 // canVerifyReleaseVersion returns true if we can safely suggest a new version
