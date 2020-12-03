@@ -1,5 +1,7 @@
 # exp
 
+[![PkgGoDev](https://pkg.go.dev/badge/golang.org/x/exp)](https://pkg.go.dev/golang.org/x/exp)
+
 This subrepository holds experimental and deprecated (in the `old`
 directory) packages.
 
