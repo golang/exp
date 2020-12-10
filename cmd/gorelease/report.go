@@ -87,7 +87,7 @@ func (r *report) Text(w io.Writer) error {
 		} else {
 			fmt.Fprintf(buf, "Suggested version: %[1]s (with tag %[2]s%[1]s)\n", r.release.version, r.release.tagPrefix)
 		}
-	} else if r.release.version != "" && r.similarModPaths() {
+	} else if r.release.version != "" && r.canVerifyReleaseVersion() {
 		if r.release.tagPrefix == "" {
 			fmt.Fprintf(buf, "%s is a valid semantic version for this release.\n", r.release.version)
 
@@ -131,10 +131,10 @@ func (r *report) addPackage(p packageReport) {
 	}
 }
 
-// validateVersion checks whether r.release.version is valid.
+// validateReleaseVersion checks whether r.release.version is valid.
 // If r.release.version is not valid, an error is returned explaining why.
 // r.release.version must be set.
-func (r *report) validateVersion() {
+func (r *report) validateReleaseVersion() {
 	if r.release.version == "" {
 		panic("validateVersion called without version")
 	}
@@ -193,8 +193,9 @@ over the base version (%s).`, r.base.version)
 	}
 }
 
-// suggestVersion suggests a new version consistent with observed changes.
-func (r *report) suggestVersion() {
+// suggestReleaseVersion suggests a new version consistent with observed
+// changes.
+func (r *report) suggestReleaseVersion() {
 	setNotValid := func(format string, args ...interface{}) {
 		r.versionInvalid = &versionMessage{
 			message: "Cannot suggest a release version.",
@@ -254,9 +255,13 @@ func (r *report) suggestVersion() {
 	setVersion(fmt.Sprintf("v%s.%s.%s", major, minor, patch))
 }
 
-// similarModPaths returns true if r.base and r.release are versions of the same
-// module or different major versions of the same module.
-func (r *report) similarModPaths() bool {
+// canVerifyReleaseVersion returns true if we can safely suggest a new version
+// or if we can verify the version passed in with -version is safe to tag.
+func (r *report) canVerifyReleaseVersion() bool {
+	// For now, return true if the base and release module paths are the same,
+	// ignoring the major version suffix.
+	// TODO(#37562, #39192, #39666, #40267): there are many more situations when
+	// we can't verify a new version.
 	basePath := strings.TrimSuffix(r.base.modPath, r.base.modPathMajor)
 	releasePath := strings.TrimSuffix(r.release.modPath, r.release.modPathMajor)
 	return basePath == releasePath

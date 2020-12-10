@@ -243,7 +243,7 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 type moduleInfo struct {
 	modRoot         string // module root directory
 	repoRoot        string // repository root directory (may be "")
-	modPath         string // module path
+	modPath         string // module path in go.mod
 	version         string // resolved version or "none"
 	versionQuery    string // a query like "latest" or "dev-branch", if specified
 	versionInferred bool   // true if the version was unspecified and inferred
@@ -393,7 +393,9 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 // loadDownloadedModule downloads a module and loads information about it and
 // its packages from the module cache.
 //
-// modPath is the module's path.
+// modPath is the module path used to fetch the module. The module's path in
+// go.mod (m.modPath) may be different, for example in a soft fork intended as
+// a replacement.
 //
 // version is the version to load. It may be "none" (indicating nothing should
 // be loaded), "" (the highest available version below max should be used), a
@@ -403,9 +405,6 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 // to max will not be considered. Typically, loadDownloadedModule is used to
 // load the base version, and max is the release version.
 func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error) {
-	// TODO(#39666): support downloaded modules that are "soft forks", where the
-	// module path in go.mod is different from modPath.
-
 	// Check the module path and version.
 	// If the version is a query, resolve it to a canonical version.
 	m = moduleInfo{modPath: modPath}
@@ -414,10 +413,10 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 	}
 
 	var ok bool
-	_, m.modPathMajor, ok = module.SplitPathVersion(m.modPath)
+	_, m.modPathMajor, ok = module.SplitPathVersion(modPath)
 	if !ok {
 		// we just validated the path above.
-		panic(fmt.Sprintf("could not find version suffix in module path %q", m.modPath))
+		panic(fmt.Sprintf("could not find version suffix in module path %q", modPath))
 	}
 
 	if version == "none" {
@@ -457,12 +456,27 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 		m.version = version
 	}
 
-	// Load packages.
+	// Download the module into the cache and load the mod file.
+	// Note that goModPath is $GOMODCACHE/cache/download/$modPath/@v/$version.mod,
+	// which is not inside modRoot. This is what the go command uses. Even if
+	// the module didn't have a go.mod file, one will be synthesized there.
 	v := module.Version{Path: modPath, Version: m.version}
-	if m.modRoot, err = downloadModule(v); err != nil {
+	if m.modRoot, m.goModPath, err = downloadModule(v); err != nil {
 		return moduleInfo{}, err
 	}
-	tmpLoadDir, tmpGoModData, tmpGoSumData, err := prepareLoadDir(nil, modPath, m.modRoot, m.version, true)
+	if m.goModData, err = ioutil.ReadFile(m.goModPath); err != nil {
+		return moduleInfo{}, err
+	}
+	if m.goModFile, err = modfile.ParseLax(m.goModPath, m.goModData, nil); err != nil {
+		return moduleInfo{}, err
+	}
+	if m.goModFile.Module == nil {
+		return moduleInfo{}, fmt.Errorf("%s: missing module directive", m.goModPath)
+	}
+	m.modPath = m.goModFile.Module.Mod.Path
+
+	// Load packages.
+	tmpLoadDir, tmpGoModData, tmpGoSumData, err := prepareLoadDir(nil, m.modPath, m.modRoot, m.version, true)
 	if err != nil {
 		return moduleInfo{}, err
 	}
@@ -471,22 +485,9 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 			err = fmt.Errorf("removing temporary load directory: %v", err)
 		}
 	}()
-	if m.pkgs, _, err = loadPackages(modPath, m.modRoot, tmpLoadDir, tmpGoModData, tmpGoSumData); err != nil {
+	if m.pkgs, _, err = loadPackages(m.modPath, m.modRoot, tmpLoadDir, tmpGoModData, tmpGoSumData); err != nil {
 		return moduleInfo{}, err
 	}
-
-	// Attempt to load the mod file, if it exists.
-	m.goModPath = filepath.Join(m.modRoot, "go.mod")
-	if m.goModData, err = ioutil.ReadFile(m.goModPath); err != nil && !os.IsNotExist(err) {
-		return moduleInfo{}, fmt.Errorf("reading go.mod: %v", err)
-	}
-	if err == nil {
-		m.goModFile, err = modfile.ParseLax(m.goModPath, m.goModData, nil)
-		if err != nil {
-			return moduleInfo{}, err
-		}
-	}
-	// The modfile might not exist, leading to err != nil. That's OK - continue.
 
 	return m, nil
 }
@@ -578,10 +579,12 @@ func makeReleaseReport(base, release moduleInfo) (report, error) {
 		}
 	}
 
-	if release.version != "" {
-		r.validateVersion()
-	} else if r.similarModPaths() {
-		r.suggestVersion()
+	if r.canVerifyReleaseVersion() {
+		if release.version == "" {
+			r.suggestReleaseVersion()
+		} else {
+			r.validateReleaseVersion()
+		}
 	}
 
 	return r, nil
@@ -825,7 +828,7 @@ func copyModuleToTempDir(modPath, modRoot string) (dir string, err error) {
 
 // downloadModule downloads a specific version of a module to the
 // module cache using 'go mod download'.
-func downloadModule(m module.Version) (modRoot string, err error) {
+func downloadModule(m module.Version) (modRoot, goModPath string, err error) {
 	defer func() {
 		if err != nil {
 			err = &downloadError{m: m, err: cleanCmdError(err)}
@@ -840,7 +843,7 @@ func downloadModule(m module.Version) (modRoot string, err error) {
 	// If it didn't read go.mod in this case, we wouldn't need a temp directory.
 	tmpDir, err := ioutil.TempDir("", "gorelease-download")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer os.Remove(tmpDir)
 	cmd := exec.Command("go", "mod", "download", "-json", "--", m.Path+"@"+m.Version)
@@ -850,26 +853,26 @@ func downloadModule(m module.Version) (modRoot string, err error) {
 	if err != nil {
 		var ok bool
 		if xerr, ok = err.(*exec.ExitError); !ok {
-			return "", err
+			return "", "", err
 		}
 	}
 
 	// If 'go mod download' exited unsuccessfully but printed well-formed JSON
 	// with an error, return that error.
-	parsed := struct{ Dir, Error string }{}
+	parsed := struct{ Dir, GoMod, Error string }{}
 	if jsonErr := json.Unmarshal(out, &parsed); jsonErr != nil {
 		if xerr != nil {
-			return "", cleanCmdError(xerr)
+			return "", "", cleanCmdError(xerr)
 		}
-		return "", jsonErr
+		return "", "", jsonErr
 	}
 	if parsed.Error != "" {
-		return "", errors.New(parsed.Error)
+		return "", "", errors.New(parsed.Error)
 	}
 	if xerr != nil {
-		return "", cleanCmdError(xerr)
+		return "", "", cleanCmdError(xerr)
 	}
-	return parsed.Dir, nil
+	return parsed.Dir, parsed.GoMod, nil
 }
 
 // prepareLoadDir creates a temporary directory and a go.mod file that requires
