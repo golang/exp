@@ -28,6 +28,9 @@ may appear when scaling up to extreme sizes, say 1 million by 1 million pixels.
 Nonetheless, at typical scales, e.g. up to 4096 × 4096, such differences are
 not expected to be perceptible to the naked eye.
 
+The encoder aims to emit byte-identical output for the same input, independent
+of the platform (and specifically its floating-point hardware).
+
 
 Structure
 
@@ -474,7 +477,7 @@ Example
 
 The production version of the "action/info" icon from the Material Design icon
 set is defined by the following SVG, also available at
-https://github.com/google/material-design-icons/blob/master/action/svg/production/ic_info_48px.svg:
+https://github.com/google/material-design-icons/blob/3.0.2/action/svg/production/ic_info_48px.svg:
 
 	<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
 	<path d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4z

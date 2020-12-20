@@ -34,6 +34,9 @@ const (
 // The zero value is usable. Calling Reset, which is optional, sets the
 // Metadata for the subsequent encoded form. If Reset is not called before
 // other Encoder methods, the default metadata is implied.
+//
+// It aims to emit byte-identical Bytes output for the same input, independent
+// of the platform (and specifically its floating-point hardware).
 type Encoder struct {
 	// HighResolutionCoordinates is whether the encoder should encode
 	// coordinate numbers for subsequent paths at the best possible resolution
@@ -410,16 +413,21 @@ func (e *Encoder) SetCircularGradient(cBase, nBase uint8, cx, cy, rx, ry float32
 // axis vectors (rx, ry) and (sx, sy) such that (cx+rx, cy+ry) and (cx+sx,
 // cy+sy) are on the ellipse.
 func (e *Encoder) SetEllipticalGradient(cBase, nBase uint8, cx, cy, rx, ry, sx, sy float32, spread GradientSpread, stops []GradientStop) {
+	// Explicitly disable FMA in the floating-point calculations below
+	// to get consistent results on all platforms, and in turn produce
+	// a byte-identical encoding.
+	// See https://golang.org/ref/spec#Floating_point_operators and issue 43219.
+
 	// See the package documentation's appendix for a derivation of the
 	// transformation matrix.
-	invRSSR := 1 / (rx*sy - sx*ry)
+	invRSSR := 1 / (float32(rx*sy) - float32(sx*ry))
 
 	ma := +sy * invRSSR
 	mb := -sx * invRSSR
-	mc := -ma*cx - mb*cy
+	mc := -float32(ma*cx) - float32(mb*cy)
 	md := -ry * invRSSR
 	me := +rx * invRSSR
-	mf := -md*cx - me*cy
+	mf := -float32(md*cx) - float32(me*cy)
 
 	e.SetGradient(cBase, nBase, true, f32.Aff3{
 		ma, mb, mc,

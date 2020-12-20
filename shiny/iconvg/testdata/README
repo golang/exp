@@ -1,6 +1,6 @@
 action-info.svg comes from the Material Design icon set. See
 action/svg/production/ic_info_48px.svg in the
-github.com/google/material-design-icons repository.
+github.com/google/material-design-icons repository at the tag 3.0.2.
 
 action-info.{lo,hi}res.ivg are low- and high-resolution IconVG versions of that
 SVG file. Low resolution means that coordinates are quantized to 1/64th of a

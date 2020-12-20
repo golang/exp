@@ -155,7 +155,7 @@ func TestDisassembly(t *testing.T) {
 			continue
 		}
 		wantFilename := filepath.FromSlash(tc.filename) + ".ivg.disassembly"
-		if overwriteTestdataFiles {
+		if *updateFlag {
 			if err := ioutil.WriteFile(filepath.FromSlash(wantFilename), got, 0666); err != nil {
 				t.Errorf("%s: WriteFile: %v", tc.filename, err)
 			}
@@ -173,7 +173,7 @@ func TestDisassembly(t *testing.T) {
 	}
 }
 
-func TestRasterizer(t *testing.T) {
+func TestDecodeAndRasterize(t *testing.T) {
 	for _, tc := range testdataTestCases {
 		ivgData, err := ioutil.ReadFile(filepath.FromSlash(tc.filename) + ".ivg")
 		if err != nil {
@@ -218,7 +218,7 @@ func TestRasterizer(t *testing.T) {
 				wantFilename += "." + variant
 			}
 			wantFilename += ".png"
-			if overwriteTestdataFiles {
+			if *updateFlag {
 				if err := encodePNG(filepath.FromSlash(wantFilename), got); err != nil {
 					t.Errorf("%s %q variant: encodePNG: %v", tc.filename, variant, err)
 				}
