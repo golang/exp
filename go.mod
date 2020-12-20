@@ -3,7 +3,7 @@ module golang.org/x/exp
 go 1.12
 
 require (
-	dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9
+	dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
 	github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
