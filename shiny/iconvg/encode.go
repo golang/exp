@@ -233,7 +233,7 @@ func (e *Encoder) SetCReg(adj uint8, incr bool, c Color) {
 	if e.err != nil {
 		return
 	}
-	if adj < 0 || 6 < adj {
+	if adj > 6 {
 		e.err = errInvalidSelectorAdjustment
 		return
 	}
@@ -272,7 +272,7 @@ func (e *Encoder) SetNReg(adj uint8, incr bool, f float32) {
 	if e.err != nil {
 		return
 	}
-	if adj < 0 || 6 < adj {
+	if adj > 6 {
 		e.err = errInvalidSelectorAdjustment
 		return
 	}
@@ -440,7 +440,7 @@ func (e *Encoder) StartPath(adj uint8, x, y float32) {
 	if e.err != nil {
 		return
 	}
-	if adj < 0 || 6 < adj {
+	if adj > 6 {
 		e.err = errInvalidSelectorAdjustment
 		return
 	}

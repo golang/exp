@@ -46,8 +46,13 @@ func testEncode(t *testing.T, e *Encoder, wantFilename string) {
 		// to non-determinism in floating-point math, the encoder needs to be fixed.
 		//
 		// See golang.org/issue/43219#issuecomment-748531069.
-		t.Fatalf("\ngot  %d bytes (on GOOS=%s GOARCH=%s, using compiler %q):\n% x\nwant %d bytes:\n% x",
+		t.Errorf("\ngot  %d bytes (on GOOS=%s GOARCH=%s, using compiler %q):\n% x\nwant %d bytes:\n% x",
 			len(got), runtime.GOOS, runtime.GOARCH, runtime.Compiler, got, len(want), want)
+		gotDisasm, err1 := disassemble(got)
+		wantDisasm, err2 := disassemble(want)
+		if err1 == nil && err2 == nil {
+			diffLines(t, string(gotDisasm), string(wantDisasm))
+		}
 	}
 }
 
