@@ -104,6 +104,8 @@ func KeyModifiers(state uint16) (m key.Modifiers) {
 
 // These constants come from /usr/include/X11/{keysymdef,XF86keysym}.h
 const (
+	xkISOLevel3Shift = 0xfe03
+
 	xkISOLeftTab = 0xfe20
 	xkBackSpace  = 0xff08
 	xkTab        = 0xff09
@@ -183,6 +185,8 @@ const (
 // that do not correspond to a Unicode code point, such as "Page Up", "F1" or
 // "Left Shift", to key.Code values.
 var nonUnicodeKeycodes = map[rune]key.Code{
+	xkISOLevel3Shift: key.CodeRightAlt,
+
 	xkISOLeftTab: key.CodeTab,
 	xkBackSpace:  key.CodeDeleteBackspace,
 	xkTab:        key.CodeTab,
