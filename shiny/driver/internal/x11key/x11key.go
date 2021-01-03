@@ -4,7 +4,7 @@
 
 //go:generate go run gen.go
 
-// x11key contains X11 numeric codes for the keyboard and mouse.
+// Package x11key contains X11 numeric codes for the keyboard and mouse.
 package x11key // import "golang.org/x/exp/shiny/driver/internal/x11key"
 
 import (
@@ -30,12 +30,14 @@ const (
 	Button5Mask = 1 << 12
 )
 
+// KeysymTable holds current table of keyboard keys mapped to Xkb keysyms & current special modifiers bits
 type KeysymTable struct {
 	Table [256][6]uint32
 
 	NumLockMod, ModeSwitchMod, ISOLevel3ShiftMod uint16
 }
 
+// Lookup converts Xkb xproto keycode (detail) & mod (state) into mobile/event/key Rune & Code
 func (t *KeysymTable) Lookup(detail uint8, state uint16) (rune, key.Code) {
 	te := t.Table[detail][0:2]
 	if state&t.ModeSwitchMod != 0 {
@@ -86,6 +88,7 @@ func isKeypad(keysym uint32) bool {
 	return keysym >= 0xff80 && keysym <= 0xffbd
 }
 
+// KeyModifiers returns mobile/event/key modifiers type from xproto mod state
 func KeyModifiers(state uint16) (m key.Modifiers) {
 	if state&ShiftMask != 0 {
 		m |= key.ModShift
