@@ -89,6 +89,8 @@ func isKeypad(keysym uint32) bool {
 }
 
 // KeyModifiers returns mobile/event/key modifiers type from xproto mod state
+// ModCapsLock, ModNumLock & ModLevel3Shift are currently implemented using default general modifier bits
+// it should be method of KeysymTable with current keyboard mapping
 func KeyModifiers(state uint16) (m key.Modifiers) {
 	if state&ShiftMask != 0 {
 		m |= key.ModShift
@@ -101,6 +103,18 @@ func KeyModifiers(state uint16) (m key.Modifiers) {
 	}
 	if state&Mod4Mask != 0 {
 		m |= key.ModMeta
+	}
+	if state&LockMask != 0 {
+		m |= key.ModCapsLock
+	}
+	if state&Mod2Mask != 0 { // TODO should goes from t.NumLockMod instead because it's dynamic
+		m |= key.ModNumLock
+	}
+	if state&Mod5Mask != 0 { // TODO should goes from t.ISOLevel3ShiftMod instead because it's dynamic
+		m |= key.ModLevel3Shift
+	}
+	if state&Mod5Mask != 0 { // TODO should goes from t.ModeSwitchMod instead because it's dynamic
+		m |= key.ModModeSwitch
 	}
 	return m
 }
