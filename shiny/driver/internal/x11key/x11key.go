@@ -204,7 +204,7 @@ var nonUnicodeKeycodes = map[rune]key.Code{
 	xkPageDown:   key.CodePageDown,
 	xkEnd:        key.CodeEnd,
 	xkInsert:     key.CodeInsert,
-	xkMenu:       key.CodeRightGUI, // TODO: CodeRightGUI or CodeMenu??
+	xkMenu:       key.CodeProps,
 	xkHelp:       key.CodeHelp,
 	xkNumLock:    key.CodeKeypadNumLock,
 	xkMultiKey:   key.CodeCompose,

@@ -13,3 +13,5 @@ require (
 	golang.org/x/tools v0.0.0-20200207183749-b753a1ba74fa
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898
 )
+
+replace golang.org/x/mobile => github.com/misak113/mobile v0.0.0-20210103170524-21e5a0da1870
