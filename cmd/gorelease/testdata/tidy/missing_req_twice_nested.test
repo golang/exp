@@ -14,10 +14,6 @@ Run 'go mod tidy' to add missing requirements.
 module example.com/tidy
 
 go 1.12
--- go.mod --
-module example.com/tidy
-
-go 1.12
 -- tidy.go --
 package tidy
 -- subdir/subsubdir/tidy.go --

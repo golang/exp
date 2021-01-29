@@ -1085,9 +1085,6 @@ func prepareLoadDir(modFile *modfile.File, modPath, modRoot, version string, cac
 // of the modPath module).
 //
 // Note: the returned importPaths will include main if it exists in root.
-//
-// TODO(deklerk): Stop at any discovered submodule. Make sure a test exists that
-// asserts that behavior.
 func collectImportPaths(modPath, root string) (importPaths []string, _ error) {
 	err := filepath.Walk(root, func(walkPath string, fi os.FileInfo, err error) error {
 		if err != nil {
