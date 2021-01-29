@@ -2,7 +2,6 @@ mod=example.com/first
 base=none
 release=v2.0.0
 success=false
-
 -- want --
 v2.0.0 is not a valid semantic version for this release.
 The module path does not end with the major version suffix /v2,

@@ -178,6 +178,12 @@ which is required for major versions v2 or greater.`, major)
 		return
 	}
 
+	for _, v := range r.release.existingVersions {
+		if semver.Compare(v, r.release.version) == 0 {
+			setNotValid("version %s already exists", v)
+		}
+	}
+
 	// Check that compatible / incompatible changes are consistent.
 	if semver.Major(r.base.version) == "v0" || r.base.modPath != r.release.modPath {
 		return
@@ -242,6 +248,24 @@ func (r *report) suggestReleaseVersion() {
 		return
 		// TODO(jayconrod): briefly explain how to prepare major version releases
 		// and link to documentation.
+	}
+
+	// Check whether we're comparing to the latest version of base.
+	//
+	// This could happen further up, but we want the more pressing errors above
+	// to take precedence.
+	var latestForBaseMajor string
+	for _, v := range r.release.existingVersions {
+		if semver.Major(v) != semver.Major(r.base.version) {
+			continue
+		}
+		if latestForBaseMajor == "" || semver.Compare(latestForBaseMajor, v) < 0 {
+			latestForBaseMajor = v
+		}
+	}
+	if latestForBaseMajor != "" && latestForBaseMajor != r.base.version {
+		setNotValid(fmt.Sprintf("Can only suggest a release version when compared against the most recent version of this major: %s.", latestForBaseMajor))
+		return
 	}
 
 	if r.base.version == "none" {

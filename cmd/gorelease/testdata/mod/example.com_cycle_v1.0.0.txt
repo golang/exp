@@ -8,7 +8,6 @@ module example.com/cycle
 go 1.12
 
 require example.com/cycledep v1.0.0
-require example.com/cycle v1.5.0
 -- cycle/main.go --
 package main
 

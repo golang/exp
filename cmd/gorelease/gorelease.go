@@ -81,6 +81,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -141,7 +142,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	success, err := runRelease(os.Stdout, wd, os.Args[1:])
+	ctx := context.WithValue(context.Background(), "env", append(os.Environ(), "GO111MODULE=on"))
+	success, err := runRelease(ctx, os.Stdout, wd, os.Args[1:])
 	if err != nil {
 		if _, ok := err.(*usageError); ok {
 			fmt.Fprintln(os.Stderr, err)
@@ -158,7 +160,7 @@ func main() {
 // runRelease is the main function of gorelease. It's called by tests, so
 // it writes to w instead of os.Stdout and returns an error instead of
 // exiting.
-func runRelease(w io.Writer, dir string, args []string) (success bool, err error) {
+func runRelease(ctx context.Context, w io.Writer, dir string, args []string) (success bool, err error) {
 	// Validate arguments and flags. We'll print our own errors, since we want to
 	// test without printing to stderr.
 	fs := flag.NewFlagSet("gorelease", flag.ContinueOnError)
@@ -213,7 +215,7 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 	repoRoot := findRepoRoot(modRoot)
 
 	// Load packages for the version to be released from the local directory.
-	release, err := loadLocalModule(modRoot, repoRoot, releaseVersion)
+	release, err := loadLocalModule(ctx, modRoot, repoRoot, releaseVersion)
 	if err != nil {
 		return false, err
 	}
@@ -225,13 +227,13 @@ func runRelease(w io.Writer, dir string, args []string) (success bool, err error
 		baseModPath = release.modPath
 		max = releaseVersion
 	}
-	base, err := loadDownloadedModule(baseModPath, baseVersion, max)
+	base, err := loadDownloadedModule(ctx, baseModPath, baseVersion, max)
 	if err != nil {
 		return false, err
 	}
 
 	// Compare packages and check for other issues.
-	report, err := makeReleaseReport(base, release)
+	report, err := makeReleaseReport(ctx, base, release)
 	if err != nil {
 		return false, err
 	}
@@ -259,6 +261,10 @@ type moduleInfo struct {
 
 	diagnostics []string            // problems not related to loading specific packages
 	pkgs        []*packages.Package // loaded packages with type information
+
+	// Versions of this module which already exist. Only loaded for release
+	// (not base).
+	existingVersions []string
 }
 
 // loadLocalModule loads information about a module and its packages from a
@@ -269,7 +275,7 @@ type moduleInfo struct {
 // repoRoot is the root directory of the repository containing the module or "".
 //
 // version is a proposed version for the module or "".
-func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error) {
+func loadLocalModule(ctx context.Context, modRoot, repoRoot, version string) (m moduleInfo, err error) {
 	if repoRoot != "" && !hasFilePathPrefix(modRoot, repoRoot) {
 		return moduleInfo{}, fmt.Errorf("module root %q is not in repository root %q", modRoot, repoRoot)
 	}
@@ -373,7 +379,7 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 			err = fmt.Errorf("removing temporary module directory: %v", rerr)
 		}
 	}()
-	tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths, prepareDiagnostics, err := prepareLoadDir(m.goModFile, m.modPath, tmpModRoot, version, false)
+	tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths, prepareDiagnostics, err := prepareLoadDir(ctx, m.goModFile, m.modPath, tmpModRoot, version, false)
 	if err != nil {
 		return moduleInfo{}, err
 	}
@@ -384,7 +390,7 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 	}()
 
 	var loadDiagnostics []string
-	m.pkgs, loadDiagnostics, err = loadPackages(m.modPath, tmpModRoot, tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths)
+	m.pkgs, loadDiagnostics, err = loadPackages(ctx, m.modPath, tmpModRoot, tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths)
 	if err != nil {
 		return moduleInfo{}, err
 	}
@@ -392,7 +398,7 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 	m.diagnostics = append(m.diagnostics, prepareDiagnostics...)
 	m.diagnostics = append(m.diagnostics, loadDiagnostics...)
 
-	highestVersion, err := findSelectedVersion(tmpLoadDir, m.modPath)
+	highestVersion, err := findSelectedVersion(ctx, tmpLoadDir, m.modPath)
 	if err != nil {
 		return moduleInfo{}, err
 	}
@@ -404,6 +410,13 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 		// whether the user provided a version already.
 		m.highestTransitiveVersion = highestVersion
 	}
+
+	// Calculate the existing versions.
+	ev, err := existingVersions(ctx, m.modPath, tmpLoadDir)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	m.existingVersions = ev
 
 	return m, nil
 }
@@ -422,7 +435,7 @@ func loadLocalModule(modRoot, repoRoot, version string) (m moduleInfo, err error
 // If version is "" and max is not "", available versions greater than or equal
 // to max will not be considered. Typically, loadDownloadedModule is used to
 // load the base version, and max is the release version.
-func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error) {
+func loadDownloadedModule(ctx context.Context, modPath, version, max string) (m moduleInfo, err error) {
 	// Check the module path and version.
 	// If the version is a query, resolve it to a canonical version.
 	m = moduleInfo{modPath: modPath}
@@ -445,7 +458,7 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 	if version == "" {
 		// Unspecified version: use the highest version below max.
 		m.versionInferred = true
-		if m.version, err = inferBaseVersion(modPath, max); err != nil {
+		if m.version, err = inferBaseVersion(ctx, modPath, max); err != nil {
 			return moduleInfo{}, err
 		}
 		if m.version == "none" {
@@ -454,7 +467,7 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 	} else if version != module.CanonicalVersion(version) {
 		// Version query: find the real version.
 		m.versionQuery = version
-		if m.version, err = queryVersion(modPath, version); err != nil {
+		if m.version, err = queryVersion(ctx, modPath, version); err != nil {
 			return moduleInfo{}, err
 		}
 		if m.version != "none" && max != "" && semver.Compare(m.version, max) >= 0 {
@@ -479,7 +492,7 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 	// which is not inside modRoot. This is what the go command uses. Even if
 	// the module didn't have a go.mod file, one will be synthesized there.
 	v := module.Version{Path: modPath, Version: m.version}
-	if m.modRoot, m.goModPath, err = downloadModule(v); err != nil {
+	if m.modRoot, m.goModPath, err = downloadModule(ctx, v); err != nil {
 		return moduleInfo{}, err
 	}
 	if m.goModData, err = ioutil.ReadFile(m.goModPath); err != nil {
@@ -494,7 +507,7 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 	m.modPath = m.goModFile.Module.Mod.Path
 
 	// Load packages.
-	tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths, _, err := prepareLoadDir(nil, m.modPath, m.modRoot, m.version, true)
+	tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths, _, err := prepareLoadDir(ctx, nil, m.modPath, m.modRoot, m.version, true)
 	if err != nil {
 		return moduleInfo{}, err
 	}
@@ -504,7 +517,7 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 		}
 	}()
 
-	if m.pkgs, _, err = loadPackages(m.modPath, m.modRoot, tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths); err != nil {
+	if m.pkgs, _, err = loadPackages(ctx, m.modPath, m.modRoot, tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths); err != nil {
 		return moduleInfo{}, err
 	}
 
@@ -518,7 +531,7 @@ func loadDownloadedModule(modPath, version, max string) (m moduleInfo, err error
 // The report recommends or validates a release version and indicates a
 // version control tag to use (with an appropriate prefix, for modules not
 // in the repository root directory).
-func makeReleaseReport(base, release moduleInfo) (report, error) {
+func makeReleaseReport(ctx context.Context, base, release moduleInfo) (report, error) {
 	// Compare each pair of packages.
 	// Ignore internal packages.
 	// If we don't have a base version to compare against just check the new
@@ -609,6 +622,38 @@ func makeReleaseReport(base, release moduleInfo) (report, error) {
 	return r, nil
 }
 
+// existingVersions returns the versions that already exist for the given
+// modPath.
+func existingVersions(ctx context.Context, modPath, modRoot string) (versions []string, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("listing versions of %s: %w", modPath, err)
+		}
+	}()
+
+	type listVersions struct {
+		Versions []string `json: "Versions"`
+	}
+	cmd := exec.CommandContext(ctx, "go", "list", "-json", "-m", "-versions", modPath)
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
+	cmd.Dir = modRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, cleanCmdError(err)
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+
+	var lv listVersions
+	if err := json.Unmarshal(out, &lv); err != nil {
+		return nil, err
+	}
+	return lv.Versions, nil
+}
+
 // findRepoRoot finds the root directory of the repository that contains dir.
 // findRepoRoot returns "" if it can't find the repository root.
 func findRepoRoot(dir string) string {
@@ -671,14 +716,14 @@ func checkModPath(modPath string) error {
 // highest available release version. Pre-release versions are not considered.
 // If there is no available version, and max appears to be the first release
 // version (for example, "v0.1.0", "v2.0.0"), "none" is returned.
-func inferBaseVersion(modPath, max string) (baseVersion string, err error) {
+func inferBaseVersion(ctx context.Context, modPath, max string) (baseVersion string, err error) {
 	defer func() {
 		if err != nil {
 			err = &baseVersionError{err: err}
 		}
 	}()
 
-	versions, err := loadVersions(modPath)
+	versions, err := loadVersions(ctx, modPath)
 	if err != nil {
 		return "", err
 	}
@@ -698,7 +743,7 @@ func inferBaseVersion(modPath, max string) (baseVersion string, err error) {
 }
 
 // queryVersion returns the canonical version for a given module version query.
-func queryVersion(modPath, query string) (resolved string, err error) {
+func queryVersion(ctx context.Context, modPath, query string) (resolved string, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("could not resolve version %s@%s: %w", modPath, query, err)
@@ -718,9 +763,12 @@ func queryVersion(modPath, query string) (resolved string, err error) {
 		}
 	}()
 	arg := modPath + "@" + query
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Version}}", "--", arg)
+	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", "--", arg)
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
 	cmd.Dir = tmpDir
-	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	cmd.Env = append(cmd.Env, "GO111MODULE=on")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", cleanCmdError(err)
@@ -731,7 +779,13 @@ func queryVersion(modPath, query string) (resolved string, err error) {
 // loadVersions loads the list of versions for the given module using
 // 'go list -m -versions'. The returned versions are sorted in ascending
 // semver order.
-func loadVersions(modPath string) ([]string, error) {
+func loadVersions(ctx context.Context, modPath string) (versions []string, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("could not load versions for %s: %v", modPath, err)
+		}
+	}()
+
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		return nil, err
@@ -741,14 +795,17 @@ func loadVersions(modPath string) ([]string, error) {
 			err = rerr
 		}
 	}()
-	cmd := exec.Command("go", "list", "-m", "-versions", "--", modPath)
+	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-versions", "--", modPath)
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
 	cmd.Dir = tmpDir
-	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	cmd.Env = append(cmd.Env, "GO111MODULE=on")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, cleanCmdError(err)
 	}
-	versions := strings.Fields(string(out))
+	versions = strings.Fields(string(out))
 	if len(versions) > 0 {
 		versions = versions[1:] // skip module path
 	}
@@ -847,7 +904,7 @@ func copyModuleToTempDir(modPath, modRoot string) (dir string, err error) {
 
 // downloadModule downloads a specific version of a module to the
 // module cache using 'go mod download'.
-func downloadModule(m module.Version) (modRoot, goModPath string, err error) {
+func downloadModule(ctx context.Context, m module.Version) (modRoot, goModPath string, err error) {
 	defer func() {
 		if err != nil {
 			err = &downloadError{m: m, err: cleanCmdError(err)}
@@ -865,7 +922,10 @@ func downloadModule(m module.Version) (modRoot, goModPath string, err error) {
 		return "", "", err
 	}
 	defer os.Remove(tmpDir)
-	cmd := exec.Command("go", "mod", "download", "-json", "--", m.Path+"@"+m.Version)
+	cmd := exec.CommandContext(ctx, "go", "mod", "download", "-json", "--", m.Path+"@"+m.Version)
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
 	cmd.Dir = tmpDir
 	out, err := cmd.Output()
 	var xerr *exec.ExitError
@@ -931,7 +991,7 @@ func downloadModule(m module.Version) (modRoot, goModPath string, err error) {
 //
 // pkgPaths are the import paths of the module being loaded, including the path
 // to any main packages (as if they were importable).
-func prepareLoadDir(modFile *modfile.File, modPath, modRoot, version string, cached bool) (dir string, goModData, goSumData []byte, pkgPaths []string, diagnostics []string, err error) {
+func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot, version string, cached bool) (dir string, goModData, goSumData []byte, pkgPaths []string, diagnostics []string, err error) {
 	defer func() {
 		if err != nil {
 			if cached {
@@ -1003,7 +1063,10 @@ func prepareLoadDir(modFile *modfile.File, modPath, modRoot, version string, cac
 	}
 
 	// Add missing requirements.
-	cmd := exec.Command("go", "get", "-d", ".")
+	cmd := exec.CommandContext(ctx, "go", "get", "-d", ".")
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
 	cmd.Dir = dir
 	if _, err := cmd.Output(); err != nil {
 		return "", nil, nil, nil, nil, fmt.Errorf("looking for missing dependencies: %w", cleanCmdError(err))
@@ -1011,17 +1074,15 @@ func prepareLoadDir(modFile *modfile.File, modPath, modRoot, version string, cac
 
 	// Report new requirements in go.mod.
 	goModPath := filepath.Join(dir, "go.mod")
-	loadReqs := func(data []byte) ([]string, error) {
+	loadReqs := func(data []byte) (reqs []module.Version, err error) {
 		modFile, err := modfile.ParseLax(goModPath, data, nil)
 		if err != nil {
 			return nil, err
 		}
-		lines := make([]string, len(modFile.Require))
-		for i, req := range modFile.Require {
-			lines[i] = req.Mod.String()
+		for _, r := range modFile.Require {
+			reqs = append(reqs, r.Mod)
 		}
-		sort.Strings(lines)
-		return lines, nil
+		return reqs, nil
 	}
 
 	oldReqs, err := loadReqs(goModData)
@@ -1037,19 +1098,27 @@ func prepareLoadDir(modFile *modfile.File, modPath, modRoot, version string, cac
 		return "", nil, nil, nil, nil, err
 	}
 
-	oldMap := make(map[string]bool)
+	oldMap := make(map[module.Version]bool)
 	for _, req := range oldReqs {
 		oldMap[req] = true
 	}
-	var missing []string
+	var missing []module.Version
 	for _, req := range newReqs {
+		// Ignore cyclic imports, since a module never needs to require itself.
+		if req.Path == modPath {
+			continue
+		}
 		if !oldMap[req] {
 			missing = append(missing, req)
 		}
 	}
 
 	if len(missing) > 0 {
-		diagnostics = append(diagnostics, fmt.Sprintf("go.mod: the following requirements are needed\n\t%s\nRun 'go mod tidy' to add missing requirements.", strings.Join(missing, "\n\t")))
+		var missingReqs []string
+		for _, m := range missing {
+			missingReqs = append(missingReqs, m.String())
+		}
+		diagnostics = append(diagnostics, fmt.Sprintf("go.mod: the following requirements are needed\n\t%s\nRun 'go mod tidy' to add missing requirements.", strings.Join(missingReqs, "\n\t")))
 		return dir, goModData, goSumData, imps, diagnostics, nil
 	}
 
@@ -1137,14 +1206,18 @@ func collectImportPaths(modPath, root string) (importPaths []string, _ error) {
 // returned through diagnostics.
 // err will be non-nil in case of a fatal error that prevented packages
 // from being loaded.
-func loadPackages(modPath, modRoot, loadDir string, goModData, goSumData []byte, pkgPaths []string) (pkgs []*packages.Package, diagnostics []string, err error) {
+func loadPackages(ctx context.Context, modPath, modRoot, loadDir string, goModData, goSumData []byte, pkgPaths []string) (pkgs []*packages.Package, diagnostics []string, err error) {
 	// Load packages.
 	// TODO(jayconrod): if there are errors loading packages in the release
 	// version, try loading in the release directory. Errors there would imply
 	// that packages don't load without replace / exclude directives.
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
-		Dir:  loadDir,
+		Mode:    packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
+		Dir:     loadDir,
+		Context: ctx,
+	}
+	if env, ok := ctx.Value("env").([]string); ok {
+		cfg.Env = env
 	}
 	if len(pkgPaths) > 0 {
 		pkgs, err = packages.Load(cfg, pkgPaths...)
@@ -1219,8 +1292,17 @@ func zipPackages(baseModPath string, basePkgs []*packages.Package, releaseModPat
 // containing the go.mod for modPath.
 //
 // If no module cycle exists, it returns empty string.
-func findSelectedVersion(modDir, modPath string) (latestVersion string, err error) {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Version}}", "--", modPath)
+func findSelectedVersion(ctx context.Context, modDir, modPath string) (latestVersion string, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("could not find selected version for %s: %v", modPath, err)
+		}
+	}()
+
+	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", "--", modPath)
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
 	cmd.Dir = modDir
 	out, err := cmd.Output()
 	if err != nil {

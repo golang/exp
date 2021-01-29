@@ -1,5 +1,6 @@
 mod=example.com/require
 base=v0.0.1
+proxyVersions=example.com/require@v0.0.1,example.com/basic@v1.0.1
 -- want --
 Suggested version: v0.1.0
 -- go.mod --

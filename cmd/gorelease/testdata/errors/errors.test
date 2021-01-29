@@ -3,7 +3,7 @@ version=v0.2.0
 base=v0.1.0
 release=v0.2.0
 success=false
-
+proxyVersions=example.com/errors@v0.1.0
 -- want --
 example.com/errors/added
 ------------------------

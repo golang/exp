@@ -1,5 +1,6 @@
 mod=example.com/private
 version=v1.0.1
 base=v1.0.0
+proxyVersions=example.com/private@v1.0.0
 -- want --
 Suggested version: v1.0.1

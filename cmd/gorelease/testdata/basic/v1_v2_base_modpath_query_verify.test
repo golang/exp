@@ -2,6 +2,7 @@ mod=example.com/basic/v2
 base=example.com/basic@>=v1.1.0
 version=v2.0.1
 release=v2.0.1
+proxyVersions=example.com/basic@v1.1.0
 -- want --
 example.com/basic/a
 -------------------

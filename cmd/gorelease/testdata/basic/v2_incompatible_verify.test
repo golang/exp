@@ -3,6 +3,7 @@ version=v2.1.2
 base=v2.1.1
 success=false
 release=v2.1.2
+proxyVersions=example.com/basic/v2@v2.1.1
 -- want --
 example.com/basic/v2/a
 ----------------------

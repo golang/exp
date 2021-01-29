@@ -6,7 +6,6 @@ success=false
 # TODO(golang.org/issue/36087): go list doesn't report positions in correct
 # place for scanner errors.
 skip=packages.Load gives error with extra "-: " prefix
-
 -- want --
 example.com/first
 -----------------

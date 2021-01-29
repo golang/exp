@@ -24,22 +24,33 @@ import (
 // buildProxyDir constructs a temporary directory suitable for use as a
 // module proxy with a file:// URL. The caller is responsible for deleting
 // the directory when it's no longer needed.
-func buildProxyDir() (proxyDir, proxyURL string, err error) {
+//
+// proxyVersions must be a map of module version true. If proxyVersions is
+// empty, all modules in mod/ will be included in the proxy list. If proxy
+// versions is non-empty, only those modules in mod/ that match an entry in
+// proxyVersions will be included.
+func buildProxyDir(proxyVersions map[module.Version]bool, tests []*test) (proxyDir, proxyURL string, err error) {
 	proxyDir, err = ioutil.TempDir("", "gorelease-proxy")
 	if err != nil {
 		return "", "", err
 	}
-	defer func(proxyDir string) {
-		if err != nil {
-			os.RemoveAll(proxyDir)
-		}
-	}(proxyDir)
 
 	txtarPaths, err := filepath.Glob(filepath.FromSlash("testdata/mod/*.txt"))
 	if err != nil {
 		return "", "", err
 	}
+
+	// Map of modPath to versions for that modPath.
 	versionLists := make(map[string][]string)
+
+	for _, t := range tests {
+		versionLists[t.modPath] = []string{}
+		modDir := filepath.Join(proxyDir, t.modPath, "@v")
+		if err := os.MkdirAll(modDir, 0777); err != nil {
+			return "", "", err
+		}
+	}
+
 	for _, txtarPath := range txtarPaths {
 		base := filepath.Base(txtarPath)
 		stem := base[:len(base)-len(".txt")]
@@ -49,6 +60,20 @@ func buildProxyDir() (proxyDir, proxyURL string, err error) {
 		}
 		modPath := strings.ReplaceAll(stem[:i], "_", "/")
 		version := stem[i+1:]
+		mv := module.Version{
+			Path:    modPath,
+			Version: version,
+		}
+
+		// User has supplied proxyVersions. Honor proxy versions by only
+		// accepting those versions supplied in proxyVersions.
+		if len(proxyVersions) > 0 {
+			if !proxyVersions[mv] {
+				// modPath@version is not in proxyVersions: skip.
+				continue
+			}
+		}
+
 		versionLists[modPath] = append(versionLists[modPath], version)
 
 		modDir := filepath.Join(proxyDir, modPath, "@v")

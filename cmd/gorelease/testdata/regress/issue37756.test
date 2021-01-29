@@ -3,6 +3,7 @@
 mod=example.com/issue37756
 version=v1.1.0
 base=v1.0.0
+proxyVersions=example.com/issue37756@v1.0.0
 -- want --
 example.com/issue37756/a
 ------------------------
