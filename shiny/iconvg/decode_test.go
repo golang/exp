@@ -17,6 +17,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"golang.org/x/image/math/f32"
 )
 
 // disassemble returns a disassembly of an encoded IconVG graphic. Users of
@@ -283,6 +285,44 @@ func TestDecodeAndRasterize(t *testing.T) {
 				continue
 			}
 		}
+	}
+}
+
+func TestInvalidAlphaPremultipliedColor(t *testing.T) {
+	// See http://golang.org/issue/39526 for some discussion.
+
+	dst := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	var z Rasterizer
+	z.SetDstImage(dst, dst.Bounds(), draw.Over)
+	z.Reset(Metadata{
+		ViewBox: Rectangle{
+			Min: f32.Vec2{0.0, 0.0},
+			Max: f32.Vec2{1.0, 1.0},
+		},
+	})
+
+	// Fill the unit square with red.
+	z.SetCReg(0, false, RGBAColor(color.RGBA{0x55, 0x00, 0x00, 0x66}))
+	z.StartPath(0, 0.0, 0.0)
+	z.AbsLineTo(1.0, 0.0)
+	z.AbsLineTo(1.0, 1.0)
+	z.AbsLineTo(0.0, 1.0)
+	z.ClosePathEndPath()
+
+	// Fill the unit square with an invalid (non-gradient) alpha-premultiplied
+	// color (super-saturated green). This should be a no-op (and not crash).
+	z.SetCReg(0, false, RGBAColor(color.RGBA{0x00, 0x99, 0x00, 0x88}))
+	z.StartPath(0, 0.0, 0.0)
+	z.AbsLineTo(1.0, 0.0)
+	z.AbsLineTo(1.0, 1.0)
+	z.AbsLineTo(0.0, 1.0)
+	z.ClosePathEndPath()
+
+	// We should see red.
+	got := dst.Pix
+	want := []byte{0x55, 0x00, 0x00, 0x66}
+	if !bytes.Equal(got, want) {
+		t.Errorf("got [% 02x], want [% 02x]", got, want)
 	}
 }
 

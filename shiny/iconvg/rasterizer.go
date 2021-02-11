@@ -234,6 +234,9 @@ func (z *Rasterizer) StartPath(adj uint8, x, y float32) {
 	} else if z.flatColor.A == 0x00 && z.flatColor.B&0x80 != 0 {
 		z.fill = &z.gradient
 		z.disabled = !z.initGradient(z.flatColor)
+	} else {
+		z.fill = nil
+		z.disabled = true
 	}
 
 	width, height := z.r.Dx(), z.r.Dy()

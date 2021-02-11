@@ -133,8 +133,10 @@ transformation matrix for common gradient geometry, such as a linear gradient
 defined by two points.
 
 At the time a gradient is used to fill a path, it is invalid for any of the
-stop colors to itself be a gradient, or for any stop offset to be less than or
-equal to a previous offset, or outside the range [0, 1].
+stop colors to be out of alpha-premultiplied range (where red, green or blue is
+greater than alpha), including referencing another gradient. It is also invalid
+for any stop offset to be less than or equal to a previous offset, or outside
+the range [0, 1].
 
 
 Colors
@@ -177,7 +179,8 @@ palette's third entry is a fully opaque orange, then 0x40 0x7f 0x82 encodes a
 
 It is valid for some encodings to yield a color value where the red, green or
 blue value is greater than the alpha value, as this may be a gradient. If it
-isn't a gradient, the subsequent rendering is undefined.
+isn't a valid gradient, it is equivalent to transparent black and drawing with
+that color is a no-op.
 
 
 Palettes
