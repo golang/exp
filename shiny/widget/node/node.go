@@ -199,7 +199,9 @@ func (m *LeafEmbed) Insert(c, nextSibling Node) {
 
 func (m *LeafEmbed) Remove(c Node) { m.remove(c) }
 
-func (m *LeafEmbed) Measure(t *theme.Theme, widthHint, heightHint int) { m.MeasuredSize = image.Point{} }
+func (m *LeafEmbed) Measure(t *theme.Theme, widthHint, heightHint int) {
+	m.MeasuredSize = image.Point{}
+}
 
 func (m *LeafEmbed) Layout(t *theme.Theme) {}
 
