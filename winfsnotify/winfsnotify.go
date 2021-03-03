@@ -40,6 +40,7 @@ type input struct {
 	path  string
 	flags uint32
 	reply chan error
+	recurse bool
 }
 
 type inode struct {
@@ -56,6 +57,7 @@ type watch struct {
 	names  map[string]uint64 // Map of names being watched and their notify flags
 	rename string            // Remembers the old name while renaming a file
 	buf    [4096]byte
+	recurse bool
 }
 
 type indexMap map[uint64]*watch
@@ -111,7 +113,7 @@ func (w *Watcher) Close() error {
 }
 
 // AddWatch adds path to the watched file set.
-func (w *Watcher) AddWatch(path string, flags uint32) error {
+func (w *Watcher) AddWatch(path string, flags uint32, isRecursive bool) error {
 	if w.isClosed {
 		return errors.New("watcher already closed")
 	}
@@ -120,6 +122,7 @@ func (w *Watcher) AddWatch(path string, flags uint32) error {
 		path:  filepath.Clean(path),
 		flags: flags,
 		reply: make(chan error),
+		recurse: isRecursive
 	}
 	w.input <- in
 	if err := w.wakeupReader(); err != nil {
@@ -218,7 +221,7 @@ func (m watchMap) set(ino *inode, watch *watch) {
 }
 
 // Must run within the I/O thread.
-func (w *Watcher) addWatch(pathname string, flags uint64) error {
+func (w *Watcher) addWatch(pathname string, flags uint64, isRecursive bool) error {
 	dir, err := getDir(pathname)
 	if err != nil {
 		return err
@@ -240,6 +243,7 @@ func (w *Watcher) addWatch(pathname string, flags uint64) error {
 			ino:   ino,
 			path:  dir,
 			names: make(map[string]uint64),
+			recurse: isRecursive
 		}
 		w.watches.set(ino, watchEntry)
 		flags |= provisional
@@ -321,7 +325,7 @@ func (w *Watcher) startRead(watch *watch) error {
 		return nil
 	}
 	e := syscall.ReadDirectoryChanges(watch.ino.handle, &watch.buf[0],
-		uint32(unsafe.Sizeof(watch.buf)), false, mask, nil, &watch.ov, 0)
+		uint32(unsafe.Sizeof(watch.buf)), watch.recurse, mask, nil, &watch.ov, 0)
 	if e != nil {
 		err := os.NewSyscallError("ReadDirectoryChanges", e)
 		if e == syscall.ERROR_ACCESS_DENIED && watch.mask&provisional == 0 {
@@ -374,7 +378,7 @@ func (w *Watcher) readEvents() {
 			case in := <-w.input:
 				switch in.op {
 				case opAddWatch:
-					in.reply <- w.addWatch(in.path, uint64(in.flags))
+					in.reply <- w.addWatch(in.path, uint64(in.flags), in.recurse)
 				case opRemoveWatch:
 					in.reply <- w.removeWatch(in.path)
 				}
