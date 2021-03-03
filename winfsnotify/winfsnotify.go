@@ -36,10 +36,10 @@ const (
 )
 
 type input struct {
-	op    int
-	path  string
-	flags uint32
-	reply chan error
+	op      int
+	path    string
+	flags   uint32
+	reply   chan error
 	recurse bool
 }
 
@@ -50,13 +50,13 @@ type inode struct {
 }
 
 type watch struct {
-	ov     syscall.Overlapped
-	ino    *inode            // i-number
-	path   string            // Directory path
-	mask   uint64            // Directory itself is being watched with these notify flags
-	names  map[string]uint64 // Map of names being watched and their notify flags
-	rename string            // Remembers the old name while renaming a file
-	buf    [4096]byte
+	ov      syscall.Overlapped
+	ino     *inode            // i-number
+	path    string            // Directory path
+	mask    uint64            // Directory itself is being watched with these notify flags
+	names   map[string]uint64 // Map of names being watched and their notify flags
+	rename  string            // Remembers the old name while renaming a file
+	buf     [4096]byte
 	recurse bool
 }
 
@@ -113,16 +113,35 @@ func (w *Watcher) Close() error {
 }
 
 // AddWatch adds path to the watched file set.
-func (w *Watcher) AddWatch(path string, flags uint32, isRecursive bool) error {
+func (w *Watcher) AddWatch(path string, flags uint32) error {
 	if w.isClosed {
 		return errors.New("watcher already closed")
 	}
 	in := &input{
-		op:    opAddWatch,
-		path:  filepath.Clean(path),
-		flags: flags,
-		reply: make(chan error),
-		recurse: isRecursive
+		op:      opAddWatch,
+		path:    filepath.Clean(path),
+		flags:   flags,
+		reply:   make(chan error),
+		recurse: false,
+	}
+	w.input <- in
+	if err := w.wakeupReader(); err != nil {
+		return err
+	}
+	return <-in.reply
+}
+
+// AddDeepWatch adds path to the watched file set which will monitor the entire subtree.
+func (w *Watcher) AddDeepWatch(path string, flags uint32) error {
+	if w.isClosed {
+		return errors.New("watcher already closed")
+	}
+	in := &input{
+		op:      opAddWatch,
+		path:    filepath.Clean(path),
+		flags:   flags,
+		reply:   make(chan error),
+		recurse: true,
 	}
 	w.input <- in
 	if err := w.wakeupReader(); err != nil {
@@ -134,6 +153,11 @@ func (w *Watcher) AddWatch(path string, flags uint32, isRecursive bool) error {
 // Watch adds path to the watched file set, watching all events.
 func (w *Watcher) Watch(path string) error {
 	return w.AddWatch(path, FS_ALL_EVENTS)
+}
+
+// DeepWatch adds path to the watched file set, watching all events in the entire subtree.
+func (w *Watcher) DeepWatch(path string) error {
+	return w.AddDeepWatch(path, FS_ALL_EVENTS)
 }
 
 // RemoveWatch removes path from the watched file set.
@@ -240,10 +264,10 @@ func (w *Watcher) addWatch(pathname string, flags uint64, isRecursive bool) erro
 			return os.NewSyscallError("CreateIoCompletionPort", e)
 		}
 		watchEntry = &watch{
-			ino:   ino,
-			path:  dir,
-			names: make(map[string]uint64),
-			recurse: isRecursive
+			ino:     ino,
+			path:    dir,
+			names:   make(map[string]uint64),
+			recurse: isRecursive,
 		}
 		w.watches.set(ino, watchEntry)
 		flags |= provisional
