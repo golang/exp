@@ -34,7 +34,7 @@ are:
   the content of a module out of the test proxy into a temporary directory
   where `gorelease` is run.
 * `version`: specified together with `mod`, it sets the version to retrieve from
-  the test proxy.
+  the test proxy. See more information below.
 * `base`: the value of the `-base` flag passed to `gorelease`.
 * `release`: the value of the `-version` flag passed to `gorelease`.
 * `dir`: the directory where `gorelease` should be invoked. Useful when the test
@@ -51,6 +51,30 @@ test. A test will fail if the actual output differs from `want`.
 
 If the `mod` and `version` parameters are not set, other files will be extracted
 to the temporary directory where `gorelease` runs.
+
+## Populating module contents
+
+When building a test in `testdata/`, there are two ways to populate the module
+directory being tested:
+
+### Option 1: inline
+
+You can inline files in the `.test` folder as described in
+https://pkg.go.dev/golang.org/x/tools/txtar#hdr-Txtar_format. For example,
+
+```
+-- some.file --
+the contents
+of the file
+```
+
+### Option 2: specify an existing file
+
+Often, multiple tests want to share the same setup - the same files. So, users
+can write these common files in `testdata/mod/`, and use one of these files as
+the module directory contents.
+
+To specify a file in `testdata/mod/` to use as the module contents.
 
 ## Module format
 
