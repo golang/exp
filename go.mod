@@ -6,10 +6,16 @@ require (
 	dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
 	github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
+	github.com/google/go-cmp v0.5.5
+	github.com/rs/zerolog v1.21.0
+	github.com/sirupsen/logrus v1.8.1
+	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/zap v1.16.0
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
 	golang.org/x/mod v0.4.2
-	golang.org/x/sys v0.0.0-20191001151750-bb3f8db39f24
-	golang.org/x/tools v0.0.0-20200207183749-b753a1ba74fa
-	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898
+	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4
+	golang.org/x/tools v0.1.0
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+	honnef.co/go/tools v0.1.3 // indirect
 )
