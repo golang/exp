@@ -80,6 +80,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -95,6 +96,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"golang.org/x/exp/apidiff"
 	"golang.org/x/mod/modfile"
@@ -425,6 +427,12 @@ func loadLocalModule(ctx context.Context, modRoot, repoRoot, version string) (m 
 		// whether the user provided a version already.
 		m.highestTransitiveVersion = highestVersion
 	}
+
+	retracted, err := loadRetractions(ctx, tmpLoadDir)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	m.diagnostics = append(m.diagnostics, retracted...)
 
 	return m, nil
 }
@@ -1374,4 +1382,77 @@ func copyEnv(ctx context.Context, current []string) []string {
 	clone := make([]string, len(env))
 	copy(clone, env)
 	return clone
+}
+
+// loadRetractions lists all retracted deps found at the modRoot.
+func loadRetractions(ctx context.Context, modRoot string) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "go", "list", "-json", "-m", "-u", "all")
+	if env, ok := ctx.Value("env").([]string); ok {
+		cmd.Env = env
+	}
+	cmd.Dir = modRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, cleanCmdError(err)
+	}
+
+	var retracted []string
+	type message struct {
+		Path      string
+		Version   string
+		Retracted []string
+	}
+
+	dec := json.NewDecoder(bytes.NewBuffer(out))
+	for {
+		var m message
+		if err := dec.Decode(&m); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if len(m.Retracted) == 0 {
+			continue
+		}
+		rationale, ok := shortRetractionRationale(m.Retracted)
+		if ok {
+			retracted = append(retracted, fmt.Sprintf("required module %s@%s retracted by module author: %s", m.Path, m.Version, rationale))
+		} else {
+			retracted = append(retracted, fmt.Sprintf("required module %s@%s retracted by module author", m.Path, m.Version))
+		}
+	}
+
+	return retracted, nil
+}
+
+// ShortRetractionRationale returns a retraction rationale string that is safe
+// to print in a terminal. It returns hard-coded strings if the rationale
+// is empty, too long, or contains non-printable characters.
+//
+// It returns true if the rationale was printable, and false if it was not (too
+// long, contains graphics, etc).
+func shortRetractionRationale(rationales []string) (string, bool) {
+	if len(rationales) == 0 {
+		return "", false
+	}
+	rationale := rationales[0]
+
+	const maxRationaleBytes = 500
+	if i := strings.Index(rationale, "\n"); i >= 0 {
+		rationale = rationale[:i]
+	}
+	rationale = strings.TrimSpace(rationale)
+	if rationale == "" || rationale == "retracted by module author" {
+		return "", false
+	}
+	if len(rationale) > maxRationaleBytes {
+		return "", false
+	}
+	for _, r := range rationale {
+		if !unicode.IsGraphic(r) && !unicode.IsSpace(r) {
+			return "", false
+		}
+	}
+	// NOTE: the go.mod parser rejects invalid UTF-8, so we don't check that here.
+	return rationale, true
 }
