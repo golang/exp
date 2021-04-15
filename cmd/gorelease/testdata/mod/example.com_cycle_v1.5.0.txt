@@ -2,5 +2,5 @@
 module example.com/cycle
 
 go 1.12
--- cycle/a.go --
+-- a.go --
 package a
