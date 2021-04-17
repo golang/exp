@@ -1574,4 +1574,37 @@ var keysymCodePoints = map[rune]rune{
 	0x1000df2: 0x0DF2, // XK_Sinh_ruu2:	SINHALA DIGA GAETTA-PILLA
 	0x1000df3: 0x0DF3, // XK_Sinh_luu2:	SINHALA DIGA GAYANUKITTA
 	0x1000df4: 0x0DF4, // XK_Sinh_kunddaliya:	SINHALA KUNDDALIYA
+	0xfe50:    0x0300, // XK_dead_grave:	COMBINING GRAVE ACCENT
+	0xfe51:    0x0301, // XK_dead_acute:	COMBINING ACUTE ACCENT
+	0xfe52:    0x0302, // XK_dead_circumflex:	COMBINING CIRCUMFLEX ACCENT
+	0xfe53:    0x0303, // XK_dead_tilde:	COMBINING TILDE
+	0xfe54:    0x0304, // XK_dead_macron:	COMBINING MACRON
+	0xfe55:    0x0306, // XK_dead_breve:	COMBINING BREVE
+	0xfe56:    0x0307, // XK_dead_abovedot:	COMBINING DOT ABOVE
+	0xfe57:    0x0308, // XK_dead_diaeresis:	COMBINING DIAERESIS
+	0xfe58:    0x030A, // XK_dead_abovering:	COMBINING RING ABOVE
+	0xfe59:    0x030B, // XK_dead_doubleacute:	COMBINING DOUBLE ACUTE ACCENT
+	0xfe5a:    0x030C, // XK_dead_caron:	COMBINING CARON
+	0xfe5b:    0x0327, // XK_dead_cedilla:	COMBINING CEDILLA
+	0xfe5c:    0x0328, // XK_dead_ogonek:	COMBINING OGONEK
+	0xfe5d:    0x0345, // XK_dead_iota:	COMBINING GREEK YPOGEGRAMMENI
+	0xfe5e:    0x3099, // XK_dead_voiced_sound:	COMB. KATAKANA-HIRAGANA VOICED
+	0xfe5f:    0x309A, // XK_dead_semivoiced_sound:	COMB. KATAKANA-HIRAGANA SEMI-VOICED
+	0xfe60:    0x0323, // XK_dead_belowdot:	COMBINING DOT BELOW
+	0xfe61:    0x0309, // XK_dead_hook:	COMBINING HOOK ABOVE
+	0xfe62:    0x031B, // XK_dead_horn:	COMBINING HORN
+	0xfe63:    0x0338, // XK_dead_stroke:	COMBINING LONG SOLIDUS OVERLAY
+	0xfe64:    0x0313, // XK_dead_abovecomma:	COMBINING COMMA ABOVE
+	0xfe65:    0x0314, // XK_dead_abovereversedcomma:	COMBINING REVERSED COMMA ABOVE
+	0xfe66:    0x030F, // XK_dead_doublegrave:	COMBINING DOUBLE GRAVE ACCENT
+	0xfe67:    0x0325, // XK_dead_belowring:	COMBINING RING BELOW
+	0xfe68:    0x0331, // XK_dead_belowmacron:	COMBINING MACRON BELOW
+	0xfe69:    0x032D, // XK_dead_belowcircumflex:	COMBINING CIRCUMFLEX ACCENT BELOW
+	0xfe6a:    0x0330, // XK_dead_belowtilde:	COMBINING TILDE BELOW
+	0xfe6b:    0x032E, // XK_dead_belowbreve:	COMBINING BREVE BELOW
+	0xfe6c:    0x0324, // XK_dead_belowdiaeresis:	COMBINING DIAERESIS BELOW
+	0xfe6d:    0x0311, // XK_dead_invertedbreve:	COMBINING INVERTED BREVE
+	0xfe6e:    0x0326, // XK_dead_belowcomma:	COMBINING COMMA BELOW
+	0xfe6f:    0x00A4, // XK_dead_currency:	CURRENCY SIGN
+	0xfe8c:    0x037E, // XK_dead_greek:	GREEK QUESTION MARK
 }
