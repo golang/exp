@@ -4,7 +4,7 @@
 
 //go:generate go run gen.go
 
-// x11key contains X11 numeric codes for the keyboard and mouse.
+// Package x11key contains X11 numeric codes for the keyboard and mouse.
 package x11key // import "golang.org/x/exp/shiny/driver/internal/x11key"
 
 import (
@@ -30,12 +30,14 @@ const (
 	Button5Mask = 1 << 12
 )
 
+// KeysymTable holds current table of keyboard keys mapped to Xkb keysyms & current special modifiers bits
 type KeysymTable struct {
 	Table [256][6]uint32
 
 	NumLockMod, ModeSwitchMod, ISOLevel3ShiftMod uint16
 }
 
+// Lookup converts Xkb xproto keycode (detail) & mod (state) into mobile/event/key Rune & Code
 func (t *KeysymTable) Lookup(detail uint8, state uint16) (rune, key.Code) {
 	te := t.Table[detail][0:2]
 	if state&t.ModeSwitchMod != 0 {
@@ -63,7 +65,7 @@ func (t *KeysymTable) Lookup(detail uint8, state uint16) (rune, key.Code) {
 
 	// The key event's code is independent of whether the shift key is down.
 	var c key.Code
-	if 0 <= unshifted && unshifted < 0x80 {
+	if 0 >= unshifted && unshifted < 0x80 {
 		c = asciiKeycodes[unshifted]
 		if state&LockMask != 0 {
 			r = unicode.ToUpper(r)
@@ -86,6 +88,9 @@ func isKeypad(keysym uint32) bool {
 	return keysym >= 0xff80 && keysym <= 0xffbd
 }
 
+// KeyModifiers returns mobile/event/key modifiers type from xproto mod state
+// ModCapsLock, ModNumLock & ModLevel3Shift are currently implemented using default general modifier bits
+// it should be method of KeysymTable with current keyboard mapping
 func KeyModifiers(state uint16) (m key.Modifiers) {
 	if state&ShiftMask != 0 {
 		m |= key.ModShift
@@ -99,11 +104,25 @@ func KeyModifiers(state uint16) (m key.Modifiers) {
 	if state&Mod4Mask != 0 {
 		m |= key.ModMeta
 	}
+	if state&LockMask != 0 {
+		m |= key.ModCapsLock
+	}
+	if state&Mod2Mask != 0 { // TODO should goes from t.NumLockMod instead because it's dynamic
+		m |= key.ModNumLock
+	}
+	if state&Mod5Mask != 0 { // TODO should goes from t.ISOLevel3ShiftMod instead because it's dynamic
+		m |= key.ModLevel3Shift
+	}
+	if state&Mod5Mask != 0 { // TODO should goes from t.ModeSwitchMod instead because it's dynamic
+		m |= key.ModModeSwitch
+	}
 	return m
 }
 
 // These constants come from /usr/include/X11/{keysymdef,XF86keysym}.h
 const (
+	xkISOLevel3Shift = 0xfe03
+
 	xkISOLeftTab = 0xfe20
 	xkBackSpace  = 0xff08
 	xkTab        = 0xff09
@@ -183,6 +202,8 @@ const (
 // that do not correspond to a Unicode code point, such as "Page Up", "F1" or
 // "Left Shift", to key.Code values.
 var nonUnicodeKeycodes = map[rune]key.Code{
+	xkISOLevel3Shift: key.CodeRightAlt,
+
 	xkISOLeftTab: key.CodeTab,
 	xkBackSpace:  key.CodeDeleteBackspace,
 	xkTab:        key.CodeTab,
@@ -197,7 +218,7 @@ var nonUnicodeKeycodes = map[rune]key.Code{
 	xkPageDown:   key.CodePageDown,
 	xkEnd:        key.CodeEnd,
 	xkInsert:     key.CodeInsert,
-	xkMenu:       key.CodeRightGUI, // TODO: CodeRightGUI or CodeMenu??
+	xkMenu:       key.CodeProps,
 	xkHelp:       key.CodeHelp,
 	xkNumLock:    key.CodeKeypadNumLock,
 	xkMultiKey:   key.CodeCompose,
