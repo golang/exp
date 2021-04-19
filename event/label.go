@@ -5,7 +5,9 @@
 package event
 
 import (
+	"fmt"
 	"reflect"
+	"strconv"
 	"unsafe"
 )
 
@@ -90,3 +92,49 @@ func (l Label) Valid() bool { return l.key != "" }
 
 // Key returns the key of this Label.
 func (l Label) Key() string { return l.key }
+
+// Apply calls the appropriate method of h on the label's value.
+func (l Label) Apply(h ValueHandler) {
+	if l.dispatch != nil {
+		l.dispatch(h, l)
+	}
+}
+
+//////////////////////////////////////////////////////////////////////
+
+// These are more demos of what Apply can do, rather than things we'd
+// necessarily want here.
+
+// Value is an expensive but general way to get a label's value.
+func (l Label) Value() interface{} {
+	var v interface{}
+	l.Apply(vhandler{&v})
+	return v
+}
+
+type vhandler struct {
+	pv *interface{}
+}
+
+func (h vhandler) String(v string)     { *h.pv = v }
+func (h vhandler) Quote(v string)      { *h.pv = strconv.Quote(v) }
+func (h vhandler) Int(v int64)         { *h.pv = v }
+func (h vhandler) Uint(v uint64)       { *h.pv = v }
+func (h vhandler) Float(v float64)     { *h.pv = v }
+func (h vhandler) Value(v interface{}) { *h.pv = v }
+
+// AppendValue appends the value of l to *dst as text.
+func (l Label) AppendValue(dst *[]byte) {
+	l.Apply(ahandler{dst})
+}
+
+type ahandler struct {
+	b *[]byte
+}
+
+func (h ahandler) String(v string)     { *h.b = append(*h.b, v...) }
+func (h ahandler) Quote(v string)      { *h.b = strconv.AppendQuote(*h.b, v) }
+func (h ahandler) Int(v int64)         { *h.b = strconv.AppendInt(*h.b, v, 10) }
+func (h ahandler) Uint(v uint64)       { *h.b = strconv.AppendUint(*h.b, v, 10) }
+func (h ahandler) Float(v float64)     { *h.b = strconv.AppendFloat(*h.b, v, 'E', -1, 32) }
+func (h ahandler) Value(v interface{}) { *h.b = append(*h.b, fmt.Sprint(v)...) }
