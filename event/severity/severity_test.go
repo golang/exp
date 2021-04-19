@@ -25,13 +25,13 @@ func TestPrint(t *testing.T) {
 		events: func(ctx context.Context) { event.To(ctx).With(severity.Debug).Log("a message") },
 		expect: `
 2020/03/05 14:27:48 [log:1] a message
-	severity=debug
+	level=debug
 `}, {
 		name:   "info",
 		events: func(ctx context.Context) { event.To(ctx).With(severity.Info).Log("a message") },
 		expect: `
 2020/03/05 14:27:48 [log:1] a message
-	severity=info
+	level=info
 `}} {
 		h := &captureHandler{}
 		h.printer = event.NewPrinter(&h.buf)

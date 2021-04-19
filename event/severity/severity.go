@@ -6,9 +6,6 @@ package severity
 
 import "golang.org/x/exp/event"
 
-// Key is the type for severity event labels.
-type Key struct{}
-
 // Level represents a severity level of an event.
 // The basic severity levels are designed to match the levels used in open telemetry.
 // Smaller numerical values correspond to less severe events (such as debug events),
@@ -36,32 +33,36 @@ const (
 	MaxLevel     = Level(24)
 )
 
+const Key = "level"
+
 var (
 	// Trace is an event.Label for trace level events.
-	Trace = Key{}.Of(TraceLevel)
+	Trace = Of(TraceLevel)
 	// Debug is an event.Label for debug level events.
-	Debug = Key{}.Of(DebugLevel)
+	Debug = Of(DebugLevel)
 	// Info is an event.Label for info level events.
-	Info = Key{}.Of(InfoLevel)
+	Info = Of(InfoLevel)
 	// Warning is an event.Label for warning level events.
-	Warning = Key{}.Of(WarningLevel)
+	Warning = Of(WarningLevel)
 	// Error is an event.Label for error level events.
-	Error = Key{}.Of(ErrorLevel)
+	Error = Of(ErrorLevel)
 	// Fatal is an event.Label for fatal level events.
-	Fatal = Key{}.Of(FatalLevel)
+	Fatal = Of(FatalLevel)
 )
-
-func (k Key) Name() string { return "severity" }
 
 func dispatchSeverity(h event.ValueHandler, l event.Label) {
 	h.String(Level(l.Unpack64()).String())
 }
 
 // Of creates a new Label with this key and the supplied value.
-func (k Key) Of(l Level) event.Label { return event.Of64(k.Name(), dispatchSeverity, uint64(l)) }
+func Of(l Level) event.Label {
+	return event.Of64(Key, dispatchSeverity, uint64(l))
+}
 
 // From can be used to get a value from a Label.
-func (k Key) From(t event.Label) Level { return Level(t.Unpack64()) }
+func From(t event.Label) Level {
+	return Level(t.Unpack64())
+}
 
 func (l Level) Class() Level {
 	switch {
