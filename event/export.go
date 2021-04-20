@@ -68,6 +68,7 @@ func Disable() {
 func (e *Exporter) Builder() *Builder {
 	b := builderPool.Get().(*Builder)
 	b.exporter = e
+	b.Event.Labels = b.labels[:0]
 	return b
 }
 

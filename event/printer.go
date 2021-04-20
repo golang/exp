@@ -53,14 +53,7 @@ func (p *printer) Handle(ev *Event) {
 		io.WriteString(p.writer, " ")
 		io.WriteString(p.writer, ev.Message)
 	}
-	for _, l := range ev.Static {
-		if !l.Valid() {
-			continue
-		}
-		io.WriteString(p.writer, "\n\t")
-		p.Label(l)
-	}
-	for _, l := range ev.Dynamic {
+	for _, l := range ev.Labels {
 		if !l.Valid() {
 			continue
 		}

@@ -10,10 +10,15 @@ import (
 )
 
 // Builder is a fluent builder for construction of new events.
+//
+// Storing the first few labels directly can avoid an allocation at all for the
+// very common cases of simple events. The length needs to be large enough to
+// cope with the majority of events but no so large as to cause undue stack
+// pressure.
 type Builder struct {
 	exporter *Exporter
-	index    int
 	Event    Event
+	labels   [4]Label
 }
 
 var builderPool = sync.Pool{New: func() interface{} { return &Builder{} }}
@@ -25,11 +30,15 @@ func (b *Builder) Clone() *Builder {
 		return nil
 	}
 	clone := builderPool.Get().(*Builder)
-	*clone = *b
-	if len(b.Event.Dynamic) > 0 {
-		clone.Event.Dynamic = make([]Label, len(b.Event.Dynamic))
-		copy(clone.Event.Dynamic, b.Event.Dynamic)
+	clone.exporter = b.exporter
+	clone.Event = b.Event
+	n := len(b.Event.Labels)
+	if n <= len(b.labels) {
+		clone.Event.Labels = clone.labels[:n]
+	} else {
+		clone.Event.Labels = make([]Label, n)
 	}
+	copy(clone.Event.Labels, b.Event.Labels)
 	return clone
 }
 
@@ -38,13 +47,7 @@ func (b *Builder) With(label Label) *Builder {
 	if b == nil {
 		return nil
 	}
-	if b.index < len(b.Event.Static) {
-		b.Event.Static[b.index] = label
-		b.index++
-		return b
-	}
-	b.Event.Dynamic = append(b.Event.Dynamic, label)
-	b.index++
+	b.Event.Labels = append(b.Event.Labels, label)
 	return b
 }
 
@@ -53,11 +56,13 @@ func (b *Builder) WithAll(labels ...Label) *Builder {
 	if b == nil || len(labels) == 0 {
 		return b
 	}
-	if len(b.Event.Dynamic) == 0 {
-		b.Event.Dynamic = labels
+	// TODO: this can cause the aliasing check based on length to fail,
+	// so find another way to check.
+	if len(b.Event.Labels) == 0 {
+		b.Event.Labels = labels
 		return b
 	}
-	b.Event.Dynamic = append(b.Event.Dynamic, labels...)
+	b.Event.Labels = append(b.Event.Labels, labels...)
 	return b
 }
 
