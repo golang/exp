@@ -103,42 +103,42 @@ func BenchmarkLogPrintf(b *testing.B) {
 
 func TestLogStdlib(t *testing.T) {
 	testBenchmark(t, stdlibLoggerNoTime, stdlibLog, `
-A where a=0
-b where b="A value"
-A where a=1
-b where b="Some other value"
-A where a=22
-b where b="Some other value"
-A where a=333
-b where b=""
-A where a=4444
-b where b="prime count of values"
-A where a=55555
-b where b="V"
-A where a=666666
-b where b="A value"
-A where a=7777777
-b where b="A value"
+a where A=0
+b where B="A value"
+a where A=1
+b where B="Some other value"
+a where A=22
+b where B="Some other value"
+a where A=333
+b where B=""
+a where A=4444
+b where B="prime count of values"
+a where A=55555
+b where B="V"
+a where A=666666
+b where B="A value"
+a where A=7777777
+b where B="A value"
 `)
 }
 
 func TestLogPrintf(t *testing.T) {
 	testBenchmark(t, stdlibWriter, stdlibPrintf, `
-2020/03/05 14:27:48 A where a=0
-2020/03/05 14:27:49 b where b="A value"
-2020/03/05 14:27:50 A where a=1
-2020/03/05 14:27:51 b where b="Some other value"
-2020/03/05 14:27:52 A where a=22
-2020/03/05 14:27:53 b where b="Some other value"
-2020/03/05 14:27:54 A where a=333
-2020/03/05 14:27:55 b where b=""
-2020/03/05 14:27:56 A where a=4444
-2020/03/05 14:27:57 b where b="prime count of values"
-2020/03/05 14:27:58 A where a=55555
-2020/03/05 14:27:59 b where b="V"
-2020/03/05 14:28:00 A where a=666666
-2020/03/05 14:28:01 b where b="A value"
-2020/03/05 14:28:02 A where a=7777777
-2020/03/05 14:28:03 b where b="A value"
+2020/03/05 14:27:48 a where A=0
+2020/03/05 14:27:49 b where B="A value"
+2020/03/05 14:27:50 a where A=1
+2020/03/05 14:27:51 b where B="Some other value"
+2020/03/05 14:27:52 a where A=22
+2020/03/05 14:27:53 b where B="Some other value"
+2020/03/05 14:27:54 a where A=333
+2020/03/05 14:27:55 b where B=""
+2020/03/05 14:27:56 a where A=4444
+2020/03/05 14:27:57 b where B="prime count of values"
+2020/03/05 14:27:58 a where A=55555
+2020/03/05 14:27:59 b where B="V"
+2020/03/05 14:28:00 a where A=666666
+2020/03/05 14:28:01 b where B="A value"
+2020/03/05 14:28:02 a where A=7777777
+2020/03/05 14:28:03 b where B="A value"
 `)
 }

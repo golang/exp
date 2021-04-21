@@ -15,6 +15,7 @@ import (
 )
 
 func TestPrint(t *testing.T) {
+	//TODO: print the textual form of severity
 	ctx := context.Background()
 	for _, test := range []struct {
 		name   string
@@ -23,35 +24,22 @@ func TestPrint(t *testing.T) {
 	}{{
 		name:   "debug",
 		events: func(ctx context.Context) { event.To(ctx).With(severity.Debug).Log("a message") },
-		expect: `
-2020/03/05 14:27:48 [log:1] a message
-	level=debug
-`}, {
+		expect: `2020/03/05 14:27:48	[1]	log	a message	{"level":debug}`,
+	}, {
 		name:   "info",
 		events: func(ctx context.Context) { event.To(ctx).With(severity.Info).Log("a message") },
-		expect: `
-2020/03/05 14:27:48 [log:1] a message
-	level=info
-`}} {
-		h := &captureHandler{}
-		h.printer = event.NewPrinter(&h.buf)
+		expect: `2020/03/05 14:27:48	[1]	log	a message	{"level":info}`},
+	} {
+		buf := &strings.Builder{}
+		h := event.Printer(buf)
 		e := event.NewExporter(h)
 		e.Now = eventtest.TestNow()
 		ctx := event.WithExporter(ctx, e)
 		test.events(ctx)
-		got := strings.TrimSpace(h.buf.String())
+		got := strings.TrimSpace(buf.String())
 		expect := strings.TrimSpace(test.expect)
 		if got != expect {
 			t.Errorf("%s failed\ngot   : %q\nexpect: %q", test.name, got, expect)
 		}
 	}
-}
-
-type captureHandler struct {
-	printer event.Printer
-	buf     strings.Builder
-}
-
-func (e *captureHandler) Handle(ev *event.Event) {
-	e.printer.Handle(ev)
 }

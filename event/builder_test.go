@@ -5,7 +5,6 @@
 package event_test
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
@@ -28,7 +27,7 @@ func TestClone(t *testing.T) {
 
 	check := func(b *event.Builder, want []event.Label) {
 		t.Helper()
-		if got := b.Event.Labels; !cmp.Equal(got, want, cmp.Comparer(labelEqual)) {
+		if got := b.Event.Labels; !cmp.Equal(got, want, cmp.Comparer(valueEqual)) {
 			t.Fatalf("got %v, want %v", got, want)
 		}
 	}
@@ -62,13 +61,6 @@ func TestClone(t *testing.T) {
 	check(b2, labels[3:5])
 }
 
-func labelEqual(l1, l2 event.Label) bool {
-	return labelString(l1) == labelString(l2)
-}
-
-func labelString(l event.Label) string {
-	var buf bytes.Buffer
-	p := event.NewPrinter(&buf)
-	p.Label(l)
-	return buf.String()
+func valueEqual(l1, l2 event.Value) bool {
+	return fmt.Sprint(l1) == fmt.Sprint(l2)
 }

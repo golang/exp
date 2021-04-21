@@ -6,135 +6,223 @@ package event
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"unsafe"
 )
 
-// ValueHandler is used to safely unpack unknown labels.
-type ValueHandler interface {
-	String(v string)
-	Quote(v string)
-	Int(v int64)
-	Uint(v uint64)
-	Float(v float64)
-	Value(v interface{})
+// Value holds any value in an efficient way that avoids allocations for
+// most types.
+type Value struct {
+	packed  uint64
+	untyped interface{}
 }
 
-// LabelDispatcher is used as the identity of a Label.
-type LabelDispatcher func(h ValueHandler, l Label)
-
-// Label holds a key and value pair.
-// It is normally used when passing around lists of labels.
+// Label is a named value.
 type Label struct {
-	key      string
-	dispatch LabelDispatcher
-	packed   uint64
-	untyped  interface{}
+	Name  string
+	Value Value
 }
 
-// OfValue creates a new label from the key and value.
-// This method is for implementing new key types, label creation should
-// normally be done with the Of method of the key.
-func OfValue(k string, d LabelDispatcher, value interface{}) Label {
-	return Label{key: k, dispatch: d, untyped: value}
-}
-
-// UnpackValue assumes the label was built using LabelOfValue and returns the value
-// that was passed to that constructor.
-// This method is for implementing new key types, for type safety normal
-// access should be done with the From method of the key.
-func (l Label) UnpackValue() interface{} { return l.untyped }
-
-// Of64 creates a new label from a key and a uint64. This is often
-// used for non uint64 values that can be packed into a uint64.
-// This method is for implementing new key types, label creation should
-// normally be done with the Of method of the key.
-func Of64(k string, d LabelDispatcher, v uint64) Label {
-	return Label{key: k, dispatch: d, packed: v}
-}
-
-// Unpack64 assumes the label was built using LabelOf64 and returns the value that
-// was passed to that constructor.
-// This method is for implementing new key types, for type safety normal
-// access should be done with the From method of the key.
-func (l Label) Unpack64() uint64 { return l.packed }
-
+// stringptr is used in untyped when the Value is a string
 type stringptr unsafe.Pointer
 
-// OfString creates a new label from a key and a string.
-// This method is for implementing new key types, label creation should
-// normally be done with the Of method of the key.
-func OfString(k string, d LabelDispatcher, v string) Label {
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
-	return Label{
-		key:      k,
-		dispatch: d,
-		packed:   uint64(hdr.Len),
-		untyped:  stringptr(hdr.Data),
+// int64Kind is used in untyped when the Value is a signed integer
+type int64Kind struct{}
+
+// uint64Kind is used in untyped when the Value is an unsigned integer
+type uint64Kind struct{}
+
+// float64Kind is used in untyped when the Value is a floating point number
+type float64Kind struct{}
+
+// boolKind is used in untyped when the Value is a boolean
+type boolKind struct{}
+
+// Format prints the label in a standard form.
+func (l *Label) Format(f fmt.State, verb rune) {
+	buf := bufPool.Get().(*buffer)
+	l.format(f.(writer), buf.data[:0])
+	bufPool.Put(buf)
+}
+
+func (l *Label) format(w writer, buf []byte) {
+	w.Write(strconv.AppendQuote(buf[:0], l.Name))
+	w.WriteString(":")
+	l.Value.format(w, buf)
+}
+
+// Format prints the value in a standard form.
+func (v *Value) Format(f fmt.State, verb rune) {
+	buf := bufPool.Get().(*buffer)
+	v.format(f.(writer), buf.data[:0])
+	bufPool.Put(buf)
+}
+
+func (v *Value) format(w writer, buf []byte) {
+	switch {
+	case v.IsString():
+		w.Write(strconv.AppendQuote(buf[:0], v.String()))
+	case v.IsInt64():
+		w.Write(strconv.AppendInt(buf[:0], v.Int64(), 10))
+	case v.IsUint64():
+		w.Write(strconv.AppendUint(buf[:0], v.Uint64(), 10))
+	case v.IsFloat64():
+		w.Write(strconv.AppendFloat(buf[:0], v.Float64(), 'g', -1, 64))
+	case v.IsBool():
+		if v.Bool() {
+			w.WriteString("true")
+		} else {
+			w.WriteString("false")
+		}
+	default:
+		fmt.Fprint(w, v.Interface())
 	}
 }
 
-// UnpackString assumes the label was built using LabelOfString and returns the
-// value that was passed to that constructor.
-// This method is for implementing new key types, for type safety normal
-// access should be done with the From method of the key.
-func (l Label) UnpackString() string {
-	var v string
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
-	hdr.Data = uintptr(l.untyped.(stringptr))
-	hdr.Len = int(l.packed)
-	return v
+// HasValue returns true if the value is set to any type.
+func (v *Value) HasValue() bool { return v.untyped != nil }
+
+// ValueOf returns a Value for the supplied value.
+func ValueOf(value interface{}) Value {
+	return Value{untyped: value}
 }
 
-// Valid returns true if the Label is a valid one (it has a key).
-func (l Label) Valid() bool { return l.key != "" }
-
-// Key returns the key of this Label.
-func (l Label) Key() string { return l.key }
-
-// Apply calls the appropriate method of h on the label's value.
-func (l Label) Apply(h ValueHandler) {
-	if l.dispatch != nil {
-		l.dispatch(h, l)
+// Interface returns the value.
+// This will never panic, things that were not set using SetInterface will be
+// unpacked and returned anyway.
+func (v Value) Interface() interface{} {
+	switch {
+	case v.IsString():
+		return v.String()
+	case v.IsInt64():
+		return v.Int64()
+	case v.IsUint64():
+		return v.Uint64()
+	case v.IsFloat64():
+		return v.Float64()
+	case v.IsBool():
+		return v.Bool()
+	default:
+		return v.untyped
 	}
 }
 
-//////////////////////////////////////////////////////////////////////
-
-// These are more demos of what Apply can do, rather than things we'd
-// necessarily want here.
-
-// Value is an expensive but general way to get a label's value.
-func (l Label) Value() interface{} {
-	var v interface{}
-	l.Apply(vhandler{&v})
-	return v
+// StringOf returns a new Value for a string.
+func StringOf(s string) Value {
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	return Value{packed: uint64(hdr.Len), untyped: stringptr(hdr.Data)}
 }
 
-type vhandler struct {
-	pv *interface{}
+// String returns the value as a string.
+// This does not panic if v's Kind is not String, instead, it returns a string
+// representation of the value in all cases.
+func (v Value) String() string {
+	if sp, ok := v.untyped.(stringptr); ok {
+		var s string
+		hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
+		hdr.Data = uintptr(sp)
+		hdr.Len = int(v.packed)
+		return s
+	}
+	// not a string, so invoke the formatter to build one
+	w := &strings.Builder{}
+	buf := bufPool.Get().(*buffer)
+	v.format(w, buf.data[:0])
+	bufPool.Put(buf)
+	return w.String()
 }
 
-func (h vhandler) String(v string)     { *h.pv = v }
-func (h vhandler) Quote(v string)      { *h.pv = strconv.Quote(v) }
-func (h vhandler) Int(v int64)         { *h.pv = v }
-func (h vhandler) Uint(v uint64)       { *h.pv = v }
-func (h vhandler) Float(v float64)     { *h.pv = v }
-func (h vhandler) Value(v interface{}) { *h.pv = v }
-
-// AppendValue appends the value of l to *dst as text.
-func (l Label) AppendValue(dst *[]byte) {
-	l.Apply(ahandler{dst})
+// IsString returns true if the value was built with SetString.
+func (v Value) IsString() bool {
+	_, ok := v.untyped.(stringptr)
+	return ok
 }
 
-type ahandler struct {
-	b *[]byte
+// Int64Of returns a new Value for a signed integer.
+func Int64Of(u int64) Value {
+	return Value{packed: uint64(u), untyped: int64Kind{}}
 }
 
-func (h ahandler) String(v string)     { *h.b = append(*h.b, v...) }
-func (h ahandler) Quote(v string)      { *h.b = strconv.AppendQuote(*h.b, v) }
-func (h ahandler) Int(v int64)         { *h.b = strconv.AppendInt(*h.b, v, 10) }
-func (h ahandler) Uint(v uint64)       { *h.b = strconv.AppendUint(*h.b, v, 10) }
-func (h ahandler) Float(v float64)     { *h.b = strconv.AppendFloat(*h.b, v, 'E', -1, 32) }
-func (h ahandler) Value(v interface{}) { *h.b = append(*h.b, fmt.Sprint(v)...) }
+// Int64 returns the int64 from a value that was set with SetInt64.
+// It will panic for any value for which IsInt64 is not true.
+func (v Value) Int64() int64 {
+	if !v.IsInt64() {
+		panic("Int64 called on non int64 value")
+	}
+	return int64(v.packed)
+}
+
+// IsInt64 returns true if the value was built with SetInt64.
+func (v Value) IsInt64() bool {
+	_, ok := v.untyped.(int64Kind)
+	return ok
+}
+
+// Uint64Of returns a new Value for an unsigned integer.
+func Uint64Of(u uint64) Value {
+	return Value{packed: u, untyped: uint64Kind{}}
+}
+
+// Uint64 returns the uint64 from a value that was set with SetUint64.
+// It will panic for any value for which IsUint64 is not true.
+func (v Value) Uint64() uint64 {
+	if !v.IsUint64() {
+		panic("Uint64 called on non uint64 value")
+	}
+	return v.packed
+}
+
+// IsUint64 returns true if the value was built with SetUint64.
+func (v Value) IsUint64() bool {
+	_, ok := v.untyped.(uint64Kind)
+	return ok
+}
+
+// Float64Of returns a new Value for a floating point number.
+func Float64Of(f float64) Value {
+	return Value{packed: math.Float64bits(f), untyped: float64Kind{}}
+}
+
+// Float64 returns the float64 from a value that was set with SetFloat64.
+// It will panic for any value for which IsFloat64 is not true.
+func (v Value) Float64() float64 {
+	if !v.IsFloat64() {
+		panic("Float64 called on non float64 value")
+	}
+	return math.Float64frombits(v.packed)
+}
+
+// IsFloat64 returns true if the value was built with SetFloat64.
+func (v Value) IsFloat64() bool {
+	_, ok := v.untyped.(float64Kind)
+	return ok
+}
+
+// BoolOf returns a new Value for a bool.
+func BoolOf(b bool) Value {
+	if b {
+		return Value{packed: 1, untyped: boolKind{}}
+	}
+	return Value{packed: 0, untyped: boolKind{}}
+}
+
+// Bool returns the bool from a value that was set with SetBool.
+// It will panic for any value for which IsBool is not true.
+func (v Value) Bool() bool {
+	if !v.IsBool() {
+		panic("Bool called on non bool value")
+	}
+	if v.packed != 0 {
+		return true
+	}
+	return false
+}
+
+// IsBool returns true if the value was built with SetBool.
+func (v Value) IsBool() bool {
+	_, ok := v.untyped.(boolKind)
+	return ok
+}

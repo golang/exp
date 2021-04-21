@@ -35,11 +35,11 @@ var (
 
 const (
 	aName = "A"
-	aMsg  = "A"
-	aMsgf = aMsg + " where a=%d"
+	aMsg  = "a"
+	aMsgf = aMsg + " where " + aName + "=%d"
 	bName = "B"
 	bMsg  = "b"
-	bMsgf = bMsg + " where b=%q"
+	bMsgf = bMsg + " where " + bName + "=%q"
 
 	timeFormat = "2006/01/02 15:04:05"
 )
@@ -61,29 +61,41 @@ func benchB(ctx context.Context, hooks Hooks, a int, b string) int {
 	return a + len(b)
 }
 
-func runBenchmark(t testing.TB, ctx context.Context, hooks Hooks) {
+func runOnce(ctx context.Context, hooks Hooks) {
 	var acc int
-	if b, ok := t.(*testing.B); ok {
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			for _, value := range initialList {
-				acc += benchA(ctx, hooks, value)
-			}
-		}
-		return
-	}
 	for _, value := range initialList {
 		acc += benchA(ctx, hooks, value)
 	}
 }
 
-func testBenchmark(t testing.TB, f func(io.Writer) context.Context, hooks Hooks, expect string) {
+func runBenchmark(b *testing.B, ctx context.Context, hooks Hooks) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		runOnce(ctx, hooks)
+	}
+}
+
+func testBenchmark(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, expect string) {
 	buf := strings.Builder{}
-	runBenchmark(t, f(&buf), hooks)
+	ctx := f(&buf)
+	runOnce(ctx, hooks)
 	got := strings.TrimSpace(buf.String())
 	expect = strings.TrimSpace(expect)
 	if diff := cmp.Diff(got, expect); diff != "" {
 		t.Error(diff)
+	}
+}
+
+func testAllocs(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, expect int) {
+	var acc int
+	ctx := f(io.Discard)
+	got := int(testing.AllocsPerRun(5, func() {
+		for _, value := range initialList {
+			acc += benchA(ctx, hooks, value)
+		}
+	}))
+	if got != expect {
+		t.Errorf("Got %d allocs, expect %d", got, expect)
 	}
 }

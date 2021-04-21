@@ -6,6 +6,9 @@ package event
 
 import (
 	"fmt"
+	"io"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -38,31 +41,101 @@ const (
 	AnnotateKind
 )
 
-// Find searches the labels of an event to see if one of them has the
-// supplied key.
-func (ev Event) Find(key string) Label {
-	for _, l := range ev.Labels {
-		if l.Key() == key {
-			return l
-		}
-	}
-	return Label{}
+// Format prints the value in a standard form.
+func (e *Event) Format(f fmt.State, verb rune) {
+	buf := bufPool.Get().(*buffer)
+	e.format(f.(writer), buf.data[:0])
+	bufPool.Put(buf)
 }
 
-// String returns a string representation of the kind for printing.
-func (k Kind) String() string {
+// Format prints the value in a standard form.
+func (e *Event) format(w writer, buf []byte) {
+	const timeFormat = "2006/01/02 15:04:05"
+	if !e.At.IsZero() {
+		w.Write(e.At.AppendFormat(buf[:0], timeFormat))
+		w.WriteString("\t")
+	}
+	//TODO: pick a standard format for the event id and parent
+	w.WriteString("[")
+	w.Write(strconv.AppendUint(buf[:0], e.ID, 10))
+	if e.Parent != 0 {
+		w.WriteString(":")
+		w.Write(strconv.AppendUint(buf[:0], e.Parent, 10))
+	}
+	w.WriteString("]")
+
+	//TODO: pick a standard format for the kind
+	w.WriteString("\t")
+	e.Kind.format(w, buf)
+
+	if e.Message != "" {
+		w.WriteString("\t")
+		w.WriteString(e.Message)
+	}
+
+	first := true
+	for _, l := range e.Labels {
+		if l.Name == "" {
+			continue
+		}
+		if first {
+			w.WriteString("\t{")
+			first = false
+		} else {
+			w.WriteString(", ")
+		}
+		l.format(w, buf)
+	}
+	if !first {
+		w.WriteString("}")
+	}
+}
+
+func (k Kind) Format(f fmt.State, verb rune) {
+	buf := bufPool.Get().(*buffer)
+	k.format(f.(writer), buf.data[:0])
+	bufPool.Put(buf)
+}
+
+func (k Kind) format(w writer, buf []byte) {
 	switch k {
 	case LogKind:
-		return "log"
+		w.WriteString("log")
 	case StartKind:
-		return "start"
+		w.WriteString("start")
 	case EndKind:
-		return "end"
+		w.WriteString("end")
 	case MetricKind:
-		return "metric"
+		w.WriteString("metric")
 	case AnnotateKind:
-		return "annotate"
+		w.WriteString("annotate")
 	default:
-		return fmt.Sprint(byte(k))
+		w.Write(strconv.AppendUint(buf[:0], uint64(k), 10))
 	}
+}
+
+// Printer returns a handler that prints the events to the supplied writer.
+// Each event is printed in normal %v mode on its own line.
+func Printer(to io.Writer) Handler {
+	return &printHandler{to: to}
+}
+
+type printHandler struct {
+	to io.Writer
+}
+
+func (h *printHandler) Handle(ev *Event) {
+	fmt.Fprintln(h.to, ev)
+}
+
+//TODO: some actual research into what this arbritray optimization number should be
+const bufCap = 50
+
+type buffer struct{ data [bufCap]byte }
+
+var bufPool = sync.Pool{New: func() interface{} { return new(buffer) }}
+
+type writer interface {
+	io.Writer
+	io.StringWriter
 }

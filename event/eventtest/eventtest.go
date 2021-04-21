@@ -11,6 +11,7 @@ package eventtest
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -21,20 +22,18 @@ import (
 // NewContext returns a context you should use for the active test.
 func NewContext(ctx context.Context, tb testing.TB) context.Context {
 	h := &testHandler{tb: tb}
-	h.printer = event.NewPrinter(&h.buf)
 	return event.WithExporter(ctx, event.NewExporter(h))
 }
 
 type testHandler struct {
-	tb      testing.TB
-	printer event.Printer
-	buf     strings.Builder
+	tb  testing.TB
+	buf strings.Builder
 }
 
 func (w *testHandler) Handle(ev *event.Event) {
 	// build our log message in buffer
 	w.buf.Reset()
-	w.printer.Handle(ev)
+	fmt.Fprint(&w.buf, ev)
 	// log to the testing.TB
 	msg := w.buf.String()
 	if len(msg) > 0 {
