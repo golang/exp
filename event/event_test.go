@@ -65,8 +65,8 @@ func TestPrint(t *testing.T) {
 `}, {
 		name: "span",
 		events: func(ctx context.Context) {
-			ctx = event.Start(ctx, "span")
-			event.To(ctx).End()
+			ctx, end := event.Start(ctx, "span")
+			end()
 		},
 		expect: `
 2020/03/05 14:27:48 [start:1] span
@@ -74,10 +74,10 @@ func TestPrint(t *testing.T) {
 `}, {
 		name: "span nested",
 		events: func(ctx context.Context) {
-			ctx = event.Start(ctx, "parent")
-			defer func() { event.To(ctx).End() }()
-			child := event.Start(ctx, "child")
-			defer func() { event.To(child).End() }()
+			ctx, end := event.Start(ctx, "parent")
+			defer end()
+			child, end2 := event.Start(ctx, "child")
+			defer end2()
 			event.To(child).Log("message")
 		},
 		expect: `

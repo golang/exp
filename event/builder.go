@@ -90,11 +90,6 @@ func (b *Builder) Logf(template string, args ...interface{}) {
 	b.Deliver(LogKind, fmt.Sprintf(template, args...))
 }
 
-// Start is a helper that calls Deliver with StartKind.
-func (b *Builder) Start(name string) uint64 {
-	return b.Deliver(StartKind, name)
-}
-
 // End is a helper that calls Deliver with EndKind.
 func (b *Builder) End() {
 	b.Deliver(EndKind, "")

@@ -87,14 +87,22 @@ func To(ctx context.Context) *Builder {
 }
 
 // Start delivers a start event and also updates the context with the event id.
-func Start(ctx context.Context, name string) context.Context {
+// Its second argument is a function that should be called to deliver the
+// matching end event. In lieue of calling the end function, you can invoke
+//    event.To(ctx).End()
+// on the returned context.
+func Start(ctx context.Context, name string) (_ context.Context, end func()) {
 	b := To(ctx)
-	if b.exporter == nil {
-		return ctx
+	if b == nil || b.exporter == nil {
+		return ctx, func() {}
 	}
 	v := contextValue{exporter: b.exporter}
-	v.parent = b.Start(name)
-	return context.WithValue(ctx, contextKey{}, v)
+	v.parent = b.Deliver(StartKind, name)
+	return context.WithValue(ctx, contextKey{}, v), func() {
+		eb := v.exporter.Builder()
+		eb.Event.Parent = v.parent
+		eb.Deliver(EndKind, "")
+	}
 }
 
 // Deliver events to the underlying handler.
