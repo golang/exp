@@ -55,7 +55,7 @@ var (
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {
-			event.To(ctx).End()
+			event.To(ctx).Deliver(event.EndKind, "")
 		},
 		BStart: func(ctx context.Context, b string) context.Context {
 			ctx, _ = event.Start(ctx, bMsg)
@@ -63,7 +63,7 @@ var (
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {
-			event.To(ctx).End()
+			event.To(ctx).Deliver(event.EndKind, "")
 		},
 	}
 

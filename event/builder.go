@@ -56,8 +56,6 @@ func (b *Builder) WithAll(labels ...Label) *Builder {
 	if b == nil || len(labels) == 0 {
 		return b
 	}
-	// TODO: this can cause the aliasing check based on length to fail,
-	// so find another way to check.
 	if len(b.Event.Labels) == 0 {
 		b.Event.Labels = labels
 		return b
@@ -88,11 +86,6 @@ func (b *Builder) Log(message string) {
 // calls Deliver with LogKind.
 func (b *Builder) Logf(template string, args ...interface{}) {
 	b.Deliver(LogKind, fmt.Sprintf(template, args...))
-}
-
-// End is a helper that calls Deliver with EndKind.
-func (b *Builder) End() {
-	b.Deliver(EndKind, "")
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
