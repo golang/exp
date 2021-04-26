@@ -83,15 +83,8 @@ var (
 	}
 )
 
-func eventDisabled() context.Context {
-	event.Disable()
-	return context.Background()
-}
-
 func eventNoExporter() context.Context {
-	// register an exporter to turn the system on, but not in this context
-	event.NewExporter(noopHandler{})
-	return context.Background()
+	return event.WithExporter(context.Background(), nil)
 }
 
 func eventNoop() context.Context {
@@ -107,7 +100,9 @@ func eventPrint(w io.Writer) context.Context {
 }
 
 func BenchmarkLogEventDisabled(b *testing.B) {
-	runBenchmark(b, eventDisabled(), eventLog)
+	event.SetEnabled(false)
+	defer event.SetEnabled(true)
+	runBenchmark(b, context.Background(), eventLog)
 }
 
 func BenchmarkLogEventNoExporter(b *testing.B) {
