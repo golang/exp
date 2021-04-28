@@ -30,19 +30,19 @@ func TestPrint(t *testing.T) {
 	}{{
 		name:   "simple",
 		events: func(ctx context.Context) { event.To(ctx).Log("a message") },
-		expect: `
-2020/03/05 14:27:48	[1]	log	a message
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message"
 `}, {
 		name:   "log 1",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Log("a message") },
-		expect: `2020/03/05 14:27:48	[1]	log	a message	{"l1":1}`}, {
-		name:   "simple",
-		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Log("a message") },
-		expect: `2020/03/05 14:27:48	[1]	log	a message	{"l1":1, "l2":2}`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" l1=1`,
 	}, {
-		name:   "simple",
+		name:   "log 2",
+		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Log("a message") },
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" l1=1 l2=2`,
+	}, {
+		name:   "log 3",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).With(l3).Log("a message") },
-		expect: `2020/03/05 14:27:48	[1]	log	a message	{"l1":1, "l2":2, "l3":3}`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" l1=1 l2=2 l3=3`,
 	}, {
 		name: "span",
 		events: func(ctx context.Context) {
@@ -50,8 +50,8 @@ func TestPrint(t *testing.T) {
 			end()
 		},
 		expect: `
-2020/03/05 14:27:48	[1]	start	span
-2020/03/05 14:27:49	[2:1]	end
+time=2020-03-05T14:27:48 id=1 kind=start msg=span
+time=2020-03-05T14:27:49 id=2 span=1 kind=end
 `}, {
 		name: "span nested",
 		events: func(ctx context.Context) {
@@ -62,27 +62,27 @@ func TestPrint(t *testing.T) {
 			event.To(child).Log("message")
 		},
 		expect: `
-2020/03/05 14:27:48	[1]	start	parent
-2020/03/05 14:27:49	[2:1]	start	child
-2020/03/05 14:27:50	[3:2]	log	message
-2020/03/05 14:27:51	[4:2]	end
-2020/03/05 14:27:52	[5:1]	end
+time=2020-03-05T14:27:48 id=1 kind=start msg=parent
+time=2020-03-05T14:27:49 id=2 span=1 kind=start msg=child
+time=2020-03-05T14:27:50 id=3 span=2 kind=log msg=message
+time=2020-03-05T14:27:51 id=4 span=2 kind=end
+time=2020-03-05T14:27:52 id=5 span=1 kind=end
 `}, {
 		name:   "metric",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric() },
-		expect: `2020/03/05 14:27:48	[1]	metric	{"l1":1}`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=metric l1=1`,
 	}, {
 		name:   "metric 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Metric() },
-		expect: `2020/03/05 14:27:48	[1]	metric	{"l1":1, "l2":2}`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=metric l1=1 l2=2`,
 	}, {
 		name:   "annotate",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Annotate() },
-		expect: `2020/03/05 14:27:48	[1]	annotate	{"l1":1}`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=annotate l1=1`,
 	}, {
 		name:   "annotate 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Annotate() },
-		expect: `2020/03/05 14:27:48	[1]	annotate	{"l1":1, "l2":2}`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=annotate l1=1 l2=2`,
 	}, {
 		name: "multiple events",
 		events: func(ctx context.Context) {
@@ -91,8 +91,8 @@ func TestPrint(t *testing.T) {
 			b.With(keys.String("myString").Of("some string value")).Log("string event")
 		},
 		expect: `
-2020/03/05 14:27:48	[1]	log	my event	{"myInt":6}
-2020/03/05 14:27:49	[2]	log	string event	{"myString":"some string value"}
+time=2020-03-05T14:27:48 id=1 kind=log msg="my event" myInt=6
+time=2020-03-05T14:27:49 id=2 kind=log msg="string event" myString="some string value"
 `}} {
 		buf := &strings.Builder{}
 		h := event.Printer(buf)
@@ -115,6 +115,6 @@ func ExampleLog() {
 	event.To(ctx).With(keys.Int("myInt").Of(6)).Log("my event")
 	event.To(ctx).With(keys.String("myString").Of("some string value")).Log("error event")
 	// Output:
-	// 2020/03/05 14:27:48	[1]	log	my event	{"myInt":6}
-	// 2020/03/05 14:27:49	[2]	log	error event	{"myString":"some string value"}
+	// time=2020-03-05T14:27:48 id=1 kind=log msg="my event" myInt=6
+	// time=2020-03-05T14:27:49 id=2 kind=log msg="error event" myString="some string value"
 }

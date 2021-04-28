@@ -123,43 +123,43 @@ func BenchmarkLogEventfDiscard(b *testing.B) {
 
 func TestLogEventf(t *testing.T) {
 	testBenchmark(t, eventPrint, eventLogf, `
-2020/03/05 14:27:48	[1]	log	a where A=0
-2020/03/05 14:27:49	[2]	log	b where B="A value"
-2020/03/05 14:27:50	[3]	log	a where A=1
-2020/03/05 14:27:51	[4]	log	b where B="Some other value"
-2020/03/05 14:27:52	[5]	log	a where A=22
-2020/03/05 14:27:53	[6]	log	b where B="Some other value"
-2020/03/05 14:27:54	[7]	log	a where A=333
-2020/03/05 14:27:55	[8]	log	b where B=""
-2020/03/05 14:27:56	[9]	log	a where A=4444
-2020/03/05 14:27:57	[10]	log	b where B="prime count of values"
-2020/03/05 14:27:58	[11]	log	a where A=55555
-2020/03/05 14:27:59	[12]	log	b where B="V"
-2020/03/05 14:28:00	[13]	log	a where A=666666
-2020/03/05 14:28:01	[14]	log	b where B="A value"
-2020/03/05 14:28:02	[15]	log	a where A=7777777
-2020/03/05 14:28:03	[16]	log	b where B="A value"
+time=2020-03-05T14:27:48 id=1 kind=log msg="a where A=0"
+time=2020-03-05T14:27:49 id=2 kind=log msg="b where B=\"A value\""
+time=2020-03-05T14:27:50 id=3 kind=log msg="a where A=1"
+time=2020-03-05T14:27:51 id=4 kind=log msg="b where B=\"Some other value\""
+time=2020-03-05T14:27:52 id=5 kind=log msg="a where A=22"
+time=2020-03-05T14:27:53 id=6 kind=log msg="b where B=\"Some other value\""
+time=2020-03-05T14:27:54 id=7 kind=log msg="a where A=333"
+time=2020-03-05T14:27:55 id=8 kind=log msg="b where B=\"\""
+time=2020-03-05T14:27:56 id=9 kind=log msg="a where A=4444"
+time=2020-03-05T14:27:57 id=10 kind=log msg="b where B=\"prime count of values\""
+time=2020-03-05T14:27:58 id=11 kind=log msg="a where A=55555"
+time=2020-03-05T14:27:59 id=12 kind=log msg="b where B=\"V\""
+time=2020-03-05T14:28:00 id=13 kind=log msg="a where A=666666"
+time=2020-03-05T14:28:01 id=14 kind=log msg="b where B=\"A value\""
+time=2020-03-05T14:28:02 id=15 kind=log msg="a where A=7777777"
+time=2020-03-05T14:28:03 id=16 kind=log msg="b where B=\"A value\""
 `)
 }
 
 func TestLogEvent(t *testing.T) {
 	testBenchmark(t, eventPrint, eventLog, `
-2020/03/05 14:27:48	[1]	log	a	{"A":0}
-2020/03/05 14:27:49	[2]	log	b	{"B":"A value"}
-2020/03/05 14:27:50	[3]	log	a	{"A":1}
-2020/03/05 14:27:51	[4]	log	b	{"B":"Some other value"}
-2020/03/05 14:27:52	[5]	log	a	{"A":22}
-2020/03/05 14:27:53	[6]	log	b	{"B":"Some other value"}
-2020/03/05 14:27:54	[7]	log	a	{"A":333}
-2020/03/05 14:27:55	[8]	log	b	{"B":""}
-2020/03/05 14:27:56	[9]	log	a	{"A":4444}
-2020/03/05 14:27:57	[10]	log	b	{"B":"prime count of values"}
-2020/03/05 14:27:58	[11]	log	a	{"A":55555}
-2020/03/05 14:27:59	[12]	log	b	{"B":"V"}
-2020/03/05 14:28:00	[13]	log	a	{"A":666666}
-2020/03/05 14:28:01	[14]	log	b	{"B":"A value"}
-2020/03/05 14:28:02	[15]	log	a	{"A":7777777}
-2020/03/05 14:28:03	[16]	log	b	{"B":"A value"}
+time=2020-03-05T14:27:48 id=1 kind=log msg=a A=0
+time=2020-03-05T14:27:49 id=2 kind=log msg=b B="A value"
+time=2020-03-05T14:27:50 id=3 kind=log msg=a A=1
+time=2020-03-05T14:27:51 id=4 kind=log msg=b B="Some other value"
+time=2020-03-05T14:27:52 id=5 kind=log msg=a A=22
+time=2020-03-05T14:27:53 id=6 kind=log msg=b B="Some other value"
+time=2020-03-05T14:27:54 id=7 kind=log msg=a A=333
+time=2020-03-05T14:27:55 id=8 kind=log msg=b B=""
+time=2020-03-05T14:27:56 id=9 kind=log msg=a A=4444
+time=2020-03-05T14:27:57 id=10 kind=log msg=b B="prime count of values"
+time=2020-03-05T14:27:58 id=11 kind=log msg=a A=55555
+time=2020-03-05T14:27:59 id=12 kind=log msg=b B=V
+time=2020-03-05T14:28:00 id=13 kind=log msg=a A=666666
+time=2020-03-05T14:28:01 id=14 kind=log msg=b B="A value"
+time=2020-03-05T14:28:02 id=15 kind=log msg=a A=7777777
+time=2020-03-05T14:28:03 id=16 kind=log msg=b B="A value"
 `)
 }
 

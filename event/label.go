@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"strconv"
 	"strings"
 	"unsafe"
 )
@@ -43,43 +42,12 @@ type boolKind struct{}
 
 // Format prints the label in a standard form.
 func (l *Label) Format(f fmt.State, verb rune) {
-	buf := bufPool.Get().(*buffer)
-	l.format(f.(writer), buf.data[:0])
-	bufPool.Put(buf)
-}
-
-func (l *Label) format(w writer, buf []byte) {
-	w.Write(strconv.AppendQuote(buf[:0], l.Name))
-	w.WriteString(":")
-	l.Value.format(w, buf)
+	newPrinter(f).Label(l)
 }
 
 // Format prints the value in a standard form.
 func (v *Value) Format(f fmt.State, verb rune) {
-	buf := bufPool.Get().(*buffer)
-	v.format(f.(writer), buf.data[:0])
-	bufPool.Put(buf)
-}
-
-func (v *Value) format(w writer, buf []byte) {
-	switch {
-	case v.IsString():
-		w.Write(strconv.AppendQuote(buf[:0], v.String()))
-	case v.IsInt64():
-		w.Write(strconv.AppendInt(buf[:0], v.Int64(), 10))
-	case v.IsUint64():
-		w.Write(strconv.AppendUint(buf[:0], v.Uint64(), 10))
-	case v.IsFloat64():
-		w.Write(strconv.AppendFloat(buf[:0], v.Float64(), 'g', -1, 64))
-	case v.IsBool():
-		if v.Bool() {
-			w.WriteString("true")
-		} else {
-			w.WriteString("false")
-		}
-	default:
-		fmt.Fprint(w, v.Interface())
-	}
+	newPrinter(f).Value(v)
 }
 
 // HasValue returns true if the value is set to any type.
@@ -129,9 +97,7 @@ func (v Value) String() string {
 	}
 	// not a string, so invoke the formatter to build one
 	w := &strings.Builder{}
-	buf := bufPool.Get().(*buffer)
-	v.format(w, buf.data[:0])
-	bufPool.Put(buf)
+	newPrinter(w).Value(&v)
 	return w.String()
 }
 
