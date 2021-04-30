@@ -1,6 +1,6 @@
 module golang.org/x/exp
 
-go 1.12
+go 1.16
 
 require (
 	dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
