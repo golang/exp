@@ -25,6 +25,11 @@ type Label struct {
 	Value Value
 }
 
+// Equal reports whether two labels are equal.
+func (l1 Label) Equal(l2 Label) bool {
+	return l1.Name == l2.Name && l1.Value.Equal(l2.Value)
+}
+
 // stringptr is used in untyped when the Value is a string
 type stringptr unsafe.Pointer
 
@@ -52,6 +57,30 @@ func (v *Value) Format(f fmt.State, verb rune) {
 
 // HasValue returns true if the value is set to any type.
 func (v *Value) HasValue() bool { return v.untyped != nil }
+
+// Equal reports whether two values are equal.
+func (v1 *Value) Equal(v2 Value) bool {
+	if !v1.HasValue() {
+		return !v2.HasValue()
+	}
+	if !v2.HasValue() {
+		return false
+	}
+	switch {
+	case v1.IsString():
+		return v2.IsString() && v1.String() == v2.String()
+	case v1.IsInt64():
+		return v2.IsInt64() && v1.packed == v2.packed
+	case v1.IsUint64():
+		return v2.IsUint64() && v1.packed == v2.packed
+	case v1.IsFloat64():
+		return v2.IsFloat64() && v1.Float64() == v2.Float64()
+	case v1.IsBool():
+		return v2.IsBool() && v1.packed == v2.packed
+	default:
+		return v1.untyped == v2.untyped
+	}
+}
 
 // ValueOf returns a Value for the supplied value.
 func ValueOf(value interface{}) Value {

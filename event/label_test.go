@@ -46,6 +46,32 @@ func TestOfAs(t *testing.T) {
 	}
 }
 
+func TestEqual(t *testing.T) {
+	var x, y int
+	vals := []event.Value{
+		{},
+		event.Int64Of(1),
+		event.Int64Of(2),
+		event.Uint64Of(3),
+		event.Uint64Of(4),
+		event.Float64Of(3.5),
+		event.Float64Of(3.7),
+		event.BoolOf(true),
+		event.BoolOf(false),
+		event.ValueOf(&x),
+		event.ValueOf(&y),
+	}
+	for i, v1 := range vals {
+		for j, v2 := range vals {
+			got := v1.Equal(v2)
+			want := i == j
+			if got != want {
+				t.Errorf("%v.Equal(%v): got %t, want %t", v1, v2, got, want)
+			}
+		}
+	}
+}
+
 func panics(f func()) (b bool) {
 	defer func() {
 		if x := recover(); x != nil {
