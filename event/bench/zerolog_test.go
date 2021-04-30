@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/exp/event/eventtest"
+	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (

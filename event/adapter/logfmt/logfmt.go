@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package event
+package logfmt
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
+
+	"golang.org/x/exp/event"
 )
 
 //TODO: some actual research into what this arbritray optimization number should be
@@ -26,7 +29,7 @@ type stringWriter struct {
 
 // Printer returns a handler that prints the events to the supplied writer.
 // Each event is printed in logfmt format on a single line.
-func Printer(to io.Writer) Handler {
+func Printer(to io.Writer) event.Handler {
 	return newPrinter(to)
 }
 
@@ -40,14 +43,33 @@ func newPrinter(to io.Writer) *printer {
 	return p
 }
 
-// Handle makes printer implement the Handler interface so it can be used
-// directly to print all handled events.
-func (p *printer) Handle(ev *Event) {
-	p.Event(ev)
+func (p *printer) Log(ctx context.Context, ev *event.Event) {
+	p.Event("log", ev)
 	p.WriteString("\n")
 }
 
-func (p *printer) Event(ev *Event) {
+func (p *printer) Metric(ctx context.Context, ev *event.Event) {
+	p.Event("metric", ev)
+	p.WriteString("\n")
+}
+
+func (p *printer) Annotate(ctx context.Context, ev *event.Event) {
+	p.Event("annotate", ev)
+	p.WriteString("\n")
+}
+
+func (p *printer) Start(ctx context.Context, ev *event.Event) context.Context {
+	p.Event("start", ev)
+	p.WriteString("\n")
+	return ctx
+}
+
+func (p *printer) End(ctx context.Context, ev *event.Event) {
+	p.Event("end", ev)
+	p.WriteString("\n")
+}
+
+func (p *printer) Event(kind string, ev *event.Event) {
 	const timeFormat = "2006-01-02T15:04:05"
 	if !ev.At.IsZero() {
 		p.WriteString("time=")
@@ -63,7 +85,7 @@ func (p *printer) Event(ev *Event) {
 	}
 
 	p.WriteString(" kind=")
-	p.Kind(ev.Kind)
+	p.WriteString(kind)
 
 	if ev.Message != "" {
 		p.WriteString(" msg=")
@@ -79,30 +101,13 @@ func (p *printer) Event(ev *Event) {
 	}
 }
 
-func (p *printer) Kind(k Kind) {
-	switch k {
-	case LogKind:
-		p.WriteString("log")
-	case StartKind:
-		p.WriteString("start")
-	case EndKind:
-		p.WriteString("end")
-	case MetricKind:
-		p.WriteString("metric")
-	case AnnotateKind:
-		p.WriteString("annotate")
-	default:
-		p.Write(strconv.AppendUint(p.buf[:0], uint64(k), 10))
-	}
-}
-
-func (p *printer) Label(l *Label) {
+func (p *printer) Label(l *event.Label) {
 	p.Ident(l.Name)
 	p.WriteString("=")
 	p.Value(&l.Value)
 }
 
-func (p *printer) Value(v *Value) {
+func (p *printer) Value(v *event.Value) {
 	switch {
 	case v.IsString():
 		p.Quote(v.String())

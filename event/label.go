@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"strings"
+	"strconv"
 	"unsafe"
 )
 
@@ -44,16 +44,6 @@ type float64Kind struct{}
 
 // boolKind is used in untyped when the Value is a boolean
 type boolKind struct{}
-
-// Format prints the label in a standard form.
-func (l *Label) Format(f fmt.State, verb rune) {
-	newPrinter(f).Label(l)
-}
-
-// Format prints the value in a standard form.
-func (v *Value) Format(f fmt.State, verb rune) {
-	newPrinter(f).Value(v)
-}
 
 // HasValue returns true if the value is set to any type.
 func (v *Value) HasValue() bool { return v.untyped != nil }
@@ -124,10 +114,23 @@ func (v Value) String() string {
 		hdr.Len = int(v.packed)
 		return s
 	}
-	// not a string, so invoke the formatter to build one
-	w := &strings.Builder{}
-	newPrinter(w).Value(&v)
-	return w.String()
+	// not a string, convert to one
+	switch {
+	case v.IsInt64():
+		return strconv.FormatInt(v.Int64(), 10)
+	case v.IsUint64():
+		return strconv.FormatUint(v.Uint64(), 10)
+	case v.IsFloat64():
+		return strconv.FormatFloat(v.Float64(), 'g', -1, 64)
+	case v.IsBool():
+		if v.Bool() {
+			return "true"
+		} else {
+			return "false"
+		}
+	default:
+		return fmt.Sprint(v.Interface())
+	}
 }
 
 // IsString returns true if the value was built with SetString.

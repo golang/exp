@@ -11,34 +11,59 @@ package eventtest
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/exp/event"
+	"golang.org/x/exp/event/adapter/logfmt"
 )
 
 // NewContext returns a context you should use for the active test.
 func NewContext(ctx context.Context, tb testing.TB) context.Context {
 	h := &testHandler{tb: tb}
+	h.p = logfmt.Printer(&h.buf)
 	return event.WithExporter(ctx, event.NewExporter(h))
 }
 
 type testHandler struct {
 	tb  testing.TB
 	buf strings.Builder
+	p   event.Handler
 }
 
-func (w *testHandler) Handle(ev *event.Event) {
-	// build our log message in buffer
-	w.buf.Reset()
-	fmt.Fprint(&w.buf, ev)
-	// log to the testing.TB
-	msg := w.buf.String()
-	if len(msg) > 0 {
-		w.tb.Log(msg)
+func (h *testHandler) Log(ctx context.Context, ev *event.Event) {
+	h.p.Log(ctx, ev)
+	h.deliver()
+}
+
+func (h *testHandler) Metric(ctx context.Context, ev *event.Event) {
+	h.p.Metric(ctx, ev)
+	h.deliver()
+}
+
+func (h *testHandler) Annotate(ctx context.Context, ev *event.Event) {
+	h.p.Annotate(ctx, ev)
+	h.deliver()
+}
+
+func (h *testHandler) Start(ctx context.Context, ev *event.Event) context.Context {
+	ctx = h.p.Start(ctx, ev)
+	h.deliver()
+	return ctx
+}
+
+func (h *testHandler) End(ctx context.Context, ev *event.Event) {
+	h.p.End(ctx, ev)
+	h.deliver()
+}
+
+func (h *testHandler) deliver() {
+	if h.buf.Len() == 0 {
+		return
 	}
+	h.tb.Log(h.buf.String())
+	h.buf.Reset()
 }
 
 func TestNow() func() time.Time {

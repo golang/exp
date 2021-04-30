@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// +build !disable_events
+
 package severity_test
 
 import (
@@ -10,7 +12,8 @@ import (
 	"testing"
 
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/eventtest"
+	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/adapter/logfmt"
 	"golang.org/x/exp/event/severity"
 )
 
@@ -31,7 +34,7 @@ func TestPrint(t *testing.T) {
 		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" level=info`},
 	} {
 		buf := &strings.Builder{}
-		h := event.Printer(buf)
+		h := logfmt.Printer(buf)
 		e := event.NewExporter(h)
 		e.Now = eventtest.TestNow()
 		ctx := event.WithExporter(ctx, e)

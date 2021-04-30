@@ -12,7 +12,7 @@ import (
 	"log"
 	"testing"
 
-	"golang.org/x/exp/event/eventtest"
+	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (

@@ -12,7 +12,7 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/event/eventtest"
+	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (

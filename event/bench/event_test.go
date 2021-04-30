@@ -10,7 +10,8 @@ import (
 	"testing"
 
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/eventtest"
+	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/adapter/logfmt"
 	"golang.org/x/exp/event/keys"
 )
 
@@ -50,20 +51,20 @@ var (
 
 	eventTrace = Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctx, _ = event.Start(ctx, aMsg)
+			ctx, _ = event.Span(ctx).Start(aMsg)
 			event.To(ctx).With(aValue.Of(a)).Annotate()
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {
-			event.To(ctx).Deliver(event.EndKind, "")
+			event.To(ctx).End()
 		},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctx, _ = event.Start(ctx, bMsg)
+			ctx, _ = event.Span(ctx).Start(bMsg)
 			event.To(ctx).With(bValue.Of(b)).Annotate()
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {
-			event.To(ctx).Deliver(event.EndKind, "")
+			event.To(ctx).End()
 		},
 	}
 
@@ -94,15 +95,9 @@ func eventNoop() context.Context {
 }
 
 func eventPrint(w io.Writer) context.Context {
-	e := event.NewExporter(event.Printer(w))
+	e := event.NewExporter(logfmt.Printer(w))
 	e.Now = eventtest.TestNow()
 	return event.WithExporter(context.Background(), e)
-}
-
-func BenchmarkLogEventDisabled(b *testing.B) {
-	event.SetEnabled(false)
-	defer event.SetEnabled(true)
-	runBenchmark(b, context.Background(), eventLog)
 }
 
 func BenchmarkLogEventNoExporter(b *testing.B) {
@@ -121,48 +116,6 @@ func BenchmarkLogEventfDiscard(b *testing.B) {
 	runBenchmark(b, eventPrint(io.Discard), eventLogf)
 }
 
-func TestLogEventf(t *testing.T) {
-	testBenchmark(t, eventPrint, eventLogf, `
-time=2020-03-05T14:27:48 id=1 kind=log msg="a where A=0"
-time=2020-03-05T14:27:49 id=2 kind=log msg="b where B=\"A value\""
-time=2020-03-05T14:27:50 id=3 kind=log msg="a where A=1"
-time=2020-03-05T14:27:51 id=4 kind=log msg="b where B=\"Some other value\""
-time=2020-03-05T14:27:52 id=5 kind=log msg="a where A=22"
-time=2020-03-05T14:27:53 id=6 kind=log msg="b where B=\"Some other value\""
-time=2020-03-05T14:27:54 id=7 kind=log msg="a where A=333"
-time=2020-03-05T14:27:55 id=8 kind=log msg="b where B=\"\""
-time=2020-03-05T14:27:56 id=9 kind=log msg="a where A=4444"
-time=2020-03-05T14:27:57 id=10 kind=log msg="b where B=\"prime count of values\""
-time=2020-03-05T14:27:58 id=11 kind=log msg="a where A=55555"
-time=2020-03-05T14:27:59 id=12 kind=log msg="b where B=\"V\""
-time=2020-03-05T14:28:00 id=13 kind=log msg="a where A=666666"
-time=2020-03-05T14:28:01 id=14 kind=log msg="b where B=\"A value\""
-time=2020-03-05T14:28:02 id=15 kind=log msg="a where A=7777777"
-time=2020-03-05T14:28:03 id=16 kind=log msg="b where B=\"A value\""
-`)
-}
-
-func TestLogEvent(t *testing.T) {
-	testBenchmark(t, eventPrint, eventLog, `
-time=2020-03-05T14:27:48 id=1 kind=log msg=a A=0
-time=2020-03-05T14:27:49 id=2 kind=log msg=b B="A value"
-time=2020-03-05T14:27:50 id=3 kind=log msg=a A=1
-time=2020-03-05T14:27:51 id=4 kind=log msg=b B="Some other value"
-time=2020-03-05T14:27:52 id=5 kind=log msg=a A=22
-time=2020-03-05T14:27:53 id=6 kind=log msg=b B="Some other value"
-time=2020-03-05T14:27:54 id=7 kind=log msg=a A=333
-time=2020-03-05T14:27:55 id=8 kind=log msg=b B=""
-time=2020-03-05T14:27:56 id=9 kind=log msg=a A=4444
-time=2020-03-05T14:27:57 id=10 kind=log msg=b B="prime count of values"
-time=2020-03-05T14:27:58 id=11 kind=log msg=a A=55555
-time=2020-03-05T14:27:59 id=12 kind=log msg=b B=V
-time=2020-03-05T14:28:00 id=13 kind=log msg=a A=666666
-time=2020-03-05T14:28:01 id=14 kind=log msg=b B="A value"
-time=2020-03-05T14:28:02 id=15 kind=log msg=a A=7777777
-time=2020-03-05T14:28:03 id=16 kind=log msg=b B="A value"
-`)
-}
-
 func BenchmarkTraceEventNoop(b *testing.B) {
 	runBenchmark(b, eventPrint(io.Discard), eventTrace)
 }
@@ -173,4 +126,10 @@ func BenchmarkMetricEventNoop(b *testing.B) {
 
 type noopHandler struct{}
 
-func (noopHandler) Handle(ev *event.Event) {}
+func (noopHandler) Log(ctx context.Context, ev *event.Event)      {}
+func (noopHandler) Metric(ctx context.Context, ev *event.Event)   {}
+func (noopHandler) Annotate(ctx context.Context, ev *event.Event) {}
+func (noopHandler) End(ctx context.Context, ev *event.Event)      {}
+func (noopHandler) Start(ctx context.Context, ev *event.Event) context.Context {
+	return ctx
+}
