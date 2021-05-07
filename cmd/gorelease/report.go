@@ -178,7 +178,7 @@ which is required for major versions v2 or greater.`, major)
 		return
 	}
 
-	for _, v := range r.release.existingVersions {
+	for _, v := range r.base.existingVersions {
 		if semver.Compare(v, r.release.version) == 0 {
 			setNotValid("version %s already exists", v)
 		}
@@ -255,7 +255,7 @@ func (r *report) suggestReleaseVersion() {
 	// This could happen further up, but we want the more pressing errors above
 	// to take precedence.
 	var latestForBaseMajor string
-	for _, v := range r.release.existingVersions {
+	for _, v := range r.base.existingVersions {
 		if semver.Major(v) != semver.Major(r.base.version) {
 			continue
 		}

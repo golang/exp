@@ -411,13 +411,6 @@ func loadLocalModule(ctx context.Context, modRoot, repoRoot, version string) (m 
 		m.highestTransitiveVersion = highestVersion
 	}
 
-	// Calculate the existing versions.
-	ev, err := existingVersions(ctx, m.modPath, tmpLoadDir)
-	if err != nil {
-		return moduleInfo{}, err
-	}
-	m.existingVersions = ev
-
 	return m, nil
 }
 
@@ -520,6 +513,13 @@ func loadDownloadedModule(ctx context.Context, modPath, version, max string) (m 
 	if m.pkgs, _, err = loadPackages(ctx, m.modPath, m.modRoot, tmpLoadDir, tmpGoModData, tmpGoSumData, pkgPaths); err != nil {
 		return moduleInfo{}, err
 	}
+
+	// Calculate the existing versions.
+	ev, err := existingVersions(ctx, m.modPath, tmpLoadDir)
+	if err != nil {
+		return moduleInfo{}, err
+	}
+	m.existingVersions = ev
 
 	return m, nil
 }

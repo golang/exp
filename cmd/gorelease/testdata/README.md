@@ -45,6 +45,9 @@ are:
   or diagnostics. True by default.
 * `skip`: non-empty if the test should be skipped. The value is a string passed
   to `t.Skip`.
+* `proxyVersions`: empty if the test should include all `mod/` entries in the
+  proxy, or else a comma-separated list of the modpath@version's it should
+  include.
 
 Test archives have a file named `want`, containing the expected output of the
 test. A test will fail if the actual output differs from `want`.

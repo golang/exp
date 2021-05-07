@@ -1,7 +1,7 @@
 mod=example.com/basic
 base=v0.0.1
 success=false
-# B() was added, so now it should suggest a new minor version. # But, there's a
+# B() was added, so now it should suggest a new minor version. But, there's a
 # later version that already exists: so it should not try to suggest anything at
 # all.
 -- want --

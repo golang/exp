@@ -269,6 +269,7 @@ func TestRelease(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	for _, test := range tests {
+		test := test
 		testName := strings.TrimSuffix(strings.TrimPrefix(filepath.ToSlash(test.testPath), "testdata/"), ".test")
 		t.Run(testName, func(t *testing.T) {
 			ctx := defaultContext
