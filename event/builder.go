@@ -17,10 +17,10 @@ type Builder struct {
 	data *builder
 }
 
-// SpanBuilder is a specialized Builder for construction of new span events.
-type SpanBuilder struct {
+// TraceBuilder is a specialized Builder for construction of new trace events.
+type TraceBuilder struct {
 	ctx  context.Context
-	data *spanBuilder
+	data *traceBuilder
 }
 
 // preallocateLabels controls the space reserved for labels in a builder.
@@ -39,13 +39,13 @@ type builder struct {
 
 var builderPool = sync.Pool{New: func() interface{} { return &builder{} }}
 
-type spanBuilder struct {
+type traceBuilder struct {
 	exporter *Exporter
 	Event    Event
 	labels   [preallocateLabels]Label
 }
 
-var spanBuilderPool = sync.Pool{New: func() interface{} { return &spanBuilder{} }}
+var traceBuilderPool = sync.Pool{New: func() interface{} { return &traceBuilder{} }}
 
 // To initializes a builder from the values stored in a context.
 func To(ctx context.Context) Builder {
@@ -65,14 +65,14 @@ func newBuilder(ctx context.Context) *builder {
 	return b
 }
 
-// Span initializes a span builder from the values stored in a context.
-func Span(ctx context.Context) SpanBuilder {
-	b := SpanBuilder{ctx: ctx}
+// Trace initializes a trace builder from the values stored in a context.
+func Trace(ctx context.Context) TraceBuilder {
+	b := TraceBuilder{ctx: ctx}
 	exporter, parent := fromContext(ctx)
 	if exporter == nil {
 		return b
 	}
-	b.data = spanBuilderPool.Get().(*spanBuilder)
+	b.data = traceBuilderPool.Get().(*traceBuilder)
 	b.data.exporter = exporter
 	b.data.Event.Labels = b.data.labels[:0]
 	b.data.Event.Parent = parent
@@ -122,11 +122,13 @@ func (b Builder) Log(message string) {
 	if b.data == nil {
 		return
 	}
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.Event.Message = message
-	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.handler.Log(b.data.ctx, &b.data.Event)
+	if b.data.exporter.log != nil {
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.Event.Message = message
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.log.Log(b.data.ctx, &b.data.Event)
+	}
 	b.done()
 }
 
@@ -136,11 +138,13 @@ func (b Builder) Logf(template string, args ...interface{}) {
 	if b.data == nil {
 		return
 	}
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.Event.Message = fmt.Sprintf(template, args...)
-	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.handler.Log(b.data.ctx, &b.data.Event)
+	if b.data.exporter.log != nil {
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.Event.Message = fmt.Sprintf(template, args...)
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.log.Log(b.data.ctx, &b.data.Event)
+	}
 	b.done()
 }
 
@@ -149,10 +153,12 @@ func (b Builder) Metric() {
 	if b.data == nil {
 		return
 	}
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.handler.Metric(b.data.ctx, &b.data.Event)
+	if b.data.exporter.metric != nil {
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.metric.Metric(b.data.ctx, &b.data.Event)
+	}
 	b.done()
 }
 
@@ -161,10 +167,12 @@ func (b Builder) Annotate() {
 	if b.data == nil {
 		return
 	}
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.handler.Annotate(b.data.ctx, &b.data.Event)
+	if b.data.exporter.annotate != nil {
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.annotate.Annotate(b.data.ctx, &b.data.Event)
+	}
 	b.done()
 }
 
@@ -173,10 +181,12 @@ func (b Builder) End() {
 	if b.data == nil {
 		return
 	}
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.handler.End(b.data.ctx, &b.data.Event)
+	if b.data.exporter.trace != nil {
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.trace.End(b.data.ctx, &b.data.Event)
+	}
 	b.done()
 }
 
@@ -196,7 +206,7 @@ func (b Builder) done() {
 }
 
 // WithAll adds all the supplied labels to the event being constructed.
-func (b SpanBuilder) WithAll(labels ...Label) SpanBuilder {
+func (b TraceBuilder) WithAll(labels ...Label) TraceBuilder {
 	if b.data != nil || len(labels) == 0 {
 		return b
 	}
@@ -213,28 +223,32 @@ func (b SpanBuilder) WithAll(labels ...Label) SpanBuilder {
 // matching end event.
 // All events created from the returned context will have this start event
 // as their parent.
-func (b SpanBuilder) Start(name string) (context.Context, func()) {
+func (b TraceBuilder) Start(name string) (context.Context, func()) {
 	if b.data == nil {
 		return b.ctx, func() {}
 	}
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.exporter.prepare(&b.data.Event)
-	exporter, parent := b.data.exporter, b.data.Event.ID
-	b.data.Event.Message = name
-	ctx := newContext(b.ctx, exporter, parent)
-	ctx = b.data.exporter.handler.Start(ctx, &b.data.Event)
-	b.done()
-	return ctx, func() {
-		b := Builder{}
-		b.data = builderPool.Get().(*builder)
-		b.data.exporter = exporter
-		b.data.Event.Parent = parent
-		b.End()
+	ctx := b.ctx
+	end := func() {}
+	if b.data.exporter.trace != nil {
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.exporter.prepare(&b.data.Event)
+		// create the end builder
+		eb := Builder{}
+		eb.data = builderPool.Get().(*builder)
+		eb.data.exporter = b.data.exporter
+		eb.data.Event.Parent = b.data.Event.ID
+		end = eb.End
+		// and now deliver the start event
+		b.data.Event.Message = name
+		ctx = newContext(ctx, b.data.exporter, b.data.Event.ID)
+		b.data.exporter.trace.Start(ctx, &b.data.Event)
 	}
+	b.done()
+	return ctx, end
 }
 
-func (b SpanBuilder) done() {
-	*b.data = spanBuilder{}
-	spanBuilderPool.Put(b.data)
+func (b TraceBuilder) done() {
+	*b.data = traceBuilder{}
+	traceBuilderPool.Put(b.data)
 }

@@ -51,7 +51,7 @@ var (
 
 	eventTrace = Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctx, _ = event.Span(ctx).Start(aMsg)
+			ctx, _ = event.Trace(ctx).Start(aMsg)
 			event.To(ctx).With(aValue.Of(a)).Annotate()
 			return ctx
 		},
@@ -59,7 +59,7 @@ var (
 			event.To(ctx).End()
 		},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctx, _ = event.Span(ctx).Start(bMsg)
+			ctx, _ = event.Trace(ctx).Start(bMsg)
 			event.To(ctx).With(bValue.Of(b)).Annotate()
 			return ctx
 		},
@@ -95,7 +95,7 @@ func eventNoop() context.Context {
 }
 
 func eventPrint(w io.Writer) context.Context {
-	e := event.NewExporter(logfmt.Printer(w))
+	e := event.NewExporter(logfmt.NewPrinter(w))
 	e.Now = eventtest.TestNow()
 	return event.WithExporter(context.Background(), e)
 }
@@ -126,7 +126,7 @@ func BenchmarkMetricEventNoop(b *testing.B) {
 
 type noopHandler struct{}
 
-func (noopHandler) Log(ctx context.Context, ev *event.Event)      {}
+func (noopHandler) Log_(ctx context.Context, ev *event.Event)     {}
 func (noopHandler) Metric(ctx context.Context, ev *event.Event)   {}
 func (noopHandler) Annotate(ctx context.Context, ev *event.Event) {}
 func (noopHandler) End(ctx context.Context, ev *event.Event)      {}

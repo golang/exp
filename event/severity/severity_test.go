@@ -34,8 +34,7 @@ func TestPrint(t *testing.T) {
 		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" level=info`},
 	} {
 		buf := &strings.Builder{}
-		h := logfmt.Printer(buf)
-		e := event.NewExporter(h)
+		e := event.NewExporter(logfmt.NewPrinter(buf))
 		e.Now = eventtest.TestNow()
 		ctx := event.WithExporter(ctx, e)
 		test.events(ctx)

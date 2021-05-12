@@ -16,7 +16,7 @@ import (
 //TODO: some actual research into what this arbritray optimization number should be
 const bufCap = 50
 
-type printer struct {
+type Printer struct {
 	io.Writer
 	io.StringWriter
 
@@ -27,14 +27,10 @@ type stringWriter struct {
 	io.Writer
 }
 
-// Printer returns a handler that prints the events to the supplied writer.
+// NewPrinter returns a handler that prints the events to the supplied writer.
 // Each event is printed in logfmt format on a single line.
-func Printer(to io.Writer) event.Handler {
-	return newPrinter(to)
-}
-
-func newPrinter(to io.Writer) *printer {
-	p := &printer{Writer: to}
+func NewPrinter(to io.Writer) *Printer {
+	p := &Printer{Writer: to}
 	ok := false
 	p.StringWriter, ok = to.(io.StringWriter)
 	if !ok {
@@ -43,33 +39,33 @@ func newPrinter(to io.Writer) *printer {
 	return p
 }
 
-func (p *printer) Log(ctx context.Context, ev *event.Event) {
+func (p *Printer) Log(ctx context.Context, ev *event.Event) {
 	p.Event("log", ev)
 	p.WriteString("\n")
 }
 
-func (p *printer) Metric(ctx context.Context, ev *event.Event) {
+func (p *Printer) Metric(ctx context.Context, ev *event.Event) {
 	p.Event("metric", ev)
 	p.WriteString("\n")
 }
 
-func (p *printer) Annotate(ctx context.Context, ev *event.Event) {
+func (p *Printer) Annotate(ctx context.Context, ev *event.Event) {
 	p.Event("annotate", ev)
 	p.WriteString("\n")
 }
 
-func (p *printer) Start(ctx context.Context, ev *event.Event) context.Context {
+func (p *Printer) Start(ctx context.Context, ev *event.Event) context.Context {
 	p.Event("start", ev)
 	p.WriteString("\n")
 	return ctx
 }
 
-func (p *printer) End(ctx context.Context, ev *event.Event) {
+func (p *Printer) End(ctx context.Context, ev *event.Event) {
 	p.Event("end", ev)
 	p.WriteString("\n")
 }
 
-func (p *printer) Event(kind string, ev *event.Event) {
+func (p *Printer) Event(kind string, ev *event.Event) {
 	const timeFormat = "2006-01-02T15:04:05"
 	if !ev.At.IsZero() {
 		p.WriteString("time=")
@@ -101,13 +97,13 @@ func (p *printer) Event(kind string, ev *event.Event) {
 	}
 }
 
-func (p *printer) Label(l *event.Label) {
+func (p *Printer) Label(l *event.Label) {
 	p.Ident(l.Name)
 	p.WriteString("=")
 	p.Value(&l.Value)
 }
 
-func (p *printer) Value(v *event.Value) {
+func (p *Printer) Value(v *event.Value) {
 	switch {
 	case v.IsString():
 		p.Quote(v.String())
@@ -128,12 +124,12 @@ func (p *printer) Value(v *event.Value) {
 	}
 }
 
-func (p *printer) Ident(s string) {
+func (p *Printer) Ident(s string) {
 	//TODO: this should also escape = if it occurs in an ident?
 	p.Quote(s)
 }
 
-func (p *printer) Quote(s string) {
+func (p *Printer) Quote(s string) {
 	if s == "" {
 		p.WriteString(`""`)
 		return

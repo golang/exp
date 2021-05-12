@@ -16,23 +16,13 @@ import (
 	"golang.org/x/exp/event/keys"
 )
 
-type testHandler struct{}
-
-func (testHandler) Log(ctx context.Context, ev *event.Event)      {}
-func (testHandler) Metric(ctx context.Context, ev *event.Event)   {}
-func (testHandler) Annotate(ctx context.Context, ev *event.Event) {}
-func (testHandler) End(ctx context.Context, ev *event.Event)      {}
-func (testHandler) Start(ctx context.Context, ev *event.Event) context.Context {
-	return ctx
-}
-
 func TestClone(t *testing.T) {
 	var labels []event.Label
 	for i := 0; i < 5; i++ { // one greater than len(Builder.labels)
 		labels = append(labels, keys.Int(fmt.Sprintf("l%d", i)).Of(i))
 	}
 
-	ctx := event.WithExporter(context.Background(), event.NewExporter(testHandler{}))
+	ctx := event.WithExporter(context.Background(), event.NewExporter(nil))
 	b1 := event.To(ctx)
 	b1.With(labels[0]).With(labels[1])
 	check(t, b1, labels[:2])
