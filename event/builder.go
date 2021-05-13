@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // Builder is a fluent builder for construction of new events.
@@ -106,7 +107,7 @@ func (b Builder) With(label Label) Builder {
 
 // WithAll adds all the supplied labels to the event being constructed.
 func (b Builder) WithAll(labels ...Label) Builder {
-	if b.data != nil || len(labels) == 0 {
+	if b.data == nil || len(labels) == 0 {
 		return b
 	}
 	if len(b.data.Event.Labels) == 0 {
@@ -117,17 +118,20 @@ func (b Builder) WithAll(labels ...Label) Builder {
 	return b
 }
 
+func (b Builder) At(t time.Time) Builder {
+	if b.data != nil {
+		b.data.Event.At = t
+	}
+	return b
+}
+
 // Log is a helper that calls Deliver with LogKind.
 func (b Builder) Log(message string) {
 	if b.data == nil {
 		return
 	}
 	if b.data.exporter.log != nil {
-		b.data.exporter.mu.Lock()
-		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Message = message
-		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.log.Log(b.data.ctx, &b.data.Event)
+		b.log(message)
 	}
 	b.done()
 }
@@ -139,13 +143,17 @@ func (b Builder) Logf(template string, args ...interface{}) {
 		return
 	}
 	if b.data.exporter.log != nil {
-		b.data.exporter.mu.Lock()
-		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Message = fmt.Sprintf(template, args...)
-		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.log.Log(b.data.ctx, &b.data.Event)
+		b.log(fmt.Sprintf(template, args...))
 	}
 	b.done()
+}
+
+func (b Builder) log(message string) {
+	b.data.exporter.mu.Lock()
+	defer b.data.exporter.mu.Unlock()
+	b.data.Event.Message = message
+	b.data.exporter.prepare(&b.data.Event)
+	b.data.exporter.log.Log(b.data.ctx, &b.data.Event)
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
@@ -207,13 +215,20 @@ func (b Builder) done() {
 
 // WithAll adds all the supplied labels to the event being constructed.
 func (b TraceBuilder) WithAll(labels ...Label) TraceBuilder {
-	if b.data != nil || len(labels) == 0 {
+	if b.data == nil || len(labels) == 0 {
 		return b
 	}
 	if len(b.data.Event.Labels) == 0 {
 		b.data.Event.Labels = labels
 	} else {
 		b.data.Event.Labels = append(b.data.Event.Labels, labels...)
+	}
+	return b
+}
+
+func (b TraceBuilder) At(t time.Time) TraceBuilder {
+	if b.data != nil {
+		b.data.Event.At = t
 	}
 	return b
 }
