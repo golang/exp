@@ -185,8 +185,11 @@ func readTest(testPath string) (*test, error) {
 				return nil, fmt.Errorf("%s:%d: %v", testPath, lineNum, err)
 			}
 		case "proxyVersions":
-			parts := strings.Split(value, ",")
+			if len(value) == 0 {
+				break
+			}
 			proxyVersions := make(map[module.Version]bool)
+			parts := strings.Split(value, ",")
 			for _, modpathWithVersion := range parts {
 				vParts := strings.Split(modpathWithVersion, "@")
 				if len(vParts) != 2 {
