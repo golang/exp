@@ -257,7 +257,8 @@ func (b TraceBuilder) Start(name string) (context.Context, func()) {
 		// and now deliver the start event
 		b.data.Event.Message = name
 		ctx = newContext(ctx, b.data.exporter, b.data.Event.ID)
-		b.data.exporter.trace.Start(ctx, &b.data.Event)
+		ctx = b.data.exporter.trace.Start(ctx, &b.data.Event)
+		eb.data.ctx = ctx
 	}
 	b.done()
 	return ctx, end

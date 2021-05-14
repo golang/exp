@@ -61,3 +61,30 @@ func check(t *testing.T, b event.Builder, want []event.Label) {
 func valueEqual(l1, l2 event.Value) bool {
 	return fmt.Sprint(l1) == fmt.Sprint(l2)
 }
+
+func TestTraceBuilder(t *testing.T) {
+	// Verify that the context returned from the handler is also returned from Start,
+	// and is the context passed to End.
+	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t}))
+	ctx, end := event.Trace(ctx).Start("s")
+	val := ctx.Value("x")
+	if val != 1 {
+		t.Fatal("context not returned from Start")
+	}
+	end()
+}
+
+type testTraceHandler struct {
+	t *testing.T
+}
+
+func (*testTraceHandler) Start(ctx context.Context, _ *event.Event) context.Context {
+	return context.WithValue(ctx, "x", 1)
+}
+
+func (t *testTraceHandler) End(ctx context.Context, _ *event.Event) {
+	val := ctx.Value("x")
+	if val != 1 {
+		t.t.Fatal("Start context not passed to End")
+	}
+}
