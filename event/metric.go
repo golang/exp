@@ -6,81 +6,71 @@ package event
 
 import (
 	"context"
-	"fmt"
 	"time"
+)
+
+// A Unit is a unit of measurement for a metric.
+type Unit string
+
+const (
+	UnitDimensionless Unit = "1"
+	UnitBytes         Unit = "By"
+	UnitMilliseconds  Unit = "ms"
 )
 
 // A Metric represents a kind of recorded measurement.
 type Metric interface {
-	Descriptor() *MetricDescriptor
+	Name() string
+	Options() MetricOptions
 }
 
-// A MetricDescriptor describes a metric.
-type MetricDescriptor struct {
-	namespace   string
-	name        string
-	description string
-	// TODO: deal with units. Follow otel, or define Go types for common units.
-	// We don't need a time unit because we'll use time.Duration, and the only
-	// other unit otel currently defines (besides dimensionless) is bytes.
-}
+type MetricOptions struct {
+	// A string that should be common for all metrics of an application or
+	// service. Defaults to the import path of the package calling
+	// the metric construction function (NewCounter, etc.).
+	Namespace string
 
-// NewMetricDescriptor creates a MetricDescriptor with the given name.
-// The namespace defaults to the import path of the caller of NewMetricDescriptor.
-// Use SetNamespace to provide a different one.
-// Neither the name nor the namespace can be empty.
-func NewMetricDescriptor(name, description string) *MetricDescriptor {
-	return newMetricDescriptor(name, description)
-}
+	// Optional description of the metric.
+	Description string
 
-func newMetricDescriptor(name, description string) *MetricDescriptor {
-	if name == "" {
-		panic("name cannot be empty")
-	}
-	return &MetricDescriptor{
-		name:        name,
-		namespace:   scanStack().Space,
-		description: description,
-	}
+	// Optional unit for the metric. Defaults to UnitDimensionless.
+	Unit Unit
 }
-
-// SetNamespace sets the namespace of m to a non-empty string.
-func (m *MetricDescriptor) SetNamespace(ns string) {
-	if ns == "" {
-		panic("namespace cannot be empty")
-	}
-	m.namespace = ns
-}
-
-func (m *MetricDescriptor) String() string {
-	return fmt.Sprintf("Metric(\"%s/%s\")", m.namespace, m.name)
-}
-
-func (m *MetricDescriptor) Name() string        { return m.name }
-func (m *MetricDescriptor) Namespace() string   { return m.namespace }
-func (m *MetricDescriptor) Description() string { return m.description }
 
 // A Counter is a metric that counts something cumulatively.
 type Counter struct {
-	*MetricDescriptor
+	name string
+	opts MetricOptions
+}
+
+func initOpts(popts *MetricOptions) MetricOptions {
+	var opts MetricOptions
+	if popts != nil {
+		opts = *popts
+	}
+	if opts.Namespace == "" {
+		opts.Namespace = scanStack().Space
+	}
+	if opts.Unit == "" {
+		opts.Unit = UnitDimensionless
+	}
+	return opts
 }
 
 // NewCounter creates a counter with the given name.
-func NewCounter(name, description string) *Counter {
-	return &Counter{newMetricDescriptor(name, description)}
+func NewCounter(name string, opts *MetricOptions) *Counter {
+	return &Counter{name, initOpts(opts)}
 }
 
-// Descriptor returns the receiver's MetricDescriptor.
-func (c *Counter) Descriptor() *MetricDescriptor {
-	return c.MetricDescriptor
-}
+func (c *Counter) Name() string           { return c.name }
+func (c *Counter) Options() MetricOptions { return c.opts }
 
 // Record delivers a metric event with the given metric, value and labels to the
 // exporter in the context.
 func (c *Counter) Record(ctx context.Context, v int64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, c, Int64(MetricVal, v))
+		record(ev, c, Int64(string(MetricVal), v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
@@ -89,26 +79,24 @@ func (c *Counter) Record(ctx context.Context, v int64, labels ...Label) {
 // A FloatGauge records a single floating-point value that may go up or down.
 // TODO(generics): Gauge[T]
 type FloatGauge struct {
-	*MetricDescriptor
+	name string
+	opts MetricOptions
 }
 
 // NewFloatGauge creates a new FloatGauge with the given name.
-func NewFloatGauge(name, description string) *FloatGauge {
-	return &FloatGauge{newMetricDescriptor(name, description)}
+func NewFloatGauge(name string, opts *MetricOptions) *FloatGauge {
+	return &FloatGauge{name, initOpts(opts)}
 }
 
-// Descriptor returns the receiver's MetricDescriptor.
-func (g *FloatGauge) Descriptor() *MetricDescriptor {
-	return g.MetricDescriptor
-}
+func (g *FloatGauge) Name() string           { return g.name }
+func (g *FloatGauge) Options() MetricOptions { return g.opts }
 
 // Record converts its argument into a Value and returns a MetricValue with the
-// receiver and the value. It is intended to be used as an argument to
-// Builder.Metric.
+// receiver and the value.
 func (g *FloatGauge) Record(ctx context.Context, v float64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, g, Float64(MetricVal, v))
+		record(ev, g, Float64(string(MetricVal), v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
@@ -117,26 +105,24 @@ func (g *FloatGauge) Record(ctx context.Context, v float64, labels ...Label) {
 // A DurationDistribution records a distribution of durations.
 // TODO(generics): Distribution[T]
 type DurationDistribution struct {
-	*MetricDescriptor
+	name string
+	opts MetricOptions
 }
 
 // NewDuration creates a new Duration with the given name.
-func NewDuration(name, description string) *DurationDistribution {
-	return &DurationDistribution{newMetricDescriptor(name, description)}
+func NewDuration(name string, opts *MetricOptions) *DurationDistribution {
+	return &DurationDistribution{name, initOpts(opts)}
 }
 
-// Descriptor returns the receiver's MetricDescriptor.
-func (d *DurationDistribution) Descriptor() *MetricDescriptor {
-	return d.MetricDescriptor
-}
+func (d *DurationDistribution) Name() string           { return d.name }
+func (d *DurationDistribution) Options() MetricOptions { return d.opts }
 
 // Record converts its argument into a Value and returns a MetricValue with the
-// receiver and the value. It is intended to be used as an argument to
-// Builder.Metric.
+// receiver and the value.
 func (d *DurationDistribution) Record(ctx context.Context, v time.Duration, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, d, Duration(MetricVal, v))
+		record(ev, d, Duration(string(MetricVal), v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
@@ -144,31 +130,29 @@ func (d *DurationDistribution) Record(ctx context.Context, v time.Duration, labe
 
 // An IntDistribution records a distribution of int64s.
 type IntDistribution struct {
-	*MetricDescriptor
+	name string
+	opts MetricOptions
 }
+
+func (d *IntDistribution) Name() string           { return d.name }
+func (d *IntDistribution) Options() MetricOptions { return d.opts }
 
 // NewIntDistribution creates a new IntDistribution with the given name.
-func NewIntDistribution(name, description string) *IntDistribution {
-	return &IntDistribution{newMetricDescriptor(name, description)}
-}
-
-// Descriptor returns the receiver's MetricDescriptor.
-func (d *IntDistribution) Descriptor() *MetricDescriptor {
-	return d.MetricDescriptor
+func NewIntDistribution(name string, opts *MetricOptions) *IntDistribution {
+	return &IntDistribution{name, initOpts(opts)}
 }
 
 // Record converts its argument into a Value and returns a MetricValue with the
-// receiver and the value. It is intended to be used as an argument to
-// Builder.Metric.
+// receiver and the value.
 func (d *IntDistribution) Record(ctx context.Context, v int64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, d, Int64(MetricVal, v))
+		record(ev, d, Int64(string(MetricVal), v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
 }
 
 func record(ev *Event, m Metric, l Label) {
-	ev.Labels = append(ev.Labels, l, Value(MetricKey, m))
+	ev.Labels = append(ev.Labels, l, MetricKey.Of(m))
 }

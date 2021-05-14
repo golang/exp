@@ -14,11 +14,20 @@ func RPCDirection(v string) event.Label { return event.String("direction", v) }
 func StatusCode(v string) event.Label   { return event.String("status.code", v) }
 
 var (
-	Started       = event.NewCounter("started", "Count of started RPCs.")
-	Finished      = event.NewCounter("finished", "Count of finished RPCs (includes error).")
-	ReceivedBytes = event.NewIntDistribution("received_bytes", "Bytes received.") //, unit.Bytes)
-	SentBytes     = event.NewIntDistribution("sent_bytes", "Bytes sent.")         //, unit.Bytes)
-	Latency       = event.NewDuration("latency", "Elapsed time of an RPC.")       //, unit.Milliseconds)
+	Started       = event.NewCounter("started", &event.MetricOptions{Description: "Count of started RPCs."})
+	Finished      = event.NewCounter("finished", &event.MetricOptions{Description: "Count of finished RPCs (includes error)."})
+	ReceivedBytes = event.NewIntDistribution("received_bytes", &event.MetricOptions{
+		Description: "Bytes received.",
+		Unit:        event.UnitBytes,
+	})
+	SentBytes = event.NewIntDistribution("sent_bytes", &event.MetricOptions{
+		Description: "Bytes sent.",
+		Unit:        event.UnitBytes,
+	})
+	Latency = event.NewDuration("latency", &event.MetricOptions{
+		Description: "Elapsed time of an RPC.",
+		Unit:        event.UnitMilliseconds,
+	})
 )
 
 const (

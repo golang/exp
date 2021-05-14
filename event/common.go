@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MetricKey      = "metric"
+	MetricKey      = interfaceKey("metric")
 	MetricVal      = "metricValue"
 	DurationMetric = interfaceKey("durationMetric")
 )

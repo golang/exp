@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !disable_events
 // +build !disable_events
 
 package event_test
@@ -24,9 +25,9 @@ var (
 	l1      = event.Int64("l1", 1)
 	l2      = event.Int64("l2", 2)
 	l3      = event.Int64("l3", 3)
-	counter = event.NewCounter("hits", "cache hits")
-	gauge   = event.NewFloatGauge("temperature", "CPU board temperature in Celsius")
-	latency = event.NewDuration("latency", "how long it took")
+	counter = event.NewCounter("hits", nil)
+	gauge   = event.NewFloatGauge("temperature", nil)
+	latency = event.NewDuration("latency", nil)
 	err     = errors.New("an error")
 )
 
@@ -275,7 +276,7 @@ func (t *testTraceHandler) Event(ctx context.Context, ev *event.Event) context.C
 
 func TestTraceDuration(t *testing.T) {
 	// Verify that a trace can can emit a latency metric.
-	dur := event.NewDuration("test", "")
+	dur := event.NewDuration("test", nil)
 	want := time.Second
 
 	check := func(t *testing.T, h *testTraceDurationHandler) {
@@ -313,7 +314,7 @@ type testTraceDurationHandler struct {
 
 func (t *testTraceDurationHandler) Event(ctx context.Context, ev *event.Event) context.Context {
 	for _, l := range ev.Labels {
-		if l.Name == event.MetricVal {
+		if l.Name == string(event.MetricVal) {
 			t.got = l
 		}
 	}
@@ -322,7 +323,7 @@ func (t *testTraceDurationHandler) Event(ctx context.Context, ev *event.Event) c
 
 func BenchmarkBuildContext(b *testing.B) {
 	// How long does it take to deliver an event from a nested context?
-	c := event.NewCounter("c", "")
+	c := event.NewCounter("c", nil)
 	for _, depth := range []int{1, 5, 7, 10} {
 		b.Run(fmt.Sprintf("depth %d", depth), func(b *testing.B) {
 			ctx := event.WithExporter(context.Background(), event.NewExporter(nopHandler{}, eventtest.ExporterOptions()))
