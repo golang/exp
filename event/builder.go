@@ -15,13 +15,8 @@ import (
 
 // Builder is a fluent builder for construction of new events.
 type Builder struct {
-	data *builder
-}
-
-// TraceBuilder is a specialized Builder for construction of new trace events.
-type TraceBuilder struct {
 	ctx  context.Context
-	data *traceBuilder
+	data *builder
 }
 
 // preallocateLabels controls the space reserved for labels in a builder.
@@ -33,24 +28,15 @@ const preallocateLabels = 4
 
 type builder struct {
 	exporter *Exporter
-	ctx      context.Context
 	Event    Event
 	labels   [preallocateLabels]Label
 }
 
 var builderPool = sync.Pool{New: func() interface{} { return &builder{} }}
 
-type traceBuilder struct {
-	exporter *Exporter
-	Event    Event
-	labels   [preallocateLabels]Label
-}
-
-var traceBuilderPool = sync.Pool{New: func() interface{} { return &traceBuilder{} }}
-
 // To initializes a builder from the values stored in a context.
 func To(ctx context.Context) Builder {
-	return Builder{data: newBuilder(ctx)}
+	return Builder{ctx: ctx, data: newBuilder(ctx)}
 }
 
 func newBuilder(ctx context.Context) *builder {
@@ -60,23 +46,8 @@ func newBuilder(ctx context.Context) *builder {
 	}
 	b := builderPool.Get().(*builder)
 	b.exporter = exporter
-	b.ctx = ctx
 	b.Event.Labels = b.labels[:0]
 	b.Event.Parent = parent
-	return b
-}
-
-// Trace initializes a trace builder from the values stored in a context.
-func Trace(ctx context.Context) TraceBuilder {
-	b := TraceBuilder{ctx: ctx}
-	exporter, parent := fromContext(ctx)
-	if exporter == nil {
-		return b
-	}
-	b.data = traceBuilderPool.Get().(*traceBuilder)
-	b.data.exporter = exporter
-	b.data.Event.Labels = b.data.labels[:0]
-	b.data.Event.Parent = parent
 	return b
 }
 
@@ -86,7 +57,7 @@ func (b Builder) Clone() Builder {
 	if b.data == nil {
 		return b
 	}
-	clone := Builder{data: builderPool.Get().(*builder)}
+	clone := Builder{ctx: b.ctx, data: builderPool.Get().(*builder)}
 	*clone.data = *b.data
 	if len(b.data.Event.Labels) == 0 || &b.data.labels[0] == &b.data.Event.Labels[0] {
 		clone.data.Event.Labels = clone.data.labels[:len(b.data.Event.Labels)]
@@ -153,7 +124,7 @@ func (b Builder) log(message string) {
 	defer b.data.exporter.mu.Unlock()
 	b.data.Event.Message = message
 	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.log.Log(b.data.ctx, &b.data.Event)
+	b.data.exporter.log.Log(b.ctx, &b.data.Event)
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
@@ -165,7 +136,7 @@ func (b Builder) Metric() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.metric.Metric(b.data.ctx, &b.data.Event)
+		b.data.exporter.metric.Metric(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -179,7 +150,7 @@ func (b Builder) Annotate() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.annotate.Annotate(b.data.ctx, &b.data.Event)
+		b.data.exporter.annotate.Annotate(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -193,7 +164,7 @@ func (b Builder) End() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.trace.End(b.data.ctx, &b.data.Event)
+		b.data.exporter.trace.End(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -213,32 +184,12 @@ func (b Builder) done() {
 	builderPool.Put(b.data)
 }
 
-// WithAll adds all the supplied labels to the event being constructed.
-func (b TraceBuilder) WithAll(labels ...Label) TraceBuilder {
-	if b.data == nil || len(labels) == 0 {
-		return b
-	}
-	if len(b.data.Event.Labels) == 0 {
-		b.data.Event.Labels = labels
-	} else {
-		b.data.Event.Labels = append(b.data.Event.Labels, labels...)
-	}
-	return b
-}
-
-func (b TraceBuilder) At(t time.Time) TraceBuilder {
-	if b.data != nil {
-		b.data.Event.At = t
-	}
-	return b
-}
-
 // Start delivers a start event with the given name and labels.
 // Its second return value is a function that should be called to deliver the
 // matching end event.
 // All events created from the returned context will have this start event
 // as their parent.
-func (b TraceBuilder) Start(name string) (context.Context, func()) {
+func (b Builder) Start(name string) (context.Context, func()) {
 	if b.data == nil {
 		return b.ctx, func() {}
 	}
@@ -253,18 +204,13 @@ func (b TraceBuilder) Start(name string) (context.Context, func()) {
 		eb.data = builderPool.Get().(*builder)
 		eb.data.exporter = b.data.exporter
 		eb.data.Event.Parent = b.data.Event.ID
-		end = eb.End
 		// and now deliver the start event
 		b.data.Event.Message = name
 		ctx = newContext(ctx, b.data.exporter, b.data.Event.ID)
 		ctx = b.data.exporter.trace.Start(ctx, &b.data.Event)
-		eb.data.ctx = ctx
+		eb.ctx = ctx
+		end = eb.End
 	}
 	b.done()
 	return ctx, end
-}
-
-func (b TraceBuilder) done() {
-	*b.data = traceBuilder{}
-	traceBuilderPool.Put(b.data)
 }

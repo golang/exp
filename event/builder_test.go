@@ -66,7 +66,7 @@ func TestTraceBuilder(t *testing.T) {
 	// Verify that the context returned from the handler is also returned from Start,
 	// and is the context passed to End.
 	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t}))
-	ctx, end := event.Trace(ctx).Start("s")
+	ctx, end := event.To(ctx).Start("s")
 	val := ctx.Value("x")
 	if val != 1 {
 		t.Fatal("context not returned from Start")

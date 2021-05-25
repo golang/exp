@@ -51,7 +51,7 @@ var (
 
 	eventTrace = Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctx, _ = event.Trace(ctx).Start(aMsg)
+			ctx, _ = event.To(ctx).Start(aMsg)
 			event.To(ctx).With(aValue.Of(a)).Annotate()
 			return ctx
 		},
@@ -59,7 +59,7 @@ var (
 			event.To(ctx).End()
 		},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctx, _ = event.Trace(ctx).Start(bMsg)
+			ctx, _ = event.To(ctx).Start(bMsg)
 			event.To(ctx).With(bValue.Of(b)).Annotate()
 			return ctx
 		},
