@@ -22,14 +22,14 @@ func Test(t *testing.T) {
 	log = log.Named("n/m")
 	log.Info("mess", zap.Float64("pi", 3.14))
 	want := &event.Event{
-		ID:      1,
-		Message: "mess",
+		ID: 1,
 		Labels: []event.Label{
 			keys.Int64("traceID").Of(17),
 			keys.String("resource").Of("R"),
 			internal.LevelKey.Of(0),
 			internal.NameKey.Of("n/m"),
 			keys.Float64("pi").Of(3.14),
+			event.Message.Of("mess"),
 		},
 	}
 	h.Got.At = want.At

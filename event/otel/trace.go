@@ -25,7 +25,8 @@ type spanKey struct{}
 
 func (t *TraceHandler) Start(ctx context.Context, e *event.Event) context.Context {
 	opts := labelsToSpanOptions(e.Labels)
-	octx, span := t.tracer.Start(ctx, e.Message, opts...)
+	name, _ := event.Trace.Find(e)
+	octx, span := t.tracer.Start(ctx, name, opts...)
 	return context.WithValue(octx, spanKey{}, span)
 }
 

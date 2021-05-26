@@ -37,15 +37,15 @@ func TestPrint(t *testing.T) {
 `}, {
 		name:   "log 1",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" l1=1`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log l1=1 msg="a message"`,
 	}, {
 		name:   "log 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" l1=1 l2=2`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log l1=1 l2=2 msg="a message"`,
 	}, {
 		name:   "log 3",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).With(l3).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message" l1=1 l2=2 l3=3`,
+		expect: `time=2020-03-05T14:27:48 id=1 kind=log l1=1 l2=2 l3=3 msg="a message"`,
 	}, {
 		name: "span",
 		events: func(ctx context.Context) {
@@ -53,7 +53,7 @@ func TestPrint(t *testing.T) {
 			end()
 		},
 		expect: `
-time=2020-03-05T14:27:48 id=1 kind=start msg=span
+time=2020-03-05T14:27:48 id=1 kind=start name=span
 time=2020-03-05T14:27:49 id=2 span=1 kind=end
 `}, {
 		name: "span nested",
@@ -65,8 +65,8 @@ time=2020-03-05T14:27:49 id=2 span=1 kind=end
 			event.To(child).Log("message")
 		},
 		expect: `
-time=2020-03-05T14:27:48 id=1 kind=start msg=parent
-time=2020-03-05T14:27:49 id=2 span=1 kind=start msg=child
+time=2020-03-05T14:27:48 id=1 kind=start name=parent
+time=2020-03-05T14:27:49 id=2 span=1 kind=start name=child
 time=2020-03-05T14:27:50 id=3 span=2 kind=log msg=message
 time=2020-03-05T14:27:51 id=4 span=2 kind=end
 time=2020-03-05T14:27:52 id=5 span=1 kind=end
@@ -94,8 +94,8 @@ time=2020-03-05T14:27:52 id=5 span=1 kind=end
 			b.With(keys.String("myString").Of("some string value")).Log("string event")
 		},
 		expect: `
-time=2020-03-05T14:27:48 id=1 kind=log msg="my event" myInt=6
-time=2020-03-05T14:27:49 id=2 kind=log msg="string event" myString="some string value"
+time=2020-03-05T14:27:48 id=1 kind=log myInt=6 msg="my event"
+time=2020-03-05T14:27:49 id=2 kind=log myString="some string value" msg="string event"
 `}} {
 		buf := &strings.Builder{}
 		e := event.NewExporter(logfmt.NewPrinter(buf))
@@ -117,6 +117,6 @@ func ExampleLog() {
 	event.To(ctx).With(keys.Int("myInt").Of(6)).Log("my event")
 	event.To(ctx).With(keys.String("myString").Of("some string value")).Log("error event")
 	// Output:
-	// time=2020-03-05T14:27:48 id=1 kind=log msg="my event" myInt=6
-	// time=2020-03-05T14:27:49 id=2 kind=log msg="error event" myString="some string value"
+	// time=2020-03-05T14:27:48 id=1 kind=log myInt=6 msg="my event"
+	// time=2020-03-05T14:27:49 id=2 kind=log myString="some string value" msg="error event"
 }

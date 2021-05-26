@@ -20,14 +20,14 @@ func TestInfo(t *testing.T) {
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := &event.Event{
-		At:      internal.TestAt,
-		ID:      1,
-		Message: "mess",
+		At: internal.TestAt,
+		ID: 1,
 		Labels: []event.Label{
 			internal.LevelKey.Of(3),
 			internal.NameKey.Of("n/m"),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
+			event.Message.Of("mess"),
 		},
 	}
 	if diff := cmp.Diff(want, &th.Got); diff != "" {

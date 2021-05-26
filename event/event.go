@@ -12,11 +12,10 @@ import (
 // Event holds the information about an event that occurred.
 // It combines the event metadata with the user supplied labels.
 type Event struct {
-	ID      uint64    // unique for this process id of the event
-	Parent  uint64    // id of the parent event for this event
-	At      time.Time // time at which the event is delivered to the exporter.
-	Message string
-	Labels  []Label
+	ID     uint64    // unique for this process id of the event
+	Parent uint64    // id of the parent event for this event
+	At     time.Time // time at which the event is delivered to the exporter.
+	Labels []Label
 }
 
 // LogHandler is a the type for something that handles log events as they occur.

@@ -24,7 +24,7 @@ type Builder struct {
 // all for the very common cases of simple events. The length needs to be large
 // enough to cope with the majority of events but no so large as to cause undue
 // stack pressure.
-const preallocateLabels = 4
+const preallocateLabels = 6
 
 type builder struct {
 	exporter *Exporter
@@ -122,7 +122,7 @@ func (b Builder) Logf(template string, args ...interface{}) {
 func (b Builder) log(message string) {
 	b.data.exporter.mu.Lock()
 	defer b.data.exporter.mu.Unlock()
-	b.data.Event.Message = message
+	b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
 	b.data.exporter.prepare(&b.data.Event)
 	b.data.exporter.log.Log(b.ctx, &b.data.Event)
 }
@@ -205,7 +205,7 @@ func (b Builder) Start(name string) (context.Context, func()) {
 		eb.data.exporter = b.data.exporter
 		eb.data.Event.Parent = b.data.Event.ID
 		// and now deliver the start event
-		b.data.Event.Message = name
+		b.data.Event.Labels = append(b.data.Event.Labels, Trace.Of(name))
 		ctx = newContext(ctx, b.data.exporter, b.data.Event.ID)
 		ctx = b.data.exporter.trace.Start(ctx, &b.data.Event)
 		eb.ctx = ctx

@@ -27,12 +27,12 @@ func Test(t *testing.T) {
 	log.WithContext(ctx).WithField("traceID", 17).WithField("resource", "R").Info("mess")
 
 	want := &event.Event{
-		ID:      1,
-		Message: "mess",
+		ID: 1,
 		Labels: []event.Label{
 			internal.LevelKey.Of(4),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
+			event.Message.Of("mess"),
 		},
 	}
 	th.Got.At = want.At

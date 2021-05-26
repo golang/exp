@@ -83,11 +83,6 @@ func (p *Printer) Event(kind string, ev *event.Event) {
 	p.WriteString(" kind=")
 	p.WriteString(kind)
 
-	if ev.Message != "" {
-		p.WriteString(" msg=")
-		p.Quote(ev.Message)
-	}
-
 	for _, l := range ev.Labels {
 		if l.Name == "" {
 			continue
