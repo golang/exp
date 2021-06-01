@@ -98,7 +98,7 @@ time=2020-03-05T14:27:48 myInt=6 msg="my event"
 time=2020-03-05T14:27:49 myString="some string value" msg="string event"
 `}} {
 		buf := &strings.Builder{}
-		e := event.NewExporter(logfmt.NewPrinter(buf))
+		e := event.NewExporter(logfmt.NewHandler(buf))
 		e.Now = eventtest.TestNow()
 		ctx := event.WithExporter(ctx, e)
 		test.events(ctx)
@@ -111,7 +111,7 @@ time=2020-03-05T14:27:49 myString="some string value" msg="string event"
 }
 
 func ExampleLog() {
-	e := event.NewExporter(logfmt.NewPrinter(os.Stdout))
+	e := event.NewExporter(logfmt.NewHandler(os.Stdout))
 	e.Now = eventtest.TestNow()
 	ctx := event.WithExporter(context.Background(), e)
 	event.To(ctx).With(keys.Int("myInt").Of(6)).Log("my event")

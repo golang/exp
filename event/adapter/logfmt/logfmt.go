@@ -17,120 +17,112 @@ import (
 const bufCap = 50
 
 type Printer struct {
-	io.Writer
-	io.StringWriter
-
 	buf     [bufCap]byte
 	needSep bool
 }
 
-type stringWriter struct {
-	io.Writer
+type Handler struct {
+	to      io.Writer
+	printer Printer
 }
 
-// NewPrinter returns a handler that prints the events to the supplied writer.
+// NewHandler returns a handler that prints the events to the supplied writer.
 // Each event is printed in logfmt format on a single line.
-func NewPrinter(to io.Writer) *Printer {
-	p := &Printer{Writer: to}
-	ok := false
-	p.StringWriter, ok = to.(io.StringWriter)
-	if !ok {
-		p.StringWriter = &stringWriter{to}
-	}
-	return p
+func NewHandler(to io.Writer) *Handler {
+	return &Handler{to: to}
 }
 
-func (p *Printer) Log(ctx context.Context, ev *event.Event) {
-	p.Event("log", ev)
+func (h *Handler) Log(ctx context.Context, ev *event.Event) {
+	h.printer.Event(h.to, "log", ev)
 }
 
-func (p *Printer) Metric(ctx context.Context, ev *event.Event) {
-	p.Event("metric", ev)
+func (h *Handler) Metric(ctx context.Context, ev *event.Event) {
+	h.printer.Event(h.to, "metric", ev)
 }
 
-func (p *Printer) Annotate(ctx context.Context, ev *event.Event) {
-	p.Event("annotate", ev)
+func (h *Handler) Annotate(ctx context.Context, ev *event.Event) {
+	h.printer.Event(h.to, "annotate", ev)
 }
 
-func (p *Printer) Start(ctx context.Context, ev *event.Event) context.Context {
-	p.Event("start", ev)
+func (h *Handler) Start(ctx context.Context, ev *event.Event) context.Context {
+	h.printer.Event(h.to, "start", ev)
 	return ctx
 }
 
-func (p *Printer) End(ctx context.Context, ev *event.Event) {
-	p.Event("end", ev)
+func (h *Handler) End(ctx context.Context, ev *event.Event) {
+	h.printer.Event(h.to, "end", ev)
 }
 
-func (p *Printer) Event(kind string, ev *event.Event) {
+func (p *Printer) Event(w io.Writer, kind string, ev *event.Event) {
 	const timeFormat = "2006-01-02T15:04:05"
 	p.needSep = false
 	if !ev.At.IsZero() {
-		p.label("time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], timeFormat)))
+		p.label(w, "time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], timeFormat)))
 	}
 
 	if ev.ID != 0 {
-		p.label("trace", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.ID, 10)))
+		p.label(w, "trace", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.ID, 10)))
 	}
 	if ev.Parent != 0 {
-		p.label("parent", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
+		p.label(w, "parent", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
 	}
 
 	if kind != "log" && kind != "start" {
-		p.label("kind", event.StringOf(kind))
+		p.label(w, "kind", event.StringOf(kind))
 	}
 
 	for _, l := range ev.Labels {
 		if l.Name == "" {
 			continue
 		}
-		p.Label(l)
+		p.Label(w, l)
 	}
-	p.WriteString("\n")
+	io.WriteString(w, "\n")
 }
 
-func (p *Printer) Label(l event.Label) {
-	p.label(l.Name, l.Value)
+func (p *Printer) Label(w io.Writer, l event.Label) {
+	p.label(w, l.Name, l.Value)
 }
 
-func (p *Printer) Value(v event.Value) {
+func (p *Printer) Value(w io.Writer, v event.Value) {
 	switch {
 	case v.IsString():
-		p.Quote(v.String())
+		p.Quote(w, v.String())
 	case v.IsBytes():
-		p.Bytes(v.Bytes())
+		p.Bytes(w, v.Bytes())
 	case v.IsInt64():
-		p.Write(strconv.AppendInt(p.buf[:0], v.Int64(), 10))
+		w.Write(strconv.AppendInt(p.buf[:0], v.Int64(), 10))
 	case v.IsUint64():
-		p.Write(strconv.AppendUint(p.buf[:0], v.Uint64(), 10))
+		w.Write(strconv.AppendUint(p.buf[:0], v.Uint64(), 10))
 	case v.IsFloat64():
-		p.Write(strconv.AppendFloat(p.buf[:0], v.Float64(), 'g', -1, 64))
+		w.Write(strconv.AppendFloat(p.buf[:0], v.Float64(), 'g', -1, 64))
 	case v.IsBool():
 		if v.Bool() {
-			p.WriteString("true")
+			io.WriteString(w, "true")
 		} else {
-			p.WriteString("false")
+			io.WriteString(w, "false")
 		}
 	default:
-		fmt.Fprint(p, v.Interface())
+		fmt.Fprint(w, v.Interface())
 	}
 }
 
-func (p *Printer) Ident(s string) {
+func (p *Printer) Ident(w io.Writer, s string) {
 	//TODO: this should also escape = if it occurs in an ident?
-	p.Quote(s)
+	p.Quote(w, s)
 }
 
-func (p *Printer) Quote(s string) {
+func (p *Printer) Quote(w io.Writer, s string) {
 	if s == "" {
-		p.WriteString(`""`)
+		io.WriteString(w, `""`)
 		return
 	}
 	if !needQuote(s) {
-		p.WriteString(s)
+		io.WriteString(w, s)
 		return
 	}
 	// string needs quoting
-	p.WriteString(`"`)
+	io.WriteString(w, `"`)
 	written := 0
 	for o, r := range s {
 		q := quoteRune(r)
@@ -138,33 +130,33 @@ func (p *Printer) Quote(s string) {
 			continue
 		}
 		// write out any prefix
-		p.WriteString(s[written:o])
+		io.WriteString(w, s[written:o])
 		written = o + 1 // we can plus 1 because all runes we escape are ascii
 		// and write out the quoted rune
-		p.WriteString(q)
+		io.WriteString(w, q)
 	}
-	p.WriteString(s[written:])
-	p.WriteString(`"`)
+	io.WriteString(w, s[written:])
+	io.WriteString(w, `"`)
 }
 
 // Bytes writes a byte array in string form to the printer.
-func (p *Printer) Bytes(buf []byte) {
+func (p *Printer) Bytes(w io.Writer, buf []byte) {
 	//TODO: non asci chars need escaping
-	p.Write(buf)
+	w.Write(buf)
 }
 
-func (p *Printer) label(name string, value event.Value) {
+func (p *Printer) label(w io.Writer, name string, value event.Value) {
 	if name == "" {
 		return
 	}
 	if p.needSep {
-		p.WriteString(" ")
+		io.WriteString(w, " ")
 	}
 	p.needSep = true
-	p.Ident(name)
+	p.Ident(w, name)
 	if value.HasValue() {
-		p.WriteString("=")
-		p.Value(value)
+		io.WriteString(w, "=")
+		p.Value(w, value)
 	}
 }
 
@@ -190,8 +182,4 @@ func quoteRune(r rune) string {
 	default:
 		return ``
 	}
-}
-
-func (w *stringWriter) WriteString(s string) (int, error) {
-	return w.Write([]byte(s))
 }

@@ -22,14 +22,14 @@ import (
 // NewContext returns a context you should use for the active test.
 func NewContext(ctx context.Context, tb testing.TB) context.Context {
 	h := &testHandler{tb: tb}
-	h.p = logfmt.NewPrinter(&h.buf)
+	h.p = logfmt.NewHandler(&h.buf)
 	return event.WithExporter(ctx, event.NewExporter(h))
 }
 
 type testHandler struct {
 	tb  testing.TB
 	buf strings.Builder
-	p   *logfmt.Printer
+	p   *logfmt.Handler
 }
 
 func (h *testHandler) Log(ctx context.Context, ev *event.Event) {

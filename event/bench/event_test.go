@@ -95,7 +95,7 @@ func eventNoop() context.Context {
 }
 
 func eventPrint(w io.Writer) context.Context {
-	e := event.NewExporter(logfmt.NewPrinter(w))
+	e := event.NewExporter(logfmt.NewHandler(w))
 	e.Now = eventtest.TestNow()
 	return event.WithExporter(context.Background(), e)
 }
