@@ -1,0 +1,7 @@
+mod=example.com/basic/v2
+base=v1.1.0
+version=v2.1.0
+success=false
+-- want --
+Cannot suggest a release version.
+Base module path is different from release.

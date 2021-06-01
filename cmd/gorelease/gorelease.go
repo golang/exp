@@ -223,8 +223,24 @@ func runRelease(ctx context.Context, w io.Writer, dir string, args []string) (su
 	// the module cache.
 	var max string
 	if baseModPath == "" {
-		baseModPath = release.modPath
-		max = releaseVersion
+		if baseVersion != "" && semver.Canonical(baseVersion) == baseVersion && module.Check(release.modPath, baseVersion) != nil {
+			// Base version was specified, but it's not consistent with the release
+			// module path, for example, the module path is example.com/m/v2, but
+			// the user said -base=v1.0.0. Instead of making the user explicitly
+			// specify the base module path, we'll adjust the major version suffix.
+			prefix, _, _ := module.SplitPathVersion(release.modPath)
+			major := semver.Major(baseVersion)
+			if strings.HasPrefix(prefix, "gopkg.in/") {
+				baseModPath = prefix + "." + semver.Major(baseVersion)
+			} else if major >= "v2" {
+				baseModPath = prefix + "/" + major
+			} else {
+				baseModPath = prefix
+			}
+		} else {
+			baseModPath = release.modPath
+			max = releaseVersion
+		}
 	}
 	base, err := loadDownloadedModule(ctx, baseModPath, baseVersion, max)
 	if err != nil {
