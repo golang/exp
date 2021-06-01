@@ -20,7 +20,6 @@ func Test(t *testing.T) {
 	ctx := event.WithExporter(context.Background(), e)
 	log.Log(ctx, "msg", "mess", "level", 1, "name", "n/m", "traceID", 17, "resource", "R")
 	want := &event.Event{
-		ID: 1,
 		At: internal.TestAt,
 		Labels: []event.Label{
 			keys.Value("level").Of(1),

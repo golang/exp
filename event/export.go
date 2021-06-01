@@ -78,9 +78,6 @@ func fromContext(ctx context.Context) (*Exporter, uint64) {
 // then the timestamp will be updated.
 // prepare must be called with the export mutex held.
 func (e *Exporter) prepare(ev *Event) {
-	e.lastEvent++
-	id := e.lastEvent
-	ev.ID = id
 	if e.Now != nil && ev.At.IsZero() {
 		ev.At = e.Now()
 	}

@@ -198,6 +198,8 @@ func (b Builder) Start(name string) (context.Context, func()) {
 	if b.data.exporter.trace != nil {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
+		b.data.exporter.lastEvent++
+		b.data.Event.ID = b.data.exporter.lastEvent
 		b.data.exporter.prepare(&b.data.Event)
 		// create the end builder
 		eb := Builder{}

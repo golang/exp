@@ -21,7 +21,6 @@ func TestInfo(t *testing.T) {
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := &event.Event{
 		At: internal.TestAt,
-		ID: 1,
 		Labels: []event.Label{
 			internal.LevelKey.Of(3),
 			internal.NameKey.Of("n/m"),

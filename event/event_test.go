@@ -33,19 +33,19 @@ func TestPrint(t *testing.T) {
 	}{{
 		name:   "simple",
 		events: func(ctx context.Context) { event.To(ctx).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log msg="a message"
+		expect: `time=2020-03-05T14:27:48 msg="a message"
 `}, {
 		name:   "log 1",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log l1=1 msg="a message"`,
+		expect: `time=2020-03-05T14:27:48 l1=1 msg="a message"`,
 	}, {
 		name:   "log 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log l1=1 l2=2 msg="a message"`,
+		expect: `time=2020-03-05T14:27:48 l1=1 l2=2 msg="a message"`,
 	}, {
 		name:   "log 3",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).With(l3).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=log l1=1 l2=2 l3=3 msg="a message"`,
+		expect: `time=2020-03-05T14:27:48 l1=1 l2=2 l3=3 msg="a message"`,
 	}, {
 		name: "span",
 		events: func(ctx context.Context) {
@@ -53,8 +53,8 @@ func TestPrint(t *testing.T) {
 			end()
 		},
 		expect: `
-time=2020-03-05T14:27:48 id=1 kind=start name=span
-time=2020-03-05T14:27:49 id=2 span=1 kind=end
+time=2020-03-05T14:27:48 trace=1 name=span
+time=2020-03-05T14:27:49 parent=1 kind=end
 `}, {
 		name: "span nested",
 		events: func(ctx context.Context) {
@@ -65,27 +65,27 @@ time=2020-03-05T14:27:49 id=2 span=1 kind=end
 			event.To(child).Log("message")
 		},
 		expect: `
-time=2020-03-05T14:27:48 id=1 kind=start name=parent
-time=2020-03-05T14:27:49 id=2 span=1 kind=start name=child
-time=2020-03-05T14:27:50 id=3 span=2 kind=log msg=message
-time=2020-03-05T14:27:51 id=4 span=2 kind=end
-time=2020-03-05T14:27:52 id=5 span=1 kind=end
+time=2020-03-05T14:27:48 trace=1 name=parent
+time=2020-03-05T14:27:49 trace=2 parent=1 name=child
+time=2020-03-05T14:27:50 parent=2 msg=message
+time=2020-03-05T14:27:51 parent=2 kind=end
+time=2020-03-05T14:27:52 parent=1 kind=end
 `}, {
 		name:   "metric",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric() },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=metric l1=1`,
+		expect: `time=2020-03-05T14:27:48 kind=metric l1=1`,
 	}, {
 		name:   "metric 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Metric() },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=metric l1=1 l2=2`,
+		expect: `time=2020-03-05T14:27:48 kind=metric l1=1 l2=2`,
 	}, {
 		name:   "annotate",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Annotate() },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=annotate l1=1`,
+		expect: `time=2020-03-05T14:27:48 kind=annotate l1=1`,
 	}, {
 		name:   "annotate 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Annotate() },
-		expect: `time=2020-03-05T14:27:48 id=1 kind=annotate l1=1 l2=2`,
+		expect: `time=2020-03-05T14:27:48 kind=annotate l1=1 l2=2`,
 	}, {
 		name: "multiple events",
 		events: func(ctx context.Context) {
@@ -94,8 +94,8 @@ time=2020-03-05T14:27:52 id=5 span=1 kind=end
 			b.With(keys.String("myString").Of("some string value")).Log("string event")
 		},
 		expect: `
-time=2020-03-05T14:27:48 id=1 kind=log myInt=6 msg="my event"
-time=2020-03-05T14:27:49 id=2 kind=log myString="some string value" msg="string event"
+time=2020-03-05T14:27:48 myInt=6 msg="my event"
+time=2020-03-05T14:27:49 myString="some string value" msg="string event"
 `}} {
 		buf := &strings.Builder{}
 		e := event.NewExporter(logfmt.NewPrinter(buf))
@@ -117,6 +117,6 @@ func ExampleLog() {
 	event.To(ctx).With(keys.Int("myInt").Of(6)).Log("my event")
 	event.To(ctx).With(keys.String("myString").Of("some string value")).Log("error event")
 	// Output:
-	// time=2020-03-05T14:27:48 id=1 kind=log myInt=6 msg="my event"
-	// time=2020-03-05T14:27:49 id=2 kind=log myString="some string value" msg="error event"
+	// time=2020-03-05T14:27:48 myInt=6 msg="my event"
+	// time=2020-03-05T14:27:49 myString="some string value" msg="error event"
 }

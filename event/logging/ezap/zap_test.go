@@ -22,7 +22,6 @@ func Test(t *testing.T) {
 	log = log.Named("n/m")
 	log.Info("mess", zap.Float64("pi", 3.14))
 	want := &event.Event{
-		ID: 1,
 		Labels: []event.Label{
 			keys.Int64("traceID").Of(17),
 			keys.String("resource").Of("R"),

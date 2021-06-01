@@ -27,7 +27,6 @@ func Test(t *testing.T) {
 	log.WithContext(ctx).WithField("traceID", 17).WithField("resource", "R").Info("mess")
 
 	want := &event.Event{
-		ID: 1,
 		Labels: []event.Label{
 			internal.LevelKey.Of(4),
 			keys.Value("traceID").Of(17),

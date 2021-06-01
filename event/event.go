@@ -12,7 +12,7 @@ import (
 // Event holds the information about an event that occurred.
 // It combines the event metadata with the user supplied labels.
 type Event struct {
-	ID     uint64    // unique for this process id of the event
+	ID     uint64    // only set for trace events, a unique id per exporter for the trace.
 	Parent uint64    // id of the parent event for this event
 	At     time.Time // time at which the event is delivered to the exporter.
 	Labels []Label

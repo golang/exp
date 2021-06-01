@@ -68,12 +68,16 @@ func (p *Printer) Event(kind string, ev *event.Event) {
 		p.label("time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], timeFormat)))
 	}
 
-	p.label("id", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.ID, 10)))
+	if ev.ID != 0 {
+		p.label("trace", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.ID, 10)))
+	}
 	if ev.Parent != 0 {
-		p.label("span", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
+		p.label("parent", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
 	}
 
-	p.label("kind", event.StringOf(kind))
+	if kind != "log" && kind != "start" {
+		p.label("kind", event.StringOf(kind))
+	}
 
 	for _, l := range ev.Labels {
 		if l.Name == "" {
