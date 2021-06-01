@@ -10,13 +10,15 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Builder is a fluent builder for construction of new events.
 type Builder struct {
-	ctx  context.Context
-	data *builder
+	ctx       context.Context
+	data      *builder
+	builderID uint64 // equals data.id if all is well
 }
 
 // preallocateLabels controls the space reserved for labels in a builder.
@@ -30,24 +32,31 @@ type builder struct {
 	exporter *Exporter
 	Event    Event
 	labels   [preallocateLabels]Label
+	id       uint64
 }
 
 var builderPool = sync.Pool{New: func() interface{} { return &builder{} }}
 
 // To initializes a builder from the values stored in a context.
 func To(ctx context.Context) Builder {
-	return Builder{ctx: ctx, data: newBuilder(ctx)}
-}
-
-func newBuilder(ctx context.Context) *builder {
+	b := Builder{ctx: ctx}
 	exporter, parent := FromContext(ctx)
 	if exporter == nil {
-		return nil
+		return b
 	}
+	b.data = allocBuilder()
+	b.builderID = b.data.id
+	b.data.exporter = exporter
+	b.data.Event.Labels = b.data.labels[:0]
+	b.data.Event.Parent = parent
+	return b
+}
+
+var builderID uint64 // atomic
+
+func allocBuilder() *builder {
 	b := builderPool.Get().(*builder)
-	b.exporter = exporter
-	b.Event.Labels = b.labels[:0]
-	b.Event.Parent = parent
+	b.id = atomic.AddUint64(&builderID, 1)
 	return b
 }
 
@@ -57,8 +66,11 @@ func (b Builder) Clone() Builder {
 	if b.data == nil {
 		return b
 	}
-	clone := Builder{ctx: b.ctx, data: builderPool.Get().(*builder)}
+	bb := allocBuilder()
+	bbid := bb.id
+	clone := Builder{ctx: b.ctx, data: bb, builderID: bb.id}
 	*clone.data = *b.data
+	clone.data.id = bbid
 	if len(b.data.Event.Labels) == 0 || &b.data.labels[0] == &b.data.Event.Labels[0] {
 		clone.data.Event.Labels = clone.data.labels[:len(b.data.Event.Labels)]
 	} else {
@@ -71,6 +83,7 @@ func (b Builder) Clone() Builder {
 // With adds a new label to the event being constructed.
 func (b Builder) With(label Label) Builder {
 	if b.data != nil {
+		checkValid(b.data, b.builderID)
 		b.data.Event.Labels = append(b.data.Event.Labels, label)
 	}
 	return b
@@ -81,6 +94,7 @@ func (b Builder) WithAll(labels ...Label) Builder {
 	if b.data == nil || len(labels) == 0 {
 		return b
 	}
+	checkValid(b.data, b.builderID)
 	if len(b.data.Event.Labels) == 0 {
 		b.data.Event.Labels = labels
 	} else {
@@ -91,6 +105,7 @@ func (b Builder) WithAll(labels ...Label) Builder {
 
 func (b Builder) At(t time.Time) Builder {
 	if b.data != nil {
+		checkValid(b.data, b.builderID)
 		b.data.Event.At = t
 	}
 	return b
@@ -98,6 +113,7 @@ func (b Builder) At(t time.Time) Builder {
 
 func (b Builder) Namespace(ns string) Builder {
 	if b.data != nil {
+		checkValid(b.data, b.builderID)
 		b.data.Event.Namespace = ns
 	}
 	return b
@@ -108,7 +124,8 @@ func (b Builder) Log(message string) {
 	if b.data == nil {
 		return
 	}
-	if b.data.exporter.handler != nil {
+	checkValid(b.data, b.builderID)
+	if b.data.exporter.loggingEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
@@ -124,6 +141,7 @@ func (b Builder) Logf(template string, args ...interface{}) {
 	if b.data == nil {
 		return
 	}
+	checkValid(b.data, b.builderID)
 	if b.data.exporter.loggingEnabled() {
 		message := fmt.Sprintf(template, args...)
 		// Duplicate code from Log so Exporter.deliver's invocation of runtime.Callers is correct.
@@ -141,6 +159,7 @@ func (b Builder) Metric() {
 	if b.data == nil {
 		return
 	}
+	checkValid(b.data, b.builderID)
 	if b.data.exporter.metricsEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
@@ -156,6 +175,7 @@ func (b Builder) Annotate() {
 	if b.data == nil {
 		return
 	}
+	checkValid(b.data, b.builderID)
 	if b.data.exporter.annotationsEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
@@ -170,6 +190,7 @@ func (b Builder) End() {
 	if b.data == nil {
 		return
 	}
+	checkValid(b.data, b.builderID)
 	if b.data.exporter.tracingEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
@@ -182,6 +203,7 @@ func (b Builder) End() {
 
 // Event returns a copy of the event currently being built.
 func (b Builder) Event() *Event {
+	checkValid(b.data, b.builderID)
 	clone := b.data.Event
 	if len(b.data.Event.Labels) > 0 {
 		clone.Labels = make([]Label, len(b.data.Event.Labels))
@@ -204,6 +226,7 @@ func (b Builder) Start(name string) (context.Context, func()) {
 	if b.data == nil {
 		return b.ctx, func() {}
 	}
+	checkValid(b.data, b.builderID)
 	ctx := b.ctx
 	end := func() {}
 	if b.data.exporter.tracingEnabled() {
@@ -215,7 +238,8 @@ func (b Builder) Start(name string) (context.Context, func()) {
 		b.data.exporter.prepare(&b.data.Event)
 		// create the end builder
 		eb := Builder{}
-		eb.data = builderPool.Get().(*builder)
+		eb.data = allocBuilder()
+		eb.builderID = eb.data.id
 		eb.data.exporter = b.data.exporter
 		eb.data.Event.Parent = traceID
 		// and now deliver the start event
@@ -227,4 +251,10 @@ func (b Builder) Start(name string) (context.Context, func()) {
 	}
 	b.done()
 	return ctx, end
+}
+
+func checkValid(b *builder, wantID uint64) {
+	if b.exporter == nil || b.id != wantID {
+		panic("Builder already delivered an event; missing call to Clone")
+	}
 }

@@ -60,6 +60,9 @@ var (
 // NewExporter creates an Exporter using the supplied handler and options.
 // Event delivery is serialized to enable safe atomic handling.
 func NewExporter(handler Handler, opts *ExporterOptions) *Exporter {
+	if handler == nil {
+		panic("handler must not be nil")
+	}
 	e := &Exporter{handler: handler}
 	if opts != nil {
 		e.opts = *opts
