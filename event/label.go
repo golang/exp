@@ -33,6 +33,9 @@ func (l1 Label) Equal(l2 Label) bool {
 // stringptr is used in untyped when the Value is a string
 type stringptr unsafe.Pointer
 
+// bytesptr is used in untyped when the Value is a byte slice
+type bytesptr unsafe.Pointer
+
 // int64Kind is used in untyped when the Value is a signed integer
 type int64Kind struct{}
 
@@ -133,9 +136,35 @@ func (v Value) String() string {
 	}
 }
 
-// IsString returns true if the value was built with SetString.
+// IsString returns true if the value was built with StringOf.
 func (v Value) IsString() bool {
 	_, ok := v.untyped.(stringptr)
+	return ok
+}
+
+// BytesOf returns a new Value for a string.
+func BytesOf(data []byte) Value {
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&data))
+	return Value{packed: uint64(hdr.Len), untyped: bytesptr(hdr.Data)}
+}
+
+// Bytes returns the value as a bytes array.
+func (v Value) Bytes() []byte {
+	bp, ok := v.untyped.(bytesptr)
+	if !ok {
+		panic("Bytes called on non []byte value")
+	}
+	var buf []byte
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+	hdr.Data = uintptr(bp)
+	hdr.Len = int(v.packed)
+	hdr.Cap = hdr.Len // TODO: is this safe?
+	return buf
+}
+
+// IsBytes returns true if the value was built with BytesOf.
+func (v Value) IsBytes() bool {
+	_, ok := v.untyped.(bytesptr)
 	return ok
 }
 

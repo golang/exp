@@ -20,7 +20,8 @@ type Printer struct {
 	io.Writer
 	io.StringWriter
 
-	buf [bufCap]byte
+	buf     [bufCap]byte
+	needSep bool
 }
 
 type stringWriter struct {
@@ -41,67 +42,58 @@ func NewPrinter(to io.Writer) *Printer {
 
 func (p *Printer) Log(ctx context.Context, ev *event.Event) {
 	p.Event("log", ev)
-	p.WriteString("\n")
 }
 
 func (p *Printer) Metric(ctx context.Context, ev *event.Event) {
 	p.Event("metric", ev)
-	p.WriteString("\n")
 }
 
 func (p *Printer) Annotate(ctx context.Context, ev *event.Event) {
 	p.Event("annotate", ev)
-	p.WriteString("\n")
 }
 
 func (p *Printer) Start(ctx context.Context, ev *event.Event) context.Context {
 	p.Event("start", ev)
-	p.WriteString("\n")
 	return ctx
 }
 
 func (p *Printer) End(ctx context.Context, ev *event.Event) {
 	p.Event("end", ev)
-	p.WriteString("\n")
 }
 
 func (p *Printer) Event(kind string, ev *event.Event) {
 	const timeFormat = "2006-01-02T15:04:05"
+	p.needSep = false
 	if !ev.At.IsZero() {
-		p.WriteString("time=")
-		p.Write(ev.At.AppendFormat(p.buf[:0], timeFormat))
-		p.WriteString(" ")
+		p.label("time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], timeFormat)))
 	}
 
-	p.WriteString("id=")
-	p.Write(strconv.AppendUint(p.buf[:0], ev.ID, 10))
+	p.label("id", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.ID, 10)))
 	if ev.Parent != 0 {
-		p.WriteString(" span=")
-		p.Write(strconv.AppendUint(p.buf[:0], ev.Parent, 10))
+		p.label("span", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
 	}
 
-	p.WriteString(" kind=")
-	p.WriteString(kind)
+	p.label("kind", event.StringOf(kind))
 
 	for _, l := range ev.Labels {
 		if l.Name == "" {
 			continue
 		}
-		p.WriteString(" ")
-		p.Label(&l)
+		p.Label(l)
 	}
+	p.WriteString("\n")
 }
 
-func (p *Printer) Label(l *event.Label) {
-	p.Ident(l.Name)
-	p.WriteString("=")
-	p.Value(&l.Value)
+func (p *Printer) Label(l event.Label) {
+	p.label(l.Name, l.Value)
 }
 
-func (p *Printer) Value(v *event.Value) {
+func (p *Printer) Value(v event.Value) {
 	switch {
 	case v.IsString():
 		p.Quote(v.String())
+	case v.IsBytes():
+		p.Bytes(v.Bytes())
 	case v.IsInt64():
 		p.Write(strconv.AppendInt(p.buf[:0], v.Int64(), 10))
 	case v.IsUint64():
@@ -149,6 +141,27 @@ func (p *Printer) Quote(s string) {
 	}
 	p.WriteString(s[written:])
 	p.WriteString(`"`)
+}
+
+// Bytes writes a byte array in string form to the printer.
+func (p *Printer) Bytes(buf []byte) {
+	//TODO: non asci chars need escaping
+	p.Write(buf)
+}
+
+func (p *Printer) label(name string, value event.Value) {
+	if name == "" {
+		return
+	}
+	if p.needSep {
+		p.WriteString(" ")
+	}
+	p.needSep = true
+	p.Ident(name)
+	if value.HasValue() {
+		p.WriteString("=")
+		p.Value(value)
+	}
 }
 
 func needQuote(s string) bool {
