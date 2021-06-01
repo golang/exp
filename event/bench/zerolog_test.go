@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (
@@ -43,7 +42,7 @@ var (
 
 func zerologPrint(w io.Writer) context.Context {
 	zerolog.TimeFieldFormat = timeFormat
-	zerolog.TimestampFunc = eventtest.TestNow()
+	zerolog.TimestampFunc = newTimer()
 	logger := zerolog.New(zerolog.SyncWriter(w)).With().Timestamp().Logger()
 	return logger.WithContext(context.Background())
 }

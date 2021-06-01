@@ -65,7 +65,8 @@ func newContext(ctx context.Context, exporter *Exporter, parent uint64) context.
 	return context.WithValue(ctx, contextKey, contextValue{exporter: exporter, parent: parent})
 }
 
-func fromContext(ctx context.Context) (*Exporter, uint64) {
+// FromContext returns the exporter and current trace for the supplied context.
+func FromContext(ctx context.Context) (*Exporter, uint64) {
 	if v, ok := ctx.Value(contextKey).(contextValue); ok {
 		return v.exporter, v.parent
 	}

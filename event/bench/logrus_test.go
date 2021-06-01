@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (
@@ -62,7 +61,7 @@ func logrusPrint(w io.Writer) context.Context {
 		Out:   w,
 		Level: logrus.InfoLevel,
 		Formatter: &logrusTimeFormatter{
-			now: eventtest.TestNow(),
+			now: newTimer(),
 			wrapped: &logrus.TextFormatter{
 				FullTimestamp:   true,
 				TimestampFormat: timeFormat,

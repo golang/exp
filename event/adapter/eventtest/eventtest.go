@@ -11,7 +11,7 @@ package eventtest
 
 import (
 	"context"
-	"strings"
+	"os"
 	"testing"
 	"time"
 
@@ -22,53 +22,47 @@ import (
 // NewContext returns a context you should use for the active test.
 func NewContext(ctx context.Context, tb testing.TB) context.Context {
 	h := &testHandler{tb: tb}
-	h.p = logfmt.NewHandler(&h.buf)
 	return event.WithExporter(ctx, event.NewExporter(h))
 }
 
 type testHandler struct {
-	tb  testing.TB
-	buf strings.Builder
-	p   *logfmt.Handler
+	tb      testing.TB
+	printer logfmt.Printer
 }
 
 func (h *testHandler) Log(ctx context.Context, ev *event.Event) {
-	h.p.Log(ctx, ev)
-	h.deliver()
+	h.event(ctx, "log", ev)
 }
 
 func (h *testHandler) Metric(ctx context.Context, ev *event.Event) {
-	h.p.Metric(ctx, ev)
-	h.deliver()
+	h.event(ctx, "metric", ev)
 }
 
 func (h *testHandler) Annotate(ctx context.Context, ev *event.Event) {
-	h.p.Annotate(ctx, ev)
-	h.deliver()
+	h.event(ctx, "annotate", ev)
 }
 
 func (h *testHandler) Start(ctx context.Context, ev *event.Event) context.Context {
-	ctx = h.p.Start(ctx, ev)
-	h.deliver()
+	h.event(ctx, "start", ev)
 	return ctx
 }
 
 func (h *testHandler) End(ctx context.Context, ev *event.Event) {
-	h.p.End(ctx, ev)
-	h.deliver()
+	h.event(ctx, "end", ev)
 }
 
-func (h *testHandler) deliver() {
-	if h.buf.Len() == 0 {
-		return
-	}
-	h.tb.Log(h.buf.String())
-	h.buf.Reset()
+func (h *testHandler) event(ctx context.Context, kind string, ev *event.Event) {
+	//TODO: choose between stdout and stderr based on the event
+	//TODO: decide if we should be calling h.tb.Fail()
+	h.printer.Event(os.Stdout, kind, ev)
 }
 
-func TestNow() func() time.Time {
+// FixedNow updates the exporter in the context to use a time function returned
+// by TestNow to make tests reproducible.
+func FixedNow(ctx context.Context) {
 	nextTime, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
-	return func() time.Time {
+	e, _ := event.FromContext(ctx)
+	e.Now = func() time.Time {
 		thisTime := nextTime
 		nextTime = nextTime.Add(time.Second)
 		return thisTime

@@ -40,7 +40,7 @@ func To(ctx context.Context) Builder {
 }
 
 func newBuilder(ctx context.Context) *builder {
-	exporter, parent := fromContext(ctx)
+	exporter, parent := FromContext(ctx)
 	if exporter == nil {
 		return nil
 	}

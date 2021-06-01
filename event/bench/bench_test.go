@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -97,5 +98,14 @@ func testAllocs(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, ex
 	}))
 	if got != expect {
 		t.Errorf("Got %d allocs, expect %d", got, expect)
+	}
+}
+
+func newTimer() func() time.Time {
+	nextTime, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
+	return func() time.Time {
+		thisTime := nextTime
+		nextTime = nextTime.Add(time.Second)
+		return thisTime
 	}
 }

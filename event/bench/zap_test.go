@@ -12,7 +12,6 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (
@@ -49,7 +48,7 @@ func zapCtx(ctx context.Context) *zap.Logger {
 }
 
 func zapPrint(w io.Writer) context.Context {
-	now := eventtest.TestNow()
+	now := newTimer()
 	ec := zap.NewProductionEncoderConfig()
 	ec.EncodeDuration = zapcore.NanosDurationEncoder
 	timeEncoder := zapcore.TimeEncoderOfLayout(timeFormat)

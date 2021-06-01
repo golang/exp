@@ -89,15 +89,15 @@ func eventNoExporter() context.Context {
 }
 
 func eventNoop() context.Context {
-	e := event.NewExporter(noopHandler{})
-	e.Now = eventtest.TestNow()
-	return event.WithExporter(context.Background(), e)
+	ctx := event.WithExporter(context.Background(), event.NewExporter(noopHandler{}))
+	eventtest.FixedNow(ctx)
+	return ctx
 }
 
 func eventPrint(w io.Writer) context.Context {
-	e := event.NewExporter(logfmt.NewHandler(w))
-	e.Now = eventtest.TestNow()
-	return event.WithExporter(context.Background(), e)
+	ctx := event.WithExporter(context.Background(), event.NewExporter(logfmt.NewHandler(w)))
+	eventtest.FixedNow(ctx)
+	return ctx
 }
 
 func BenchmarkLogEventNoExporter(b *testing.B) {

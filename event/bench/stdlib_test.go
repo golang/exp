@@ -11,8 +11,6 @@ import (
 	"io/ioutil"
 	"log"
 	"testing"
-
-	"golang.org/x/exp/event/adapter/eventtest"
 )
 
 var (
@@ -83,7 +81,7 @@ func ctxPrintf(ctx context.Context, msg string, args ...interface{}) {
 }
 
 func stdlibWriter(w io.Writer) context.Context {
-	now := eventtest.TestNow()
+	now := newTimer()
 	return context.WithValue(context.Background(), writerKey{},
 		func(msg string, args ...interface{}) {
 			fmt.Fprint(w, now().Format(timeFormat), " ")
