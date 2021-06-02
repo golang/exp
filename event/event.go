@@ -12,9 +12,10 @@ import (
 // Event holds the information about an event that occurred.
 // It combines the event metadata with the user supplied labels.
 type Event struct {
-	Parent uint64    // id of the parent event for this event
-	At     time.Time // time at which the event is delivered to the exporter.
-	Labels []Label
+	Parent    uint64    // id of the parent event for this event
+	Namespace string    // namespace of event; if empty, set by exporter to import path
+	At        time.Time // time at which the event is delivered to the exporter.
+	Labels    []Label
 }
 
 // Handler is a the type for something that handles events as they occur.

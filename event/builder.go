@@ -96,13 +96,24 @@ func (b Builder) At(t time.Time) Builder {
 	return b
 }
 
+func (b Builder) Namespace(ns string) Builder {
+	if b.data != nil {
+		b.data.Event.Namespace = ns
+	}
+	return b
+}
+
 // Log is a helper that calls Deliver with LogKind.
 func (b Builder) Log(message string) {
 	if b.data == nil {
 		return
 	}
 	if b.data.exporter.handler != nil {
-		b.log(message)
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.handler.Log(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -114,17 +125,15 @@ func (b Builder) Logf(template string, args ...interface{}) {
 		return
 	}
 	if b.data.exporter.loggingEnabled() {
-		b.log(fmt.Sprintf(template, args...))
+		message := fmt.Sprintf(template, args...)
+		// Duplicate code from Log so Exporter.deliver's invocation of runtime.Callers is correct.
+		b.data.exporter.mu.Lock()
+		defer b.data.exporter.mu.Unlock()
+		b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
+		b.data.exporter.prepare(&b.data.Event)
+		b.data.exporter.handler.Log(b.ctx, &b.data.Event)
 	}
 	b.done()
-}
-
-func (b Builder) log(message string) {
-	b.data.exporter.mu.Lock()
-	defer b.data.exporter.mu.Unlock()
-	b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
-	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.handler.Log(b.ctx, &b.data.Event)
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
