@@ -113,9 +113,17 @@ func BenchmarkLogEventfDiscard(b *testing.B) {
 }
 
 func BenchmarkTraceEventNoop(b *testing.B) {
+	runBenchmark(b, eventNoop(), eventTrace)
+}
+
+func BenchmarkTraceEventDiscard(b *testing.B) {
 	runBenchmark(b, eventPrint(io.Discard), eventTrace)
 }
 
 func BenchmarkMetricEventNoop(b *testing.B) {
+	runBenchmark(b, eventNoop(), eventMetric)
+}
+
+func BenchmarkMetricEventDiscard(b *testing.B) {
 	runBenchmark(b, eventPrint(io.Discard), eventMetric)
 }
