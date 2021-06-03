@@ -98,8 +98,7 @@ time=2020-03-05T14:27:48 myInt=6 msg="my event"
 time=2020-03-05T14:27:49 myString="some string value" msg="string event"
 `}} {
 		buf := &strings.Builder{}
-		ctx := event.WithExporter(ctx, event.NewExporter(logfmt.NewHandler(buf)))
-		eventtest.FixedNow(ctx)
+		ctx := event.WithExporter(ctx, eventtest.ExporterOptions().NewExporter(logfmt.NewHandler(buf)))
 		test.events(ctx)
 		got := strings.TrimSpace(buf.String())
 		expect := strings.TrimSpace(test.expect)
@@ -110,8 +109,7 @@ time=2020-03-05T14:27:49 myString="some string value" msg="string event"
 }
 
 func ExampleLog() {
-	ctx := event.WithExporter(context.Background(), event.NewExporter(logfmt.NewHandler(os.Stdout)))
-	eventtest.FixedNow(ctx)
+	ctx := event.WithExporter(context.Background(), eventtest.ExporterOptions().NewExporter(logfmt.NewHandler(os.Stdout)))
 	event.To(ctx).With(keys.Int("myInt").Of(6)).Log("my event")
 	event.To(ctx).With(keys.String("myString").Of("some string value")).Log("error event")
 	// Output:

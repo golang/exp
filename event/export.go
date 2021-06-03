@@ -16,11 +16,22 @@ import (
 
 // Exporter synchronizes the delivery of events to handlers.
 type Exporter struct {
-	Now func() time.Time
+	opts ExporterOptions
 
 	mu        sync.Mutex
 	handler   Handler
 	lastEvent uint64
+}
+
+type ExporterOptions struct {
+	// If non-nil, sets zero Event.At on delivery.
+	Now func() time.Time
+
+	// Disable some event types, for better performance.
+	DisableLogging     bool
+	DisableTracing     bool
+	DisableAnnotations bool
+	DisableMetrics     bool
 }
 
 // contextKey is used as the key for storing a contextValue on the context.
@@ -42,7 +53,11 @@ var (
 // NewExporter creates an Exporter using the supplied handler.
 // Event delivery is serialized to enable safe atomic handling.
 func NewExporter(handler Handler) *Exporter {
-	return &Exporter{Now: time.Now, handler: handler}
+	return (ExporterOptions{}).NewExporter(handler)
+}
+
+func (opts ExporterOptions) NewExporter(handler Handler) *Exporter {
+	return &Exporter{opts: opts, handler: handler}
 }
 
 func setDefaultExporter(e *Exporter) {
@@ -71,14 +86,12 @@ func FromContext(ctx context.Context) (*Exporter, uint64) {
 // then the timestamp will be updated.
 // prepare must be called with the export mutex held.
 func (e *Exporter) prepare(ev *Event) {
-	if e.Now != nil && ev.At.IsZero() {
-		ev.At = e.Now()
+	if e.opts.Now != nil && ev.At.IsZero() {
+		ev.At = e.opts.Now()
 	}
 }
 
-//TODO: decide how to control the enable/disable behaviour
-
-func (e *Exporter) loggingEnabled() bool     { return true }
-func (e *Exporter) annotationsEnabled() bool { return true }
-func (e *Exporter) tracingEnabled() bool     { return true }
-func (e *Exporter) metricsEnabled() bool     { return true }
+func (e *Exporter) loggingEnabled() bool     { return !e.opts.DisableLogging }
+func (e *Exporter) annotationsEnabled() bool { return !e.opts.DisableAnnotations }
+func (e *Exporter) tracingEnabled() bool     { return !e.opts.DisableTracing }
+func (e *Exporter) metricsEnabled() bool     { return !e.opts.DisableMetrics }

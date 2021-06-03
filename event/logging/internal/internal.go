@@ -34,7 +34,6 @@ var TestAt = time.Now()
 
 func NewTestExporter() (*event.Exporter, *TestHandler) {
 	te := &TestHandler{}
-	e := event.NewExporter(te)
-	e.Now = func() time.Time { return TestAt }
-	return e, te
+	opts := event.ExporterOptions{Now: func() time.Time { return TestAt }}
+	return opts.NewExporter(te), te
 }

@@ -57,17 +57,13 @@ func (h *testHandler) event(ctx context.Context, ev *event.Event) {
 	h.printer.Event(os.Stdout, ev)
 }
 
-// FixedNow updates the exporter in the context to use a time function returned
-// by TestNow to make tests reproducible.
-func FixedNow(ctx context.Context) {
+func ExporterOptions() event.ExporterOptions {
 	nextTime, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
-	e, _ := event.FromContext(ctx)
-	if e == nil {
-		return
-	}
-	e.Now = func() time.Time {
-		thisTime := nextTime
-		nextTime = nextTime.Add(time.Second)
-		return thisTime
+	return event.ExporterOptions{
+		Now: func() time.Time {
+			thisTime := nextTime
+			nextTime = nextTime.Add(time.Second)
+			return thisTime
+		},
 	}
 }
