@@ -14,19 +14,19 @@ import (
 	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/logging/elogr"
-	"golang.org/x/exp/event/logging/internal"
+	"golang.org/x/exp/event/severity"
 )
 
 func TestInfo(t *testing.T) {
 	ctx, th := eventtest.NewCapture()
-	log := elogr.NewLogger(ctx, "/").WithName("n").V(3)
+	log := elogr.NewLogger(ctx, "/").WithName("n").V(int(severity.DebugLevel))
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := []event.Event{{
 		At: eventtest.InitialTime,
 		Labels: []event.Label{
-			internal.LevelKey.Of(3),
-			internal.NameKey.Of("n/m"),
+			severity.Debug,
+			event.Name.Of("n/m"),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
 			event.Message.Of("mess"),

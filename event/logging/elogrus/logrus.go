@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
-	"golang.org/x/exp/event/logging/internal"
+	"golang.org/x/exp/event/severity"
 )
 
 type formatter struct{}
@@ -47,10 +47,31 @@ func (f *formatter) Format(e *logrus.Entry) ([]byte, error) {
 		ctx = context.Background()
 	}
 	b := event.To(ctx).At(e.Time)
-	b.With(internal.LevelKey.Of(int(e.Level))) // TODO: convert level
+	b.With(convertLevel(e.Level))
 	for k, v := range e.Data {
 		b.With(keys.Value(k).Of(v))
 	}
 	b.Log(e.Message)
 	return nil, nil
+}
+
+func convertLevel(level logrus.Level) event.Label {
+	switch level {
+	case logrus.PanicLevel:
+		return severity.Of(severity.FatalLevel + 1)
+	case logrus.FatalLevel:
+		return severity.Fatal
+	case logrus.ErrorLevel:
+		return severity.Error
+	case logrus.WarnLevel:
+		return severity.Warning
+	case logrus.InfoLevel:
+		return severity.Info
+	case logrus.DebugLevel:
+		return severity.Debug
+	case logrus.TraceLevel:
+		return severity.Trace
+	default:
+		return severity.Trace
+	}
 }

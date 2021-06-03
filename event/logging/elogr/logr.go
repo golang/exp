@@ -11,7 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
-	"golang.org/x/exp/event/logging/internal"
+	"golang.org/x/exp/event/severity"
 )
 
 type logger struct {
@@ -89,12 +89,12 @@ func (l *logger) Info(msg string, keysAndValues ...interface{}) {
 // while the err field should be used to attach the actual error that
 // triggered this log line, if present.
 func (l *logger) Error(err error, msg string, keysAndValues ...interface{}) {
-	l.log(msg, l.builder.Clone().With(internal.ErrorKey.Of(err)), keysAndValues)
+	l.log(msg, l.builder.Clone().With(event.Error.Of(err)), keysAndValues)
 }
 
 func (l *logger) log(msg string, b event.Builder, keysAndValues []interface{}) {
-	b.With(internal.LevelKey.Of(l.verbosity)) // TODO: Convert verbosity to level.
-	b.With(internal.NameKey.Of(l.name))
+	b.With(convertVerbosity(l.verbosity))
+	b.With(event.Name.Of(l.name))
 	addLabels(b, keysAndValues)
 	b.Log(msg)
 }
@@ -110,4 +110,8 @@ func (l *logger) WithValues(keysAndValues ...interface{}) logr.Logger {
 
 func newLabel(key, value interface{}) event.Label {
 	return keys.Value(key.(string)).Of(value)
+}
+
+func convertVerbosity(v int) event.Label {
+	return severity.Of(severity.Level(v))
 }

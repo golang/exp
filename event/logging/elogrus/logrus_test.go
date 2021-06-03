@@ -17,7 +17,7 @@ import (
 	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/logging/elogrus"
-	"golang.org/x/exp/event/logging/internal"
+	"golang.org/x/exp/event/severity"
 )
 
 func Test(t *testing.T) {
@@ -30,7 +30,7 @@ func Test(t *testing.T) {
 
 	want := []event.Event{{
 		Labels: []event.Label{
-			internal.LevelKey.Of(4),
+			severity.Info,
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
 			event.Message.Of("mess"),

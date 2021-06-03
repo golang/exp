@@ -23,7 +23,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
-	"golang.org/x/exp/event/logging/internal"
+	"golang.org/x/exp/event/severity"
 )
 
 type core struct {
@@ -52,8 +52,8 @@ func (c *core) With(fields []zapcore.Field) zapcore.Core {
 func (c *core) Write(e zapcore.Entry, fs []zapcore.Field) error {
 	b := c.builder.Clone().
 		At(e.Time).
-		With(internal.LevelKey.Of(int(e.Level))). // TODO: convert zap level to general level
-		With(internal.NameKey.Of(e.LoggerName))
+		With(convertLevel(e.Level)).
+		With(event.Name.Of(e.LoggerName))
 	// TODO: add these additional labels more efficiently.
 	if e.Stack != "" {
 		b.With(keys.String("stack").Of(e.Stack))
@@ -147,4 +147,25 @@ func stringerToString(stringer interface{}) (s string) {
 	}()
 
 	return stringer.(fmt.Stringer).String()
+}
+
+func convertLevel(level zapcore.Level) event.Label {
+	switch level {
+	case zapcore.DebugLevel:
+		return severity.Debug
+	case zapcore.InfoLevel:
+		return severity.Info
+	case zapcore.WarnLevel:
+		return severity.Warning
+	case zapcore.ErrorLevel:
+		return severity.Error
+	case zapcore.DPanicLevel:
+		return severity.Of(severity.FatalLevel - 1)
+	case zapcore.PanicLevel:
+		return severity.Of(severity.FatalLevel + 1)
+	case zapcore.FatalLevel:
+		return severity.Fatal
+	default:
+		return severity.Trace
+	}
 }
