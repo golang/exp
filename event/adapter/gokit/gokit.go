@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package egokit provides a go-kit logger for events.
-package egokit
+// Package gokit provides a go-kit logger for events.
+package gokit
 
 import (
 	"context"

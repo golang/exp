@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package ezap_test
+package zap_test
 
 import (
 	"testing"
@@ -14,8 +14,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/eventtest"
+	ezap "golang.org/x/exp/event/adapter/zap"
 	"golang.org/x/exp/event/keys"
-	"golang.org/x/exp/event/logging/ezap"
 	"golang.org/x/exp/event/severity"
 )
 

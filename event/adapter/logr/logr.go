@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package elogr is a logr implementation that uses events.
-package elogr
+// Package logr is a logr implementation that uses events.
+package logr
 
 import (
 	"context"
@@ -113,5 +113,6 @@ func newLabel(key, value interface{}) event.Label {
 }
 
 func convertVerbosity(v int) event.Label {
+	//TODO: this needs to be more complicated, v decreases with increasing severity
 	return severity.Of(severity.Level(v))
 }

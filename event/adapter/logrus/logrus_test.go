@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package elogrus_test
+package logrus_test
 
 import (
 	"io"
@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/eventtest"
+	elogrus "golang.org/x/exp/event/adapter/logrus"
 	"golang.org/x/exp/event/keys"
-	"golang.org/x/exp/event/logging/elogrus"
 	"golang.org/x/exp/event/severity"
 )
 

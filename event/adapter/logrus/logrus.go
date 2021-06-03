@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-// Package elogrus provides a logrus Formatter for events.
+// Package logrus provides a logrus Formatter for events.
 // To use for the global logger:
 //   logrus.SetFormatter(elogrus.NewFormatter(exporter))
 //   logrus.SetOutput(io.Discard)
@@ -14,7 +14,7 @@
 //
 // If you call elogging.SetExporter, then you can pass nil
 // for the exporter above and it will use the global one.
-package elogrus
+package logrus
 
 import (
 	"context"

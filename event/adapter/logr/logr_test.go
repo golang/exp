@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package egokit_test
+package logr_test
 
 import (
 	"testing"
@@ -12,25 +12,27 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/eventtest"
+	elogr "golang.org/x/exp/event/adapter/logr"
 	"golang.org/x/exp/event/keys"
-	"golang.org/x/exp/event/logging/egokit"
+	"golang.org/x/exp/event/severity"
 )
 
-func Test(t *testing.T) {
-	log := egokit.NewLogger()
-	ctx, h := eventtest.NewCapture()
-	log.Log(ctx, "msg", "mess", "level", 1, "name", "n/m", "traceID", 17, "resource", "R")
+func TestInfo(t *testing.T) {
+	ctx, th := eventtest.NewCapture()
+	log := elogr.NewLogger(ctx, "/").WithName("n").V(int(severity.DebugLevel))
+	log = log.WithName("m")
+	log.Info("mess", "traceID", 17, "resource", "R")
 	want := []event.Event{{
 		At: eventtest.InitialTime,
 		Labels: []event.Label{
-			keys.Value("level").Of(1),
-			keys.Value("name").Of("n/m"),
+			severity.Debug,
+			event.Name.Of("n/m"),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
 			event.Message.Of("mess"),
 		},
 	}}
-	if diff := cmp.Diff(want, h.Got); diff != "" {
+	if diff := cmp.Diff(want, th.Got); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

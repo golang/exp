@@ -4,13 +4,13 @@
 
 // +build !disable_events
 
-// ezap provides an implementation of zapcore.Core for events.
+// zap provides an implementation of zapcore.Core for events.
 // To use globally:
 //     zap.ReplaceGlobals(zap.New(NewCore(exporter)))
 //
 // If you call elogging.SetExporter, then you can pass nil
 // for the exporter above and it will use the global one.
-package ezap
+package zap
 
 import (
 	"context"
