@@ -7,7 +7,6 @@
 package elogr_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -19,11 +18,11 @@ import (
 )
 
 func TestInfo(t *testing.T) {
-	e, th := internal.NewTestExporter()
-	log := elogr.NewLogger(event.WithExporter(context.Background(), e), "/").WithName("n").V(3)
+	ctx, th := eventtest.NewCapture()
+	log := elogr.NewLogger(ctx, "/").WithName("n").V(3)
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
-	want := &event.Event{
+	want := []event.Event{{
 		At: eventtest.InitialTime,
 		Labels: []event.Label{
 			internal.LevelKey.Of(3),
@@ -32,8 +31,8 @@ func TestInfo(t *testing.T) {
 			keys.Value("resource").Of("R"),
 			event.Message.Of("mess"),
 		},
-	}
-	if diff := cmp.Diff(want, &th.Got); diff != "" {
+	}}
+	if diff := cmp.Diff(want, th.Got); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }
