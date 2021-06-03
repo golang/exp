@@ -2,9 +2,9 @@ package internal
 
 import (
 	"context"
-	"time"
 
 	"golang.org/x/exp/event"
+	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/keys"
 )
 
@@ -26,9 +26,7 @@ func (h *TestHandler) Log(_ context.Context, ev *event.Event) {
 	copy(h.Got.Labels, ev.Labels)
 }
 
-var TestAt = time.Now()
-
 func NewTestExporter() (*event.Exporter, *TestHandler) {
 	te := &TestHandler{}
-	return event.NewExporter(te, &event.ExporterOptions{Now: func() time.Time { return TestAt }}), te
+	return event.NewExporter(te, eventtest.ExporterOptions()), te
 }

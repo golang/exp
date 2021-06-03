@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
+	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/logging/elogr"
 	"golang.org/x/exp/event/logging/internal"
@@ -23,7 +24,7 @@ func TestInfo(t *testing.T) {
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := &event.Event{
-		At: internal.TestAt,
+		At: eventtest.InitialTime,
 		Labels: []event.Label{
 			internal.LevelKey.Of(3),
 			internal.NameKey.Of("n/m"),

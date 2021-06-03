@@ -57,8 +57,13 @@ func (h *testHandler) event(ctx context.Context, ev *event.Event) {
 	h.printer.Event(os.Stdout, ev)
 }
 
+var InitialTime = func() time.Time {
+	t, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
+	return t
+}()
+
 func ExporterOptions() *event.ExporterOptions {
-	nextTime, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
+	nextTime := InitialTime
 	return &event.ExporterOptions{
 		Now: func() time.Time {
 			thisTime := nextTime
