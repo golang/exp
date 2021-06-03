@@ -15,17 +15,18 @@ type TraceHandler struct {
 	tracer trace.Tracer
 }
 
-var _ event.TraceHandler = (*TraceHandler)(nil)
-
 func NewTraceHandler(t trace.Tracer) *TraceHandler {
 	return &TraceHandler{tracer: t}
 }
 
 type spanKey struct{}
 
-func (t *TraceHandler) Start(ctx context.Context, e *event.Event) context.Context {
-	opts := labelsToSpanOptions(e.Labels)
-	name, _ := event.Trace.Find(e)
+func (t *TraceHandler) Log(ctx context.Context, ev *event.Event)      {}
+func (t *TraceHandler) Annotate(ctx context.Context, ev *event.Event) {}
+func (t *TraceHandler) Metric(ctx context.Context, ev *event.Event)   {}
+func (t *TraceHandler) Start(ctx context.Context, ev *event.Event) context.Context {
+	opts := labelsToSpanOptions(ev.Labels)
+	name, _ := event.Name.Find(ev)
 	octx, span := t.tracer.Start(ctx, name, opts...)
 	return context.WithValue(octx, spanKey{}, span)
 }

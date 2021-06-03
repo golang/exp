@@ -25,6 +25,11 @@ func (h *TestHandler) Log(_ context.Context, ev *event.Event) {
 	copy(h.Got.Labels, ev.Labels)
 }
 
+func (h *TestHandler) Annotate(_ context.Context, _ *event.Event)                {}
+func (h *TestHandler) Metric(_ context.Context, _ *event.Event)                  {}
+func (h *TestHandler) Start(ctx context.Context, _ *event.Event) context.Context { return ctx }
+func (h *TestHandler) End(_ context.Context, _ *event.Event)                     {}
+
 var TestAt = time.Now()
 
 func NewTestExporter() (*event.Exporter, *TestHandler) {

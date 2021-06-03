@@ -22,23 +22,23 @@ func TestCommon(t *testing.T) {
 
 	event.To(ctx).Log(simple)
 	checkFind(t, h, "Log", event.Message, true, simple)
-	checkFind(t, h, "Log", event.Trace, false, "")
+	checkFind(t, h, "Log", event.Name, false, "")
 
 	event.To(ctx).Metric()
 	checkFind(t, h, "Metric", event.Message, false, "")
-	checkFind(t, h, "Metric", event.Trace, false, "")
+	checkFind(t, h, "Metric", event.Name, false, "")
 
 	event.To(ctx).Annotate()
 	checkFind(t, h, "Annotate", event.Message, false, "")
-	checkFind(t, h, "Annotate", event.Trace, false, "")
+	checkFind(t, h, "Annotate", event.Name, false, "")
 
 	_, end := event.To(ctx).Start(trace)
 	checkFind(t, h, "Start", event.Message, false, "")
-	checkFind(t, h, "Start", event.Trace, true, trace)
+	checkFind(t, h, "Start", event.Name, true, trace)
 
 	end()
 	checkFind(t, h, "End", event.Message, false, "")
-	checkFind(t, h, "End", event.Trace, false, "")
+	checkFind(t, h, "End", event.Name, false, "")
 }
 
 type finder interface {

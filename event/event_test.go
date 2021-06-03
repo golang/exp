@@ -54,7 +54,7 @@ func TestPrint(t *testing.T) {
 		},
 		expect: `
 time=2020-03-05T14:27:48 trace=1 name=span
-time=2020-03-05T14:27:49 parent=1 kind=end
+time=2020-03-05T14:27:49 parent=1 end
 `}, {
 		name: "span nested",
 		events: func(ctx context.Context) {
@@ -66,26 +66,26 @@ time=2020-03-05T14:27:49 parent=1 kind=end
 		},
 		expect: `
 time=2020-03-05T14:27:48 trace=1 name=parent
-time=2020-03-05T14:27:49 trace=2 parent=1 name=child
+time=2020-03-05T14:27:49 parent=1 trace=2 name=child
 time=2020-03-05T14:27:50 parent=2 msg=message
-time=2020-03-05T14:27:51 parent=2 kind=end
-time=2020-03-05T14:27:52 parent=1 kind=end
+time=2020-03-05T14:27:51 parent=2 end
+time=2020-03-05T14:27:52 parent=1 end
 `}, {
 		name:   "metric",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric() },
-		expect: `time=2020-03-05T14:27:48 kind=metric l1=1`,
+		expect: `time=2020-03-05T14:27:48 l1=1 metric`,
 	}, {
 		name:   "metric 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Metric() },
-		expect: `time=2020-03-05T14:27:48 kind=metric l1=1 l2=2`,
+		expect: `time=2020-03-05T14:27:48 l1=1 l2=2 metric`,
 	}, {
 		name:   "annotate",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Annotate() },
-		expect: `time=2020-03-05T14:27:48 kind=annotate l1=1`,
+		expect: `time=2020-03-05T14:27:48 l1=1`,
 	}, {
 		name:   "annotate 2",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Annotate() },
-		expect: `time=2020-03-05T14:27:48 kind=annotate l1=1 l2=2`,
+		expect: `time=2020-03-05T14:27:48 l1=1 l2=2`,
 	}, {
 		name: "multiple events",
 		events: func(ctx context.Context) {

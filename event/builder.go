@@ -101,7 +101,7 @@ func (b Builder) Log(message string) {
 	if b.data == nil {
 		return
 	}
-	if b.data.exporter.log != nil {
+	if b.data.exporter.handler != nil {
 		b.log(message)
 	}
 	b.done()
@@ -113,7 +113,7 @@ func (b Builder) Logf(template string, args ...interface{}) {
 	if b.data == nil {
 		return
 	}
-	if b.data.exporter.log != nil {
+	if b.data.exporter.loggingEnabled() {
 		b.log(fmt.Sprintf(template, args...))
 	}
 	b.done()
@@ -124,7 +124,7 @@ func (b Builder) log(message string) {
 	defer b.data.exporter.mu.Unlock()
 	b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
 	b.data.exporter.prepare(&b.data.Event)
-	b.data.exporter.log.Log(b.ctx, &b.data.Event)
+	b.data.exporter.handler.Log(b.ctx, &b.data.Event)
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
@@ -132,11 +132,12 @@ func (b Builder) Metric() {
 	if b.data == nil {
 		return
 	}
-	if b.data.exporter.metric != nil {
+	if b.data.exporter.metricsEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
+		b.data.Event.Labels = append(b.data.Event.Labels, Metric.Value())
 		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.metric.Metric(b.ctx, &b.data.Event)
+		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -146,11 +147,11 @@ func (b Builder) Annotate() {
 	if b.data == nil {
 		return
 	}
-	if b.data.exporter.annotate != nil {
+	if b.data.exporter.annotationsEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.annotate.Annotate(b.ctx, &b.data.Event)
+		b.data.exporter.handler.Annotate(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -160,11 +161,12 @@ func (b Builder) End() {
 	if b.data == nil {
 		return
 	}
-	if b.data.exporter.trace != nil {
+	if b.data.exporter.tracingEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
+		b.data.Event.Labels = append(b.data.Event.Labels, End.Value())
 		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.trace.End(b.ctx, &b.data.Event)
+		b.data.exporter.handler.End(b.ctx, &b.data.Event)
 	}
 	b.done()
 }
@@ -195,21 +197,22 @@ func (b Builder) Start(name string) (context.Context, func()) {
 	}
 	ctx := b.ctx
 	end := func() {}
-	if b.data.exporter.trace != nil {
+	if b.data.exporter.tracingEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.lastEvent++
-		b.data.Event.ID = b.data.exporter.lastEvent
+		traceID := b.data.exporter.lastEvent
+		b.data.Event.Labels = append(b.data.Event.Labels, Trace.Of(traceID))
 		b.data.exporter.prepare(&b.data.Event)
 		// create the end builder
 		eb := Builder{}
 		eb.data = builderPool.Get().(*builder)
 		eb.data.exporter = b.data.exporter
-		eb.data.Event.Parent = b.data.Event.ID
+		eb.data.Event.Parent = traceID
 		// and now deliver the start event
-		b.data.Event.Labels = append(b.data.Event.Labels, Trace.Of(name))
-		ctx = newContext(ctx, b.data.exporter, b.data.Event.ID)
-		ctx = b.data.exporter.trace.Start(ctx, &b.data.Event)
+		b.data.Event.Labels = append(b.data.Event.Labels, Name.Of(name))
+		ctx = newContext(ctx, b.data.exporter, traceID)
+		ctx = b.data.exporter.handler.Start(ctx, &b.data.Event)
 		eb.ctx = ctx
 		end = eb.End
 	}

@@ -126,7 +126,7 @@ func BenchmarkMetricEventNoop(b *testing.B) {
 
 type noopHandler struct{}
 
-func (noopHandler) Log_(ctx context.Context, ev *event.Event)     {}
+func (noopHandler) Log(ctx context.Context, ev *event.Event)      {}
 func (noopHandler) Metric(ctx context.Context, ev *event.Event)   {}
 func (noopHandler) Annotate(ctx context.Context, ev *event.Event) {}
 func (noopHandler) End(ctx context.Context, ev *event.Event)      {}

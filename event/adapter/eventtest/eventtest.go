@@ -31,30 +31,30 @@ type testHandler struct {
 }
 
 func (h *testHandler) Log(ctx context.Context, ev *event.Event) {
-	h.event(ctx, "log", ev)
+	h.event(ctx, ev)
 }
 
 func (h *testHandler) Metric(ctx context.Context, ev *event.Event) {
-	h.event(ctx, "metric", ev)
+	h.event(ctx, ev)
 }
 
 func (h *testHandler) Annotate(ctx context.Context, ev *event.Event) {
-	h.event(ctx, "annotate", ev)
+	h.event(ctx, ev)
 }
 
 func (h *testHandler) Start(ctx context.Context, ev *event.Event) context.Context {
-	h.event(ctx, "start", ev)
+	h.event(ctx, ev)
 	return ctx
 }
 
 func (h *testHandler) End(ctx context.Context, ev *event.Event) {
-	h.event(ctx, "end", ev)
+	h.event(ctx, ev)
 }
 
-func (h *testHandler) event(ctx context.Context, kind string, ev *event.Event) {
+func (h *testHandler) event(ctx context.Context, ev *event.Event) {
 	//TODO: choose between stdout and stderr based on the event
 	//TODO: decide if we should be calling h.tb.Fail()
-	h.printer.Event(os.Stdout, kind, ev)
+	h.printer.Event(os.Stdout, ev)
 }
 
 // FixedNow updates the exporter in the context to use a time function returned

@@ -78,6 +78,10 @@ type testTraceHandler struct {
 	t *testing.T
 }
 
+func (*testTraceHandler) Log(ctx context.Context, _ *event.Event)      {}
+func (*testTraceHandler) Annotate(ctx context.Context, _ *event.Event) {}
+func (*testTraceHandler) Metric(ctx context.Context, _ *event.Event)   {}
+
 func (*testTraceHandler) Start(ctx context.Context, _ *event.Event) context.Context {
 	return context.WithValue(ctx, "x", 1)
 }

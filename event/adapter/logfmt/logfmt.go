@@ -33,42 +33,35 @@ func NewHandler(to io.Writer) *Handler {
 }
 
 func (h *Handler) Log(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, "log", ev)
+	h.printer.Event(h.to, ev)
 }
 
 func (h *Handler) Metric(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, "metric", ev)
+	h.printer.Event(h.to, ev)
 }
 
 func (h *Handler) Annotate(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, "annotate", ev)
+	h.printer.Event(h.to, ev)
 }
 
 func (h *Handler) Start(ctx context.Context, ev *event.Event) context.Context {
-	h.printer.Event(h.to, "start", ev)
+	h.printer.Event(h.to, ev)
 	return ctx
 }
 
 func (h *Handler) End(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, "end", ev)
+	h.printer.Event(h.to, ev)
 }
 
-func (p *Printer) Event(w io.Writer, kind string, ev *event.Event) {
+func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	const timeFormat = "2006-01-02T15:04:05"
 	p.needSep = false
 	if !ev.At.IsZero() {
 		p.label(w, "time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], timeFormat)))
 	}
 
-	if ev.ID != 0 {
-		p.label(w, "trace", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.ID, 10)))
-	}
 	if ev.Parent != 0 {
 		p.label(w, "parent", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
-	}
-
-	if kind != "log" && kind != "start" {
-		p.label(w, "kind", event.StringOf(kind))
 	}
 
 	for _, l := range ev.Labels {
