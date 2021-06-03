@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package egokit
+package egokit_test
 
 import (
 	"context"
@@ -13,11 +13,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
+	"golang.org/x/exp/event/logging/egokit"
 	"golang.org/x/exp/event/logging/internal"
 )
 
 func Test(t *testing.T) {
-	log := NewLogger()
+	log := egokit.NewLogger()
 	e, h := internal.NewTestExporter()
 	ctx := event.WithExporter(context.Background(), e)
 	log.Log(ctx, "msg", "mess", "level", 1, "name", "n/m", "traceID", 17, "resource", "R")

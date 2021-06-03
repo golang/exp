@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package ezap
+package ezap_test
 
 import (
 	"context"
@@ -14,13 +14,14 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
+	"golang.org/x/exp/event/logging/ezap"
 	"golang.org/x/exp/event/logging/internal"
 )
 
 func Test(t *testing.T) {
 	e, h := internal.NewTestExporter()
 	ctx := event.WithExporter(context.Background(), e)
-	log := zap.New(NewCore(ctx), zap.Fields(zap.Int("traceID", 17), zap.String("resource", "R")))
+	log := zap.New(ezap.NewCore(ctx), zap.Fields(zap.Int("traceID", 17), zap.String("resource", "R")))
 	log = log.Named("n/m")
 	log.Info("mess", zap.Float64("pi", 3.14))
 	want := &event.Event{

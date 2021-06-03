@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package otel
+package otel_test
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/exp/event"
+	"golang.org/x/exp/event/otel"
 )
 
 func TestTrace(t *testing.T) {
@@ -110,7 +111,7 @@ func setupOtel() (context.Context, trace.Tracer, func() string) {
 	stp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(bsp))
 	tracer := stp.Tracer("")
 
-	ee := event.NewExporter(NewTraceHandler(tracer))
+	ee := event.NewExporter(otel.NewTraceHandler(tracer))
 	ctx = event.WithExporter(ctx, ee)
 	return ctx, tracer, func() string { stp.Shutdown(ctx); return e.got }
 }

@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package elogrus
+package elogrus_test
 
 import (
 	"context"
@@ -16,13 +16,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
+	"golang.org/x/exp/event/logging/elogrus"
 	"golang.org/x/exp/event/logging/internal"
 )
 
 func Test(t *testing.T) {
 	e, th := internal.NewTestExporter()
 	log := logrus.New()
-	log.SetFormatter(NewFormatter())
+	log.SetFormatter(elogrus.NewFormatter())
 	log.SetOutput(io.Discard)
 	// adding WithContext panics, because event.FromContext assumes
 	ctx := event.WithExporter(context.Background(), e)

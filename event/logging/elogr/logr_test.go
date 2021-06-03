@@ -4,7 +4,7 @@
 
 // +build !disable_events
 
-package elogr
+package elogr_test
 
 import (
 	"context"
@@ -13,12 +13,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/keys"
+	"golang.org/x/exp/event/logging/elogr"
 	"golang.org/x/exp/event/logging/internal"
 )
 
 func TestInfo(t *testing.T) {
 	e, th := internal.NewTestExporter()
-	log := NewLogger(event.WithExporter(context.Background(), e), "/").WithName("n").V(3)
+	log := elogr.NewLogger(event.WithExporter(context.Background(), e), "/").WithName("n").V(3)
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := &event.Event{
