@@ -70,7 +70,7 @@ func runOnce(ctx context.Context, hooks Hooks) {
 }
 
 func runBenchmark(b *testing.B, ctx context.Context, hooks Hooks) {
-	b.ReportAllocs()
+	//b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		runOnce(ctx, hooks)
