@@ -22,7 +22,7 @@ import (
 // NewContext returns a context you should use for the active test.
 func NewContext(ctx context.Context, tb testing.TB) context.Context {
 	h := &testHandler{tb: tb}
-	return event.WithExporter(ctx, event.NewExporter(h))
+	return event.WithExporter(ctx, event.NewExporter(h, nil))
 }
 
 type testHandler struct {
@@ -57,9 +57,9 @@ func (h *testHandler) event(ctx context.Context, ev *event.Event) {
 	h.printer.Event(os.Stdout, ev)
 }
 
-func ExporterOptions() event.ExporterOptions {
+func ExporterOptions() *event.ExporterOptions {
 	nextTime, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
-	return event.ExporterOptions{
+	return &event.ExporterOptions{
 		Now: func() time.Time {
 			thisTime := nextTime
 			nextTime = nextTime.Add(time.Second)

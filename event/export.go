@@ -50,14 +50,17 @@ var (
 	defaultExporter unsafe.Pointer
 )
 
-// NewExporter creates an Exporter using the supplied handler.
+// NewExporter creates an Exporter using the supplied handler and options.
 // Event delivery is serialized to enable safe atomic handling.
-func NewExporter(handler Handler) *Exporter {
-	return (ExporterOptions{}).NewExporter(handler)
-}
-
-func (opts ExporterOptions) NewExporter(handler Handler) *Exporter {
-	return &Exporter{opts: opts, handler: handler}
+func NewExporter(handler Handler, opts *ExporterOptions) *Exporter {
+	e := &Exporter{handler: handler}
+	if opts != nil {
+		e.opts = *opts
+	}
+	if e.opts.Now == nil {
+		e.opts.Now = time.Now
+	}
+	return e
 }
 
 func setDefaultExporter(e *Exporter) {

@@ -22,7 +22,7 @@ func TestClone(t *testing.T) {
 		labels = append(labels, keys.Int(fmt.Sprintf("l%d", i)).Of(i))
 	}
 
-	ctx := event.WithExporter(context.Background(), event.NewExporter(nil))
+	ctx := event.WithExporter(context.Background(), event.NewExporter(nil, nil))
 	b1 := event.To(ctx)
 	b1.With(labels[0]).With(labels[1])
 	check(t, b1, labels[:2])
@@ -65,7 +65,7 @@ func valueEqual(l1, l2 event.Value) bool {
 func TestTraceBuilder(t *testing.T) {
 	// Verify that the context returned from the handler is also returned from Start,
 	// and is the context passed to End.
-	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t}))
+	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t}, nil))
 	ctx, end := event.To(ctx).Start("s")
 	val := ctx.Value("x")
 	if val != 1 {

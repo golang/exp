@@ -111,7 +111,7 @@ func setupOtel() (context.Context, trace.Tracer, func() string) {
 	stp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(bsp))
 	tracer := stp.Tracer("")
 
-	ee := event.NewExporter(otel.NewTraceHandler(tracer))
+	ee := event.NewExporter(otel.NewTraceHandler(tracer), nil)
 	ctx = event.WithExporter(ctx, ee)
 	return ctx, tracer, func() string { stp.Shutdown(ctx); return e.got }
 }

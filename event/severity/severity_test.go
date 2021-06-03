@@ -34,7 +34,7 @@ func TestPrint(t *testing.T) {
 		expect: `time=2020-03-05T14:27:48 level=info msg="a message"`},
 	} {
 		buf := &strings.Builder{}
-		ctx := event.WithExporter(ctx, eventtest.ExporterOptions().NewExporter(logfmt.NewHandler(buf)))
+		ctx := event.WithExporter(ctx, event.NewExporter(logfmt.NewHandler(buf), eventtest.ExporterOptions()))
 		test.events(ctx)
 		got := strings.TrimSpace(buf.String())
 		expect := strings.TrimSpace(test.expect)
