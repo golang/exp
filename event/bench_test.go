@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package bench_test
+package event_test
 
 import (
 	"context"
@@ -69,7 +69,6 @@ var (
 		},
 	}
 
-	gauge       = event.NewFloatGauge("gauge", "a gauge")
 	eventMetric = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
 			event.To(ctx).With(aStat.Of(a)).Metric(gauge.Record(1))

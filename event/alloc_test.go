@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/logfmt"
+	"golang.org/x/exp/event/bench"
 )
 
 func TestAllocs(t *testing.T) {
@@ -27,4 +28,8 @@ func TestAllocs(t *testing.T) {
 	if allocs != 0 {
 		t.Errorf("Got %d allocs, expect 0", allocs)
 	}
+}
+
+func TestBenchAllocs(t *testing.T) {
+	bench.TestAllocs(t, eventPrint, eventLog, 0)
 }
