@@ -59,3 +59,15 @@ func SetDefaultExporter(e *Exporter) {
 func (ev *Event) Is(m Matcher) bool {
 	return m.Matches(ev)
 }
+
+// NopHandler is a handler that does nothing. It can be used for tests, or
+// embedded in a struct to avoid having to implement all the Handler methods.
+type NopHandler struct{}
+
+func (NopHandler) Log(context.Context, *Event)      {}
+func (NopHandler) Metric(context.Context, *Event)   {}
+func (NopHandler) Annotate(context.Context, *Event) {}
+func (NopHandler) End(context.Context, *Event)      {}
+func (NopHandler) Start(ctx context.Context, _ *Event) context.Context {
+	return ctx
+}

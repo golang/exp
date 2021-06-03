@@ -23,7 +23,7 @@ func TestClone(t *testing.T) {
 		labels = append(labels, keys.Int(fmt.Sprintf("l%d", i)).Of(i))
 	}
 
-	ctx := event.WithExporter(context.Background(), event.NewExporter(noopHandler{}, nil))
+	ctx := event.WithExporter(context.Background(), event.NewExporter(event.NopHandler{}, nil))
 	b1 := event.To(ctx)
 	b1.With(labels[0]).With(labels[1])
 	check(t, b1, labels[:2])
@@ -95,7 +95,7 @@ func (t *testTraceHandler) End(ctx context.Context, _ *event.Event) {
 }
 
 func TestFailToClone(t *testing.T) {
-	ctx := event.WithExporter(context.Background(), event.NewExporter(noopHandler{}, nil))
+	ctx := event.WithExporter(context.Background(), event.NewExporter(event.NopHandler{}, nil))
 
 	catch := func(f func()) {
 		defer func() {
@@ -127,14 +127,4 @@ func TestFailToClone(t *testing.T) {
 		// b1.data is populated, but with the wrong information.
 		b1.Log("msg2")
 	})
-}
-
-type noopHandler struct{}
-
-func (noopHandler) Log(ctx context.Context, ev *event.Event)      {}
-func (noopHandler) Metric(ctx context.Context, ev *event.Event)   {}
-func (noopHandler) Annotate(ctx context.Context, ev *event.Event) {}
-func (noopHandler) End(ctx context.Context, ev *event.Event)      {}
-func (noopHandler) Start(ctx context.Context, ev *event.Event) context.Context {
-	return ctx
 }
