@@ -2,17 +2,22 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package bench_test
+package bench
 
 import (
 	"context"
 	"io"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
+
+type Info struct {
+	Name string
+	Msg  string
+	Msgf string
+}
 
 type Hooks struct {
 	AStart func(ctx context.Context, a int) context.Context
@@ -32,17 +37,22 @@ var (
 		"ı",
 		"prime count of values",
 	}
+
+	A = Info{
+		Name: "A",
+		Msg:  "a",
+		Msgf: "a where A=%d",
+	}
+
+	B = Info{
+		Name: "B",
+		Msg:  "b",
+		Msgf: "b where B=%q",
+	}
 )
 
 const (
-	aName = "A"
-	aMsg  = "a"
-	aMsgf = aMsg + " where " + aName + "=%d"
-	bName = "B"
-	bMsg  = "b"
-	bMsgf = bMsg + " where " + bName + "=%q"
-
-	timeFormat = "2006/01/02 15:04:05"
+	TimeFormat = "2006/01/02 15:04:05"
 )
 
 type namedBenchmark struct {
@@ -69,15 +79,14 @@ func runOnce(ctx context.Context, hooks Hooks) {
 	}
 }
 
-func runBenchmark(b *testing.B, ctx context.Context, hooks Hooks) {
-	//b.ReportAllocs()
+func RunBenchmark(b *testing.B, ctx context.Context, hooks Hooks) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		runOnce(ctx, hooks)
 	}
 }
 
-func testBenchmark(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, expect string) {
+func TestBenchmark(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, expect string) {
 	buf := strings.Builder{}
 	ctx := f(&buf)
 	runOnce(ctx, hooks)
@@ -88,7 +97,8 @@ func testBenchmark(t *testing.T, f func(io.Writer) context.Context, hooks Hooks,
 	}
 }
 
-func testAllocs(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, expect int) {
+func TestAllocs(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, expect int) {
+	t.Helper()
 	var acc int
 	ctx := f(io.Discard)
 	got := int(testing.AllocsPerRun(5, func() {
@@ -98,14 +108,5 @@ func testAllocs(t *testing.T, f func(io.Writer) context.Context, hooks Hooks, ex
 	}))
 	if got != expect {
 		t.Errorf("Got %d allocs, expect %d", got, expect)
-	}
-}
-
-func newTimer() func() time.Time {
-	nextTime, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
-	return func() time.Time {
-		thisTime := nextTime
-		nextTime = nextTime.Add(time.Second)
-		return thisTime
 	}
 }

@@ -8,8 +8,10 @@ package bench_test
 
 import (
 	"testing"
+
+	"golang.org/x/exp/event/bench"
 )
 
 func TestLogEventAllocs(t *testing.T) {
-	testAllocs(t, eventPrint, eventLog, 0)
+	bench.TestAllocs(t, eventPrint, eventLog, 0)
 }

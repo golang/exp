@@ -12,29 +12,31 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/bench"
 )
 
 var (
-	zapLog = Hooks{
+	zapLog = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zapCtx(ctx).Info(aMsg, zap.Int(aName, a))
+			zapCtx(ctx).Info(bench.A.Msg, zap.Int(bench.A.Name, a))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zapCtx(ctx).Info(bMsg, zap.String(bName, b))
+			zapCtx(ctx).Info(bench.B.Msg, zap.String(bench.B.Name, b))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
-	zapLogf = Hooks{
+	zapLogf = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zapCtx(ctx).Sugar().Infof(aMsgf, a)
+			zapCtx(ctx).Sugar().Infof(bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zapCtx(ctx).Sugar().Infof(bMsgf, b)
+			zapCtx(ctx).Sugar().Infof(bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -48,10 +50,10 @@ func zapCtx(ctx context.Context) *zap.Logger {
 }
 
 func zapPrint(w io.Writer) context.Context {
-	now := newTimer()
+	now := eventtest.ExporterOptions().Now
 	ec := zap.NewProductionEncoderConfig()
 	ec.EncodeDuration = zapcore.NanosDurationEncoder
-	timeEncoder := zapcore.TimeEncoderOfLayout(timeFormat)
+	timeEncoder := zapcore.TimeEncoderOfLayout(bench.TimeFormat)
 	ec.EncodeTime = func(t time.Time, a zapcore.PrimitiveArrayEncoder) {
 		timeEncoder(now(), a)
 	}
@@ -65,15 +67,15 @@ func zapPrint(w io.Writer) context.Context {
 }
 
 func BenchmarkLogZap(b *testing.B) {
-	runBenchmark(b, zapPrint(io.Discard), zapLog)
+	bench.RunBenchmark(b, zapPrint(io.Discard), zapLog)
 }
 
 func BenchmarkLogZapf(b *testing.B) {
-	runBenchmark(b, zapPrint(io.Discard), zapLogf)
+	bench.RunBenchmark(b, zapPrint(io.Discard), zapLogf)
 }
 
 func TestLogZapf(t *testing.T) {
-	testBenchmark(t, zapPrint, zapLogf, `
+	bench.TestBenchmark(t, zapPrint, zapLogf, `
 2020/03/05 14:27:48	info	a where A=0
 2020/03/05 14:27:49	info	b where B="A value"
 2020/03/05 14:27:50	info	a where A=1
@@ -93,7 +95,7 @@ func TestLogZapf(t *testing.T) {
 `)
 }
 func TestLogZap(t *testing.T) {
-	testBenchmark(t, zapPrint, zapLog, `
+	bench.TestBenchmark(t, zapPrint, zapLog, `
 2020/03/05 14:27:48	info	a	{"A": 0}
 2020/03/05 14:27:49	info	b	{"B": "A value"}
 2020/03/05 14:27:50	info	a	{"A": 1}

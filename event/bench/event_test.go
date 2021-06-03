@@ -12,46 +12,47 @@ import (
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/adapter/logfmt"
+	"golang.org/x/exp/event/bench"
 	"golang.org/x/exp/event/keys"
 )
 
 var (
-	aValue  = keys.Int(aName)
-	bValue  = keys.String(bName)
+	aValue  = keys.Int(bench.A.Name)
+	bValue  = keys.String(bench.B.Name)
 	aCount  = keys.Int64("aCount")
 	aStat   = keys.Int("aValue")
 	bCount  = keys.Int64("B")
 	bLength = keys.Int("BLen")
 
-	eventLog = Hooks{
+	eventLog = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			event.To(ctx).With(aValue.Of(a)).Log(aMsg)
+			event.To(ctx).With(aValue.Of(a)).Log(bench.A.Msg)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			event.To(ctx).With(bValue.Of(b)).Log(bMsg)
+			event.To(ctx).With(bValue.Of(b)).Log(bench.B.Msg)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	eventLogf = Hooks{
+	eventLogf = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			event.To(ctx).Logf(aMsgf, a)
+			event.To(ctx).Logf(bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			event.To(ctx).Logf(bMsgf, b)
+			event.To(ctx).Logf(bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	eventTrace = Hooks{
+	eventTrace = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctx, _ = event.To(ctx).Start(aMsg)
+			ctx, _ = event.To(ctx).Start(bench.A.Msg)
 			event.To(ctx).With(aValue.Of(a)).Annotate()
 			return ctx
 		},
@@ -59,7 +60,7 @@ var (
 			event.To(ctx).End()
 		},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctx, _ = event.To(ctx).Start(bMsg)
+			ctx, _ = event.To(ctx).Start(bench.B.Msg)
 			event.To(ctx).With(bValue.Of(b)).Annotate()
 			return ctx
 		},
@@ -69,7 +70,7 @@ var (
 	}
 
 	gauge       = event.NewFloatGauge("gauge", "a gauge")
-	eventMetric = Hooks{
+	eventMetric = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
 			event.To(ctx).With(aStat.Of(a)).Metric(gauge.Record(1))
 			event.To(ctx).With(aCount.Of(1)).Metric(gauge.Record(1))
@@ -98,33 +99,33 @@ func eventPrint(w io.Writer) context.Context {
 }
 
 func BenchmarkLogEventNoExporter(b *testing.B) {
-	runBenchmark(b, eventNoExporter(), eventLog)
+	bench.RunBenchmark(b, eventNoExporter(), eventLog)
 }
 
 func BenchmarkLogEventNoop(b *testing.B) {
-	runBenchmark(b, eventNoop(), eventLog)
+	bench.RunBenchmark(b, eventNoop(), eventLog)
 }
 
 func BenchmarkLogEventDiscard(b *testing.B) {
-	runBenchmark(b, eventPrint(io.Discard), eventLog)
+	bench.RunBenchmark(b, eventPrint(io.Discard), eventLog)
 }
 
 func BenchmarkLogEventfDiscard(b *testing.B) {
-	runBenchmark(b, eventPrint(io.Discard), eventLogf)
+	bench.RunBenchmark(b, eventPrint(io.Discard), eventLogf)
 }
 
 func BenchmarkTraceEventNoop(b *testing.B) {
-	runBenchmark(b, eventNoop(), eventTrace)
+	bench.RunBenchmark(b, eventNoop(), eventTrace)
 }
 
 func BenchmarkTraceEventDiscard(b *testing.B) {
-	runBenchmark(b, eventPrint(io.Discard), eventTrace)
+	bench.RunBenchmark(b, eventPrint(io.Discard), eventTrace)
 }
 
 func BenchmarkMetricEventNoop(b *testing.B) {
-	runBenchmark(b, eventNoop(), eventMetric)
+	bench.RunBenchmark(b, eventNoop(), eventMetric)
 }
 
 func BenchmarkMetricEventDiscard(b *testing.B) {
-	runBenchmark(b, eventPrint(io.Discard), eventMetric)
+	bench.RunBenchmark(b, eventPrint(io.Discard), eventMetric)
 }

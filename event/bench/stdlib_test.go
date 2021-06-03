@@ -11,37 +11,40 @@ import (
 	"io/ioutil"
 	"log"
 	"testing"
+
+	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/bench"
 )
 
 var (
-	baseline = Hooks{
+	baseline = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context { return ctx },
 		AEnd:   func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context { return ctx },
 		BEnd:   func(ctx context.Context) {},
 	}
 
-	stdlibLog = Hooks{
+	stdlibLog = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			logCtx(ctx).Printf(aMsgf, a)
+			logCtx(ctx).Printf(bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			logCtx(ctx).Printf(bMsgf, b)
+			logCtx(ctx).Printf(bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	stdlibPrintf = Hooks{
+	stdlibPrintf = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctxPrintf(ctx, aMsgf, a)
+			ctxPrintf(ctx, bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctxPrintf(ctx, bMsgf, b)
+			ctxPrintf(ctx, bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -49,7 +52,7 @@ var (
 )
 
 func BenchmarkBaseline(b *testing.B) {
-	runBenchmark(b, context.Background(), Hooks{
+	bench.RunBenchmark(b, context.Background(), bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context { return ctx },
 		AEnd:   func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context { return ctx },
@@ -81,10 +84,10 @@ func ctxPrintf(ctx context.Context, msg string, args ...interface{}) {
 }
 
 func stdlibWriter(w io.Writer) context.Context {
-	now := newTimer()
+	now := eventtest.ExporterOptions().Now
 	return context.WithValue(context.Background(), writerKey{},
 		func(msg string, args ...interface{}) {
-			fmt.Fprint(w, now().Format(timeFormat), " ")
+			fmt.Fprint(w, now().Format(bench.TimeFormat), " ")
 			fmt.Fprintf(w, msg, args...)
 			fmt.Fprintln(w)
 		},
@@ -92,15 +95,15 @@ func stdlibWriter(w io.Writer) context.Context {
 }
 
 func BenchmarkLogStdlib(b *testing.B) {
-	runBenchmark(b, stdlibLogger(ioutil.Discard), stdlibLog)
+	bench.RunBenchmark(b, stdlibLogger(ioutil.Discard), stdlibLog)
 }
 
 func BenchmarkLogPrintf(b *testing.B) {
-	runBenchmark(b, stdlibWriter(io.Discard), stdlibPrintf)
+	bench.RunBenchmark(b, stdlibWriter(io.Discard), stdlibPrintf)
 }
 
 func TestLogStdlib(t *testing.T) {
-	testBenchmark(t, stdlibLoggerNoTime, stdlibLog, `
+	bench.TestBenchmark(t, stdlibLoggerNoTime, stdlibLog, `
 a where A=0
 b where B="A value"
 a where A=1
@@ -121,7 +124,7 @@ b where B="A value"
 }
 
 func TestLogPrintf(t *testing.T) {
-	testBenchmark(t, stdlibWriter, stdlibPrintf, `
+	bench.TestBenchmark(t, stdlibWriter, stdlibPrintf, `
 2020/03/05 14:27:48 a where A=0
 2020/03/05 14:27:49 b where B="A value"
 2020/03/05 14:27:50 a where A=1

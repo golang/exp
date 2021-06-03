@@ -10,30 +10,32 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/bench"
 )
 
 var (
-	zerologMsg = Hooks{
+	zerologMsg = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zerolog.Ctx(ctx).Info().Int(aName, a).Msg(aMsg)
+			zerolog.Ctx(ctx).Info().Int(bench.A.Name, a).Msg(bench.A.Msg)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zerolog.Ctx(ctx).Info().Str(bName, b).Msg(bMsg)
+			zerolog.Ctx(ctx).Info().Str(bench.B.Name, b).Msg(bench.B.Msg)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	zerologMsgf = Hooks{
+	zerologMsgf = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zerolog.Ctx(ctx).Info().Msgf(aMsgf, a)
+			zerolog.Ctx(ctx).Info().Msgf(bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zerolog.Ctx(ctx).Info().Msgf(bMsgf, b)
+			zerolog.Ctx(ctx).Info().Msgf(bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -41,22 +43,22 @@ var (
 )
 
 func zerologPrint(w io.Writer) context.Context {
-	zerolog.TimeFieldFormat = timeFormat
-	zerolog.TimestampFunc = newTimer()
+	zerolog.TimeFieldFormat = bench.TimeFormat
+	zerolog.TimestampFunc = eventtest.ExporterOptions().Now
 	logger := zerolog.New(zerolog.SyncWriter(w)).With().Timestamp().Logger()
 	return logger.WithContext(context.Background())
 }
 
 func BenchmarkLogZerolog(b *testing.B) {
-	runBenchmark(b, zerologPrint(io.Discard), zerologMsg)
+	bench.RunBenchmark(b, zerologPrint(io.Discard), zerologMsg)
 }
 
 func BenchmarkLogZerologf(b *testing.B) {
-	runBenchmark(b, zerologPrint(io.Discard), zerologMsgf)
+	bench.RunBenchmark(b, zerologPrint(io.Discard), zerologMsgf)
 }
 
 func TestLogZerologf(t *testing.T) {
-	testBenchmark(t, zerologPrint, zerologMsgf, `
+	bench.TestBenchmark(t, zerologPrint, zerologMsgf, `
 {"level":"info","time":"2020/03/05 14:27:48","message":"a where A=0"}
 {"level":"info","time":"2020/03/05 14:27:49","message":"b where B=\"A value\""}
 {"level":"info","time":"2020/03/05 14:27:50","message":"a where A=1"}

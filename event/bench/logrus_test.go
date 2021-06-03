@@ -11,30 +11,32 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/bench"
 )
 
 var (
-	logrusLog = Hooks{
+	logrusLog = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			logrusCtx(ctx).WithField(aName, a).Info(aMsg)
+			logrusCtx(ctx).WithField(bench.A.Name, a).Info(bench.A.Msg)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			logrusCtx(ctx).WithField(bName, b).Info(bMsg)
+			logrusCtx(ctx).WithField(bench.B.Name, b).Info(bench.B.Msg)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	logrusLogf = Hooks{
+	logrusLogf = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			logrusCtx(ctx).Infof(aMsgf, a)
+			logrusCtx(ctx).Infof(bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			logrusCtx(ctx).Infof(bMsgf, b)
+			logrusCtx(ctx).Infof(bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -61,10 +63,10 @@ func logrusPrint(w io.Writer) context.Context {
 		Out:   w,
 		Level: logrus.InfoLevel,
 		Formatter: &logrusTimeFormatter{
-			now: newTimer(),
+			now: eventtest.ExporterOptions().Now,
 			wrapped: &logrus.TextFormatter{
 				FullTimestamp:   true,
-				TimestampFormat: timeFormat,
+				TimestampFormat: bench.TimeFormat,
 				DisableSorting:  true,
 				DisableColors:   true,
 			},
@@ -74,15 +76,15 @@ func logrusPrint(w io.Writer) context.Context {
 }
 
 func BenchmarkLogrus(b *testing.B) {
-	runBenchmark(b, logrusPrint(io.Discard), logrusLog)
+	bench.RunBenchmark(b, logrusPrint(io.Discard), logrusLog)
 }
 
 func BenchmarkLogrusf(b *testing.B) {
-	runBenchmark(b, logrusPrint(io.Discard), logrusLogf)
+	bench.RunBenchmark(b, logrusPrint(io.Discard), logrusLogf)
 }
 
 func TestLogrusf(t *testing.T) {
-	testBenchmark(t, logrusPrint, logrusLogf, `
+	bench.TestBenchmark(t, logrusPrint, logrusLogf, `
 time="2020/03/05 14:27:48" level=info msg="a where A=0"
 time="2020/03/05 14:27:49" level=info msg="b where B=\"A value\""
 time="2020/03/05 14:27:50" level=info msg="a where A=1"

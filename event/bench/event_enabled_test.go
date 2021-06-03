@@ -8,10 +8,12 @@ package bench_test
 
 import (
 	"testing"
+
+	"golang.org/x/exp/event/bench"
 )
 
 func TestLogEventf(t *testing.T) {
-	testBenchmark(t, eventPrint, eventLogf, `
+	bench.TestBenchmark(t, eventPrint, eventLogf, `
 time=2020-03-05T14:27:48 msg="a where A=0"
 time=2020-03-05T14:27:49 msg="b where B=\"A value\""
 time=2020-03-05T14:27:50 msg="a where A=1"
@@ -32,7 +34,7 @@ time=2020-03-05T14:28:03 msg="b where B=\"A value\""
 }
 
 func TestLogEvent(t *testing.T) {
-	testBenchmark(t, eventPrint, eventLog, `
+	bench.TestBenchmark(t, eventPrint, eventLog, `
 time=2020-03-05T14:27:48 A=0 msg=a
 time=2020-03-05T14:27:49 B="A value" msg=b
 time=2020-03-05T14:27:50 A=1 msg=a
