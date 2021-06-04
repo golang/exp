@@ -66,15 +66,15 @@ func zapPrint(w io.Writer) context.Context {
 	return context.WithValue(context.Background(), zapKey{}, logger)
 }
 
-func BenchmarkLogZap(b *testing.B) {
+func BenchmarkZapLogDiscard(b *testing.B) {
 	bench.RunBenchmark(b, zapPrint(io.Discard), zapLog)
 }
 
-func BenchmarkLogZapf(b *testing.B) {
+func BenchmarkZapLogfDiscard(b *testing.B) {
 	bench.RunBenchmark(b, zapPrint(io.Discard), zapLogf)
 }
 
-func TestLogZapf(t *testing.T) {
+func TestZapLogfDiscard(t *testing.T) {
 	bench.TestBenchmark(t, zapPrint, zapLogf, `
 2020/03/05 14:27:48	info	a where A=0
 2020/03/05 14:27:49	info	b where B="A value"

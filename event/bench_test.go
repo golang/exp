@@ -97,34 +97,34 @@ func eventPrint(w io.Writer) context.Context {
 	return event.WithExporter(context.Background(), event.NewExporter(logfmt.NewHandler(w), eventtest.ExporterOptions()))
 }
 
-func BenchmarkLogEventNoExporter(b *testing.B) {
+func BenchmarkEventLogNoExporter(b *testing.B) {
 	bench.RunBenchmark(b, eventNoExporter(), eventLog)
 }
 
-func BenchmarkLogEventNoop(b *testing.B) {
+func BenchmarkEventLogNoop(b *testing.B) {
 	bench.RunBenchmark(b, eventNoop(), eventLog)
 }
 
-func BenchmarkLogEventDiscard(b *testing.B) {
+func BenchmarkEventLogDiscard(b *testing.B) {
 	bench.RunBenchmark(b, eventPrint(io.Discard), eventLog)
 }
 
-func BenchmarkLogEventfDiscard(b *testing.B) {
+func BenchmarkEventLogfDiscard(b *testing.B) {
 	bench.RunBenchmark(b, eventPrint(io.Discard), eventLogf)
 }
 
-func BenchmarkTraceEventNoop(b *testing.B) {
+func BenchmarkEventTraceNoop(b *testing.B) {
 	bench.RunBenchmark(b, eventNoop(), eventTrace)
 }
 
-func BenchmarkTraceEventDiscard(b *testing.B) {
+func BenchmarkEventTraceDiscard(b *testing.B) {
 	bench.RunBenchmark(b, eventPrint(io.Discard), eventTrace)
 }
 
-func BenchmarkMetricEventNoop(b *testing.B) {
+func BenchmarkEventMetricNoop(b *testing.B) {
 	bench.RunBenchmark(b, eventNoop(), eventMetric)
 }
 
-func BenchmarkMetricEventDiscard(b *testing.B) {
+func BenchmarkEventMetricDiscard(b *testing.B) {
 	bench.RunBenchmark(b, eventPrint(io.Discard), eventMetric)
 }

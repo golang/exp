@@ -75,11 +75,11 @@ func logrusPrint(w io.Writer) context.Context {
 	return context.WithValue(context.Background(), logrusKey{}, logger)
 }
 
-func BenchmarkLogrus(b *testing.B) {
+func BenchmarkLogrusLogDiscard(b *testing.B) {
 	bench.RunBenchmark(b, logrusPrint(io.Discard), logrusLog)
 }
 
-func BenchmarkLogrusf(b *testing.B) {
+func BenchmarkLogrusLogfDiscard(b *testing.B) {
 	bench.RunBenchmark(b, logrusPrint(io.Discard), logrusLogf)
 }
 

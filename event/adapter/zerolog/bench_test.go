@@ -49,11 +49,11 @@ func zerologPrint(w io.Writer) context.Context {
 	return logger.WithContext(context.Background())
 }
 
-func BenchmarkLogZerolog(b *testing.B) {
+func BenchmarkZerologLogDiscard(b *testing.B) {
 	bench.RunBenchmark(b, zerologPrint(io.Discard), zerologMsg)
 }
 
-func BenchmarkLogZerologf(b *testing.B) {
+func BenchmarkZerologLogfDiscard(b *testing.B) {
 	bench.RunBenchmark(b, zerologPrint(io.Discard), zerologMsgf)
 }
 

@@ -94,11 +94,11 @@ func stdlibWriter(w io.Writer) context.Context {
 	)
 }
 
-func BenchmarkLogStdlib(b *testing.B) {
+func BenchmarkStdlibLogfDiscard(b *testing.B) {
 	bench.RunBenchmark(b, stdlibLogger(ioutil.Discard), stdlibLog)
 }
 
-func BenchmarkLogPrintf(b *testing.B) {
+func BenchmarkStdlibPrintfDiscard(b *testing.B) {
 	bench.RunBenchmark(b, stdlibWriter(io.Discard), stdlibPrintf)
 }
 
