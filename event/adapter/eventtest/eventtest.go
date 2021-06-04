@@ -58,7 +58,7 @@ func (h *testHandler) event(ctx context.Context, ev *event.Event) {
 }
 
 var InitialTime = func() time.Time {
-	t, _ := time.Parse(time.RFC3339Nano, "2020-03-05T14:27:48Z")
+	t, _ := time.Parse(logfmt.TimeFormat, "2020/03/05 14:27:48")
 	return t
 }()
 

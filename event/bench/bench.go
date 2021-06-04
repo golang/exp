@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/exp/event/adapter/logfmt"
 )
 
 type Info struct {
@@ -33,7 +34,7 @@ var (
 		"Some other value",
 		"A nice longer value but not too long",
 		"V",
-		"",
+		" ",
 		"ı",
 		"prime count of values",
 	}
@@ -52,7 +53,45 @@ var (
 )
 
 const (
-	TimeFormat = "2006/01/02 15:04:05"
+	TimeFormat = logfmt.TimeFormat
+
+	LogfmtOutput = `
+time="2020/03/05 14:27:48" level=info A=0 msg=a
+time="2020/03/05 14:27:49" level=info B="A value" msg=b
+time="2020/03/05 14:27:50" level=info A=1 msg=a
+time="2020/03/05 14:27:51" level=info B="Some other value" msg=b
+time="2020/03/05 14:27:52" level=info A=22 msg=a
+time="2020/03/05 14:27:53" level=info B="Some other value" msg=b
+time="2020/03/05 14:27:54" level=info A=333 msg=a
+time="2020/03/05 14:27:55" level=info B=" " msg=b
+time="2020/03/05 14:27:56" level=info A=4444 msg=a
+time="2020/03/05 14:27:57" level=info B="prime count of values" msg=b
+time="2020/03/05 14:27:58" level=info A=55555 msg=a
+time="2020/03/05 14:27:59" level=info B=V msg=b
+time="2020/03/05 14:28:00" level=info A=666666 msg=a
+time="2020/03/05 14:28:01" level=info B="A value" msg=b
+time="2020/03/05 14:28:02" level=info A=7777777 msg=a
+time="2020/03/05 14:28:03" level=info B="A value" msg=b
+`
+
+	LogfOutput = `
+time="2020/03/05 14:27:48" level=info msg="a where A=0"
+time="2020/03/05 14:27:49" level=info msg="b where B=\"A value\""
+time="2020/03/05 14:27:50" level=info msg="a where A=1"
+time="2020/03/05 14:27:51" level=info msg="b where B=\"Some other value\""
+time="2020/03/05 14:27:52" level=info msg="a where A=22"
+time="2020/03/05 14:27:53" level=info msg="b where B=\"Some other value\""
+time="2020/03/05 14:27:54" level=info msg="a where A=333"
+time="2020/03/05 14:27:55" level=info msg="b where B=\" \""
+time="2020/03/05 14:27:56" level=info msg="a where A=4444"
+time="2020/03/05 14:27:57" level=info msg="b where B=\"prime count of values\""
+time="2020/03/05 14:27:58" level=info msg="a where A=55555"
+time="2020/03/05 14:27:59" level=info msg="b where B=\"V\""
+time="2020/03/05 14:28:00" level=info msg="a where A=666666"
+time="2020/03/05 14:28:01" level=info msg="b where B=\"A value\""
+time="2020/03/05 14:28:02" level=info msg="a where A=7777777"
+time="2020/03/05 14:28:03" level=info msg="b where B=\"A value\""
+`
 )
 
 type namedBenchmark struct {

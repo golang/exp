@@ -9,12 +9,16 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/exp/event"
 )
 
 //TODO: some actual research into what this arbritray optimization number should be
 const bufCap = 50
+
+const TimeFormat = "2006/01/02 15:04:05"
 
 type Printer struct {
 	buf     [bufCap]byte
@@ -54,10 +58,9 @@ func (h *Handler) End(ctx context.Context, ev *event.Event) {
 }
 
 func (p *Printer) Event(w io.Writer, ev *event.Event) {
-	const timeFormat = "2006-01-02T15:04:05"
 	p.needSep = false
 	if !ev.At.IsZero() {
-		p.label(w, "time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], timeFormat)))
+		p.label(w, "time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], TimeFormat)))
 	}
 
 	if ev.Parent != 0 {
@@ -101,30 +104,24 @@ func (p *Printer) Value(w io.Writer, v event.Value) {
 }
 
 func (p *Printer) Ident(w io.Writer, s string) {
-	//TODO: this should also escape = if it occurs in an ident?
 	p.Quote(w, s)
 }
 
 func (p *Printer) Quote(w io.Writer, s string) {
-	if s == "" {
-		io.WriteString(w, `""`)
-		return
-	}
-	if !needQuote(s) {
+	if !stringNeedQuote(s) {
 		io.WriteString(w, s)
 		return
 	}
-	// string needs quoting
 	io.WriteString(w, `"`)
 	written := 0
-	for o, r := range s {
+	for offset, r := range s {
 		q := quoteRune(r)
 		if len(q) == 0 {
 			continue
 		}
 		// write out any prefix
-		io.WriteString(w, s[written:o])
-		written = o + 1 // we can plus 1 because all runes we escape are ascii
+		io.WriteString(w, s[written:offset])
+		written = offset + utf8.RuneLen(r)
 		// and write out the quoted rune
 		io.WriteString(w, q)
 	}
@@ -134,8 +131,27 @@ func (p *Printer) Quote(w io.Writer, s string) {
 
 // Bytes writes a byte array in string form to the printer.
 func (p *Printer) Bytes(w io.Writer, buf []byte) {
-	//TODO: non asci chars need escaping
-	w.Write(buf)
+	if !bytesNeedQuote(buf) {
+		w.Write(buf)
+		return
+	}
+	io.WriteString(w, `"`)
+	written := 0
+	for offset := 0; offset < len(buf); {
+		r, size := utf8.DecodeRune(buf[offset:])
+		offset += size
+		q := quoteRune(r)
+		if len(q) == 0 {
+			continue
+		}
+		// write out any prefix
+		w.Write(buf[written : offset-size])
+		written = offset
+		// and write out the quoted rune
+		io.WriteString(w, q)
+	}
+	w.Write(buf[written:])
+	io.WriteString(w, `"`)
 }
 
 func (p *Printer) label(w io.Writer, name string, value event.Value) {
@@ -153,21 +169,37 @@ func (p *Printer) label(w io.Writer, name string, value event.Value) {
 	}
 }
 
-func needQuote(s string) bool {
+func stringNeedQuote(s string) bool {
+	if len(s) == 0 {
+		return true
+	}
 	for _, r := range s {
-		if len(quoteRune(r)) > 0 {
+		if runeForcesQuote(r) {
 			return true
 		}
 	}
 	return false
 }
 
+func bytesNeedQuote(buf []byte) bool {
+	for offset := 0; offset < len(buf); {
+		r, size := utf8.DecodeRune(buf[offset:])
+		offset += size
+		if runeForcesQuote(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func runeForcesQuote(r rune) bool {
+	return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+}
+
 func quoteRune(r rune) string {
 	switch r {
 	case '"':
 		return `\"`
-	case ' ':
-		return ` ` // does not change but forces quoting
 	case '\n':
 		return `\n`
 	case '\\':

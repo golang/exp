@@ -66,7 +66,7 @@ func TestLogZerologf(t *testing.T) {
 {"level":"info","time":"2020/03/05 14:27:52","message":"a where A=22"}
 {"level":"info","time":"2020/03/05 14:27:53","message":"b where B=\"Some other value\""}
 {"level":"info","time":"2020/03/05 14:27:54","message":"a where A=333"}
-{"level":"info","time":"2020/03/05 14:27:55","message":"b where B=\"\""}
+{"level":"info","time":"2020/03/05 14:27:55","message":"b where B=\" \""}
 {"level":"info","time":"2020/03/05 14:27:56","message":"a where A=4444"}
 {"level":"info","time":"2020/03/05 14:27:57","message":"b where B=\"prime count of values\""}
 {"level":"info","time":"2020/03/05 14:27:58","message":"a where A=55555"}

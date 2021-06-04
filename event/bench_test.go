@@ -14,6 +14,7 @@ import (
 	"golang.org/x/exp/event/adapter/logfmt"
 	"golang.org/x/exp/event/bench"
 	"golang.org/x/exp/event/keys"
+	"golang.org/x/exp/event/severity"
 )
 
 var (
@@ -26,12 +27,12 @@ var (
 
 	eventLog = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			event.To(ctx).With(aValue.Of(a)).Log(bench.A.Msg)
+			event.To(ctx).With(severity.Info).With(aValue.Of(a)).Log(bench.A.Msg)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			event.To(ctx).With(bValue.Of(b)).Log(bench.B.Msg)
+			event.To(ctx).With(severity.Info).With(bValue.Of(b)).Log(bench.B.Msg)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -39,12 +40,12 @@ var (
 
 	eventLogf = bench.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			event.To(ctx).Logf(bench.A.Msgf, a)
+			event.To(ctx).With(severity.Info).Logf(bench.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			event.To(ctx).Logf(bench.B.Msgf, b)
+			event.To(ctx).With(severity.Info).Logf(bench.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},

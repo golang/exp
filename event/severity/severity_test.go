@@ -27,11 +27,11 @@ func TestPrint(t *testing.T) {
 	}{{
 		name:   "debug",
 		events: func(ctx context.Context) { event.To(ctx).With(severity.Debug).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 level=debug msg="a message"`,
+		expect: `time="2020/03/05 14:27:48" level=debug msg="a message"`,
 	}, {
 		name:   "info",
 		events: func(ctx context.Context) { event.To(ctx).With(severity.Info).Log("a message") },
-		expect: `time=2020-03-05T14:27:48 level=info msg="a message"`},
+		expect: `time="2020/03/05 14:27:48" level=info msg="a message"`},
 	} {
 		buf := &strings.Builder{}
 		ctx := event.WithExporter(ctx, event.NewExporter(logfmt.NewHandler(buf), eventtest.ExporterOptions()))

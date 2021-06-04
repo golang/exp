@@ -54,7 +54,7 @@ func zapPrint(w io.Writer) context.Context {
 	ec := zap.NewProductionEncoderConfig()
 	ec.EncodeDuration = zapcore.NanosDurationEncoder
 	timeEncoder := zapcore.TimeEncoderOfLayout(bench.TimeFormat)
-	ec.EncodeTime = func(t time.Time, a zapcore.PrimitiveArrayEncoder) {
+	ec.EncodeTime = func(_ time.Time, a zapcore.PrimitiveArrayEncoder) {
 		timeEncoder(now(), a)
 	}
 	enc := zapcore.NewConsoleEncoder(ec)
@@ -83,7 +83,7 @@ func TestZapLogfDiscard(t *testing.T) {
 2020/03/05 14:27:52	info	a where A=22
 2020/03/05 14:27:53	info	b where B="Some other value"
 2020/03/05 14:27:54	info	a where A=333
-2020/03/05 14:27:55	info	b where B=""
+2020/03/05 14:27:55	info	b where B=" "
 2020/03/05 14:27:56	info	a where A=4444
 2020/03/05 14:27:57	info	b where B="prime count of values"
 2020/03/05 14:27:58	info	a where A=55555
@@ -103,7 +103,7 @@ func TestLogZap(t *testing.T) {
 2020/03/05 14:27:52	info	a	{"A": 22}
 2020/03/05 14:27:53	info	b	{"B": "Some other value"}
 2020/03/05 14:27:54	info	a	{"A": 333}
-2020/03/05 14:27:55	info	b	{"B": ""}
+2020/03/05 14:27:55	info	b	{"B": " "}
 2020/03/05 14:27:56	info	a	{"A": 4444}
 2020/03/05 14:27:57	info	b	{"B": "prime count of values"}
 2020/03/05 14:27:58	info	a	{"A": 55555}

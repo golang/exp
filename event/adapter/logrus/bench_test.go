@@ -84,22 +84,5 @@ func BenchmarkLogrusLogfDiscard(b *testing.B) {
 }
 
 func TestLogrusf(t *testing.T) {
-	bench.TestBenchmark(t, logrusPrint, logrusLogf, `
-time="2020/03/05 14:27:48" level=info msg="a where A=0"
-time="2020/03/05 14:27:49" level=info msg="b where B=\"A value\""
-time="2020/03/05 14:27:50" level=info msg="a where A=1"
-time="2020/03/05 14:27:51" level=info msg="b where B=\"Some other value\""
-time="2020/03/05 14:27:52" level=info msg="a where A=22"
-time="2020/03/05 14:27:53" level=info msg="b where B=\"Some other value\""
-time="2020/03/05 14:27:54" level=info msg="a where A=333"
-time="2020/03/05 14:27:55" level=info msg="b where B=\"\""
-time="2020/03/05 14:27:56" level=info msg="a where A=4444"
-time="2020/03/05 14:27:57" level=info msg="b where B=\"prime count of values\""
-time="2020/03/05 14:27:58" level=info msg="a where A=55555"
-time="2020/03/05 14:27:59" level=info msg="b where B=\"V\""
-time="2020/03/05 14:28:00" level=info msg="a where A=666666"
-time="2020/03/05 14:28:01" level=info msg="b where B=\"A value\""
-time="2020/03/05 14:28:02" level=info msg="a where A=7777777"
-time="2020/03/05 14:28:03" level=info msg="b where B=\"A value\""
-`)
+	bench.TestBenchmark(t, logrusPrint, logrusLogf, bench.LogfOutput)
 }

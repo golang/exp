@@ -87,9 +87,9 @@ func stdlibWriter(w io.Writer) context.Context {
 	now := eventtest.ExporterOptions().Now
 	return context.WithValue(context.Background(), writerKey{},
 		func(msg string, args ...interface{}) {
-			fmt.Fprint(w, now().Format(bench.TimeFormat), " ")
-			fmt.Fprintf(w, msg, args...)
-			fmt.Fprintln(w)
+			fmt.Fprintf(w, "time=%q level=info msg=%q\n",
+				now().Format(bench.TimeFormat),
+				fmt.Sprintf(msg, args...))
 		},
 	)
 }
@@ -111,7 +111,7 @@ b where B="Some other value"
 a where A=22
 b where B="Some other value"
 a where A=333
-b where B=""
+b where B=" "
 a where A=4444
 b where B="prime count of values"
 a where A=55555
@@ -124,22 +124,5 @@ b where B="A value"
 }
 
 func TestLogPrintf(t *testing.T) {
-	bench.TestBenchmark(t, stdlibWriter, stdlibPrintf, `
-2020/03/05 14:27:48 a where A=0
-2020/03/05 14:27:49 b where B="A value"
-2020/03/05 14:27:50 a where A=1
-2020/03/05 14:27:51 b where B="Some other value"
-2020/03/05 14:27:52 a where A=22
-2020/03/05 14:27:53 b where B="Some other value"
-2020/03/05 14:27:54 a where A=333
-2020/03/05 14:27:55 b where B=""
-2020/03/05 14:27:56 a where A=4444
-2020/03/05 14:27:57 b where B="prime count of values"
-2020/03/05 14:27:58 a where A=55555
-2020/03/05 14:27:59 b where B="V"
-2020/03/05 14:28:00 a where A=666666
-2020/03/05 14:28:01 b where B="A value"
-2020/03/05 14:28:02 a where A=7777777
-2020/03/05 14:28:03 b where B="A value"
-`)
+	bench.TestBenchmark(t, stdlibWriter, stdlibPrintf, bench.LogfOutput)
 }
