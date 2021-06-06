@@ -9,6 +9,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"time"
 	"unsafe"
 )
 
@@ -48,6 +49,9 @@ type float64Kind struct{}
 // boolKind is used in untyped when the Value is a boolean
 type boolKind struct{}
 
+// durationKind is used in untyped when the Value is a time.Duration
+type durationKind struct{}
+
 // HasValue returns true if the value is set to any type.
 func (v *Value) HasValue() bool { return v.untyped != nil }
 
@@ -70,6 +74,8 @@ func (v1 *Value) Equal(v2 Value) bool {
 		return v2.IsFloat64() && v1.Float64() == v2.Float64()
 	case v1.IsBool():
 		return v2.IsBool() && v1.packed == v2.packed
+	case v1.IsDuration():
+		return v2.IsDuration() && v1.packed == v2.packed
 	default:
 		return v1.untyped == v2.untyped
 	}
@@ -95,6 +101,8 @@ func (v Value) Interface() interface{} {
 		return v.Float64()
 	case v.IsBool():
 		return v.Bool()
+	case v.IsDuration():
+		return v.Duration()
 	default:
 		return v.untyped
 	}
@@ -251,5 +259,21 @@ func (v Value) Bool() bool {
 // IsBool returns true if the value was built with SetBool.
 func (v Value) IsBool() bool {
 	_, ok := v.untyped.(boolKind)
+	return ok
+}
+
+func DurationOf(d time.Duration) Value {
+	return Value{packed: uint64(d), untyped: durationKind{}}
+}
+
+func (v Value) Duration() time.Duration {
+	if !v.IsDuration() {
+		panic("Duration called on non-Duration value")
+	}
+	return time.Duration(v.packed)
+}
+
+func (v Value) IsDuration() bool {
+	_, ok := v.untyped.(durationKind)
 	return ok
 }

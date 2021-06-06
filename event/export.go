@@ -108,26 +108,14 @@ func (e *Exporter) prepare(ev *Event) {
 		// Get the pc of the user function that delivered the event.
 		// This is sensitive to the call stack.
 		// 0: runtime.Callers
-		// 1: Exporter.prepare (this function)
-		// 2: Builder.{Start,End,etc.}
-		// 3: user function
-		var pcs [1]uintptr
-		runtime.Callers(3, pcs[:])
-		pc := pcs[0]
-		if pc != 0 {
-			ns, ok := e.pcToNamespace[pc]
-			if !ok {
-				// If we call runtime.CallersFrames(pcs[:1]) in this function, the
-				// compiler will think the pcs array escapes and will allocate.
-				f := callerFrameFunction(pc)
-				ns = namespace(f)
-				if e.pcToNamespace == nil {
-					e.pcToNamespace = map[uintptr]string{}
-				}
-				e.pcToNamespace[pc] = ns
-			}
-			ev.Namespace = ns
+		// 1: importPath
+		// 2: Exporter.prepare (this function)
+		// 3: Builder.{Start,End,etc.}
+		// 4: user function
+		if e.pcToNamespace == nil {
+			e.pcToNamespace = map[uintptr]string{}
 		}
+		ev.Namespace = importPath(4, e.pcToNamespace)
 	}
 }
 
@@ -135,6 +123,23 @@ func (e *Exporter) loggingEnabled() bool     { return !e.opts.DisableLogging }
 func (e *Exporter) annotationsEnabled() bool { return !e.opts.DisableAnnotations }
 func (e *Exporter) tracingEnabled() bool     { return !e.opts.DisableTracing }
 func (e *Exporter) metricsEnabled() bool     { return !e.opts.DisableMetrics }
+
+func importPath(depth int, cache map[uintptr]string) string {
+	var pcs [1]uintptr
+	runtime.Callers(depth, pcs[:])
+	pc := pcs[0]
+	ns, ok := cache[pc]
+	if !ok {
+		// If we call runtime.CallersFrames(pcs[:1]) in this function, the
+		// compiler will think the pcs array escapes and will allocate.
+		f := callerFrameFunction(pc)
+		ns = namespace(f)
+		if cache != nil {
+			cache[pc] = ns
+		}
+	}
+	return ns
+}
 
 func callerFrameFunction(pc uintptr) string {
 	frame, _ := runtime.CallersFrames([]uintptr{pc}).Next()

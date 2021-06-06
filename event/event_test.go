@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/eventtest"
@@ -19,9 +20,11 @@ import (
 )
 
 var (
-	l1 = keys.Int("l1").Of(1)
-	l2 = keys.Int("l2").Of(2)
-	l3 = keys.Int("l3").Of(3)
+	l1      = keys.Int("l1").Of(1)
+	l2      = keys.Int("l2").Of(2)
+	l3      = keys.Int("l3").Of(3)
+	gauge   = event.NewMetric(event.Gauge, "gauge", "")
+	latency = event.NewMetric(event.Distribution, "latency", "")
 )
 
 func TestPrint(t *testing.T) {
@@ -72,12 +75,14 @@ time=2020-03-05T14:27:51 parent=2 end
 time=2020-03-05T14:27:52 parent=1 end
 `}, {
 		name:   "metric",
-		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric() },
-		expect: `time=2020-03-05T14:27:48 l1=1 metric`,
+		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric(gauge, event.Int64Of(2)) },
+		expect: `time=2020-03-05T14:27:48 l1=1 metricValue=2 metric=Gauge("golang.org/x/exp/event_test/gauge")`,
 	}, {
-		name:   "metric 2",
-		events: func(ctx context.Context) { event.To(ctx).With(l1).With(l2).Metric() },
-		expect: `time=2020-03-05T14:27:48 l1=1 l2=2 metric`,
+		name: "metric 2",
+		events: func(ctx context.Context) {
+			event.To(ctx).With(l1).With(l2).Metric(latency, event.DurationOf(3*time.Second))
+		},
+		expect: `time=2020-03-05T14:27:48 l1=1 l2=2 metricValue=3s metric=Distribution("golang.org/x/exp/event_test/latency")`,
 	}, {
 		name:   "annotate",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Annotate() },

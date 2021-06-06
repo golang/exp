@@ -68,16 +68,17 @@ var (
 		},
 	}
 
+	gauge       = event.NewMetric(event.Gauge, "gauge", "m")
 	eventMetric = Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			event.To(ctx).With(aStat.Of(a)).Metric()
-			event.To(ctx).With(aCount.Of(1)).Metric()
+			event.To(ctx).With(aStat.Of(a)).Metric(gauge, event.Int64Of(1))
+			event.To(ctx).With(aCount.Of(1)).Metric(gauge, event.Int64Of(1))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			event.To(ctx).With(bLength.Of(len(b))).Metric()
-			event.To(ctx).With(bCount.Of(1)).Metric()
+			event.To(ctx).With(bLength.Of(len(b))).Metric(gauge, event.Int64Of(1))
+			event.To(ctx).With(bCount.Of(1)).Metric(gauge, event.Int64Of(1))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},

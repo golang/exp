@@ -155,7 +155,7 @@ func (b Builder) Logf(template string, args ...interface{}) {
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
-func (b Builder) Metric() {
+func (b Builder) Metric(m *Metric, value Value) {
 	if b.data == nil {
 		return
 	}
@@ -163,11 +163,25 @@ func (b Builder) Metric() {
 	if b.data.exporter.metricsEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Labels = append(b.data.Event.Labels, Metric.Value())
+		if b.data.Event.Namespace == "" {
+			b.data.Event.Namespace = m.Namespace()
+		}
+		b.data.Event.Labels = append(b.data.Event.Labels, MetricValue.Of(value), MetricKey.Of(ValueOf(m)))
 		b.data.exporter.prepare(&b.data.Event)
 		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
 	}
 	b.done()
+}
+
+func (b Builder) Count(m *Metric) {
+	if m.Kind() != Counter {
+		panic("Builder.Count called on non-counter")
+	}
+	b.Metric(m, Int64Of(1))
+}
+
+func (b Builder) Since(m *Metric, start time.Time) {
+	b.Metric(m, DurationOf(time.Since(start)))
 }
 
 // Annotate is a helper that calls Deliver with AnnotateKind.
