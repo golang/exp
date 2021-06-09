@@ -25,7 +25,7 @@ func TestCommon(t *testing.T) {
 	checkFind(t, h, "Log", event.Message, true, simple)
 	checkFind(t, h, "Log", event.Name, false, "")
 
-	m.To(ctx).Record(3)
+	event.To(ctx).Metric(m.Record(3))
 	checkFind(t, h, "Metric", event.Message, false, "")
 	checkFind(t, h, "Metric", event.Name, false, "")
 

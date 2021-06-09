@@ -71,14 +71,14 @@ var (
 	gauge       = event.NewFloatGauge("gauge")
 	eventMetric = Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			gauge.To(ctx).With(aStat.Of(a)).Record(1)
-			gauge.To(ctx).With(aCount.Of(1)).Record(1)
+			event.To(ctx).With(aStat.Of(a)).Metric(gauge.Record(1))
+			event.To(ctx).With(aCount.Of(1)).Metric(gauge.Record(1))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			gauge.To(ctx).With(bLength.Of(len(b))).Record(1)
-			gauge.To(ctx).With(bCount.Of(1)).Record(1)
+			event.To(ctx).With(bLength.Of(len(b))).Metric(gauge.Record(1))
+			event.To(ctx).With(bCount.Of(1)).Metric(gauge.Record(1))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},

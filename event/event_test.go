@@ -76,16 +76,16 @@ time=2020-03-05T14:27:51 parent=2 end
 time=2020-03-05T14:27:52 parent=1 end
 `}, {
 		name:   "counter",
-		events: func(ctx context.Context) { counter.To(ctx).With(l1).Record(2) },
+		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric(counter.Record(2)) },
 		expect: `time=2020-03-05T14:27:48 l1=1 metricValue=2 metric=Metric("golang.org/x/exp/event_test/hits")`,
 	}, {
 		name:   "gauge",
-		events: func(ctx context.Context) { gauge.To(ctx).With(l1).Record(98.6) },
+		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric(gauge.Record(98.6)) },
 		expect: `time=2020-03-05T14:27:48 l1=1 metricValue=98.6 metric=Metric("golang.org/x/exp/event_test/temperature")`,
 	}, {
 		name: "duration",
 		events: func(ctx context.Context) {
-			latency.To(ctx).With(l1).With(l2).Record(3 * time.Second)
+			event.To(ctx).With(l1).With(l2).Metric(latency.Record(3 * time.Second))
 		},
 		expect: `time=2020-03-05T14:27:48 l1=1 l2=2 metricValue=3s metric=Metric("golang.org/x/exp/event_test/latency")`,
 	}, {

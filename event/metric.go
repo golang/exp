@@ -5,7 +5,6 @@
 package event
 
 import (
-	"context"
 	"fmt"
 	"time"
 )
@@ -54,8 +53,8 @@ func (m *MetricDescriptor) WithNamespace(ns string) *MetricDescriptor {
 	return m
 }
 
-func (m *MetricDescriptor) Name() string      { return m.name }
-func (m *MetricDescriptor) Namespace() string { return m.namespace }
+func (m MetricDescriptor) Name() string      { return m.name }
+func (m MetricDescriptor) Namespace() string { return m.namespace }
 
 // A counter is a metric that counts something cumulatively.
 type Counter struct {
@@ -70,47 +69,13 @@ func (c *Counter) Descriptor() MetricDescriptor {
 	return c.MetricDescriptor
 }
 
-func (c *Counter) To(ctx context.Context) CounterBuilder {
-	b := CounterBuilder{builderCommon: builderCommon{ctx: ctx}, c: c}
-	b.data = newBuilder(ctx)
-	if b.data != nil {
-		b.builderID = b.data.id
-	}
-	return b
+type MetricValue struct {
+	m Metric
+	v Value
 }
 
-type CounterBuilder struct {
-	builderCommon
-	c *Counter
-}
-
-func (b CounterBuilder) With(label Label) CounterBuilder {
-	b.addLabel(label)
-	return b
-}
-
-func (b CounterBuilder) WithAll(labels ...Label) CounterBuilder {
-	b.addLabels(labels)
-	return b
-}
-
-func (b CounterBuilder) Record(v uint64) {
-	record(b.builderCommon, b.c, Uint64Of(v))
-}
-
-func record(b builderCommon, m Metric, v Value) {
-	if b.data == nil {
-		return
-	}
-	checkValid(b.data, b.builderID)
-	if b.data.exporter.metricsEnabled() {
-		b.data.exporter.mu.Lock()
-		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Labels = append(b.data.Event.Labels, MetricValue.Of(v), MetricKey.Of(ValueOf(m)))
-		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
-	}
-	b.done()
+func (c *Counter) Record(v uint64) MetricValue {
+	return MetricValue{c, Uint64Of(v)}
 }
 
 // A FloatGauge records a single floating-point value that may go up or down.
@@ -127,32 +92,8 @@ func (g *FloatGauge) Descriptor() MetricDescriptor {
 	return g.MetricDescriptor
 }
 
-func (g *FloatGauge) To(ctx context.Context) FloatGaugeBuilder {
-	b := FloatGaugeBuilder{builderCommon: builderCommon{ctx: ctx}, g: g}
-	b.data = newBuilder(ctx)
-	if b.data != nil {
-		b.builderID = b.data.id
-	}
-	return b
-}
-
-type FloatGaugeBuilder struct {
-	builderCommon
-	g *FloatGauge
-}
-
-func (b FloatGaugeBuilder) With(label Label) FloatGaugeBuilder {
-	b.addLabel(label)
-	return b
-}
-
-func (b FloatGaugeBuilder) WithAll(labels ...Label) FloatGaugeBuilder {
-	b.addLabels(labels)
-	return b
-}
-
-func (b FloatGaugeBuilder) Record(v float64) {
-	record(b.builderCommon, b.g, Float64Of(v))
+func (g *FloatGauge) Record(v float64) MetricValue {
+	return MetricValue{g, Float64Of(v)}
 }
 
 // A Duration records a distribution of durations.
@@ -169,30 +110,6 @@ func (d *Duration) Descriptor() MetricDescriptor {
 	return d.MetricDescriptor
 }
 
-func (d *Duration) To(ctx context.Context) DurationBuilder {
-	b := DurationBuilder{builderCommon: builderCommon{ctx: ctx}, d: d}
-	b.data = newBuilder(ctx)
-	if b.data != nil {
-		b.builderID = b.data.id
-	}
-	return b
-}
-
-type DurationBuilder struct {
-	builderCommon
-	d *Duration
-}
-
-func (b DurationBuilder) With(label Label) DurationBuilder {
-	b.addLabel(label)
-	return b
-}
-
-func (b DurationBuilder) WithAll(labels ...Label) DurationBuilder {
-	b.addLabels(labels)
-	return b
-}
-
-func (b DurationBuilder) Record(v time.Duration) {
-	record(b.builderCommon, b.d, DurationOf(v))
+func (d *Duration) Record(v time.Duration) MetricValue {
+	return MetricValue{d, DurationOf(v)}
 }

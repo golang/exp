@@ -9,7 +9,7 @@ const Name = stringKey("name")
 const Trace = traceKey("trace")
 const End = tagKey("end")
 const MetricKey = valueKey("metric")
-const MetricValue = valueKey("metricValue")
+const MetricVal = valueKey("metricValue")
 
 type stringKey string
 type traceKey string
