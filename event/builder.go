@@ -16,6 +16,10 @@ import (
 
 // Builder is a fluent builder for construction of new events.
 type Builder struct {
+	builderCommon
+}
+
+type builderCommon struct {
 	ctx       context.Context
 	data      *builder
 	builderID uint64 // equals data.id if all is well
@@ -39,20 +43,27 @@ var builderPool = sync.Pool{New: func() interface{} { return &builder{} }}
 
 // To initializes a builder from the values stored in a context.
 func To(ctx context.Context) Builder {
-	b := Builder{ctx: ctx}
-	exporter, parent := FromContext(ctx)
-	if exporter == nil {
-		return b
+	b := Builder{builderCommon{ctx: ctx}}
+	b.data = newBuilder(ctx)
+	if b.data != nil {
+		b.builderID = b.data.id
 	}
-	b.data = allocBuilder()
-	b.builderID = b.data.id
-	b.data.exporter = exporter
-	b.data.Event.Labels = b.data.labels[:0]
-	b.data.Event.Parent = parent
 	return b
 }
 
 var builderID uint64 // atomic
+
+func newBuilder(ctx context.Context) *builder {
+	exporter, parent := FromContext(ctx)
+	if exporter == nil {
+		return nil
+	}
+	b := allocBuilder()
+	b.exporter = exporter
+	b.Event.Labels = b.labels[:0]
+	b.Event.Parent = parent
+	return b
+}
 
 func allocBuilder() *builder {
 	b := builderPool.Get().(*builder)
@@ -63,12 +74,16 @@ func allocBuilder() *builder {
 // Clone returns a copy of this builder.
 // The two copies can be independently delivered.
 func (b Builder) Clone() Builder {
+	return Builder{b.clone()}
+}
+
+func (b builderCommon) clone() builderCommon {
 	if b.data == nil {
 		return b
 	}
 	bb := allocBuilder()
 	bbid := bb.id
-	clone := Builder{ctx: b.ctx, data: bb, builderID: bb.id}
+	clone := builderCommon{ctx: b.ctx, data: bb, builderID: bb.id}
 	*clone.data = *b.data
 	clone.data.id = bbid
 	if len(b.data.Event.Labels) == 0 || &b.data.labels[0] == &b.data.Event.Labels[0] {
@@ -82,17 +97,26 @@ func (b Builder) Clone() Builder {
 
 // With adds a new label to the event being constructed.
 func (b Builder) With(label Label) Builder {
-	if b.data != nil {
-		checkValid(b.data, b.builderID)
-		b.data.Event.Labels = append(b.data.Event.Labels, label)
-	}
+	b.addLabel(label)
 	return b
+}
+
+func (b builderCommon) addLabel(label Label) {
+	if b.data != nil {
+		b.data.Event.Labels = append(b.data.Event.Labels, label)
+		checkValid(b.data, b.builderID)
+	}
 }
 
 // WithAll adds all the supplied labels to the event being constructed.
 func (b Builder) WithAll(labels ...Label) Builder {
+	b.addLabels(labels)
+	return b
+}
+
+func (b builderCommon) addLabels(labels []Label) {
 	if b.data == nil || len(labels) == 0 {
-		return b
+		return
 	}
 	checkValid(b.data, b.builderID)
 	if len(b.data.Event.Labels) == 0 {
@@ -100,23 +124,30 @@ func (b Builder) WithAll(labels ...Label) Builder {
 	} else {
 		b.data.Event.Labels = append(b.data.Event.Labels, labels...)
 	}
-	return b
 }
 
 func (b Builder) At(t time.Time) Builder {
+	b.setAt(t)
+	return b
+}
+
+func (b builderCommon) setAt(t time.Time) {
 	if b.data != nil {
 		checkValid(b.data, b.builderID)
 		b.data.Event.At = t
 	}
-	return b
 }
 
 func (b Builder) Namespace(ns string) Builder {
+	b.setNamespace(ns)
+	return b
+}
+
+func (b builderCommon) setNamespace(ns string) {
 	if b.data != nil {
 		checkValid(b.data, b.builderID)
 		b.data.Event.Namespace = ns
 	}
-	return b
 }
 
 // Log is a helper that calls Deliver with LogKind.
@@ -155,34 +186,34 @@ func (b Builder) Logf(template string, args ...interface{}) {
 }
 
 // Metric is a helper that calls Deliver with MetricKind.
-func (b Builder) Metric(m *Metric, value Value) {
-	if b.data == nil {
-		return
-	}
-	checkValid(b.data, b.builderID)
-	if b.data.exporter.metricsEnabled() {
-		b.data.exporter.mu.Lock()
-		defer b.data.exporter.mu.Unlock()
-		if b.data.Event.Namespace == "" {
-			b.data.Event.Namespace = m.Namespace()
-		}
-		b.data.Event.Labels = append(b.data.Event.Labels, MetricValue.Of(value), MetricKey.Of(ValueOf(m)))
-		b.data.exporter.prepare(&b.data.Event)
-		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
-	}
-	b.done()
-}
+// func (b Builder) Metric(m *Metric, value Value) {
+// 	if b.data == nil {
+// 		return
+// 	}
+// 	checkValid(b.data, b.builderID)
+// 	if b.data.exporter.metricsEnabled() {
+// 		b.data.exporter.mu.Lock()
+// 		defer b.data.exporter.mu.Unlock()
+// 		if b.data.Event.Namespace == "" {
+// 			b.data.Event.Namespace = m.Namespace()
+// 		}
+// 		b.data.Event.Labels = append(b.data.Event.Labels, MetricValue.Of(value), MetricKey.Of(ValueOf(m)))
+// 		b.data.exporter.prepare(&b.data.Event)
+// 		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
+// 	}
+// 	b.done()
+// }
 
-func (b Builder) Count(m *Metric) {
-	if m.Kind() != Counter {
-		panic("Builder.Count called on non-counter")
-	}
-	b.Metric(m, Int64Of(1))
-}
+// func (b Builder) Count(m *Metric) {
+// 	if m.Kind() != Counter {
+// 		panic("Builder.Count called on non-counter")
+// 	}
+// 	b.Metric(m, Int64Of(1))
+// }
 
-func (b Builder) Since(m *Metric, start time.Time) {
-	b.Metric(m, DurationOf(time.Since(start)))
-}
+// func (b Builder) Since(m *Metric, start time.Time) {
+// 	b.Metric(m, DurationOf(time.Since(start)))
+// }
 
 // Annotate is a helper that calls Deliver with AnnotateKind.
 func (b Builder) Annotate() {
@@ -226,7 +257,7 @@ func (b Builder) Event() *Event {
 	return &clone
 }
 
-func (b Builder) done() {
+func (b builderCommon) done() {
 	*b.data = builder{}
 	builderPool.Put(b.data)
 }
