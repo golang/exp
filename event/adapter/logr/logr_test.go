@@ -23,13 +23,14 @@ func TestInfo(t *testing.T) {
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := []event.Event{{
-		At: eventtest.InitialTime,
+		At:      eventtest.InitialTime,
+		Kind:    event.LogKind,
+		Message: "mess",
+		Name:    "n/m",
 		Labels: []event.Label{
 			severity.Debug,
-			event.Name.Of("n/m"),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
-			event.Message.Of("mess"),
 		},
 	}}
 	if diff := cmp.Diff(want, th.Got); diff != "" {

@@ -180,13 +180,13 @@ func BenchmarkBuildContext(b *testing.B) {
 			}
 			b.Run("direct", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					event.To(ctx).With(event.Name.Of("foo")).Metric(c.Record(1))
+					event.To(ctx).Name("foo").Metric(c.Record(1))
 				}
 			})
 			b.Run("cloned", func(b *testing.B) {
 				bu := event.To(ctx)
 				for i := 0; i < b.N; i++ {
-					bu.Clone().With(event.Name.Of("foo")).Metric(c.Record(1))
+					bu.Clone().Name("foo").Metric(c.Record(1))
 				}
 			})
 		})

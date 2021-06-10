@@ -103,6 +103,20 @@ func (b Builder) With(label Label) Builder {
 	return b
 }
 
+func (b Builder) Name(name string) Builder {
+	if b.data != nil {
+		b.data.Event.Name = name
+	}
+	return b
+}
+
+func (b Builder) Error(err error) Builder {
+	if b.data != nil {
+		b.data.Event.Error = err
+	}
+	return b
+}
+
 func (b builderCommon) addLabel(label Label) {
 	if b.data != nil {
 		b.data.Event.Labels = append(b.data.Event.Labels, label)
@@ -161,7 +175,8 @@ func (b Builder) Log(message string) {
 	if b.data.exporter.loggingEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
+		b.data.Event.Kind = LogKind
+		b.data.Event.Message = message
 		b.data.exporter.prepare(&b.data.Event)
 		b.data.exporter.handler.Log(b.ctx, &b.data.Event)
 	}
@@ -180,7 +195,8 @@ func (b Builder) Logf(template string, args ...interface{}) {
 		// Duplicate code from Log so Exporter.deliver's invocation of runtime.Callers is correct.
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Labels = append(b.data.Event.Labels, Message.Of(message))
+		b.data.Event.Kind = LogKind
+		b.data.Event.Message = message
 		b.data.exporter.prepare(&b.data.Event)
 		b.data.exporter.handler.Log(b.ctx, &b.data.Event)
 	}
@@ -199,6 +215,7 @@ func (b Builder) Metric(mv MetricValue) {
 			b.data.Event.Namespace = mv.m.Descriptor().Namespace()
 		}
 		b.data.Event.Labels = append(b.data.Event.Labels, MetricVal.Of(mv.v), MetricKey.Of(mv.m))
+		b.data.Event.Kind = MetricKind
 		b.data.exporter.prepare(&b.data.Event)
 		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
 	}
@@ -235,7 +252,7 @@ func (b Builder) End() {
 		}
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
-		b.data.Event.Labels = append(b.data.Event.Labels, End.Value())
+		b.data.Event.Kind = TraceKind
 		b.data.exporter.prepare(&b.data.Event)
 		b.data.exporter.handler.End(b.ctx, &b.data.Event)
 	}
@@ -279,10 +296,11 @@ func (b Builder) Start(name string) (context.Context, Builder) {
 		// create the end builder
 		endBuilder = b.Clone()
 		endBuilder.data.Event.Parent = traceID
-		b.data.Event.Labels = append(b.data.Event.Labels, Trace.Of(traceID))
+		b.data.Event.Kind = TraceKind
+		b.data.Event.TraceID = traceID
 		b.data.exporter.prepare(&b.data.Event)
 		// and now deliver the start event
-		b.data.Event.Labels = append(b.data.Event.Labels, Name.Of(name))
+		b.data.Event.Name = name
 		now := time.Now()
 		ctx = newContext(ctx, b.data.exporter, traceID, now)
 		ctx = b.data.exporter.handler.Start(ctx, &b.data.Event)

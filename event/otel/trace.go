@@ -26,8 +26,7 @@ func (t *TraceHandler) Annotate(ctx context.Context, ev *event.Event) {}
 func (t *TraceHandler) Metric(ctx context.Context, ev *event.Event)   {}
 func (t *TraceHandler) Start(ctx context.Context, ev *event.Event) context.Context {
 	opts := labelsToSpanOptions(ev.Labels)
-	name, _ := event.Name.Find(ev)
-	octx, span := t.tracer.Start(ctx, name, opts...)
+	octx, span := t.tracer.Start(ctx, ev.Name, opts...)
 	return context.WithValue(octx, spanKey{}, span)
 }
 

@@ -25,13 +25,14 @@ func Test(t *testing.T) {
 	log = log.Named("n/m")
 	log.Info("mess", zap.Float64("pi", 3.14))
 	want := []event.Event{{
+		Kind:    event.LogKind,
+		Message: "mess",
+		Name:    "n/m",
 		Labels: []event.Label{
 			keys.Int64("traceID").Of(17),
 			keys.String("resource").Of("R"),
 			severity.Info,
-			event.Name.Of("n/m"),
 			keys.Float64("pi").Of(3.14),
-			event.Message.Of("mess"),
 		},
 	}}
 	if diff := cmp.Diff(want, h.Got, cmpopts.IgnoreFields(event.Event{}, "At")); diff != "" {

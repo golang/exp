@@ -89,12 +89,12 @@ func (l *logger) Info(msg string, keysAndValues ...interface{}) {
 // while the err field should be used to attach the actual error that
 // triggered this log line, if present.
 func (l *logger) Error(err error, msg string, keysAndValues ...interface{}) {
-	l.log(msg, l.builder.Clone().With(event.Error.Of(err)), keysAndValues)
+	l.log(msg, l.builder.Clone().Error(err), keysAndValues)
 }
 
 func (l *logger) log(msg string, b event.Builder, keysAndValues []interface{}) {
 	b.With(convertVerbosity(l.verbosity))
-	b.With(event.Name.Of(l.name))
+	b.Name(l.name)
 	addLabels(b, keysAndValues)
 	b.Log(msg)
 }

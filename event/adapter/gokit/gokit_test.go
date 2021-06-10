@@ -21,13 +21,14 @@ func Test(t *testing.T) {
 	ctx, h := eventtest.NewCapture()
 	log.Log(ctx, "msg", "mess", "level", 1, "name", "n/m", "traceID", 17, "resource", "R")
 	want := []event.Event{{
-		At: eventtest.InitialTime,
+		At:      eventtest.InitialTime,
+		Kind:    event.LogKind,
+		Message: "mess",
 		Labels: []event.Label{
 			keys.Value("level").Of(1),
 			keys.Value("name").Of("n/m"),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
-			event.Message.Of("mess"),
 		},
 	}}
 	if diff := cmp.Diff(want, h.Got); diff != "" {

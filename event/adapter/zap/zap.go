@@ -53,7 +53,7 @@ func (c *core) Write(e zapcore.Entry, fs []zapcore.Field) error {
 	b := c.builder.Clone().
 		At(e.Time).
 		With(convertLevel(e.Level)).
-		With(event.Name.Of(e.LoggerName))
+		Name(e.LoggerName)
 	// TODO: add these additional labels more efficiently.
 	if e.Stack != "" {
 		b.With(keys.String("stack").Of(e.Stack))

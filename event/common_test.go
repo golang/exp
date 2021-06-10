@@ -21,47 +21,50 @@ func TestCommon(t *testing.T) {
 	const trace = "a trace"
 
 	event.To(ctx).Log(simple)
-	checkFind(t, h, "Log", event.Message, true, simple)
-	checkFind(t, h, "Log", event.Name, false, "")
+	checkMessage(t, h, "Log", simple)
+	checkName(t, h, "Log", "")
 	h.Reset()
 
 	event.To(ctx).Metric(m.Record(3))
-	checkFind(t, h, "Metric", event.Message, false, "")
-	checkFind(t, h, "Metric", event.Name, false, "")
+	checkMessage(t, h, "Metric", "")
+	checkName(t, h, "Metric", "")
 	h.Reset()
 
 	event.To(ctx).Annotate()
-	checkFind(t, h, "Annotate", event.Message, false, "")
-	checkFind(t, h, "Annotate", event.Name, false, "")
+	checkMessage(t, h, "Annotate", "")
+	checkName(t, h, "Annotate", "")
 	h.Reset()
 
 	_, eb := event.To(ctx).Start(trace)
-	checkFind(t, h, "Start", event.Message, false, "")
-	checkFind(t, h, "Start", event.Name, true, trace)
+	checkMessage(t, h, "Start", "")
+	checkName(t, h, "Start", trace)
 	h.Reset()
 
 	eb.End()
-	checkFind(t, h, "End", event.Message, false, "")
-	checkFind(t, h, "End", event.Name, false, "")
+	checkMessage(t, h, "End", "")
+	checkName(t, h, "End", "")
 }
 
 type finder interface {
 	Find(*event.Event) (string, bool)
 }
 
-func checkFind(t *testing.T, h *eventtest.CaptureHandler, method string, key finder, match bool, text string) {
+func checkMessage(t *testing.T, h *eventtest.CaptureHandler, method string, text string) {
 	if len(h.Got) != 1 {
 		t.Errorf("Got %d events, expected 1", len(h.Got))
 		return
 	}
-	m, ok := key.Find(&h.Got[0])
-	if ok && !match {
-		t.Errorf("%s produced an event with a %v", method, key)
+	if h.Got[0].Message != text {
+		t.Errorf("Expected event with Message %q from %s got %q", text, method, h.Got[0].Message)
 	}
-	if !ok && match {
-		t.Errorf("%s did not produce an event with a %v", method, key)
+}
+
+func checkName(t *testing.T, h *eventtest.CaptureHandler, method string, text string) {
+	if len(h.Got) != 1 {
+		t.Errorf("Got %d events, expected 1", len(h.Got))
+		return
 	}
-	if m != text {
-		t.Errorf("Expected event with %v %q from %s got %q", key, text, method, m)
+	if h.Got[0].Name != text {
+		t.Errorf("Expected event with Name %q from %s got %q", text, method, h.Got[0].Name)
 	}
 }
