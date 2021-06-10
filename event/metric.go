@@ -18,7 +18,7 @@ type Metric interface {
 type MetricDescriptor struct {
 	namespace   string
 	name        string
-	Description string
+	description string
 	// TODO: deal with units. Follow otel, or define Go types for common units.
 	// We don't need a time unit because we'll use time.Duration, and the only
 	// other unit otel currently defines (besides dimensionless) is bytes.
@@ -28,11 +28,11 @@ type MetricDescriptor struct {
 // The namespace defaults to the import path of the caller of NewMetricDescriptor.
 // Use SetNamespace to provide a different one.
 // Neither the name nor the namespace can be empty.
-func NewMetricDescriptor(name string) *MetricDescriptor {
-	return newMetricDescriptor(name)
+func NewMetricDescriptor(name, description string) *MetricDescriptor {
+	return newMetricDescriptor(name, description)
 }
 
-func newMetricDescriptor(name string) *MetricDescriptor {
+func newMetricDescriptor(name, description string) *MetricDescriptor {
 	if name == "" {
 		panic("name cannot be empty")
 	}
@@ -45,7 +45,8 @@ func newMetricDescriptor(name string) *MetricDescriptor {
 		//   2  this function
 		//   3  caller of this function (one of the NewXXX methods in this package)
 		//   4  caller's caller
-		namespace: importPath(4, nil),
+		namespace:   importPath(4, nil),
+		description: description,
 	}
 }
 
@@ -61,8 +62,9 @@ func (m *MetricDescriptor) String() string {
 	return fmt.Sprintf("Metric(\"%s/%s\")", m.namespace, m.name)
 }
 
-func (m *MetricDescriptor) Name() string      { return m.name }
-func (m *MetricDescriptor) Namespace() string { return m.namespace }
+func (m *MetricDescriptor) Name() string        { return m.name }
+func (m *MetricDescriptor) Namespace() string   { return m.namespace }
+func (m *MetricDescriptor) Description() string { return m.description }
 
 // A MetricValue is a pair of a Metric and a Value.
 type MetricValue struct {
@@ -76,8 +78,8 @@ type Counter struct {
 }
 
 // NewCounter creates a counter with the given name.
-func NewCounter(name string) *Counter {
-	return &Counter{newMetricDescriptor(name)}
+func NewCounter(name, description string) *Counter {
+	return &Counter{newMetricDescriptor(name, description)}
 }
 
 // Descriptor returns the receiver's MetricDescriptor.
@@ -99,8 +101,8 @@ type FloatGauge struct {
 }
 
 // NewFloatGauge creates a new FloatGauge with the given name.
-func NewFloatGauge(name string) *FloatGauge {
-	return &FloatGauge{newMetricDescriptor(name)}
+func NewFloatGauge(name, description string) *FloatGauge {
+	return &FloatGauge{newMetricDescriptor(name, description)}
 }
 
 // Descriptor returns the receiver's MetricDescriptor.
@@ -122,8 +124,8 @@ type Duration struct {
 }
 
 // NewDuration creates a new Duration with the given name.
-func NewDuration(name string) *Duration {
-	return &Duration{newMetricDescriptor(name)}
+func NewDuration(name, description string) *Duration {
+	return &Duration{newMetricDescriptor(name, description)}
 }
 
 // Descriptor returns the receiver's MetricDescriptor.

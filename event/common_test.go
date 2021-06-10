@@ -15,7 +15,7 @@ import (
 
 func TestCommon(t *testing.T) {
 	ctx, h := eventtest.NewCapture()
-	m := event.NewCounter("m")
+	m := event.NewCounter("m", "")
 
 	const simple = "simple message"
 	const trace = "a trace"

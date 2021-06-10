@@ -23,9 +23,9 @@ var (
 	l1      = keys.Int("l1").Of(1)
 	l2      = keys.Int("l2").Of(2)
 	l3      = keys.Int("l3").Of(3)
-	counter = event.NewCounter("hits")
-	gauge   = event.NewFloatGauge("temperature")
-	latency = event.NewDuration("latency")
+	counter = event.NewCounter("hits", "cache hits")
+	gauge   = event.NewFloatGauge("temperature", "CPU board temperature in Celsius")
+	latency = event.NewDuration("latency", "how long it took")
 )
 
 func TestPrint(t *testing.T) {

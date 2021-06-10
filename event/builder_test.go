@@ -129,7 +129,7 @@ func TestFailToClone(t *testing.T) {
 
 func TestTraceDuration(t *testing.T) {
 	// Verify that a trace can can emit a latency metric.
-	dur := event.NewDuration("test")
+	dur := event.NewDuration("test", "")
 	want := 200 * time.Millisecond
 
 	check := func(t *testing.T, h *testTraceDurationHandler) {
@@ -171,7 +171,7 @@ func (t *testTraceDurationHandler) Metric(ctx context.Context, e *event.Event) {
 
 func BenchmarkBuildContext(b *testing.B) {
 	// How long does it take to deliver an event from a nested context?
-	c := event.NewCounter("c")
+	c := event.NewCounter("c", "")
 	for _, depth := range []int{1, 5, 7, 10} {
 		b.Run(fmt.Sprintf("depth %d", depth), func(b *testing.B) {
 			ctx := event.WithExporter(context.Background(), event.NewExporter(event.NopHandler{}, nil))
