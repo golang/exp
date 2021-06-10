@@ -49,8 +49,9 @@ var contextKey interface{} = contextKeyType{}
 // contextValue is stored by value in the context to track the exporter and
 // current parent event.
 type contextValue struct {
-	exporter *Exporter
-	parent   uint64
+	exporter  *Exporter
+	parent    uint64
+	startTime time.Time // for trace latency
 }
 
 var (
@@ -81,16 +82,16 @@ func getDefaultExporter() *Exporter {
 	return (*Exporter)(atomic.LoadPointer(&defaultExporter))
 }
 
-func newContext(ctx context.Context, exporter *Exporter, parent uint64) context.Context {
-	return context.WithValue(ctx, contextKey, contextValue{exporter: exporter, parent: parent})
+func newContext(ctx context.Context, exporter *Exporter, parent uint64, t time.Time) context.Context {
+	return context.WithValue(ctx, contextKey, contextValue{exporter: exporter, parent: parent, startTime: t})
 }
 
-// FromContext returns the exporter and current trace for the supplied context.
-func FromContext(ctx context.Context) (*Exporter, uint64) {
+// FromContext returns the exporter, parentID and parent start time for the supplied context.
+func FromContext(ctx context.Context) (*Exporter, uint64, time.Time) {
 	if v, ok := ctx.Value(contextKey).(contextValue); ok {
-		return v.exporter, v.parent
+		return v.exporter, v.parent, v.startTime
 	}
-	return getDefaultExporter(), 0
+	return getDefaultExporter(), 0, time.Time{}
 }
 
 // prepare events before delivering to the underlying handler.

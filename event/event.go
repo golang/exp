@@ -42,7 +42,7 @@ type Matcher interface {
 // The exporter is called synchronously from the event call site, so it should
 // return quickly so as not to hold up user code.
 func WithExporter(ctx context.Context, e *Exporter) context.Context {
-	return newContext(ctx, e, 0)
+	return newContext(ctx, e, 0, time.Time{})
 }
 
 // SetDefaultExporter sets an exporter that is used if no exporter can be

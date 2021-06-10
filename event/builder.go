@@ -33,10 +33,11 @@ type builderCommon struct {
 const preallocateLabels = 6
 
 type builder struct {
-	exporter *Exporter
-	Event    Event
-	labels   [preallocateLabels]Label
-	id       uint64
+	exporter    *Exporter
+	Event       Event
+	labels      [preallocateLabels]Label
+	id          uint64
+	parentStart time.Time
 }
 
 var builderPool = sync.Pool{New: func() interface{} { return &builder{} }}
@@ -54,12 +55,13 @@ func To(ctx context.Context) Builder {
 var builderID uint64 // atomic
 
 func newBuilder(ctx context.Context) *builder {
-	exporter, parent := FromContext(ctx)
+	exporter, parent, parentStart := FromContext(ctx)
 	if exporter == nil {
 		return nil
 	}
 	b := allocBuilder()
 	b.exporter = exporter
+	b.parentStart = parentStart
 	b.Event.Labels = b.labels[:0]
 	b.Event.Parent = parent
 	return b
@@ -196,7 +198,7 @@ func (b Builder) Metric(mv MetricValue) {
 		if b.data.Event.Namespace == "" {
 			b.data.Event.Namespace = mv.m.Descriptor().Namespace()
 		}
-		b.data.Event.Labels = append(b.data.Event.Labels, MetricVal.Of(mv.v), MetricKey.Of(ValueOf(mv.m)))
+		b.data.Event.Labels = append(b.data.Event.Labels, MetricVal.Of(mv.v), MetricKey.Of(mv.m))
 		b.data.exporter.prepare(&b.data.Event)
 		b.data.exporter.handler.Metric(b.ctx, &b.data.Event)
 	}
@@ -225,6 +227,12 @@ func (b Builder) End() {
 	}
 	checkValid(b.data, b.builderID)
 	if b.data.exporter.tracingEnabled() {
+		// If there is a DurationMetric label, emit a Metric event
+		// with the time since Start was called.
+		if v, ok := DurationMetric.Find(&b.data.Event); ok {
+			m := v.(*Duration)
+			b.Clone().Metric(m.Record(time.Since(b.data.parentStart)))
+		}
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.Event.Labels = append(b.data.Event.Labels, End.Value())
@@ -267,18 +275,18 @@ func (b Builder) Start(name string) (context.Context, func()) {
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.lastEvent++
 		traceID := b.data.exporter.lastEvent
+		// create the end builder
+		eb := b.Clone()
+		eb.data.Event.Parent = traceID
+
 		b.data.Event.Labels = append(b.data.Event.Labels, Trace.Of(traceID))
 		b.data.exporter.prepare(&b.data.Event)
-		// create the end builder
-		eb := Builder{}
-		eb.data = allocBuilder()
-		eb.builderID = eb.data.id
-		eb.data.exporter = b.data.exporter
-		eb.data.Event.Parent = traceID
 		// and now deliver the start event
 		b.data.Event.Labels = append(b.data.Event.Labels, Name.Of(name))
-		ctx = newContext(ctx, b.data.exporter, traceID)
+		now := time.Now()
+		ctx = newContext(ctx, b.data.exporter, traceID, now)
 		ctx = b.data.exporter.handler.Start(ctx, &b.data.Event)
+		eb.data.parentStart = now
 		eb.ctx = ctx
 		end = eb.End
 	}

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
@@ -66,7 +67,7 @@ func valueEqual(l1, l2 event.Value) bool {
 func TestTraceBuilder(t *testing.T) {
 	// Verify that the context returned from the handler is also returned from Start,
 	// and is the context passed to End.
-	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t}, nil))
+	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t: t}, nil))
 	ctx, end := event.To(ctx).Start("s")
 	val := ctx.Value("x")
 	if val != 1 {
@@ -76,12 +77,9 @@ func TestTraceBuilder(t *testing.T) {
 }
 
 type testTraceHandler struct {
+	event.NopHandler
 	t *testing.T
 }
-
-func (*testTraceHandler) Log(ctx context.Context, _ *event.Event)      {}
-func (*testTraceHandler) Annotate(ctx context.Context, _ *event.Event) {}
-func (*testTraceHandler) Metric(ctx context.Context, _ *event.Event)   {}
 
 func (*testTraceHandler) Start(ctx context.Context, _ *event.Event) context.Context {
 	return context.WithValue(ctx, "x", 1)
@@ -127,6 +125,48 @@ func TestFailToClone(t *testing.T) {
 		// b1.data is populated, but with the wrong information.
 		b1.Log("msg2")
 	})
+}
+
+func TestTraceDuration(t *testing.T) {
+	// Verify that a trace can can emit a latency metric.
+	dur := event.NewDuration("test")
+	want := 200 * time.Millisecond
+
+	check := func(t *testing.T, h *testTraceDurationHandler) {
+		if !h.got.HasValue() {
+			t.Fatal("no metric value")
+		}
+		got := h.got.Duration().Round(50 * time.Millisecond)
+		if got != want {
+			t.Fatalf("got %s, want %s", got, want)
+		}
+	}
+
+	t.Run("end function", func(t *testing.T) {
+		h := &testTraceDurationHandler{}
+		ctx := event.WithExporter(context.Background(), event.NewExporter(h, nil))
+		ctx, end := event.To(ctx).With(event.DurationMetric.Of(dur)).Start("s")
+		time.Sleep(want)
+		end()
+		check(t, h)
+	})
+	t.Run("End method", func(t *testing.T) {
+		h := &testTraceDurationHandler{}
+		ctx := event.WithExporter(context.Background(), event.NewExporter(h, nil))
+		ctx, _ = event.To(ctx).Start("s")
+		time.Sleep(want)
+		event.To(ctx).With(event.DurationMetric.Of(dur)).End()
+		check(t, h)
+	})
+}
+
+type testTraceDurationHandler struct {
+	event.NopHandler
+	got event.Value
+}
+
+func (t *testTraceDurationHandler) Metric(ctx context.Context, e *event.Event) {
+	t.got, _ = event.MetricVal.Find(e)
 }
 
 func BenchmarkBuildContext(b *testing.B) {
