@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/logfmt"
 )
@@ -30,31 +32,11 @@ type testHandler struct {
 	printer logfmt.Printer
 }
 
-func (h *testHandler) Log(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *testHandler) Metric(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *testHandler) Annotate(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *testHandler) Start(ctx context.Context, ev *event.Event) context.Context {
-	h.event(ctx, ev)
-	return ctx
-}
-
-func (h *testHandler) End(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *testHandler) event(ctx context.Context, ev *event.Event) {
+func (h *testHandler) Event(ctx context.Context, ev *event.Event) context.Context {
 	//TODO: choose between stdout and stderr based on the event
 	//TODO: decide if we should be calling h.tb.Fail()
 	h.printer.Event(os.Stdout, ev)
+	return ctx
 }
 
 var InitialTime = func() time.Time {
@@ -71,4 +53,8 @@ func ExporterOptions() *event.ExporterOptions {
 			return thisTime
 		},
 	}
+}
+
+func CmpOption() cmp.Option {
+	return cmpopts.IgnoreFields(event.Event{}, "At", "ctx", "target", "labels")
 }

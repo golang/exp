@@ -32,7 +32,7 @@ func Test(t *testing.T) {
 		Kind:    event.LogKind,
 		Message: "mess",
 		Labels: []event.Label{
-			severity.Info,
+			severity.Info.Label(),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
 		},
@@ -40,7 +40,7 @@ func Test(t *testing.T) {
 	// logrus fields are stored in a map, so we have to sort to overcome map
 	// iteration indeterminacy.
 	less := func(a, b event.Label) bool { return a.Name < b.Name }
-	if diff := cmp.Diff(want, th.Got, cmpopts.SortSlices(less), cmpopts.IgnoreFields(event.Event{}, "At")); diff != "" {
+	if diff := cmp.Diff(want, th.Got, cmpopts.SortSlices(less), eventtest.CmpOption()); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

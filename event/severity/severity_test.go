@@ -18,7 +18,6 @@ import (
 )
 
 func TestPrint(t *testing.T) {
-	//TODO: print the textual form of severity
 	ctx := context.Background()
 	for _, test := range []struct {
 		name   string
@@ -26,11 +25,11 @@ func TestPrint(t *testing.T) {
 		expect string
 	}{{
 		name:   "debug",
-		events: func(ctx context.Context) { event.To(ctx).With(severity.Debug).Log("a message") },
+		events: func(ctx context.Context) { severity.Debug.Log(ctx, "a message") },
 		expect: `time="2020/03/05 14:27:48" level=debug msg="a message"`,
 	}, {
 		name:   "info",
-		events: func(ctx context.Context) { event.To(ctx).With(severity.Info).Log("a message") },
+		events: func(ctx context.Context) { severity.Info.Log(ctx, "a message") },
 		expect: `time="2020/03/05 14:27:48" level=info msg="a message"`},
 	} {
 		buf := &strings.Builder{}

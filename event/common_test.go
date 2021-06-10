@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/eventtest"
+	"golang.org/x/exp/event/keys"
 )
 
 func TestCommon(t *testing.T) {
@@ -20,27 +21,32 @@ func TestCommon(t *testing.T) {
 	const simple = "simple message"
 	const trace = "a trace"
 
-	event.To(ctx).Log(simple)
+	event.Log(ctx, simple)
 	checkMessage(t, h, "Log", simple)
 	checkName(t, h, "Log", "")
 	h.Reset()
 
-	event.To(ctx).Metric(m.Record(3))
+	event.Logf(ctx, "logf %s message", "to")
+	checkMessage(t, h, "Logf", "logf to message")
+	checkName(t, h, "Logf", "")
+	h.Reset()
+
+	m.Record(ctx, 3)
 	checkMessage(t, h, "Metric", "")
 	checkName(t, h, "Metric", "")
 	h.Reset()
 
-	event.To(ctx).Annotate()
+	event.Annotate(ctx, keys.String("").Of(""))
 	checkMessage(t, h, "Annotate", "")
 	checkName(t, h, "Annotate", "")
 	h.Reset()
 
-	_, eb := event.To(ctx).Start(trace)
+	ctx = event.Start(ctx, trace)
 	checkMessage(t, h, "Start", "")
 	checkName(t, h, "Start", trace)
 	h.Reset()
 
-	eb.End()
+	event.End(ctx)
 	checkMessage(t, h, "End", "")
 	checkName(t, h, "End", "")
 }

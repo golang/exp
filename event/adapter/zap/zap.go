@@ -27,15 +27,14 @@ import (
 )
 
 type core struct {
-	builder event.Builder // never delivered, only cloned
+	ctx    context.Context
+	labels []event.Label
 }
 
 var _ zapcore.Core = (*core)(nil)
 
 func NewCore(ctx context.Context) zapcore.Core {
-	return &core{
-		builder: event.To(ctx),
-	}
+	return &core{ctx: ctx}
 }
 
 func (c *core) Enabled(level zapcore.Level) bool {
@@ -44,25 +43,37 @@ func (c *core) Enabled(level zapcore.Level) bool {
 
 func (c *core) With(fields []zapcore.Field) zapcore.Core {
 	c2 := *c
-	c2.builder = c2.builder.Clone()
-	addLabels(c2.builder, fields)
+	if len(fields) > 0 {
+		c2.labels = make([]event.Label, len(c.labels), len(c.labels)+len(fields))
+		copy(c2.labels, c.labels)
+		for _, f := range fields {
+			c2.labels = append(c2.labels, newLabel(f))
+		}
+	}
 	return &c2
 }
 
 func (c *core) Write(e zapcore.Entry, fs []zapcore.Field) error {
-	b := c.builder.Clone().
-		At(e.Time).
-		With(convertLevel(e.Level)).
-		Name(e.LoggerName)
+	ev := event.New(c.ctx, event.LogKind)
+	if ev == nil {
+		return nil
+	}
+	ev.At = e.Time
+	ev.Labels = append(ev.Labels, c.labels...)
+	ev.Labels = append(ev.Labels, convertLevel(e.Level).Label())
+	ev.Name = e.LoggerName
 	// TODO: add these additional labels more efficiently.
 	if e.Stack != "" {
-		b.With(keys.String("stack").Of(e.Stack))
+		ev.Labels = append(ev.Labels, keys.String("stack").Of(e.Stack))
 	}
 	if e.Caller.Defined {
-		b.With(keys.String("caller").Of(e.Caller.String()))
+		ev.Labels = append(ev.Labels, keys.String("caller").Of(e.Caller.String()))
 	}
-	addLabels(b, fs)
-	b.Log(e.Message)
+	for _, f := range fs {
+		ev.Labels = append(ev.Labels, newLabel(f))
+	}
+	ev.Message = e.Message
+	ev.Deliver()
 	return nil
 }
 
@@ -71,14 +82,6 @@ func (c *core) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.Checked
 }
 
 func (c *core) Sync() error { return nil }
-
-// addLabels creates a new []event.Label with the given labels followed by the
-// labels constructed from fields.
-func addLabels(b event.Builder, fields []zap.Field) {
-	for i := 0; i < len(fields); i++ {
-		b.With(newLabel(fields[i]))
-	}
-}
 
 func newLabel(f zap.Field) event.Label {
 	switch f.Type {
@@ -149,7 +152,7 @@ func stringerToString(stringer interface{}) (s string) {
 	return stringer.(fmt.Stringer).String()
 }
 
-func convertLevel(level zapcore.Level) event.Label {
+func convertLevel(level zapcore.Level) severity.Level {
 	switch level {
 	case zapcore.DebugLevel:
 		return severity.Debug
@@ -160,9 +163,9 @@ func convertLevel(level zapcore.Level) event.Label {
 	case zapcore.ErrorLevel:
 		return severity.Error
 	case zapcore.DPanicLevel:
-		return severity.Of(severity.FatalLevel - 1)
+		return severity.Fatal - 1
 	case zapcore.PanicLevel:
-		return severity.Of(severity.FatalLevel + 1)
+		return severity.Fatal + 1
 	case zapcore.FatalLevel:
 		return severity.Fatal
 	default:

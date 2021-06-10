@@ -57,7 +57,7 @@ func TestPrint(t *testing.T) {
 		expect: `err="an error"`,
 	}, {
 		name:   "end",
-		event:  event.Event{Kind: event.TraceKind},
+		event:  event.Event{Kind: event.EndKind},
 		expect: `end`,
 	}, {
 		name: "string",

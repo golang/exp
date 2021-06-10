@@ -19,7 +19,7 @@ import (
 
 func TestInfo(t *testing.T) {
 	ctx, th := eventtest.NewCapture()
-	log := elogr.NewLogger(ctx, "/").WithName("n").V(int(severity.DebugLevel))
+	log := elogr.NewLogger(ctx, "/").WithName("n").V(int(severity.Debug))
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := []event.Event{{
@@ -28,12 +28,12 @@ func TestInfo(t *testing.T) {
 		Message: "mess",
 		Name:    "n/m",
 		Labels: []event.Label{
-			severity.Debug,
+			severity.Debug.Label(),
 			keys.Value("traceID").Of(17),
 			keys.Value("resource").Of("R"),
 		},
 	}}
-	if diff := cmp.Diff(want, th.Got); diff != "" {
+	if diff := cmp.Diff(want, th.Got, eventtest.CmpOption()); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

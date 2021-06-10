@@ -17,7 +17,7 @@ const thisImportPath = "golang.org/x/exp/event_test"
 func TestNamespace(t *testing.T) {
 	var h nsHandler
 	ctx := event.WithExporter(context.Background(), event.NewExporter(&h, &event.ExporterOptions{EnableNamespaces: true}))
-	event.To(ctx).Log("msg")
+	event.Log(ctx, "msg")
 	if got, want := h.ns, thisImportPath; got != want {
 		t.Errorf("got namespace %q, want, %q", got, want)
 	}
@@ -27,29 +27,9 @@ type nsHandler struct {
 	ns string
 }
 
-func (h *nsHandler) Log(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *nsHandler) Metric(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *nsHandler) Annotate(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *nsHandler) Start(ctx context.Context, ev *event.Event) context.Context {
-	h.event(ctx, ev)
+func (h *nsHandler) Event(ctx context.Context, ev *event.Event) context.Context {
+	h.ns = ev.Namespace
 	return ctx
-}
-
-func (h *nsHandler) End(ctx context.Context, ev *event.Event) {
-	h.event(ctx, ev)
-}
-
-func (h *nsHandler) event(event context.Context, e *event.Event) {
-	h.ns = e.Namespace
 }
 
 func BenchmarkRuntimeCallers(b *testing.B) {

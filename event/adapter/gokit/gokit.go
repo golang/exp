@@ -34,7 +34,10 @@ func (l *logger) Log(keyvals ...interface{}) error {
 			keyvals = keyvals[1:]
 		}
 	}
-	b := event.To(ctx)
+	ev := event.New(ctx, event.LogKind)
+	if ev == nil {
+		return nil
+	}
 	var msg string
 	for i := 0; i < len(keyvals); i += 2 {
 		key := keyvals[i].(string)
@@ -42,9 +45,10 @@ func (l *logger) Log(keyvals ...interface{}) error {
 		if key == "msg" || key == "message" {
 			msg = fmt.Sprint(value)
 		} else {
-			b.With(keys.Value(key).Of(value))
+			ev.Labels = append(ev.Labels, keys.Value(key).Of(value))
 		}
 	}
-	b.Log(msg)
+	ev.Message = msg
+	ev.Deliver()
 	return nil
 }

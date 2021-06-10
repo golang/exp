@@ -40,25 +40,9 @@ func NewHandler(to io.Writer) *Handler {
 	return &Handler{to: to}
 }
 
-func (h *Handler) Log(ctx context.Context, ev *event.Event) {
-	h.Printer.Event(h.to, ev)
-}
-
-func (h *Handler) Metric(ctx context.Context, ev *event.Event) {
-	h.Printer.Event(h.to, ev)
-}
-
-func (h *Handler) Annotate(ctx context.Context, ev *event.Event) {
-	h.Printer.Event(h.to, ev)
-}
-
-func (h *Handler) Start(ctx context.Context, ev *event.Event) context.Context {
+func (h *Handler) Event(ctx context.Context, ev *event.Event) context.Context {
 	h.Printer.Event(h.to, ev)
 	return ctx
-}
-
-func (h *Handler) End(ctx context.Context, ev *event.Event) {
-	h.Printer.Event(h.to, ev)
 }
 
 func (p *Printer) Event(w io.Writer, ev *event.Event) {
@@ -94,7 +78,7 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 		p.label(w, "name", event.StringOf(ev.Name))
 	}
 
-	if ev.Kind == event.TraceKind && ev.TraceID == 0 {
+	if ev.Kind == event.EndKind {
 		p.label(w, "end", event.Value{})
 	}
 

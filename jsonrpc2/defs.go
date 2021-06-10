@@ -13,7 +13,6 @@ var (
 	Method       = keys.String("method")
 	RPCID        = keys.String("id")
 	RPCDirection = keys.String("direction")
-	Error        = keys.Value("error")
 	StatusCode   = keys.String("status.code")
 )
 

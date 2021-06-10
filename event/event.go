@@ -6,6 +6,7 @@ package event
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -21,27 +22,26 @@ type Event struct {
 	Name      string
 	Error     error
 	Labels    []Label
+
+	ctx    context.Context
+	target *target
+	labels [preallocateLabels]Label
 }
 
 // Handler is a the type for something that handles events as they occur.
 type Handler interface {
-	// Log indicates a logging event.
-	Log(context.Context, *Event)
-	// Metric indicates a metric record event.
-	Metric(context.Context, *Event)
-	// Annotate reports label values at a point in time.
-	Annotate(context.Context, *Event)
-	// Start indicates a trace start event.
-	Start(context.Context, *Event) context.Context
-	// End indicates a trace end event.
-	End(context.Context, *Event)
+	// Event is called with each event.
+	Event(context.Context, *Event) context.Context
 }
 
-// Matcher is the interface to something that can check if an event matches
-// a condition.
-type Matcher interface {
-	Matches(ev *Event) bool
-}
+// preallocateLabels controls the space reserved for labels in a builder.
+// Storing the first few labels directly in builders can avoid an allocation at
+// all for the very common cases of simple events. The length needs to be large
+// enough to cope with the majority of events but no so large as to cause undue
+// stack pressure.
+const preallocateLabels = 6
+
+var eventPool = sync.Pool{New: func() interface{} { return &Event{} }}
 
 // WithExporter returns a context with the exporter attached.
 // The exporter is called synchronously from the event call site, so it should
@@ -56,23 +56,58 @@ func SetDefaultExporter(e *Exporter) {
 	setDefaultExporter(e)
 }
 
-// Is uses the matcher to check if the event is a match.
-// This is a simple helper to convert code like
-//   event.End.Matches(ev)
-// to the more readable
-//   ev.Is(event.End)
-func (ev *Event) Is(m Matcher) bool {
-	return m.Matches(ev)
+// New prepares a new event.
+// This is intended to avoid allocations in the steady state case, to do this
+// it uses a pool of events.
+// Events are returned to the pool when Deliver is called. Failure to call
+// Deliver will exhaust the pool and cause allocations.
+// It returns nil if there is no active exporter for this kind of event.
+func New(ctx context.Context, kind Kind) *Event {
+	var t *target
+	if v, ok := ctx.Value(contextKey).(*target); ok {
+		t = v
+	} else {
+		t = getDefaultTarget()
+	}
+	if t == nil {
+		return nil
+	}
+	//TODO: we can change this to a much faster test
+	switch kind {
+	case LogKind:
+		if !t.exporter.loggingEnabled() {
+			return nil
+		}
+	case MetricKind:
+		if !t.exporter.metricsEnabled() {
+			return nil
+		}
+	case StartKind, EndKind:
+		if !t.exporter.tracingEnabled() {
+			return nil
+		}
+	}
+	ev := eventPool.Get().(*Event)
+	*ev = Event{
+		ctx:    ctx,
+		target: t,
+		Kind:   kind,
+		Parent: t.parent,
+	}
+	ev.Labels = ev.labels[:0]
+	return ev
 }
 
-// NopHandler is a handler that does nothing. It can be used for tests, or
-// embedded in a struct to avoid having to implement all the Handler methods.
-type NopHandler struct{}
-
-func (NopHandler) Log(context.Context, *Event)      {}
-func (NopHandler) Metric(context.Context, *Event)   {}
-func (NopHandler) Annotate(context.Context, *Event) {}
-func (NopHandler) End(context.Context, *Event)      {}
-func (NopHandler) Start(ctx context.Context, _ *Event) context.Context {
+// Deliver the event to the exporter that was found in New.
+// This also returns the event to the pool, it is an error to do anything
+// with the event after it is delivered.
+func (ev *Event) Deliver() context.Context {
+	// get the event ready to send
+	ev.target.exporter.prepare(ev)
+	// now hold the lock while we deliver the event
+	ev.target.exporter.mu.Lock()
+	defer ev.target.exporter.mu.Unlock()
+	ctx := ev.target.exporter.handler.Event(ev.ctx, ev)
+	eventPool.Put(ev)
 	return ctx
 }

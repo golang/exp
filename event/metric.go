@@ -5,6 +5,7 @@
 package event
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -37,8 +38,7 @@ func newMetricDescriptor(name, description string) *MetricDescriptor {
 		panic("name cannot be empty")
 	}
 	return &MetricDescriptor{
-		name: name,
-		// TODO: use the global callers, will also need a lock
+		name:        name,
 		namespace:   scanStack().Space,
 		description: description,
 	}
@@ -84,8 +84,13 @@ func (c *Counter) Descriptor() *MetricDescriptor {
 // Record converts its argument into a Value and returns a MetricValue with the
 // receiver and the value. It is intended to be used as an argument to
 // Builder.Metric.
-func (c *Counter) Record(v uint64) MetricValue {
-	return MetricValue{c, Uint64Of(v)}
+func (c *Counter) Record(ctx context.Context, v uint64, labels ...Label) {
+	ev := New(ctx, MetricKind)
+	if ev != nil {
+		record(ev, c, Uint64Of(v))
+		ev.Labels = append(ev.Labels, labels...)
+		ev.Deliver()
+	}
 }
 
 // A FloatGauge records a single floating-point value that may go up or down.
@@ -107,8 +112,13 @@ func (g *FloatGauge) Descriptor() *MetricDescriptor {
 // Record converts its argument into a Value and returns a MetricValue with the
 // receiver and the value. It is intended to be used as an argument to
 // Builder.Metric.
-func (g *FloatGauge) Record(v float64) MetricValue {
-	return MetricValue{g, Float64Of(v)}
+func (g *FloatGauge) Record(ctx context.Context, v float64, labels ...Label) {
+	ev := New(ctx, MetricKind)
+	if ev != nil {
+		record(ev, g, Float64Of(v))
+		ev.Labels = append(ev.Labels, labels...)
+		ev.Deliver()
+	}
 }
 
 // A Duration records a distribution of durations.
@@ -130,8 +140,13 @@ func (d *Duration) Descriptor() *MetricDescriptor {
 // Record converts its argument into a Value and returns a MetricValue with the
 // receiver and the value. It is intended to be used as an argument to
 // Builder.Metric.
-func (d *Duration) Record(v time.Duration) MetricValue {
-	return MetricValue{d, DurationOf(v)}
+func (d *Duration) Record(ctx context.Context, v time.Duration, labels ...Label) {
+	ev := New(ctx, MetricKind)
+	if ev != nil {
+		record(ev, d, DurationOf(v))
+		ev.Labels = append(ev.Labels, labels...)
+		ev.Deliver()
+	}
 }
 
 // An IntDistribution records a distribution of int64s.
@@ -152,6 +167,15 @@ func (d *IntDistribution) Descriptor() *MetricDescriptor {
 // Record converts its argument into a Value and returns a MetricValue with the
 // receiver and the value. It is intended to be used as an argument to
 // Builder.Metric.
-func (d *IntDistribution) Record(v int64) MetricValue {
-	return MetricValue{d, Int64Of(v)}
+func (d *IntDistribution) Record(ctx context.Context, v int64, labels ...Label) {
+	ev := New(ctx, MetricKind)
+	if ev != nil {
+		record(ev, d, Int64Of(v))
+		ev.Labels = append(ev.Labels, labels...)
+		ev.Deliver()
+	}
+}
+
+func record(ev *Event, m Metric, v Value) {
+	ev.Labels = append(ev.Labels, MetricVal.Of(v), MetricKey.Of(ValueOf(m)))
 }

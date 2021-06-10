@@ -20,8 +20,8 @@ func NewExporter(h interface{}) *Exporter { return &Exporter{} }
 
 func To(ctx context.Context) Builder                        { return Builder{} }
 func (b Builder) Clone() Builder                            { return b }
-func (b Builder) With(label Label) Builder                  { return b }
-func (b Builder) WithAll(labels ...Label) Builder           { return b }
+func (b Builder) Label(label Label) Builder                 { return b }
+func (b Builder) Labels(labels ...Label) Builder            { return b }
 func (b Builder) Log(message string)                        {}
 func (b Builder) Logf(template string, args ...interface{}) {}
 func (b Builder) Metric()                                   {}
@@ -35,6 +35,6 @@ func (b Builder) Start(name string) (context.Context, func()) {
 func newContext(ctx context.Context, exporter *Exporter, parent uint64) context.Context {
 	return ctx
 }
-func FromContext(ctx context.Context) (*Exporter, uint64) { return nil, 0 }
+func FromContext(ctx context.Context) *Target { return nil }
 
 func setDefaultExporter(e *Exporter) {}

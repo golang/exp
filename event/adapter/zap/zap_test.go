@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.uber.org/zap"
 	"golang.org/x/exp/event"
 	ezap "golang.org/x/exp/event/adapter/zap"
@@ -31,11 +30,11 @@ func Test(t *testing.T) {
 		Labels: []event.Label{
 			keys.Int64("traceID").Of(17),
 			keys.String("resource").Of("R"),
-			severity.Info,
+			severity.Info.Label(),
 			keys.Float64("pi").Of(3.14),
 		},
 	}}
-	if diff := cmp.Diff(want, h.Got, cmpopts.IgnoreFields(event.Event{}, "At")); diff != "" {
+	if diff := cmp.Diff(want, h.Got, eventtest.CmpOption()); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

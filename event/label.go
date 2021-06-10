@@ -166,7 +166,7 @@ func (v Value) Bytes() []byte {
 	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 	hdr.Data = uintptr(bp)
 	hdr.Len = int(v.packed)
-	hdr.Cap = hdr.Len // TODO: is this safe?
+	hdr.Cap = hdr.Len
 	return buf
 }
 

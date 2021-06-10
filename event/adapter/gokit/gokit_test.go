@@ -31,7 +31,7 @@ func Test(t *testing.T) {
 			keys.Value("resource").Of("R"),
 		},
 	}}
-	if diff := cmp.Diff(want, h.Got); diff != "" {
+	if diff := cmp.Diff(want, h.Got, eventtest.CmpOption()); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

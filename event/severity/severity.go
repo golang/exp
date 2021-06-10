@@ -4,7 +4,12 @@
 
 package severity
 
-import "golang.org/x/exp/event"
+import (
+	"context"
+	"fmt"
+
+	"golang.org/x/exp/event"
+)
 
 // Level represents a severity level of an event.
 // The basic severity levels are designed to match the levels used in open telemetry.
@@ -24,35 +29,20 @@ import "golang.org/x/exp/event"
 type Level uint64
 
 const (
-	TraceLevel   = Level(1)
-	DebugLevel   = Level(5)
-	InfoLevel    = Level(9)
-	WarningLevel = Level(13)
-	ErrorLevel   = Level(17)
-	FatalLevel   = Level(21)
-	MaxLevel     = Level(24)
+	Trace   = Level(1)
+	Debug   = Level(5)
+	Info    = Level(9)
+	Warning = Level(13)
+	Error   = Level(17)
+	Fatal   = Level(21)
+	Max     = Level(24)
 )
 
 const Key = "level"
 
-var (
-	// Trace is an event.Label for trace level events.
-	Trace = Of(TraceLevel)
-	// Debug is an event.Label for debug level events.
-	Debug = Of(DebugLevel)
-	// Info is an event.Label for info level events.
-	Info = Of(InfoLevel)
-	// Warning is an event.Label for warning level events.
-	Warning = Of(WarningLevel)
-	// Error is an event.Label for error level events.
-	Error = Of(ErrorLevel)
-	// Fatal is an event.Label for fatal level events.
-	Fatal = Of(FatalLevel)
-)
-
-// Of creates a new Label with this key and the supplied value.
-func Of(v Level) event.Label {
-	return event.Label{Name: Key, Value: event.ValueOf(v)}
+// Of creates a label for the level.
+func (l Level) Label() event.Label {
+	return event.Label{Name: Key, Value: event.ValueOf(l)}
 }
 
 // From can be used to get a value from a Label.
@@ -60,22 +50,41 @@ func From(t event.Label) Level {
 	return t.Value.Interface().(Level)
 }
 
+func (l Level) Log(ctx context.Context, msg string, labels ...event.Label) {
+	ev := event.New(ctx, event.LogKind)
+	if ev != nil {
+		ev.Labels = append(ev.Labels, l.Label())
+		ev.Labels = append(ev.Labels, labels...)
+		ev.Message = msg
+		ev.Deliver()
+	}
+}
+
+func (l Level) Logf(ctx context.Context, msg string, args ...interface{}) {
+	ev := event.New(ctx, event.LogKind)
+	if ev != nil {
+		ev.Labels = append(ev.Labels, l.Label())
+		ev.Message = fmt.Sprintf(msg, args...)
+		ev.Deliver()
+	}
+}
+
 func (l Level) Class() Level {
 	switch {
-	case l > MaxLevel:
-		return MaxLevel
-	case l > FatalLevel:
-		return FatalLevel
-	case l > ErrorLevel:
-		return ErrorLevel
-	case l > WarningLevel:
-		return WarningLevel
-	case l > DebugLevel:
-		return DebugLevel
-	case l > InfoLevel:
-		return InfoLevel
-	case l > TraceLevel:
-		return TraceLevel
+	case l > Max:
+		return Max
+	case l > Fatal:
+		return Fatal
+	case l > Error:
+		return Error
+	case l > Warning:
+		return Warning
+	case l > Debug:
+		return Debug
+	case l > Info:
+		return Info
+	case l > Trace:
+		return Trace
 	default:
 		return 0
 	}
@@ -86,58 +95,58 @@ func (l Level) String() string {
 	case 0:
 		return "invalid"
 
-	case TraceLevel:
+	case Trace:
 		return "trace"
-	case TraceLevel + 1:
+	case Trace + 1:
 		return "trace2"
-	case TraceLevel + 2:
+	case Trace + 2:
 		return "trace3"
-	case TraceLevel + 3:
+	case Trace + 3:
 		return "trace4"
 
-	case DebugLevel:
+	case Debug:
 		return "debug"
-	case DebugLevel + 1:
+	case Debug + 1:
 		return "debug2"
-	case DebugLevel + 2:
+	case Debug + 2:
 		return "debug3"
-	case DebugLevel + 3:
+	case Debug + 3:
 		return "debug4"
 
-	case InfoLevel:
+	case Info:
 		return "info"
-	case InfoLevel + 1:
+	case Info + 1:
 		return "info2"
-	case InfoLevel + 2:
+	case Info + 2:
 		return "info3"
-	case InfoLevel + 3:
+	case Info + 3:
 		return "info4"
 
-	case WarningLevel:
+	case Warning:
 		return "warning"
-	case WarningLevel + 1:
+	case Warning + 1:
 		return "warning2"
-	case WarningLevel + 2:
+	case Warning + 2:
 		return "warning3"
-	case WarningLevel + 3:
+	case Warning + 3:
 		return "warning4"
 
-	case ErrorLevel:
+	case Error:
 		return "error"
-	case ErrorLevel + 1:
+	case Error + 1:
 		return "error2"
-	case ErrorLevel + 2:
+	case Error + 2:
 		return "error3"
-	case ErrorLevel + 3:
+	case Error + 3:
 		return "error4"
 
-	case FatalLevel:
+	case Fatal:
 		return "fatal"
-	case FatalLevel + 1:
+	case Fatal + 1:
 		return "fatal2"
-	case FatalLevel + 2:
+	case Fatal + 2:
 		return "fatal3"
-	case FatalLevel + 3:
+	case Fatal + 3:
 		return "fatal4"
 	default:
 		return "invalid"

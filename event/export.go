@@ -16,12 +16,20 @@ import (
 
 // Exporter synchronizes the delivery of events to handlers.
 type Exporter struct {
-	opts ExporterOptions
+	lastEvent uint64 // accessed using atomic, must be 64 bit aligned
+	opts      ExporterOptions
 
-	mu        sync.Mutex
-	handler   Handler
-	lastEvent uint64
-	sources   sources
+	mu      sync.Mutex
+	handler Handler
+	sources sources
+}
+
+// target is a bound exporter.
+// Normally you get a target by looking in the context using To.
+type target struct {
+	exporter  *Exporter
+	parent    uint64
+	startTime time.Time // for trace latency
 }
 
 type ExporterOptions struct {
@@ -44,16 +52,8 @@ type contextKeyType struct{}
 
 var contextKey interface{} = contextKeyType{}
 
-// contextValue is stored by value in the context to track the exporter and
-// current parent event.
-type contextValue struct {
-	exporter  *Exporter
-	parent    uint64
-	startTime time.Time // for trace latency
-}
-
 var (
-	defaultExporter unsafe.Pointer
+	defaultTarget unsafe.Pointer
 )
 
 // NewExporter creates an Exporter using the supplied handler and options.
@@ -76,32 +76,27 @@ func NewExporter(handler Handler, opts *ExporterOptions) *Exporter {
 }
 
 func setDefaultExporter(e *Exporter) {
-	atomic.StorePointer(&defaultExporter, unsafe.Pointer(e))
+	atomic.StorePointer(&defaultTarget, unsafe.Pointer(&target{exporter: e}))
 }
 
-func getDefaultExporter() *Exporter {
-	return (*Exporter)(atomic.LoadPointer(&defaultExporter))
+func getDefaultTarget() *target {
+	return (*target)(atomic.LoadPointer(&defaultTarget))
 }
 
-func newContext(ctx context.Context, exporter *Exporter, parent uint64, t time.Time) context.Context {
-	return context.WithValue(ctx, contextKey, contextValue{exporter: exporter, parent: parent, startTime: t})
-}
-
-// FromContext returns the exporter, parentID and parent start time for the supplied context.
-func FromContext(ctx context.Context) (*Exporter, uint64, time.Time) {
-	if v, ok := ctx.Value(contextKey).(contextValue); ok {
-		return v.exporter, v.parent, v.startTime
+func newContext(ctx context.Context, exporter *Exporter, parent uint64, start time.Time) context.Context {
+	var t *target
+	if exporter != nil {
+		t = &target{exporter: exporter, parent: parent, startTime: start}
 	}
-	return getDefaultExporter(), 0, time.Time{}
+	return context.WithValue(ctx, contextKey, t)
 }
 
 // prepare events before delivering to the underlying handler.
-// The event will be assigned a new ID.
+// it is safe to call this more than once (trace events have to call it early)
 // If the event does not have a timestamp, and the exporter has a Now function
 // then the timestamp will be updated.
 // If automatic namespaces are enabled and the event doesn't have a namespace,
 // one based on the caller's import path will be provided.
-// prepare must be called with the export mutex held.
 func (e *Exporter) prepare(ev *Event) {
 	if e.opts.Now != nil && ev.At.IsZero() {
 		ev.At = e.opts.Now()

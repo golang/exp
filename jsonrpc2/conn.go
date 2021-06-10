@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/exp/event"
+	"golang.org/x/exp/event/keys"
 	errors "golang.org/x/xerrors"
 )
 
@@ -52,10 +53,10 @@ type Connection struct {
 }
 
 type AsyncCall struct {
-	id         ID
-	response   chan *Response // the channel a response will be delivered on
-	resultBox  chan asyncResult
-	endBuilder event.Builder // close the tracing span when all processing for the message is complete
+	id        ID
+	response  chan *Response // the channel a response will be delivered on
+	resultBox chan asyncResult
+	ctx       context.Context
 }
 
 type asyncResult struct {
@@ -65,11 +66,10 @@ type asyncResult struct {
 
 // incoming is used to track an incoming request as it is being handled
 type incoming struct {
-	request    *Request        // the request being processed
-	baseCtx    context.Context // a base context for the message processing
-	endBuilder event.Builder   // builder's End method called when all processing for the message is complete
-	handleCtx  context.Context // the context for handling the message, child of baseCtx
-	cancel     func()          // a function that cancels the handling context
+	request   *Request        // the request being processed
+	baseCtx   context.Context // a base context for the message processing
+	handleCtx context.Context // the context for handling the message, child of baseCtx
+	cancel    func()          // a function that cancels the handling context
 }
 
 // Bind returns the options unmodified.
@@ -124,12 +124,14 @@ func (c *Connection) Notify(ctx context.Context, method string, params interface
 	if err != nil {
 		return errors.Errorf("marshaling notify parameters: %v", err)
 	}
-	b := event.To(ctx).With(Method.Of(method))
-	b.Clone().Metric(Started.Record(1))
-	ctx, endBuilder := b.With(RPCDirection.Of(Outbound)).Start(method)
-	err = c.write(ctx, notify)
-	event.To(ctx).With(Error.Of(err)).Metric(Finished.Record(1))
-	endBuilder.End()
+	ctx = event.Start(ctx, method, RPCDirection.Of(Outbound))
+	Started.Record(ctx, 1, Method.Of(method))
+	var errLabel event.Label
+	if err = c.write(ctx, notify); err != nil {
+		errLabel = keys.Value("error").Of(err)
+	}
+	Finished.Record(ctx, 1, errLabel)
+	event.End(ctx)
 	return err
 }
 
@@ -150,10 +152,11 @@ func (c *Connection) Call(ctx context.Context, method string, params interface{}
 		result.resultBox <- asyncResult{err: errors.Errorf("marshaling call parameters: %w", err)}
 		return result
 	}
-	b := event.To(ctx).With(Method.Of(method))
-	b.Clone().Metric(Started.Record(1))
-	ctx, endBuilder := b.Clone().With(RPCDirection.Of(Outbound)).With(RPCID.Of(fmt.Sprintf("%q", result.id))).Start(method)
-	result.endBuilder = endBuilder
+	//TODO: rewrite this using the new target/prototype stuff
+	ctx = event.Start(ctx, method,
+		Method.Of(method), RPCDirection.Of(Outbound), RPCID.Of(fmt.Sprintf("%q", result.id)))
+	Started.Record(ctx, 1, Method.Of(method))
+	result.ctx = ctx
 	// We have to add ourselves to the pending map before we send, otherwise we
 	// are racing the response.
 	// rchan is buffered in case the response arrives without a listener.
@@ -191,7 +194,7 @@ func (a *AsyncCall) IsReady() bool {
 // The response will be unmarshaled from JSON into the result.
 func (a *AsyncCall) Await(ctx context.Context, result interface{}) error {
 	status := "NONE"
-	defer a.endBuilder.With(StatusCode.Of(status)).End()
+	defer event.End(a.ctx, StatusCode.Of(status))
 	var r asyncResult
 	select {
 	case response := <-a.response:
@@ -292,14 +295,14 @@ func (c *Connection) readIncoming(ctx context.Context, reader Reader, toQueue ch
 				request: msg,
 			}
 			// add a span to the context for this request
-			b := event.To(ctx).With(Method.Of(msg.Method)).With(RPCDirection.Of(Inbound))
+			var idLabel event.Label
 			if msg.IsCall() {
-				b = b.With(RPCID.Of(fmt.Sprintf("%q", msg.ID)))
+				idLabel = RPCID.Of(fmt.Sprintf("%q", msg.ID))
 			}
-			entry.baseCtx, entry.endBuilder = b.Start(msg.Method)
-			b = event.To(entry.baseCtx).With(Method.Of(msg.Method))
-			b.Clone().Metric(Started.Record(1))
-			b.Metric(ReceivedBytes.Record(n))
+			entry.baseCtx = event.Start(ctx, msg.Method,
+				Method.Of(msg.Method), RPCDirection.Of(Inbound), idLabel)
+			Started.Record(entry.baseCtx, 1, Method.Of(msg.Method))
+			ReceivedBytes.Record(entry.baseCtx, n, Method.Of(msg.Method))
 			// in theory notifications cannot be cancelled, but we build them a cancel context anyway
 			entry.handleCtx, entry.cancel = context.WithCancel(entry.baseCtx)
 			// if the request is a call, add it to the incoming map so it can be
@@ -412,7 +415,7 @@ func (c *Connection) reply(entry *incoming, result interface{}, rerr error) {
 	if err := c.respond(entry, result, rerr); err != nil {
 		// no way to propagate this error
 		//TODO: should we do more than just log it?
-		event.To(entry.baseCtx).With(Error.Of(err)).Log("jsonrpc2 message delivery failed")
+		event.Log(entry.baseCtx, "jsonrpc2 message delivery failed", keys.Value("error").Of(err))
 	}
 }
 
@@ -458,7 +461,7 @@ func (c *Connection) respond(entry *incoming, result interface{}, rerr error) er
 		entry.cancel = nil
 	}
 	// mark the entire request processing as done
-	entry.endBuilder.With(StatusCode.Of(status)).End()
+	event.End(entry.baseCtx, StatusCode.Of(status))
 	return err
 }
 
@@ -469,6 +472,6 @@ func (c *Connection) write(ctx context.Context, msg Message) error {
 	defer func() { c.writerBox <- writer }()
 	n, err := writer.Write(ctx, msg)
 	// TODO: get a method label in here somehow.
-	event.To(ctx).Metric(SentBytes.Record(n))
+	SentBytes.Record(ctx, n)
 	return err
 }

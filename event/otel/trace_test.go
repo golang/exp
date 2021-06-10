@@ -95,9 +95,8 @@ func (s *traceSpec) apply(ctx context.Context) {
 		ctx, span = s.tracer.Start(ctx, s.name)
 		defer span.End()
 	} else {
-		var eb event.Builder
-		ctx, eb = event.To(ctx).Start(s.name)
-		defer eb.End()
+		ctx = event.Start(ctx, s.name)
+		defer event.End(ctx)
 	}
 	for _, c := range s.children {
 		c.apply(ctx)
