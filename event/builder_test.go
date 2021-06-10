@@ -131,6 +131,7 @@ func TestFailToClone(t *testing.T) {
 
 func BenchmarkBuildContext(b *testing.B) {
 	// How long does it take to deliver an event from a nested context?
+	c := event.NewCounter("c")
 	for _, depth := range []int{1, 5, 7, 10} {
 		b.Run(fmt.Sprintf("depth %d", depth), func(b *testing.B) {
 			ctx := event.WithExporter(context.Background(), event.NewExporter(event.NopHandler{}, nil))
@@ -139,13 +140,13 @@ func BenchmarkBuildContext(b *testing.B) {
 			}
 			b.Run("direct", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					event.To(ctx).With(event.Name.Of("foo")).Metric()
+					event.To(ctx).With(event.Name.Of("foo")).Metric(c.Record(1))
 				}
 			})
 			b.Run("cloned", func(b *testing.B) {
 				bu := event.To(ctx)
 				for i := 0; i < b.N; i++ {
-					bu.Clone().With(event.Name.Of("foo")).Metric()
+					bu.Clone().With(event.Name.Of("foo")).Metric(c.Record(1))
 				}
 			})
 		})
