@@ -139,3 +139,25 @@ func (d *Duration) Descriptor() *MetricDescriptor {
 func (d *Duration) Record(v time.Duration) MetricValue {
 	return MetricValue{d, DurationOf(v)}
 }
+
+// An IntDistribution records a distribution of int64s.
+type IntDistribution struct {
+	*MetricDescriptor
+}
+
+// NewIntDistribution creates a new IntDistribution with the given name.
+func NewIntDistribution(name, description string) *IntDistribution {
+	return &IntDistribution{newMetricDescriptor(name, description)}
+}
+
+// Descriptor returns the receiver's MetricDescriptor.
+func (d *IntDistribution) Descriptor() *MetricDescriptor {
+	return d.MetricDescriptor
+}
+
+// Record converts its argument into a Value and returns a MetricValue with the
+// receiver and the value. It is intended to be used as an argument to
+// Builder.Metric.
+func (d *IntDistribution) Record(v int64) MetricValue {
+	return MetricValue{d, Int64Of(v)}
+}
