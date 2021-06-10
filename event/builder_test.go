@@ -68,12 +68,12 @@ func TestTraceBuilder(t *testing.T) {
 	// Verify that the context returned from the handler is also returned from Start,
 	// and is the context passed to End.
 	ctx := event.WithExporter(context.Background(), event.NewExporter(&testTraceHandler{t: t}, nil))
-	ctx, end := event.To(ctx).Start("s")
+	ctx, eb := event.To(ctx).Start("s")
 	val := ctx.Value("x")
 	if val != 1 {
 		t.Fatal("context not returned from Start")
 	}
-	end()
+	eb.End()
 }
 
 type testTraceHandler struct {
@@ -142,15 +142,15 @@ func TestTraceDuration(t *testing.T) {
 		}
 	}
 
-	t.Run("end function", func(t *testing.T) {
+	t.Run("returned builder", func(t *testing.T) {
 		h := &testTraceDurationHandler{}
 		ctx := event.WithExporter(context.Background(), event.NewExporter(h, nil))
-		ctx, end := event.To(ctx).With(event.DurationMetric.Of(dur)).Start("s")
+		ctx, eb := event.To(ctx).With(event.DurationMetric.Of(dur)).Start("s")
 		time.Sleep(want)
-		end()
+		eb.End()
 		check(t, h)
 	})
-	t.Run("End method", func(t *testing.T) {
+	t.Run("separate builder", func(t *testing.T) {
 		h := &testTraceDurationHandler{}
 		ctx := event.WithExporter(context.Background(), event.NewExporter(h, nil))
 		ctx, _ = event.To(ctx).Start("s")

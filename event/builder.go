@@ -259,26 +259,26 @@ func (b builderCommon) done() {
 }
 
 // Start delivers a start event with the given name and labels.
-// Its second return value is a function that should be called to deliver the
-// matching end event.
+// Its second return value is a Builder whose End method can be
+// called to deliver the matching End event.
+// (It is also fine to ignore the Builder.)
 // All events created from the returned context will have this start event
 // as their parent.
-func (b Builder) Start(name string) (context.Context, func()) {
+func (b Builder) Start(name string) (context.Context, Builder) {
 	if b.data == nil {
-		return b.ctx, func() {}
+		return b.ctx, Builder{}
 	}
 	checkValid(b.data, b.builderID)
 	ctx := b.ctx
-	end := func() {}
+	var endBuilder Builder
 	if b.data.exporter.tracingEnabled() {
 		b.data.exporter.mu.Lock()
 		defer b.data.exporter.mu.Unlock()
 		b.data.exporter.lastEvent++
 		traceID := b.data.exporter.lastEvent
 		// create the end builder
-		eb := b.Clone()
-		eb.data.Event.Parent = traceID
-
+		endBuilder = b.Clone()
+		endBuilder.data.Event.Parent = traceID
 		b.data.Event.Labels = append(b.data.Event.Labels, Trace.Of(traceID))
 		b.data.exporter.prepare(&b.data.Event)
 		// and now deliver the start event
@@ -286,12 +286,11 @@ func (b Builder) Start(name string) (context.Context, func()) {
 		now := time.Now()
 		ctx = newContext(ctx, b.data.exporter, traceID, now)
 		ctx = b.data.exporter.handler.Start(ctx, &b.data.Event)
-		eb.data.parentStart = now
-		eb.ctx = ctx
-		end = eb.End
+		endBuilder.data.parentStart = now
+		endBuilder.ctx = ctx
 	}
 	b.done()
-	return ctx, end
+	return ctx, endBuilder
 }
 
 func checkValid(b *builder, wantID uint64) {

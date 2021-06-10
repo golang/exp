@@ -35,12 +35,12 @@ func TestCommon(t *testing.T) {
 	checkFind(t, h, "Annotate", event.Name, false, "")
 	h.Reset()
 
-	_, end := event.To(ctx).Start(trace)
+	_, eb := event.To(ctx).Start(trace)
 	checkFind(t, h, "Start", event.Message, false, "")
 	checkFind(t, h, "Start", event.Name, true, trace)
 	h.Reset()
 
-	end()
+	eb.End()
 	checkFind(t, h, "End", event.Message, false, "")
 	checkFind(t, h, "End", event.Name, false, "")
 }

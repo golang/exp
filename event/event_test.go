@@ -53,8 +53,8 @@ func TestPrint(t *testing.T) {
 	}, {
 		name: "span",
 		events: func(ctx context.Context) {
-			ctx, end := event.To(ctx).Start("span")
-			end()
+			ctx, eb := event.To(ctx).Start("span")
+			eb.End()
 		},
 		expect: `
 time=2020-03-05T14:27:48 trace=1 name=span
@@ -62,10 +62,10 @@ time=2020-03-05T14:27:49 parent=1 end
 `}, {
 		name: "span nested",
 		events: func(ctx context.Context) {
-			ctx, end := event.To(ctx).Start("parent")
-			defer end()
-			child, end2 := event.To(ctx).Start("child")
-			defer end2()
+			ctx, eb := event.To(ctx).Start("parent")
+			defer eb.End()
+			child, eb2 := event.To(ctx).Start("child")
+			defer eb2.End()
 			event.To(child).Log("message")
 		},
 		expect: `
