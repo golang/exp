@@ -11,32 +11,31 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/adapter/logfmt"
-	"golang.org/x/exp/event/bench"
+	"golang.org/x/exp/event/eventtest"
 )
 
 var (
-	gokitLog = bench.Hooks{
+	gokitLog = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			gokitCtx(ctx).Log(bench.A.Name, a, "msg", bench.A.Msg)
+			gokitCtx(ctx).Log(eventtest.A.Name, a, "msg", eventtest.A.Msg)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			gokitCtx(ctx).Log(bench.B.Name, b, "msg", bench.B.Msg)
+			gokitCtx(ctx).Log(eventtest.B.Name, b, "msg", eventtest.B.Msg)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
-	gokitLogf = bench.Hooks{
+	gokitLogf = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			gokitCtx(ctx).Log("msg", fmt.Sprintf(bench.A.Msgf, a))
+			gokitCtx(ctx).Log("msg", fmt.Sprintf(eventtest.A.Msgf, a))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			gokitCtx(ctx).Log("msg", fmt.Sprintf(bench.B.Msgf, b))
+			gokitCtx(ctx).Log("msg", fmt.Sprintf(eventtest.B.Msgf, b))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -57,16 +56,16 @@ func gokitPrint(w io.Writer) context.Context {
 }
 
 func BenchmarkGokitLogDiscard(b *testing.B) {
-	bench.RunBenchmark(b, gokitPrint(io.Discard), gokitLog)
+	eventtest.RunBenchmark(b, gokitPrint(io.Discard), gokitLog)
 }
 
 func BenchmarkGokitLogfDiscard(b *testing.B) {
-	bench.RunBenchmark(b, gokitPrint(io.Discard), gokitLogf)
+	eventtest.RunBenchmark(b, gokitPrint(io.Discard), gokitLogf)
 }
 
 func TestGokitLogfDiscard(t *testing.T) {
-	bench.TestBenchmark(t, gokitPrint, gokitLogf, bench.LogfOutput)
+	eventtest.TestBenchmark(t, gokitPrint, gokitLogf, eventtest.LogfOutput)
 }
 func TestLogGokit(t *testing.T) {
-	bench.TestBenchmark(t, gokitPrint, gokitLog, bench.LogfmtOutput)
+	eventtest.TestBenchmark(t, gokitPrint, gokitLog, eventtest.LogfmtOutput)
 }

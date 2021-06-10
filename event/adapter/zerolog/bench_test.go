@@ -10,32 +10,31 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/exp/event/adapter/eventtest"
-	"golang.org/x/exp/event/bench"
+	"golang.org/x/exp/event/eventtest"
 )
 
 var (
-	zerologMsg = bench.Hooks{
+	zerologMsg = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zerolog.Ctx(ctx).Info().Int(bench.A.Name, a).Msg(bench.A.Msg)
+			zerolog.Ctx(ctx).Info().Int(eventtest.A.Name, a).Msg(eventtest.A.Msg)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zerolog.Ctx(ctx).Info().Str(bench.B.Name, b).Msg(bench.B.Msg)
+			zerolog.Ctx(ctx).Info().Str(eventtest.B.Name, b).Msg(eventtest.B.Msg)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	zerologMsgf = bench.Hooks{
+	zerologMsgf = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zerolog.Ctx(ctx).Info().Msgf(bench.A.Msgf, a)
+			zerolog.Ctx(ctx).Info().Msgf(eventtest.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zerolog.Ctx(ctx).Info().Msgf(bench.B.Msgf, b)
+			zerolog.Ctx(ctx).Info().Msgf(eventtest.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -43,22 +42,22 @@ var (
 )
 
 func zerologPrint(w io.Writer) context.Context {
-	zerolog.TimeFieldFormat = bench.TimeFormat
+	zerolog.TimeFieldFormat = eventtest.TimeFormat
 	zerolog.TimestampFunc = eventtest.ExporterOptions().Now
 	logger := zerolog.New(zerolog.SyncWriter(w)).With().Timestamp().Logger()
 	return logger.WithContext(context.Background())
 }
 
 func BenchmarkZerologLogDiscard(b *testing.B) {
-	bench.RunBenchmark(b, zerologPrint(io.Discard), zerologMsg)
+	eventtest.RunBenchmark(b, zerologPrint(io.Discard), zerologMsg)
 }
 
 func BenchmarkZerologLogfDiscard(b *testing.B) {
-	bench.RunBenchmark(b, zerologPrint(io.Discard), zerologMsgf)
+	eventtest.RunBenchmark(b, zerologPrint(io.Discard), zerologMsgf)
 }
 
 func TestLogZerologf(t *testing.T) {
-	bench.TestBenchmark(t, zerologPrint, zerologMsgf, `
+	eventtest.TestBenchmark(t, zerologPrint, zerologMsgf, `
 {"level":"info","time":"2020/03/05 14:27:48","message":"a where A=0"}
 {"level":"info","time":"2020/03/05 14:27:49","message":"b where B=\"A value\""}
 {"level":"info","time":"2020/03/05 14:27:50","message":"a where A=1"}

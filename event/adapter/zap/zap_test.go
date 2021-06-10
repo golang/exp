@@ -13,8 +13,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.uber.org/zap"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/adapter/eventtest"
 	ezap "golang.org/x/exp/event/adapter/zap"
+	"golang.org/x/exp/event/eventtest"
 	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )

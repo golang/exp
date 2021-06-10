@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/eventtest"
 )
 
 func TestCommon(t *testing.T) {

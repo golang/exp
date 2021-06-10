@@ -12,31 +12,30 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/event/adapter/eventtest"
-	"golang.org/x/exp/event/bench"
+	"golang.org/x/exp/event/eventtest"
 )
 
 var (
-	zapLog = bench.Hooks{
+	zapLog = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zapCtx(ctx).Info(bench.A.Msg, zap.Int(bench.A.Name, a))
+			zapCtx(ctx).Info(eventtest.A.Msg, zap.Int(eventtest.A.Name, a))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zapCtx(ctx).Info(bench.B.Msg, zap.String(bench.B.Name, b))
+			zapCtx(ctx).Info(eventtest.B.Msg, zap.String(eventtest.B.Name, b))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
-	zapLogf = bench.Hooks{
+	zapLogf = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			zapCtx(ctx).Sugar().Infof(bench.A.Msgf, a)
+			zapCtx(ctx).Sugar().Infof(eventtest.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			zapCtx(ctx).Sugar().Infof(bench.B.Msgf, b)
+			zapCtx(ctx).Sugar().Infof(eventtest.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -53,7 +52,7 @@ func zapPrint(w io.Writer) context.Context {
 	now := eventtest.ExporterOptions().Now
 	ec := zap.NewProductionEncoderConfig()
 	ec.EncodeDuration = zapcore.NanosDurationEncoder
-	timeEncoder := zapcore.TimeEncoderOfLayout(bench.TimeFormat)
+	timeEncoder := zapcore.TimeEncoderOfLayout(eventtest.TimeFormat)
 	ec.EncodeTime = func(_ time.Time, a zapcore.PrimitiveArrayEncoder) {
 		timeEncoder(now(), a)
 	}
@@ -67,15 +66,15 @@ func zapPrint(w io.Writer) context.Context {
 }
 
 func BenchmarkZapLogDiscard(b *testing.B) {
-	bench.RunBenchmark(b, zapPrint(io.Discard), zapLog)
+	eventtest.RunBenchmark(b, zapPrint(io.Discard), zapLog)
 }
 
 func BenchmarkZapLogfDiscard(b *testing.B) {
-	bench.RunBenchmark(b, zapPrint(io.Discard), zapLogf)
+	eventtest.RunBenchmark(b, zapPrint(io.Discard), zapLogf)
 }
 
 func TestZapLogfDiscard(t *testing.T) {
-	bench.TestBenchmark(t, zapPrint, zapLogf, `
+	eventtest.TestBenchmark(t, zapPrint, zapLogf, `
 2020/03/05 14:27:48	info	a where A=0
 2020/03/05 14:27:49	info	b where B="A value"
 2020/03/05 14:27:50	info	a where A=1
@@ -95,7 +94,7 @@ func TestZapLogfDiscard(t *testing.T) {
 `)
 }
 func TestLogZap(t *testing.T) {
-	bench.TestBenchmark(t, zapPrint, zapLog, `
+	eventtest.TestBenchmark(t, zapPrint, zapLog, `
 2020/03/05 14:27:48	info	a	{"A": 0}
 2020/03/05 14:27:49	info	b	{"B": "A value"}
 2020/03/05 14:27:50	info	a	{"A": 1}

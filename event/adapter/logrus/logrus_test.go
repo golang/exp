@@ -14,8 +14,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/adapter/eventtest"
 	elogrus "golang.org/x/exp/event/adapter/logrus"
+	"golang.org/x/exp/event/eventtest"
 	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )

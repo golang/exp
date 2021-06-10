@@ -14,9 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/adapter/logfmt"
-	"golang.org/x/exp/event/bench"
+	"golang.org/x/exp/event/eventtest"
 	"golang.org/x/exp/event/keys"
 )
 
@@ -129,9 +128,9 @@ func ExampleLog() {
 }
 
 func TestLogEventf(t *testing.T) {
-	bench.TestBenchmark(t, eventPrint, eventLogf, bench.LogfOutput)
+	eventtest.TestBenchmark(t, eventPrint, eventLogf, eventtest.LogfOutput)
 }
 
 func TestLogEvent(t *testing.T) {
-	bench.TestBenchmark(t, eventPrint, eventLog, bench.LogfmtOutput)
+	eventtest.TestBenchmark(t, eventPrint, eventLog, eventtest.LogfmtOutput)
 }

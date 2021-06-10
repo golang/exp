@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/logfmt"
-	"golang.org/x/exp/event/bench"
+	"golang.org/x/exp/event/eventtest"
 )
 
 func TestAllocs(t *testing.T) {
@@ -31,5 +31,5 @@ func TestAllocs(t *testing.T) {
 }
 
 func TestBenchAllocs(t *testing.T) {
-	bench.TestAllocs(t, eventPrint, eventLog, 0)
+	eventtest.TestAllocs(t, eventPrint, eventLog, 0)
 }

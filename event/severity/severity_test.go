@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/adapter/logfmt"
+	"golang.org/x/exp/event/eventtest"
 	"golang.org/x/exp/event/severity"
 )
 

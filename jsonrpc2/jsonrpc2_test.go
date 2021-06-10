@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/exp/event/adapter/eventtest"
+	"golang.org/x/exp/event/eventtest"
 	"golang.org/x/exp/internal/stack/stacktest"
 	"golang.org/x/exp/jsonrpc2"
 	errors "golang.org/x/xerrors"

@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/adapter/eventtest"
 	"golang.org/x/exp/event/adapter/gokit"
+	"golang.org/x/exp/event/eventtest"
 	"golang.org/x/exp/event/keys"
 )
 

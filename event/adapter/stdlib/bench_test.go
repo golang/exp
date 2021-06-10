@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package bench_test
+package stdlib_test
 
 import (
 	"context"
@@ -12,39 +12,38 @@ import (
 	"log"
 	"testing"
 
-	"golang.org/x/exp/event/adapter/eventtest"
-	"golang.org/x/exp/event/bench"
+	"golang.org/x/exp/event/eventtest"
 )
 
 var (
-	baseline = bench.Hooks{
+	baseline = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context { return ctx },
 		AEnd:   func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context { return ctx },
 		BEnd:   func(ctx context.Context) {},
 	}
 
-	stdlibLog = bench.Hooks{
+	stdlibLog = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			logCtx(ctx).Printf(bench.A.Msgf, a)
+			logCtx(ctx).Printf(eventtest.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			logCtx(ctx).Printf(bench.B.Msgf, b)
+			logCtx(ctx).Printf(eventtest.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
 	}
 
-	stdlibPrintf = bench.Hooks{
+	stdlibPrintf = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctxPrintf(ctx, bench.A.Msgf, a)
+			ctxPrintf(ctx, eventtest.A.Msgf, a)
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctxPrintf(ctx, bench.B.Msgf, b)
+			ctxPrintf(ctx, eventtest.B.Msgf, b)
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -52,7 +51,7 @@ var (
 )
 
 func BenchmarkBaseline(b *testing.B) {
-	bench.RunBenchmark(b, context.Background(), bench.Hooks{
+	eventtest.RunBenchmark(b, context.Background(), eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context { return ctx },
 		AEnd:   func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context { return ctx },
@@ -88,22 +87,22 @@ func stdlibWriter(w io.Writer) context.Context {
 	return context.WithValue(context.Background(), writerKey{},
 		func(msg string, args ...interface{}) {
 			fmt.Fprintf(w, "time=%q level=info msg=%q\n",
-				now().Format(bench.TimeFormat),
+				now().Format(eventtest.TimeFormat),
 				fmt.Sprintf(msg, args...))
 		},
 	)
 }
 
 func BenchmarkStdlibLogfDiscard(b *testing.B) {
-	bench.RunBenchmark(b, stdlibLogger(ioutil.Discard), stdlibLog)
+	eventtest.RunBenchmark(b, stdlibLogger(ioutil.Discard), stdlibLog)
 }
 
 func BenchmarkStdlibPrintfDiscard(b *testing.B) {
-	bench.RunBenchmark(b, stdlibWriter(io.Discard), stdlibPrintf)
+	eventtest.RunBenchmark(b, stdlibWriter(io.Discard), stdlibPrintf)
 }
 
 func TestLogStdlib(t *testing.T) {
-	bench.TestBenchmark(t, stdlibLoggerNoTime, stdlibLog, `
+	eventtest.TestBenchmark(t, stdlibLoggerNoTime, stdlibLog, `
 a where A=0
 b where B="A value"
 a where A=1
@@ -124,5 +123,5 @@ b where B="A value"
 }
 
 func TestLogPrintf(t *testing.T) {
-	bench.TestBenchmark(t, stdlibWriter, stdlibPrintf, bench.LogfOutput)
+	eventtest.TestBenchmark(t, stdlibWriter, stdlibPrintf, eventtest.LogfOutput)
 }
