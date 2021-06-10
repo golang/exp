@@ -9,71 +9,85 @@ import (
 	"time"
 )
 
+// A Metric represents a kind of recorded measurement.
 type Metric interface {
-	Descriptor() MetricDescriptor
+	Descriptor() *MetricDescriptor
 }
 
+// A MetricDescriptor describes a metric.
 type MetricDescriptor struct {
 	namespace   string
 	name        string
 	Description string
-	// For unit, follow otel, or define Go types for common units? We don't need
-	// a time unit because we'll use time.Duration, and the only other unit otel
-	// currently defines (besides dimensionless) is bytes.
+	// TODO: deal with units. Follow otel, or define Go types for common units.
+	// We don't need a time unit because we'll use time.Duration, and the only
+	// other unit otel currently defines (besides dimensionless) is bytes.
 }
 
-// TODO: how to force a non-empty namespace?
+// NewMetricDescriptor creates a MetricDescriptor with the given name.
+// The namespace defaults to the import path of the caller of NewMetricDescriptor.
+// Use SetNamespace to provide a different one.
+// Neither the name nor the namespace can be empty.
+func NewMetricDescriptor(name string) *MetricDescriptor {
+	return newMetricDescriptor(name)
+}
 
-func NewMetricDescriptor(name string) MetricDescriptor {
+func newMetricDescriptor(name string) *MetricDescriptor {
 	if name == "" {
 		panic("name cannot be empty")
 	}
-	m := MetricDescriptor{name: name}
-	// TODO: make this work right whether called from in this package or externally.
-	// Set namespace to the caller's import path.
-	// Depth:
-	//   0  runtime.Callers
-	//   1  importPath
-	//   2  this function
-	//   3  caller of this function (one of the NewXXX methods in this package)
-	//   4  caller's caller
-	m.namespace = importPath(4, nil)
-	return m
+	return &MetricDescriptor{
+		name: name,
+		// Set namespace to the caller's import path.
+		// Depth:
+		//   0  runtime.Callers
+		//   1  importPath
+		//   2  this function
+		//   3  caller of this function (one of the NewXXX methods in this package)
+		//   4  caller's caller
+		namespace: importPath(4, nil),
+	}
+}
+
+// SetNamespace sets the namespace of m to a non-empty string.
+func (m *MetricDescriptor) SetNamespace(ns string) {
+	if ns == "" {
+		panic("namespace cannot be empty")
+	}
+	m.namespace = ns
 }
 
 func (m *MetricDescriptor) String() string {
 	return fmt.Sprintf("Metric(\"%s/%s\")", m.namespace, m.name)
 }
 
-func (m *MetricDescriptor) WithNamespace(ns string) *MetricDescriptor {
-	if ns == "" {
-		panic("namespace cannot be empty")
-	}
-	m.namespace = ns
-	return m
-}
+func (m *MetricDescriptor) Name() string      { return m.name }
+func (m *MetricDescriptor) Namespace() string { return m.namespace }
 
-func (m MetricDescriptor) Name() string      { return m.name }
-func (m MetricDescriptor) Namespace() string { return m.namespace }
-
-// A counter is a metric that counts something cumulatively.
-type Counter struct {
-	MetricDescriptor
-}
-
-func NewCounter(name string) *Counter {
-	return &Counter{NewMetricDescriptor(name)}
-}
-
-func (c *Counter) Descriptor() MetricDescriptor {
-	return c.MetricDescriptor
-}
-
+// A MetricValue is a pair of a Metric and a Value.
 type MetricValue struct {
 	m Metric
 	v Value
 }
 
+// A Counter is a metric that counts something cumulatively.
+type Counter struct {
+	*MetricDescriptor
+}
+
+// NewCounter creates a counter with the given name.
+func NewCounter(name string) *Counter {
+	return &Counter{newMetricDescriptor(name)}
+}
+
+// Descriptor returns the receiver's MetricDescriptor.
+func (c *Counter) Descriptor() *MetricDescriptor {
+	return c.MetricDescriptor
+}
+
+// Record converts its argument into a Value and returns a MetricValue with the
+// receiver and the value. It is intended to be used as an argument to
+// Builder.Metric.
 func (c *Counter) Record(v uint64) MetricValue {
 	return MetricValue{c, Uint64Of(v)}
 }
@@ -81,17 +95,22 @@ func (c *Counter) Record(v uint64) MetricValue {
 // A FloatGauge records a single floating-point value that may go up or down.
 // TODO(generics): Gauge[T]
 type FloatGauge struct {
-	MetricDescriptor
+	*MetricDescriptor
 }
 
+// NewFloatGauge creates a new FloatGauge with the given name.
 func NewFloatGauge(name string) *FloatGauge {
-	return &FloatGauge{NewMetricDescriptor(name)}
+	return &FloatGauge{newMetricDescriptor(name)}
 }
 
-func (g *FloatGauge) Descriptor() MetricDescriptor {
+// Descriptor returns the receiver's MetricDescriptor.
+func (g *FloatGauge) Descriptor() *MetricDescriptor {
 	return g.MetricDescriptor
 }
 
+// Record converts its argument into a Value and returns a MetricValue with the
+// receiver and the value. It is intended to be used as an argument to
+// Builder.Metric.
 func (g *FloatGauge) Record(v float64) MetricValue {
 	return MetricValue{g, Float64Of(v)}
 }
@@ -99,17 +118,22 @@ func (g *FloatGauge) Record(v float64) MetricValue {
 // A Duration records a distribution of durations.
 // TODO(generics): Distribution[T]
 type Duration struct {
-	MetricDescriptor
+	*MetricDescriptor
 }
 
+// NewDuration creates a new Duration with the given name.
 func NewDuration(name string) *Duration {
-	return &Duration{NewMetricDescriptor(name)}
+	return &Duration{newMetricDescriptor(name)}
 }
 
-func (d *Duration) Descriptor() MetricDescriptor {
+// Descriptor returns the receiver's MetricDescriptor.
+func (d *Duration) Descriptor() *MetricDescriptor {
 	return d.MetricDescriptor
 }
 
+// Record converts its argument into a Value and returns a MetricValue with the
+// receiver and the value. It is intended to be used as an argument to
+// Builder.Metric.
 func (d *Duration) Record(v time.Duration) MetricValue {
 	return MetricValue{d, DurationOf(v)}
 }
