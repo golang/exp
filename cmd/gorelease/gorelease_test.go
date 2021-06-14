@@ -269,102 +269,104 @@ func TestRelease(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	for _, test := range tests {
-		test := test
 		testName := strings.TrimSuffix(strings.TrimPrefix(filepath.ToSlash(test.testPath), "testdata/"), ".test")
-		t.Run(testName, func(t *testing.T) {
-			ctx := defaultContext
+		t.Run(testName, testRelease(defaultContext, tests, test))
+	}
+}
 
-			if test.skip != "" {
-				t.Skip(test.skip)
+func testRelease(ctx context.Context, tests []*test, test *test) func(t *testing.T) {
+	return func(t *testing.T) {
+		if test.skip != "" {
+			t.Skip(test.skip)
+		}
+
+		t.Parallel()
+
+		if len(test.proxyVersions) > 0 {
+			var cleanup func()
+			var err error
+			ctx, cleanup, err = prepareProxy(test.proxyVersions, tests)
+			if err != nil {
+				t.Fatalf("preparing test proxy: %v", err)
 			}
+			t.Cleanup(cleanup)
+		}
 
-			t.Parallel()
+		// Extract the files in the release version. They may be part of the
+		// test archive or in testdata/mod.
+		testDir, err := ioutil.TempDir("", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if *testwork {
+			fmt.Fprintf(os.Stderr, "test dir: %s\n", testDir)
+		} else {
+			t.Cleanup(func() {
+				os.RemoveAll(testDir)
+			})
+		}
 
-			if len(test.proxyVersions) > 0 {
-				var cleanup func()
-				ctx, cleanup, err = prepareProxy(test.proxyVersions, tests)
-				if err != nil {
-					t.Fatalf("preparing test proxy: %v", err)
-				}
-				t.Cleanup(cleanup)
-			}
-
-			// Extract the files in the release version. They may be part of the
-			// test archive or in testdata/mod.
-			testDir, err := ioutil.TempDir("", "")
+		var arc *txtar.Archive
+		if test.version != "" {
+			arcBase := fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(test.modPath, "/", "_"), test.version)
+			arcPath := filepath.Join("testdata/mod", arcBase)
+			var err error
+			arc, err = txtar.ParseFile(arcPath)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if *testwork {
-				fmt.Fprintf(os.Stderr, "test dir: %s\n", testDir)
-			} else {
-				t.Cleanup(func() {
-					os.RemoveAll(testDir)
-				})
-			}
+		} else {
+			arc = &test.Archive
+		}
+		if err := extractTxtar(testDir, arc); err != nil {
+			t.Fatal(err)
+		}
 
-			var arc *txtar.Archive
-			if test.version != "" {
-				arcBase := fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(test.modPath, "/", "_"), test.version)
-				arcPath := filepath.Join("testdata/mod", arcBase)
-				var err error
-				arc, err = txtar.ParseFile(arcPath)
-				if err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				arc = &test.Archive
+		// Generate the report and compare it against the expected text.
+		var args []string
+		if test.baseVersion != "" {
+			args = append(args, "-base="+test.baseVersion)
+		}
+		if test.releaseVersion != "" {
+			args = append(args, "-version="+test.releaseVersion)
+		}
+		buf := &bytes.Buffer{}
+		releaseDir := filepath.Join(testDir, test.dir)
+		success, err := runRelease(ctx, buf, releaseDir, args)
+		if err != nil {
+			if !test.wantError {
+				t.Fatalf("unexpected error: %v", err)
 			}
-			if err := extractTxtar(testDir, arc); err != nil {
-				t.Fatal(err)
-			}
-
-			// Generate the report and compare it against the expected text.
-			var args []string
-			if test.baseVersion != "" {
-				args = append(args, "-base="+test.baseVersion)
-			}
-			if test.releaseVersion != "" {
-				args = append(args, "-version="+test.releaseVersion)
-			}
-			buf := &bytes.Buffer{}
-			releaseDir := filepath.Join(testDir, test.dir)
-			success, err := runRelease(ctx, buf, releaseDir, args)
-			if err != nil {
-				if !test.wantError {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if errMsg := []byte(err.Error()); !bytes.Equal(errMsg, bytes.TrimSpace(test.want)) {
-					if *updateGolden {
-						if err := updateTest(test, errMsg); err != nil {
-							t.Fatal(err)
-						}
-					} else {
-						t.Fatalf("got error: %s; want error: %s", errMsg, test.want)
-					}
-				}
-				return
-			}
-			if test.wantError {
-				t.Fatalf("got success; want error %s", test.want)
-			}
-
-			got := bytes.TrimSpace(buf.Bytes())
-			if filepath.Separator != '/' {
-				got = bytes.ReplaceAll(got, []byte{filepath.Separator}, []byte{'/'})
-			}
-			if !bytes.Equal(got, test.want) {
+			if errMsg := []byte(err.Error()); !bytes.Equal(errMsg, bytes.TrimSpace(test.want)) {
 				if *updateGolden {
-					if err := updateTest(test, got); err != nil {
+					if err := updateTest(test, errMsg); err != nil {
 						t.Fatal(err)
 					}
 				} else {
-					t.Fatalf("got:\n%s\n\nwant:\n%s", got, test.want)
+					t.Fatalf("got error: %s; want error: %s", errMsg, test.want)
 				}
 			}
-			if success != test.wantSuccess {
-				t.Fatalf("got success: %v; want success %v", success, test.wantSuccess)
+			return
+		}
+		if test.wantError {
+			t.Fatalf("got success; want error %s", test.want)
+		}
+
+		got := bytes.TrimSpace(buf.Bytes())
+		if filepath.Separator != '/' {
+			got = bytes.ReplaceAll(got, []byte{filepath.Separator}, []byte{'/'})
+		}
+		if !bytes.Equal(got, test.want) {
+			if *updateGolden {
+				if err := updateTest(test, got); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				t.Fatalf("got:\n%s\n\nwant:\n%s", got, test.want)
 			}
-		})
+		}
+		if success != test.wantSuccess {
+			t.Fatalf("got success: %v; want success %v", success, test.wantSuccess)
+		}
 	}
 }

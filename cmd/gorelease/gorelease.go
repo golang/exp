@@ -634,9 +634,7 @@ func existingVersions(ctx context.Context, modPath, modRoot string) (versions []
 		Versions []string `json: "Versions"`
 	}
 	cmd := exec.CommandContext(ctx, "go", "list", "-json", "-m", "-versions", modPath)
-	if env, ok := ctx.Value("env").([]string); ok {
-		cmd.Env = env
-	}
+	cmd.Env = copyEnv(ctx, cmd.Env)
 	cmd.Dir = modRoot
 	out, err := cmd.Output()
 	if err != nil {
@@ -763,9 +761,7 @@ func queryVersion(ctx context.Context, modPath, query string) (resolved string, 
 	}()
 	arg := modPath + "@" + query
 	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", "--", arg)
-	if env, ok := ctx.Value("env").([]string); ok {
-		cmd.Env = env
-	}
+	cmd.Env = copyEnv(ctx, cmd.Env)
 	cmd.Dir = tmpDir
 	cmd.Env = append(cmd.Env, "GO111MODULE=on")
 	out, err := cmd.Output()
@@ -795,9 +791,7 @@ func loadVersions(ctx context.Context, modPath string) (versions []string, err e
 		}
 	}()
 	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-versions", "--", modPath)
-	if env, ok := ctx.Value("env").([]string); ok {
-		cmd.Env = env
-	}
+	cmd.Env = copyEnv(ctx, cmd.Env)
 	cmd.Dir = tmpDir
 	cmd.Env = append(cmd.Env, "GO111MODULE=on")
 	out, err := cmd.Output()
@@ -922,9 +916,7 @@ func downloadModule(ctx context.Context, m module.Version) (modRoot, goModPath s
 	}
 	defer os.Remove(tmpDir)
 	cmd := exec.CommandContext(ctx, "go", "mod", "download", "-json", "--", m.Path+"@"+m.Version)
-	if env, ok := ctx.Value("env").([]string); ok {
-		cmd.Env = env
-	}
+	cmd.Env = copyEnv(ctx, cmd.Env)
 	cmd.Dir = tmpDir
 	out, err := cmd.Output()
 	var xerr *exec.ExitError
@@ -1063,9 +1055,7 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 
 	// Add missing requirements.
 	cmd := exec.CommandContext(ctx, "go", "get", "-d", ".")
-	if env, ok := ctx.Value("env").([]string); ok {
-		cmd.Env = env
-	}
+	cmd.Env = copyEnv(ctx, cmd.Env)
 	cmd.Dir = dir
 	if _, err := cmd.Output(); err != nil {
 		return "", nil, nil, nil, nil, fmt.Errorf("looking for missing dependencies: %w", cleanCmdError(err))
@@ -1269,9 +1259,7 @@ func loadPackages(ctx context.Context, modPath, modRoot, loadDir string, goModDa
 		Dir:     loadDir,
 		Context: ctx,
 	}
-	if env, ok := ctx.Value("env").([]string); ok {
-		cfg.Env = env
-	}
+	cfg.Env = copyEnv(ctx, cfg.Env)
 	if len(pkgPaths) > 0 {
 		pkgs, err = packages.Load(cfg, pkgPaths...)
 		if err != nil {
@@ -1353,13 +1341,21 @@ func findSelectedVersion(ctx context.Context, modDir, modPath string) (latestVer
 	}()
 
 	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", "--", modPath)
-	if env, ok := ctx.Value("env").([]string); ok {
-		cmd.Env = env
-	}
+	cmd.Env = copyEnv(ctx, cmd.Env)
 	cmd.Dir = modDir
 	out, err := cmd.Output()
 	if err != nil {
 		return "", cleanCmdError(err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func copyEnv(ctx context.Context, current []string) []string {
+	env, ok := ctx.Value("env").([]string)
+	if !ok {
+		return current
+	}
+	clone := make([]string, len(env))
+	copy(clone, env)
+	return clone
 }
