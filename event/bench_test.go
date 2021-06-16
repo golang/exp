@@ -97,6 +97,12 @@ func eventPrint(w io.Writer) context.Context {
 	return event.WithExporter(context.Background(), event.NewExporter(logfmt.NewHandler(w), eventtest.ExporterOptions()))
 }
 
+func eventPrintSource(w io.Writer) context.Context {
+	opts := eventtest.ExporterOptions()
+	opts.EnableNamespaces = true
+	return event.WithExporter(context.Background(), event.NewExporter(logfmt.NewHandler(w), opts))
+}
+
 func BenchmarkEventLogNoExporter(b *testing.B) {
 	eventtest.RunBenchmark(b, eventNoExporter(), eventLog)
 }
@@ -107,6 +113,10 @@ func BenchmarkEventLogNoop(b *testing.B) {
 
 func BenchmarkEventLogDiscard(b *testing.B) {
 	eventtest.RunBenchmark(b, eventPrint(io.Discard), eventLog)
+}
+
+func BenchmarkEventLogSourceDiscard(b *testing.B) {
+	eventtest.RunBenchmark(b, eventPrintSource(io.Discard), eventLog)
 }
 
 func BenchmarkEventLogfDiscard(b *testing.B) {
