@@ -8,8 +8,6 @@ package event
 
 import (
 	"context"
-	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,10 +18,10 @@ import (
 type Exporter struct {
 	opts ExporterOptions
 
-	mu            sync.Mutex
-	handler       Handler
-	lastEvent     uint64
-	pcToNamespace map[uintptr]string
+	mu        sync.Mutex
+	handler   Handler
+	lastEvent uint64
+	sources   sources
 }
 
 type ExporterOptions struct {
@@ -64,7 +62,10 @@ func NewExporter(handler Handler, opts *ExporterOptions) *Exporter {
 	if handler == nil {
 		panic("handler must not be nil")
 	}
-	e := &Exporter{handler: handler}
+	e := &Exporter{
+		handler: handler,
+		sources: newCallers(),
+	}
 	if opts != nil {
 		e.opts = *opts
 	}
@@ -106,17 +107,7 @@ func (e *Exporter) prepare(ev *Event) {
 		ev.At = e.opts.Now()
 	}
 	if e.opts.EnableNamespaces && ev.Namespace == "" {
-		// Get the pc of the user function that delivered the event.
-		// This is sensitive to the call stack.
-		// 0: runtime.Callers
-		// 1: importPath
-		// 2: Exporter.prepare (this function)
-		// 3: Builder.{Start,End,etc.}
-		// 4: user function
-		if e.pcToNamespace == nil {
-			e.pcToNamespace = map[uintptr]string{}
-		}
-		ev.Namespace = importPath(4, e.pcToNamespace)
+		ev.Namespace = e.sources.scanStack().Space
 	}
 }
 
@@ -124,42 +115,3 @@ func (e *Exporter) loggingEnabled() bool     { return !e.opts.DisableLogging }
 func (e *Exporter) annotationsEnabled() bool { return !e.opts.DisableAnnotations }
 func (e *Exporter) tracingEnabled() bool     { return !e.opts.DisableTracing }
 func (e *Exporter) metricsEnabled() bool     { return !e.opts.DisableMetrics }
-
-func importPath(depth int, cache map[uintptr]string) string {
-	var pcs [1]uintptr
-	runtime.Callers(depth, pcs[:])
-	pc := pcs[0]
-	ns, ok := cache[pc]
-	if !ok {
-		// If we call runtime.CallersFrames(pcs[:1]) in this function, the
-		// compiler will think the pcs array escapes and will allocate.
-		f := callerFrameFunction(pc)
-		ns = namespace(f)
-		if cache != nil {
-			cache[pc] = ns
-		}
-	}
-	return ns
-}
-
-func callerFrameFunction(pc uintptr) string {
-	frame, _ := runtime.CallersFrames([]uintptr{pc}).Next()
-	return frame.Function
-}
-
-func namespace(funcPath string) string {
-	// Function is the fully-qualified function name. The name itself may
-	// have dots (for a closure, for instance), but it can't have slashes.
-	// So the package path ends at the first dot after the last slash.
-	i := strings.LastIndexByte(funcPath, '/')
-	if i < 0 {
-		i = 0
-	}
-	end := strings.IndexByte(funcPath[i:], '.')
-	if end >= 0 {
-		end += i
-	} else {
-		end = len(funcPath)
-	}
-	return funcPath[:end]
-}

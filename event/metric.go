@@ -38,14 +38,8 @@ func newMetricDescriptor(name, description string) *MetricDescriptor {
 	}
 	return &MetricDescriptor{
 		name: name,
-		// Set namespace to the caller's import path.
-		// Depth:
-		//   0  runtime.Callers
-		//   1  importPath
-		//   2  this function
-		//   3  caller of this function (one of the NewXXX methods in this package)
-		//   4  caller's caller
-		namespace:   importPath(4, nil),
+		// TODO: use the global callers, will also need a lock
+		namespace:   scanStack().Space,
 		description: description,
 	}
 }

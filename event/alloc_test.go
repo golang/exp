@@ -20,7 +20,7 @@ func TestAllocs(t *testing.T) {
 	anInt := event.Label{Name: "int", Value: event.Int64Of(4)}
 	aString := event.Label{Name: "string", Value: event.StringOf("value")}
 
-	e := event.NewExporter(logfmt.NewHandler(ioutil.Discard), nil)
+	e := event.NewExporter(logfmt.NewHandler(ioutil.Discard), &event.ExporterOptions{EnableNamespaces: true})
 	ctx := event.WithExporter(context.Background(), e)
 	allocs := int(testing.AllocsPerRun(5, func() {
 		event.To(ctx).With(aString).With(anInt).Log("message1")
