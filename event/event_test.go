@@ -77,17 +77,17 @@ time="2020/03/05 14:27:52" parent=1 end
 `}, {
 		name:   "counter",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric(counter.Record(2)) },
-		expect: `time="2020/03/05 14:27:48" l1=1 metricValue=2 metric=Metric("golang.org/x/exp/event_test/hits")`,
+		expect: `time="2020/03/05 14:27:48" in="golang.org/x/exp/event_test" l1=1 metricValue=2 metric="Metric(\"golang.org/x/exp/event_test/hits\")"`,
 	}, {
 		name:   "gauge",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Metric(gauge.Record(98.6)) },
-		expect: `time="2020/03/05 14:27:48" l1=1 metricValue=98.6 metric=Metric("golang.org/x/exp/event_test/temperature")`,
+		expect: `time="2020/03/05 14:27:48" in="golang.org/x/exp/event_test" l1=1 metricValue=98.6 metric="Metric(\"golang.org/x/exp/event_test/temperature\")"`,
 	}, {
 		name: "duration",
 		events: func(ctx context.Context) {
 			event.To(ctx).With(l1).With(l2).Metric(latency.Record(3 * time.Second))
 		},
-		expect: `time="2020/03/05 14:27:48" l1=1 l2=2 metricValue=3s metric=Metric("golang.org/x/exp/event_test/latency")`,
+		expect: `time="2020/03/05 14:27:48" in="golang.org/x/exp/event_test" l1=1 l2=2 metricValue=3s metric="Metric(\"golang.org/x/exp/event_test/latency\")"`,
 	}, {
 		name:   "annotate",
 		events: func(ctx context.Context) { event.To(ctx).With(l1).Annotate() },

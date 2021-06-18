@@ -5,6 +5,7 @@
 package logfmt
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -21,13 +22,16 @@ const bufCap = 50
 const TimeFormat = "2006/01/02 15:04:05"
 
 type Printer struct {
-	buf     [bufCap]byte
-	needSep bool
+	QuoteValues       bool
+	SuppressNamespace bool
+	buf               [bufCap]byte
+	needSep           bool
+	w                 bytes.Buffer
 }
 
 type Handler struct {
-	to      io.Writer
-	printer Printer
+	to io.Writer
+	Printer
 }
 
 // NewHandler returns a handler that prints the events to the supplied writer.
@@ -37,30 +41,34 @@ func NewHandler(to io.Writer) *Handler {
 }
 
 func (h *Handler) Log(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, ev)
+	h.Printer.Event(h.to, ev)
 }
 
 func (h *Handler) Metric(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, ev)
+	h.Printer.Event(h.to, ev)
 }
 
 func (h *Handler) Annotate(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, ev)
+	h.Printer.Event(h.to, ev)
 }
 
 func (h *Handler) Start(ctx context.Context, ev *event.Event) context.Context {
-	h.printer.Event(h.to, ev)
+	h.Printer.Event(h.to, ev)
 	return ctx
 }
 
 func (h *Handler) End(ctx context.Context, ev *event.Event) {
-	h.printer.Event(h.to, ev)
+	h.Printer.Event(h.to, ev)
 }
 
 func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	p.needSep = false
 	if !ev.At.IsZero() {
 		p.label(w, "time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], TimeFormat)))
+	}
+
+	if !p.SuppressNamespace && ev.Namespace != "" {
+		p.label(w, "in", event.StringOf(ev.Namespace))
 	}
 
 	if ev.Parent != 0 {
@@ -90,6 +98,10 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 		p.label(w, "end", event.Value{})
 	}
 
+	if ev.Error != nil {
+		p.label(w, "err", event.ValueOf(ev.Error))
+	}
+
 	io.WriteString(w, "\n")
 }
 
@@ -100,9 +112,19 @@ func (p *Printer) Label(w io.Writer, l event.Label) {
 func (p *Printer) Value(w io.Writer, v event.Value) {
 	switch {
 	case v.IsString():
-		p.Quote(w, v.String())
+		s := v.String()
+		if p.QuoteValues || stringNeedQuote(s) {
+			p.quoteString(w, s)
+		} else {
+			io.WriteString(w, s)
+		}
 	case v.IsBytes():
-		p.Bytes(w, v.Bytes())
+		buf := v.Bytes()
+		if p.QuoteValues || bytesNeedQuote(buf) {
+			p.quoteBytes(w, buf)
+		} else {
+			w.Write(buf)
+		}
 	case v.IsInt64():
 		w.Write(strconv.AppendInt(p.buf[:0], v.Int64(), 10))
 	case v.IsUint64():
@@ -116,19 +138,30 @@ func (p *Printer) Value(w io.Writer, v event.Value) {
 			io.WriteString(w, "false")
 		}
 	default:
-		fmt.Fprint(w, v.Interface())
+		if p.w.Cap() == 0 {
+			// we rely on the inliner to cause this to not allocate
+			p.w = *bytes.NewBuffer(p.buf[:0])
+		}
+		fmt.Fprint(&p.w, v.Interface())
+		b := p.w.Bytes()
+		p.w.Reset()
+		if p.QuoteValues || bytesNeedQuote(b) {
+			p.quoteBytes(w, b)
+		} else {
+			w.Write(b)
+		}
 	}
 }
 
 func (p *Printer) Ident(w io.Writer, s string) {
-	p.Quote(w, s)
-}
-
-func (p *Printer) Quote(w io.Writer, s string) {
 	if !stringNeedQuote(s) {
 		io.WriteString(w, s)
 		return
 	}
+	p.quoteString(w, s)
+}
+
+func (p *Printer) quoteString(w io.Writer, s string) {
 	io.WriteString(w, `"`)
 	written := 0
 	for offset, r := range s {
@@ -147,11 +180,7 @@ func (p *Printer) Quote(w io.Writer, s string) {
 }
 
 // Bytes writes a byte array in string form to the printer.
-func (p *Printer) Bytes(w io.Writer, buf []byte) {
-	if !bytesNeedQuote(buf) {
-		w.Write(buf)
-		return
-	}
+func (p *Printer) quoteBytes(w io.Writer, buf []byte) {
 	io.WriteString(w, `"`)
 	written := 0
 	for offset := 0; offset < len(buf); {
