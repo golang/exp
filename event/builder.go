@@ -97,12 +97,6 @@ func (b builderCommon) clone() builderCommon {
 	return clone
 }
 
-// With adds a new label to the event being constructed.
-func (b Builder) With(label Label) Builder {
-	b.addLabel(label)
-	return b
-}
-
 func (b Builder) Name(name string) Builder {
 	if b.data != nil {
 		b.data.Event.Name = name
@@ -119,27 +113,18 @@ func (b Builder) Error(err error) Builder {
 
 func (b builderCommon) addLabel(label Label) {
 	if b.data != nil {
-		b.data.Event.Labels = append(b.data.Event.Labels, label)
 		checkValid(b.data, b.builderID)
 	}
 }
 
-// WithAll adds all the supplied labels to the event being constructed.
-func (b Builder) WithAll(labels ...Label) Builder {
-	b.addLabels(labels)
-	return b
-}
-
-func (b builderCommon) addLabels(labels []Label) {
+// With adds all the supplied labels to the event being constructed.
+func (b Builder) With(labels ...Label) Builder {
 	if b.data == nil || len(labels) == 0 {
-		return
+		return b
 	}
 	checkValid(b.data, b.builderID)
-	if len(b.data.Event.Labels) == 0 {
-		b.data.Event.Labels = labels
-	} else {
-		b.data.Event.Labels = append(b.data.Event.Labels, labels...)
-	}
+	b.data.Event.Labels = append(b.data.Event.Labels, labels...)
+	return b
 }
 
 func (b Builder) At(t time.Time) Builder {
