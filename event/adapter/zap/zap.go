@@ -26,14 +26,14 @@ import (
 )
 
 type core struct {
-	ctx    context.Context
+	ev     *event.Event // cloned but never delivered
 	labels []event.Label
 }
 
 var _ zapcore.Core = (*core)(nil)
 
 func NewCore(ctx context.Context) zapcore.Core {
-	return &core{ctx: ctx}
+	return &core{ev: event.New(ctx, event.LogKind)}
 }
 
 func (c *core) Enabled(level zapcore.Level) bool {
@@ -53,15 +53,19 @@ func (c *core) With(fields []zapcore.Field) zapcore.Core {
 }
 
 func (c *core) Write(e zapcore.Entry, fs []zapcore.Field) error {
-	ev := event.New(c.ctx, event.LogKind)
+	if c.ev == nil {
+		return nil
+	}
+	ev := c.ev.Clone()
 	if ev == nil {
 		return nil
 	}
 	ev.At = e.Time
+	// TODO: Add labels more efficiently: compare cap(ev.Labels) to the total number to add,
+	// and allocate a []Label once.
 	ev.Labels = append(ev.Labels, c.labels...)
 	ev.Labels = append(ev.Labels, convertLevel(e.Level).Label())
 	ev.Labels = append(ev.Labels, event.String("name", e.LoggerName))
-	// TODO: add these additional labels more efficiently.
 	if e.Stack != "" {
 		ev.Labels = append(ev.Labels, event.String("stack", e.Stack))
 	}
@@ -89,8 +93,7 @@ func newLabel(f zap.Field) event.Label {
 		zapcore.ErrorType:
 		return event.Value(f.Key, f.Interface)
 	case zapcore.DurationType:
-		// TODO: avoid this allocation?
-		return event.Value(f.Key, time.Duration(f.Integer))
+		return event.Duration(f.Key, time.Duration(f.Integer))
 	case zapcore.Float64Type:
 		return event.Float64(f.Key, math.Float64frombits(uint64(f.Integer)))
 	case zapcore.Float32Type:

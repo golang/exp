@@ -95,16 +95,26 @@ func New(ctx context.Context, kind Kind) *Event {
 	return ev
 }
 
+// Clone makes a deep copy of the Event.
+// Deliver can be called on both Events independently.
+func (ev *Event) Clone() *Event {
+	ev2 := eventPool.Get().(*Event)
+	*ev2 = *ev
+	ev2.Labels = append(ev2.labels[:0], ev.Labels...)
+	return ev2
+}
+
 // Deliver the event to the exporter that was found in New.
 // This also returns the event to the pool, it is an error to do anything
 // with the event after it is delivered.
 func (ev *Event) Deliver() context.Context {
+	e := ev.target.exporter
 	// get the event ready to send
-	ev.target.exporter.prepare(ev)
+	e.prepare(ev)
 	// now hold the lock while we deliver the event
-	ev.target.exporter.mu.Lock()
-	defer ev.target.exporter.mu.Unlock()
-	ctx := ev.target.exporter.handler.Event(ev.ctx, ev)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	ctx := e.handler.Event(ev.ctx, ev)
 	eventPool.Put(ev)
 	return ctx
 }

@@ -14,7 +14,7 @@ import (
 )
 
 type logger struct {
-	ctx       context.Context
+	ev        *event.Event // cloned, never delivered
 	labels    []event.Label
 	nameSep   string
 	name      string
@@ -25,7 +25,7 @@ var _ logr.Logger = (*logger)(nil)
 
 func NewLogger(ctx context.Context, nameSep string) logr.Logger {
 	return &logger{
-		ctx:     ctx,
+		ev:      event.New(ctx, event.LogKind),
 		nameSep: nameSep,
 	}
 }
@@ -69,10 +69,10 @@ func (l *logger) Enabled() bool {
 // variable information.  The key/value pairs should alternate string
 // keys and arbitrary values.
 func (l *logger) Info(msg string, keysAndValues ...interface{}) {
-	ev := event.New(l.ctx, event.LogKind)
-	if ev != nil {
-		l.log(ev, msg, keysAndValues)
+	if l.ev == nil {
+		return
 	}
+	l.log(l.ev.Clone(), msg, keysAndValues)
 }
 
 // Error logs an error, with the given message and key/value pairs as context.
@@ -84,11 +84,12 @@ func (l *logger) Info(msg string, keysAndValues ...interface{}) {
 // while the err field should be used to attach the actual error that
 // triggered this log line, if present.
 func (l *logger) Error(err error, msg string, keysAndValues ...interface{}) {
-	ev := event.New(l.ctx, event.LogKind)
-	if ev != nil {
-		ev.Labels = append(ev.Labels, event.Value("error", err))
-		l.log(ev, msg, keysAndValues)
+	if l.ev == nil {
+		return
 	}
+	ev := l.ev.Clone()
+	ev.Labels = append(ev.Labels, event.Value("error", err))
+	l.log(ev, msg, keysAndValues)
 }
 
 func (l *logger) log(ev *event.Event, msg string, keysAndValues []interface{}) {
