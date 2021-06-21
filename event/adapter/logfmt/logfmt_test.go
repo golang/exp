@@ -37,7 +37,7 @@ func TestPrint(t *testing.T) {
 	}, {
 		name:   "namespace",
 		event:  event.Event{Namespace: "golang.org/x/exp/event"},
-		expect: `in="golang.org/x/exp/event"`,
+		expect: `in=golang.org/x/exp/event`,
 	}, {
 		name:   "at",
 		event:  event.Event{At: at},
@@ -177,7 +177,7 @@ func TestPrinterFlags(t *testing.T) {
 			Namespace: "golang.org/x/exp/event",
 			Labels:    []event.Label{event.String("msg", "some text")},
 		},
-		before: `in="golang.org/x/exp/event" msg="some text"`,
+		before: `in=golang.org/x/exp/event msg="some text"`,
 		after:  `msg="some text"`,
 	}} {
 		t.Run(test.name, func(t *testing.T) {

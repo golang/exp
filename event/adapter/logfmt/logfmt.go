@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"unicode"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/exp/event"
@@ -48,7 +48,10 @@ func (h *Handler) Event(ctx context.Context, ev *event.Event) context.Context {
 func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	p.needSep = false
 	if !ev.At.IsZero() {
-		p.Label(w, event.Bytes("time", ev.At.AppendFormat(p.buf[:0], TimeFormat)))
+		p.separator(w)
+		io.WriteString(w, `time="`)
+		p.time(w, ev.At)
+		io.WriteString(w, `"`)
 	}
 
 	if !p.SuppressNamespace && ev.Namespace != "" {
@@ -56,7 +59,9 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	}
 
 	if ev.Parent != 0 {
-		p.Label(w, event.Bytes("parent", strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
+		p.separator(w)
+		io.WriteString(w, `parent=`)
+		w.Write(strconv.AppendUint(p.buf[:0], ev.Parent, 10))
 	}
 	for _, l := range ev.Labels {
 		if l.Name == "" {
@@ -66,42 +71,39 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	}
 
 	if ev.TraceID != 0 {
-		p.Label(w, event.Uint64("trace", ev.TraceID))
+		p.separator(w)
+		io.WriteString(w, `trace=`)
+		w.Write(strconv.AppendUint(p.buf[:0], ev.TraceID, 10))
 	}
 
 	if ev.Kind == event.EndKind {
-		p.Label(w, event.Value("end", nil))
+		p.separator(w)
+		io.WriteString(w, `end`)
 	}
 
 	io.WriteString(w, "\n")
+}
+
+func (p *Printer) separator(w io.Writer) {
+	if p.needSep {
+		io.WriteString(w, " ")
+	}
+	p.needSep = true
 }
 
 func (p *Printer) Label(w io.Writer, l event.Label) {
 	if l.Name == "" {
 		return
 	}
-	if p.needSep {
-		io.WriteString(w, " ")
-	}
-	p.needSep = true
+	p.separator(w)
 	p.Ident(w, l.Name)
 	if l.HasValue() {
 		io.WriteString(w, "=")
 		switch {
 		case l.IsString():
-			s := l.String()
-			if p.QuoteValues || stringNeedQuote(s) {
-				p.quoteString(w, s)
-			} else {
-				io.WriteString(w, s)
-			}
+			p.string(w, l.String())
 		case l.IsBytes():
-			buf := l.Bytes()
-			if p.QuoteValues || bytesNeedQuote(buf) {
-				p.quoteBytes(w, buf)
-			} else {
-				w.Write(buf)
-			}
+			p.bytes(w, l.Bytes())
 		case l.IsInt64():
 			w.Write(strconv.AppendInt(p.buf[:0], l.Int64(), 10))
 		case l.IsUint64():
@@ -115,17 +117,21 @@ func (p *Printer) Label(w io.Writer, l event.Label) {
 				io.WriteString(w, "false")
 			}
 		default:
-			if p.w.Cap() == 0 {
-				// we rely on the inliner to cause this to not allocate
-				p.w = *bytes.NewBuffer(p.buf[:0])
-			}
-			fmt.Fprint(&p.w, l.Interface())
-			b := p.w.Bytes()
-			p.w.Reset()
-			if p.QuoteValues || bytesNeedQuote(b) {
-				p.quoteBytes(w, b)
-			} else {
-				w.Write(b)
+			v := l.Interface()
+			switch v := v.(type) {
+			case string:
+				p.string(w, v)
+			case fmt.Stringer:
+				p.string(w, v.String())
+			default:
+				if p.w.Cap() == 0 {
+					// we rely on the inliner to cause this to not allocate
+					p.w = *bytes.NewBuffer(p.buf[:0])
+				}
+				fmt.Fprint(&p.w, v)
+				b := p.w.Bytes()
+				p.w.Reset()
+				p.bytes(w, b)
 			}
 		}
 	}
@@ -137,6 +143,14 @@ func (p *Printer) Ident(w io.Writer, s string) {
 		return
 	}
 	p.quoteString(w, s)
+}
+
+func (p *Printer) string(w io.Writer, s string) {
+	if p.QuoteValues || stringNeedQuote(s) {
+		p.quoteString(w, s)
+	} else {
+		io.WriteString(w, s)
+	}
 }
 
 func (p *Printer) quoteString(w io.Writer, s string) {
@@ -155,6 +169,14 @@ func (p *Printer) quoteString(w io.Writer, s string) {
 	}
 	io.WriteString(w, s[written:])
 	io.WriteString(w, `"`)
+}
+
+func (p *Printer) bytes(w io.Writer, buf []byte) {
+	if p.QuoteValues || stringNeedQuote(string(buf)) {
+		p.quoteBytes(w, buf)
+	} else {
+		w.Write(buf)
+	}
 }
 
 // Bytes writes a byte array in string form to the printer.
@@ -178,31 +200,42 @@ func (p *Printer) quoteBytes(w io.Writer, buf []byte) {
 	io.WriteString(w, `"`)
 }
 
+// time writes a timstamp in the same format as
+func (p *Printer) time(w io.Writer, t time.Time) {
+	year, month, day := t.Date()
+	hour, minute, second := t.Clock()
+	p.padInt(w, int64(year), 4)
+	io.WriteString(w, `/`)
+	p.padInt(w, int64(month), 2)
+	io.WriteString(w, `/`)
+	p.padInt(w, int64(day), 2)
+	io.WriteString(w, ` `)
+	p.padInt(w, int64(hour), 2)
+	io.WriteString(w, `:`)
+	p.padInt(w, int64(minute), 2)
+	io.WriteString(w, `:`)
+	p.padInt(w, int64(second), 2)
+}
+
+func (p *Printer) padInt(w io.Writer, v int64, width int) {
+	b := strconv.AppendInt(p.buf[:0], int64(v), 10)
+	if len(b) < width {
+		io.WriteString(w, "0000"[:width-len(b)])
+	}
+	w.Write(b)
+}
+
 func stringNeedQuote(s string) bool {
 	if len(s) == 0 {
 		return true
 	}
-	for _, r := range s {
-		if runeForcesQuote(r) {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= utf8.RuneSelf || c == ' ' || c == '"' || c == '\n' || c == '\\' {
 			return true
 		}
 	}
 	return false
-}
-
-func bytesNeedQuote(buf []byte) bool {
-	for offset := 0; offset < len(buf); {
-		r, size := utf8.DecodeRune(buf[offset:])
-		offset += size
-		if runeForcesQuote(r) {
-			return true
-		}
-	}
-	return false
-}
-
-func runeForcesQuote(r rune) bool {
-	return !unicode.IsLetter(r) && !unicode.IsNumber(r)
 }
 
 func quoteRune(r rune) string {
