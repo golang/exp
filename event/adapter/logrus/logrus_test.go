@@ -16,7 +16,6 @@ import (
 	"golang.org/x/exp/event"
 	elogrus "golang.org/x/exp/event/adapter/logrus"
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )
 
@@ -29,12 +28,12 @@ func Test(t *testing.T) {
 	log.WithContext(ctx).WithField("traceID", 17).WithField("resource", "R").Info("mess")
 
 	want := []event.Event{{
-		Kind:    event.LogKind,
-		Message: "mess",
+		Kind: event.LogKind,
 		Labels: []event.Label{
 			severity.Info.Label(),
-			keys.Value("traceID").Of(17),
-			keys.Value("resource").Of("R"),
+			event.Value("traceID", 17),
+			event.Value("resource", "R"),
+			event.String("msg", "mess"),
 		},
 	}}
 	// logrus fields are stored in a map, so we have to sort to overcome map

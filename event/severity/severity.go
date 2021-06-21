@@ -55,7 +55,7 @@ func (l Level) Log(ctx context.Context, msg string, labels ...event.Label) {
 	if ev != nil {
 		ev.Labels = append(ev.Labels, l.Label())
 		ev.Labels = append(ev.Labels, labels...)
-		ev.Message = msg
+		ev.Labels = append(ev.Labels, event.String("msg", msg))
 		ev.Deliver()
 	}
 }
@@ -64,7 +64,7 @@ func (l Level) Logf(ctx context.Context, msg string, args ...interface{}) {
 	ev := event.New(ctx, event.LogKind)
 	if ev != nil {
 		ev.Labels = append(ev.Labels, l.Label())
-		ev.Message = fmt.Sprintf(msg, args...)
+		ev.Labels = append(ev.Labels, event.String("msg", fmt.Sprintf(msg, args...)))
 		ev.Deliver()
 	}
 }

@@ -24,8 +24,8 @@ type spanKey struct{}
 func (t *TraceHandler) Event(ctx context.Context, ev *event.Event) context.Context {
 	switch ev.Kind {
 	case event.StartKind:
-		opts := labelsToSpanOptions(ev.Labels)
-		octx, span := t.tracer.Start(ctx, ev.Name, opts...)
+		name, opts := labelsToSpanOptions(ev.Labels)
+		octx, span := t.tracer.Start(ctx, name, opts...)
 		return context.WithValue(octx, spanKey{}, span)
 	case event.EndKind:
 		span, ok := ctx.Value(spanKey{}).(trace.Span)
@@ -39,8 +39,9 @@ func (t *TraceHandler) Event(ctx context.Context, ev *event.Event) context.Conte
 	}
 }
 
-func labelsToSpanOptions(ls []event.Label) []trace.SpanOption {
+func labelsToSpanOptions(ls []event.Label) (string, []trace.SpanOption) {
 	var opts []trace.SpanOption
+	var name string
 	for _, l := range ls {
 		switch l.Name {
 		case "link":
@@ -49,7 +50,9 @@ func labelsToSpanOptions(ls []event.Label) []trace.SpanOption {
 			opts = append(opts, trace.WithNewRoot())
 		case "spanKind":
 			opts = append(opts, trace.WithSpanKind(l.Interface().(trace.SpanKind)))
+		case "name":
+			name = l.String()
 		}
 	}
-	return opts
+	return name, opts
 }

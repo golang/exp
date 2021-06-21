@@ -36,7 +36,7 @@ func Log(ctx context.Context, msg string, labels ...Label) {
 	ev := New(ctx, LogKind)
 	if ev != nil {
 		ev.Labels = append(ev.Labels, labels...)
-		ev.Message = msg
+		ev.Labels = append(ev.Labels, String("msg", msg))
 		ev.Deliver()
 	}
 }
@@ -44,7 +44,7 @@ func Log(ctx context.Context, msg string, labels ...Label) {
 func Logf(ctx context.Context, msg string, args ...interface{}) {
 	ev := New(ctx, LogKind)
 	if ev != nil {
-		ev.Message = fmt.Sprintf(msg, args...)
+		ev.Labels = append(ev.Labels, String("msg", fmt.Sprintf(msg, args...)))
 		ev.Deliver()
 	}
 }
@@ -60,8 +60,8 @@ func Annotate(ctx context.Context, labels ...Label) {
 func Start(ctx context.Context, name string, labels ...Label) context.Context {
 	ev := New(ctx, StartKind)
 	if ev != nil {
+		ev.Labels = append(ev.Labels, String("name", name))
 		ev.Labels = append(ev.Labels, labels...)
-		ev.Name = name
 		ev.TraceID = atomic.AddUint64(&ev.target.exporter.lastEvent, 1)
 		ev.target.exporter.prepare(ev)
 		ev.ctx = newContext(ev.ctx, ev.target.exporter, ev.TraceID, ev.At)

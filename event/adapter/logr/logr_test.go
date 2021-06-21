@@ -13,7 +13,6 @@ import (
 	"golang.org/x/exp/event"
 	elogr "golang.org/x/exp/event/adapter/logr"
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )
 
@@ -23,14 +22,14 @@ func TestInfo(t *testing.T) {
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := []event.Event{{
-		At:      eventtest.InitialTime,
-		Kind:    event.LogKind,
-		Message: "mess",
-		Name:    "n/m",
+		At:   eventtest.InitialTime,
+		Kind: event.LogKind,
 		Labels: []event.Label{
 			severity.Debug.Label(),
-			keys.Value("traceID").Of(17),
-			keys.Value("resource").Of("R"),
+			event.Value("traceID", 17),
+			event.Value("resource", "R"),
+			event.String("name", "n/m"),
+			event.String("msg", "mess"),
 		},
 	}}
 	if diff := cmp.Diff(want, th.Got, eventtest.CmpOption()); diff != "" {

@@ -69,20 +69,8 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 		p.Label(w, event.Uint64("trace", ev.TraceID))
 	}
 
-	if ev.Message != "" {
-		p.Label(w, event.String("msg", ev.Message))
-	}
-
-	if ev.Name != "" {
-		p.Label(w, event.String("name", ev.Name))
-	}
-
 	if ev.Kind == event.EndKind {
 		p.Label(w, event.Value("end", nil))
-	}
-
-	if ev.Error != nil {
-		p.Label(w, event.Value("err", ev.Error))
 	}
 
 	io.WriteString(w, "\n")

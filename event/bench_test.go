@@ -12,26 +12,18 @@ import (
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/logfmt"
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )
 
 var (
-	aValue  = keys.Int(eventtest.A.Name)
-	bValue  = keys.String(eventtest.B.Name)
-	aCount  = keys.Int64("aCount")
-	aStat   = keys.Int("aValue")
-	bCount  = keys.Int64("B")
-	bLength = keys.Int("BLen")
-
 	eventLog = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			severity.Info.Log(ctx, eventtest.A.Msg, aValue.Of(a))
+			severity.Info.Log(ctx, eventtest.A.Msg, event.Int64(eventtest.A.Name, int64(a)))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			severity.Info.Log(ctx, eventtest.B.Msg, bValue.Of(b))
+			severity.Info.Log(ctx, eventtest.B.Msg, event.String(eventtest.B.Name, b))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},
@@ -52,14 +44,14 @@ var (
 
 	eventTrace = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			ctx = event.Start(ctx, eventtest.A.Msg, aValue.Of(a))
+			ctx = event.Start(ctx, eventtest.A.Msg, event.Int64(eventtest.A.Name, int64(a)))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {
 			event.End(ctx)
 		},
 		BStart: func(ctx context.Context, b string) context.Context {
-			ctx = event.Start(ctx, eventtest.B.Msg, bValue.Of(b))
+			ctx = event.Start(ctx, eventtest.B.Msg, event.String(eventtest.B.Name, b))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {
@@ -69,14 +61,14 @@ var (
 
 	eventMetric = eventtest.Hooks{
 		AStart: func(ctx context.Context, a int) context.Context {
-			gauge.Record(ctx, 1, aStat.Of(a))
-			gauge.Record(ctx, 1, aCount.Of(1))
+			gauge.Record(ctx, 1, event.Int64("aValue", int64(a)))
+			gauge.Record(ctx, 1, event.Int64("aCount", 1))
 			return ctx
 		},
 		AEnd: func(ctx context.Context) {},
 		BStart: func(ctx context.Context, b string) context.Context {
-			gauge.Record(ctx, 1, bLength.Of(len(b)))
-			gauge.Record(ctx, 1, bCount.Of(1))
+			gauge.Record(ctx, 1, event.Int64("BLen", int64(len(b))))
+			gauge.Record(ctx, 1, event.Int64("B", 1))
 			return ctx
 		},
 		BEnd: func(ctx context.Context) {},

@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )
 
@@ -87,7 +86,7 @@ func (l *logger) Info(msg string, keysAndValues ...interface{}) {
 func (l *logger) Error(err error, msg string, keysAndValues ...interface{}) {
 	ev := event.New(l.ctx, event.LogKind)
 	if ev != nil {
-		ev.Labels = append(ev.Labels, keys.Value("error").Of(err))
+		ev.Labels = append(ev.Labels, event.Value("error", err))
 		l.log(ev, msg, keysAndValues)
 	}
 }
@@ -98,8 +97,10 @@ func (l *logger) log(ev *event.Event, msg string, keysAndValues []interface{}) {
 	for i := 0; i < len(keysAndValues); i += 2 {
 		ev.Labels = append(ev.Labels, newLabel(keysAndValues[i], keysAndValues[i+1]))
 	}
-	ev.Name = l.name
-	ev.Message = msg
+	ev.Labels = append(ev.Labels,
+		event.String("name", l.name),
+		event.String("msg", msg),
+	)
 	ev.Deliver()
 }
 
@@ -118,7 +119,7 @@ func (l *logger) WithValues(keysAndValues ...interface{}) logr.Logger {
 }
 
 func newLabel(key, value interface{}) event.Label {
-	return keys.Value(key.(string)).Of(value)
+	return event.Value(key.(string), value)
 }
 
 func convertVerbosity(v int) severity.Level {

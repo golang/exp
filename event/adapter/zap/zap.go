@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )
 
@@ -61,18 +60,18 @@ func (c *core) Write(e zapcore.Entry, fs []zapcore.Field) error {
 	ev.At = e.Time
 	ev.Labels = append(ev.Labels, c.labels...)
 	ev.Labels = append(ev.Labels, convertLevel(e.Level).Label())
-	ev.Name = e.LoggerName
+	ev.Labels = append(ev.Labels, event.String("name", e.LoggerName))
 	// TODO: add these additional labels more efficiently.
 	if e.Stack != "" {
-		ev.Labels = append(ev.Labels, keys.String("stack").Of(e.Stack))
+		ev.Labels = append(ev.Labels, event.String("stack", e.Stack))
 	}
 	if e.Caller.Defined {
-		ev.Labels = append(ev.Labels, keys.String("caller").Of(e.Caller.String()))
+		ev.Labels = append(ev.Labels, event.String("caller", e.Caller.String()))
 	}
 	for _, f := range fs {
 		ev.Labels = append(ev.Labels, newLabel(f))
 	}
-	ev.Message = e.Message
+	ev.Labels = append(ev.Labels, event.String("msg", e.Message))
 	ev.Deliver()
 	return nil
 }
@@ -88,39 +87,38 @@ func newLabel(f zap.Field) event.Label {
 	case zapcore.ArrayMarshalerType, zapcore.ObjectMarshalerType, zapcore.BinaryType, zapcore.ByteStringType,
 		zapcore.Complex128Type, zapcore.Complex64Type, zapcore.TimeFullType, zapcore.ReflectType,
 		zapcore.ErrorType:
-		return keys.Value(f.Key).Of(f.Interface)
+		return event.Value(f.Key, f.Interface)
 	case zapcore.DurationType:
 		// TODO: avoid this allocation?
-		return keys.Value(f.Key).Of(time.Duration(f.Integer))
+		return event.Value(f.Key, time.Duration(f.Integer))
 	case zapcore.Float64Type:
-		return keys.Float64(f.Key).Of(math.Float64frombits(uint64(f.Integer)))
+		return event.Float64(f.Key, math.Float64frombits(uint64(f.Integer)))
 	case zapcore.Float32Type:
-		return keys.Float32(f.Key).Of(math.Float32frombits(uint32(f.Integer)))
+		return event.Float64(f.Key, float64(math.Float32frombits(uint32(f.Integer))))
 	case zapcore.BoolType:
 		b := false
 		if f.Integer != 0 {
 			b = true
 		}
-		return keys.Bool(f.Key).Of(b)
+		return event.Bool(f.Key, b)
 	case zapcore.Int64Type:
-		return keys.Int64(f.Key).Of(f.Integer)
+		return event.Int64(f.Key, f.Integer)
 	case zapcore.Int32Type:
-		return keys.Int32(f.Key).Of(int32(f.Integer))
+		return event.Int64(f.Key, f.Integer)
 
 		//, zapcore.Int16Type, zapcore.Int8Type,
 		// 		zapcore.Uint64Type, zapcore.Uint32Type, zapcore.Uint16Type, zapcore.Uint8Type, zapcore.UintptrType:
-		//		return (f.Key).Of(uint64(f.Integer))
+		//		return (f.Key,uint64(f.Integer))
 	case zapcore.StringType:
-		return keys.String(f.Key).Of(f.String)
+		return event.String(f.Key, f.String)
 	case zapcore.TimeType:
-		key := keys.Value(f.Key)
 		t := time.Unix(0, f.Integer)
 		if f.Interface != nil {
 			t = t.In(f.Interface.(*time.Location))
 		}
-		return key.Of(t)
+		return event.Value(f.Key, t)
 	case zapcore.StringerType:
-		return keys.String(f.Key).Of(stringerToString(f.Interface))
+		return event.String(f.Key, stringerToString(f.Interface))
 	case zapcore.NamespaceType:
 		// TODO: ???
 		return event.Label{}

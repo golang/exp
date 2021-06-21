@@ -21,7 +21,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/keys"
 	"golang.org/x/exp/event/severity"
 )
 
@@ -53,9 +52,9 @@ func (f *formatter) Format(e *logrus.Entry) ([]byte, error) {
 	ev.At = e.Time
 	ev.Labels = append(ev.Labels, convertLevel(e.Level).Label())
 	for k, v := range e.Data {
-		ev.Labels = append(ev.Labels, keys.Value(k).Of(v))
+		ev.Labels = append(ev.Labels, event.Value(k, v))
 	}
-	ev.Message = e.Message
+	ev.Labels = append(ev.Labels, event.String("msg", e.Message))
 	ev.Deliver()
 	return nil, nil
 }

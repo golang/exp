@@ -13,7 +13,6 @@ import (
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/gokit"
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/event/keys"
 )
 
 func Test(t *testing.T) {
@@ -21,14 +20,14 @@ func Test(t *testing.T) {
 	ctx, h := eventtest.NewCapture()
 	log.Log(ctx, "msg", "mess", "level", 1, "name", "n/m", "traceID", 17, "resource", "R")
 	want := []event.Event{{
-		At:      eventtest.InitialTime,
-		Kind:    event.LogKind,
-		Message: "mess",
+		At:   eventtest.InitialTime,
+		Kind: event.LogKind,
 		Labels: []event.Label{
-			keys.Value("level").Of(1),
-			keys.Value("name").Of("n/m"),
-			keys.Value("traceID").Of(17),
-			keys.Value("resource").Of("R"),
+			event.Value("level", 1),
+			event.Value("name", "n/m"),
+			event.Value("traceID", 17),
+			event.Value("resource", "R"),
+			event.String("msg", "mess"),
 		},
 	}}
 	if diff := cmp.Diff(want, h.Got, eventtest.CmpOption()); diff != "" {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/keys"
 )
 
 type logger struct {
@@ -45,10 +44,10 @@ func (l *logger) Log(keyvals ...interface{}) error {
 		if key == "msg" || key == "message" {
 			msg = fmt.Sprint(value)
 		} else {
-			ev.Labels = append(ev.Labels, keys.Value(key).Of(value))
+			ev.Labels = append(ev.Labels, event.Value(key, value))
 		}
 	}
-	ev.Message = msg
+	ev.Labels = append(ev.Labels, event.String("msg", msg))
 	ev.Deliver()
 	return nil
 }

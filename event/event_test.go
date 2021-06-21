@@ -17,13 +17,12 @@ import (
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/logfmt"
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/event/keys"
 )
 
 var (
-	l1      = keys.Int("l1").Of(1)
-	l2      = keys.Int("l2").Of(2)
-	l3      = keys.Int("l3").Of(3)
+	l1      = event.Int64("l1", 1)
+	l2      = event.Int64("l2", 2)
+	l3      = event.Int64("l3", 3)
 	counter = event.NewCounter("hits", "cache hits")
 	gauge   = event.NewFloatGauge("temperature", "CPU board temperature in Celsius")
 	latency = event.NewDuration("latency", "how long it took")
@@ -58,7 +57,7 @@ func TestPrint(t *testing.T) {
 			event.End(ctx)
 		},
 		expect: `
-time="2020/03/05 14:27:48" trace=1 name=span
+time="2020/03/05 14:27:48" name=span trace=1
 time="2020/03/05 14:27:49" parent=1 end
 `}, {
 		name: "span nested",
@@ -70,8 +69,8 @@ time="2020/03/05 14:27:49" parent=1 end
 			event.Log(child, "message")
 		},
 		expect: `
-time="2020/03/05 14:27:48" trace=1 name=parent
-time="2020/03/05 14:27:49" parent=1 trace=2 name=child
+time="2020/03/05 14:27:48" name=parent trace=1
+time="2020/03/05 14:27:49" parent=1 name=child trace=2
 time="2020/03/05 14:27:50" parent=2 msg=message
 time="2020/03/05 14:27:51" parent=2 end
 time="2020/03/05 14:27:52" parent=1 end
@@ -106,8 +105,8 @@ time="2020/03/05 14:27:52" parent=1 end
 			t.With(p).Int("myInt", 6).Message("my event").Send()
 			t.With(p).String("myString", "some string value").Message("string event").Send()
 			*/
-			event.Log(ctx, "my event", keys.Int("myInt").Of(6))
-			event.Log(ctx, "string event", keys.String("myString").Of("some string value"))
+			event.Log(ctx, "my event", event.Int64("myInt", 6))
+			event.Log(ctx, "string event", event.String("myString", "some string value"))
 		},
 		expect: `
 time="2020/03/05 14:27:48" myInt=6 msg="my event"
@@ -126,8 +125,8 @@ time="2020/03/05 14:27:49" myString="some string value" msg="string event"
 
 func ExampleLog() {
 	ctx := event.WithExporter(context.Background(), event.NewExporter(logfmt.NewHandler(os.Stdout), eventtest.ExporterOptions()))
-	event.Log(ctx, "my event", keys.Int("myInt").Of(6))
-	event.Log(ctx, "error event", keys.String("myString").Of("some string value"))
+	event.Log(ctx, "my event", event.Int64("myInt", 6))
+	event.Log(ctx, "error event", event.String("myString", "some string value"))
 	// Output:
 	// time="2020/03/05 14:27:48" myInt=6 msg="my event"
 	// time="2020/03/05 14:27:49" myString="some string value" msg="error event"

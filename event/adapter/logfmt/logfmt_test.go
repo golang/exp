@@ -5,7 +5,6 @@
 package logfmt_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -40,21 +39,13 @@ func TestPrint(t *testing.T) {
 		event:  event.Event{Namespace: "golang.org/x/exp/event"},
 		expect: `in="golang.org/x/exp/event"`,
 	}, {
-		name:   "name",
-		event:  event.Event{Name: "named"},
-		expect: `name=named`,
-	}, {
 		name:   "at",
 		event:  event.Event{At: at},
 		expect: `time="2020/03/05 14:27:48"`,
 	}, {
 		name:   "message",
-		event:  event.Event{Message: "a message"},
+		event:  event.Event{Labels: []event.Label{event.String("msg", "a message")}},
 		expect: `msg="a message"`,
-	}, {
-		name:   "error",
-		event:  event.Event{Error: errors.New("an error")},
-		expect: `err="an error"`,
 	}, {
 		name:   "end",
 		event:  event.Event{Kind: event.EndKind},
@@ -123,15 +114,15 @@ func TestPrint(t *testing.T) {
 		expect: `"name with space"=text`,
 	}, {
 		name:   "quoting quote",
-		event:  event.Event{Message: `with"middle`},
+		event:  event.Event{Labels: []event.Label{event.String("msg", `with"middle`)}},
 		expect: `msg="with\"middle"`,
 	}, {
 		name:   "quoting newline",
-		event:  event.Event{Message: "with\nmiddle"},
+		event:  event.Event{Labels: []event.Label{event.String("msg", "with\nmiddle")}},
 		expect: `msg="with\nmiddle"`,
 	}, {
 		name:   "quoting slash",
-		event:  event.Event{Message: `with\middle`},
+		event:  event.Event{Labels: []event.Label{event.String("msg", `with\middle`)}},
 		expect: `msg="with\\middle"`,
 	}, {
 		name: "quoting bytes",
@@ -184,7 +175,7 @@ func TestPrinterFlags(t *testing.T) {
 		printer: logfmt.Printer{SuppressNamespace: true},
 		event: event.Event{
 			Namespace: "golang.org/x/exp/event",
-			Message:   "some text",
+			Labels:    []event.Label{event.String("msg", "some text")},
 		},
 		before: `in="golang.org/x/exp/event" msg="some text"`,
 		after:  `msg="some text"`,

@@ -18,9 +18,6 @@ type Event struct {
 	Namespace string    // namespace of event; if empty, set by exporter to import path
 	At        time.Time // time at which the event is delivered to the exporter.
 	Kind      Kind
-	Message   string
-	Name      string
-	Error     error
 	Labels    []Label
 
 	ctx    context.Context

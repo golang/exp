@@ -11,7 +11,6 @@ import (
 
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/event/keys"
 )
 
 func TestCommon(t *testing.T) {
@@ -36,7 +35,7 @@ func TestCommon(t *testing.T) {
 	checkName(t, h, "Metric", "")
 	h.Reset()
 
-	event.Annotate(ctx, keys.String("").Of(""))
+	event.Annotate(ctx, event.String("", ""))
 	checkMessage(t, h, "Annotate", "")
 	checkName(t, h, "Annotate", "")
 	h.Reset()
@@ -60,8 +59,16 @@ func checkMessage(t *testing.T, h *eventtest.CaptureHandler, method string, text
 		t.Errorf("Got %d events, expected 1", len(h.Got))
 		return
 	}
-	if h.Got[0].Message != text {
-		t.Errorf("Expected event with Message %q from %s got %q", text, method, h.Got[0].Message)
+	for _, l := range h.Got[0].Labels {
+		if l.Name == "msg" {
+			if l.String() != text {
+				t.Errorf("Expected event with Message %q from %s got %q", text, method, l.String())
+			}
+			return
+		}
+	}
+	if text != "" {
+		t.Errorf("Expected event with Message %q from %s got %q", text, method, "")
 	}
 }
 
@@ -70,7 +77,15 @@ func checkName(t *testing.T, h *eventtest.CaptureHandler, method string, text st
 		t.Errorf("Got %d events, expected 1", len(h.Got))
 		return
 	}
-	if h.Got[0].Name != text {
-		t.Errorf("Expected event with Name %q from %s got %q", text, method, h.Got[0].Name)
+	for _, l := range h.Got[0].Labels {
+		if l.Name == "name" {
+			if l.String() != text {
+				t.Errorf("Expected event with Name %q from %s got %q", text, method, l.String())
+			}
+			return
+		}
+	}
+	if text != "" {
+		t.Errorf("Expected event with Name %q from %s got %q", text, method, "")
 	}
 }

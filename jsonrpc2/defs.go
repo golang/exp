@@ -6,15 +6,12 @@ package jsonrpc2
 
 import (
 	"golang.org/x/exp/event"
-	"golang.org/x/exp/event/keys"
 )
 
-var (
-	Method       = keys.String("method")
-	RPCID        = keys.String("id")
-	RPCDirection = keys.String("direction")
-	StatusCode   = keys.String("status.code")
-)
+func Method(v string) event.Label       { return event.String("method", v) }
+func RPCID(v string) event.Label        { return event.String("id", v) }
+func RPCDirection(v string) event.Label { return event.String("direction", v) }
+func StatusCode(v string) event.Label   { return event.String("status.code", v) }
 
 var (
 	Started       = event.NewCounter("started", "Count of started RPCs.")
