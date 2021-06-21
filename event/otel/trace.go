@@ -44,11 +44,11 @@ func labelsToSpanOptions(ls []event.Label) []trace.SpanOption {
 	for _, l := range ls {
 		switch l.Name {
 		case "link":
-			opts = append(opts, trace.WithLinks(l.Value.Interface().(trace.Link)))
+			opts = append(opts, trace.WithLinks(l.Interface().(trace.Link)))
 		case "newRoot":
 			opts = append(opts, trace.WithNewRoot())
 		case "spanKind":
-			opts = append(opts, trace.WithSpanKind(l.Value.Interface().(trace.SpanKind)))
+			opts = append(opts, trace.WithSpanKind(l.Interface().(trace.SpanKind)))
 		}
 	}
 	return opts

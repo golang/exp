@@ -48,17 +48,16 @@ func (h *Handler) Event(ctx context.Context, ev *event.Event) context.Context {
 func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	p.needSep = false
 	if !ev.At.IsZero() {
-		p.label(w, "time", event.BytesOf(ev.At.AppendFormat(p.buf[:0], TimeFormat)))
+		p.Label(w, event.Bytes("time", ev.At.AppendFormat(p.buf[:0], TimeFormat)))
 	}
 
 	if !p.SuppressNamespace && ev.Namespace != "" {
-		p.label(w, "in", event.StringOf(ev.Namespace))
+		p.Label(w, event.String("in", ev.Namespace))
 	}
 
 	if ev.Parent != 0 {
-		p.label(w, "parent", event.BytesOf(strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
+		p.Label(w, event.Bytes("parent", strconv.AppendUint(p.buf[:0], ev.Parent, 10)))
 	}
-
 	for _, l := range ev.Labels {
 		if l.Name == "" {
 			continue
@@ -67,72 +66,79 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 	}
 
 	if ev.TraceID != 0 {
-		p.label(w, "trace", event.Uint64Of(ev.TraceID))
+		p.Label(w, event.Uint64("trace", ev.TraceID))
 	}
 
 	if ev.Message != "" {
-		p.label(w, "msg", event.StringOf(ev.Message))
+		p.Label(w, event.String("msg", ev.Message))
 	}
 
 	if ev.Name != "" {
-		p.label(w, "name", event.StringOf(ev.Name))
+		p.Label(w, event.String("name", ev.Name))
 	}
 
 	if ev.Kind == event.EndKind {
-		p.label(w, "end", event.Value{})
+		p.Label(w, event.Value("end", nil))
 	}
 
 	if ev.Error != nil {
-		p.label(w, "err", event.ValueOf(ev.Error))
+		p.Label(w, event.Value("err", ev.Error))
 	}
 
 	io.WriteString(w, "\n")
 }
 
 func (p *Printer) Label(w io.Writer, l event.Label) {
-	p.label(w, l.Name, l.Value)
-}
-
-func (p *Printer) Value(w io.Writer, v event.Value) {
-	switch {
-	case v.IsString():
-		s := v.String()
-		if p.QuoteValues || stringNeedQuote(s) {
-			p.quoteString(w, s)
-		} else {
-			io.WriteString(w, s)
-		}
-	case v.IsBytes():
-		buf := v.Bytes()
-		if p.QuoteValues || bytesNeedQuote(buf) {
-			p.quoteBytes(w, buf)
-		} else {
-			w.Write(buf)
-		}
-	case v.IsInt64():
-		w.Write(strconv.AppendInt(p.buf[:0], v.Int64(), 10))
-	case v.IsUint64():
-		w.Write(strconv.AppendUint(p.buf[:0], v.Uint64(), 10))
-	case v.IsFloat64():
-		w.Write(strconv.AppendFloat(p.buf[:0], v.Float64(), 'g', -1, 64))
-	case v.IsBool():
-		if v.Bool() {
-			io.WriteString(w, "true")
-		} else {
-			io.WriteString(w, "false")
-		}
-	default:
-		if p.w.Cap() == 0 {
-			// we rely on the inliner to cause this to not allocate
-			p.w = *bytes.NewBuffer(p.buf[:0])
-		}
-		fmt.Fprint(&p.w, v.Interface())
-		b := p.w.Bytes()
-		p.w.Reset()
-		if p.QuoteValues || bytesNeedQuote(b) {
-			p.quoteBytes(w, b)
-		} else {
-			w.Write(b)
+	if l.Name == "" {
+		return
+	}
+	if p.needSep {
+		io.WriteString(w, " ")
+	}
+	p.needSep = true
+	p.Ident(w, l.Name)
+	if l.HasValue() {
+		io.WriteString(w, "=")
+		switch {
+		case l.IsString():
+			s := l.String()
+			if p.QuoteValues || stringNeedQuote(s) {
+				p.quoteString(w, s)
+			} else {
+				io.WriteString(w, s)
+			}
+		case l.IsBytes():
+			buf := l.Bytes()
+			if p.QuoteValues || bytesNeedQuote(buf) {
+				p.quoteBytes(w, buf)
+			} else {
+				w.Write(buf)
+			}
+		case l.IsInt64():
+			w.Write(strconv.AppendInt(p.buf[:0], l.Int64(), 10))
+		case l.IsUint64():
+			w.Write(strconv.AppendUint(p.buf[:0], l.Uint64(), 10))
+		case l.IsFloat64():
+			w.Write(strconv.AppendFloat(p.buf[:0], l.Float64(), 'g', -1, 64))
+		case l.IsBool():
+			if l.Bool() {
+				io.WriteString(w, "true")
+			} else {
+				io.WriteString(w, "false")
+			}
+		default:
+			if p.w.Cap() == 0 {
+				// we rely on the inliner to cause this to not allocate
+				p.w = *bytes.NewBuffer(p.buf[:0])
+			}
+			fmt.Fprint(&p.w, l.Interface())
+			b := p.w.Bytes()
+			p.w.Reset()
+			if p.QuoteValues || bytesNeedQuote(b) {
+				p.quoteBytes(w, b)
+			} else {
+				w.Write(b)
+			}
 		}
 	}
 }
@@ -182,21 +188,6 @@ func (p *Printer) quoteBytes(w io.Writer, buf []byte) {
 	}
 	w.Write(buf[written:])
 	io.WriteString(w, `"`)
-}
-
-func (p *Printer) label(w io.Writer, name string, value event.Value) {
-	if name == "" {
-		return
-	}
-	if p.needSep {
-		io.WriteString(w, " ")
-	}
-	p.needSep = true
-	p.Ident(w, name)
-	if value.HasValue() {
-		io.WriteString(w, "=")
-		p.Value(w, value)
-	}
 }
 
 func stringNeedQuote(s string) bool {

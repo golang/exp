@@ -207,12 +207,14 @@ func TestTraceDuration(t *testing.T) {
 }
 
 type testTraceDurationHandler struct {
-	got event.Value
+	got event.Label
 }
 
 func (t *testTraceDurationHandler) Event(ctx context.Context, ev *event.Event) context.Context {
-	if ev.Kind == event.MetricKind {
-		t.got, _ = event.MetricVal.Find(ev)
+	for _, l := range ev.Labels {
+		if l.Name == event.MetricVal {
+			t.got = l
+		}
 	}
 	return ctx
 }

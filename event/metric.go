@@ -60,12 +60,6 @@ func (m *MetricDescriptor) Name() string        { return m.name }
 func (m *MetricDescriptor) Namespace() string   { return m.namespace }
 func (m *MetricDescriptor) Description() string { return m.description }
 
-// A MetricValue is a pair of a Metric and a Value.
-type MetricValue struct {
-	m Metric
-	v Value
-}
-
 // A Counter is a metric that counts something cumulatively.
 type Counter struct {
 	*MetricDescriptor
@@ -87,7 +81,7 @@ func (c *Counter) Descriptor() *MetricDescriptor {
 func (c *Counter) Record(ctx context.Context, v uint64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, c, Uint64Of(v))
+		record(ev, c, Uint64(MetricVal, v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
@@ -115,35 +109,35 @@ func (g *FloatGauge) Descriptor() *MetricDescriptor {
 func (g *FloatGauge) Record(ctx context.Context, v float64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, g, Float64Of(v))
+		record(ev, g, Float64(MetricVal, v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
 }
 
-// A Duration records a distribution of durations.
+// A DurationDistribution records a distribution of durations.
 // TODO(generics): Distribution[T]
-type Duration struct {
+type DurationDistribution struct {
 	*MetricDescriptor
 }
 
 // NewDuration creates a new Duration with the given name.
-func NewDuration(name, description string) *Duration {
-	return &Duration{newMetricDescriptor(name, description)}
+func NewDuration(name, description string) *DurationDistribution {
+	return &DurationDistribution{newMetricDescriptor(name, description)}
 }
 
 // Descriptor returns the receiver's MetricDescriptor.
-func (d *Duration) Descriptor() *MetricDescriptor {
+func (d *DurationDistribution) Descriptor() *MetricDescriptor {
 	return d.MetricDescriptor
 }
 
 // Record converts its argument into a Value and returns a MetricValue with the
 // receiver and the value. It is intended to be used as an argument to
 // Builder.Metric.
-func (d *Duration) Record(ctx context.Context, v time.Duration, labels ...Label) {
+func (d *DurationDistribution) Record(ctx context.Context, v time.Duration, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, d, DurationOf(v))
+		record(ev, d, Duration(MetricVal, v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
@@ -170,12 +164,12 @@ func (d *IntDistribution) Descriptor() *MetricDescriptor {
 func (d *IntDistribution) Record(ctx context.Context, v int64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, d, Int64Of(v))
+		record(ev, d, Int64(MetricVal, v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
 }
 
-func record(ev *Event, m Metric, v Value) {
-	ev.Labels = append(ev.Labels, MetricVal.Of(v), MetricKey.Of(ValueOf(m)))
+func record(ev *Event, m Metric, l Label) {
+	ev.Labels = append(ev.Labels, l, Value(MetricKey, m))
 }

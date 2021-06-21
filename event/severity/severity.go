@@ -42,12 +42,12 @@ const Key = "level"
 
 // Of creates a label for the level.
 func (l Level) Label() event.Label {
-	return event.Label{Name: Key, Value: event.ValueOf(l)}
+	return event.Value(Key, l)
 }
 
 // From can be used to get a value from a Label.
 func From(t event.Label) Level {
-	return t.Value.Interface().(Level)
+	return t.Interface().(Level)
 }
 
 func (l Level) Log(ctx context.Context, msg string, labels ...event.Label) {

@@ -62,80 +62,63 @@ func TestPrint(t *testing.T) {
 	}, {
 		name: "string",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "v1",
-				Value: event.StringOf("text"),
-			}, {
-				Name:  "v2",
-				Value: event.StringOf("text with quotes"),
-			}, {
-				Name:  "empty",
-				Value: event.StringOf(""),
-			}},
+			Labels: []event.Label{
+				event.String("v1", "text"),
+				event.String("v2", "text with quotes"),
+				event.String("empty", ""),
+			},
 		},
 		expect: `v1=text v2="text with quotes" empty=""`,
 	}, {
 		name: "int",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "value",
-				Value: event.Int64Of(67),
-			}},
+			Labels: []event.Label{
+				event.Int64("value", 67),
+			},
 		},
 		expect: `value=67`,
 	}, {
 		name: "float",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "value",
-				Value: event.Float64Of(263.2),
-			}},
+			Labels: []event.Label{
+				event.Float64("value", 263.2),
+			},
 		},
 		expect: `value=263.2`,
 	}, {
 		name: "bool",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "v1",
-				Value: event.BoolOf(true),
-			}, {
-				Name:  "v2",
-				Value: event.BoolOf(false),
-			}},
+			Labels: []event.Label{
+				event.Bool("v1", true),
+				event.Bool("v2", false),
+			},
 		},
 		expect: `v1=true v2=false`,
 	}, {
 		name: "value",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "v1",
-				Value: event.ValueOf(notString{"simple"}),
-			}, {
-				Name:  "v2",
-				Value: event.ValueOf(notString{"needs quoting"}),
-			}},
+			Labels: []event.Label{
+				event.Value("v1", notString{"simple"}),
+				event.Value("v2", notString{"needs quoting"}),
+			},
 		},
 		expect: `v1=simple v2="needs quoting"`,
 	}, {
 		name: "empty label",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name: "before",
-			}, {
-				Name:  "",
-				Value: event.StringOf("text"),
-			}, {
-				Name: "after",
-			}},
+			Labels: []event.Label{
+				event.Value("before", nil),
+				event.String("", "text"),
+				event.Value("after", nil),
+			},
 		},
 		expect: `before after`,
 	}, {
 		name: "quoted ident",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "name with space",
-				Value: event.StringOf("text"),
-			}},
+			Labels: []event.Label{
+				event.String("name with space", "text"),
+			},
 		},
 		expect: `"name with space"=text`,
 	}, {
@@ -153,10 +136,9 @@ func TestPrint(t *testing.T) {
 	}, {
 		name: "quoting bytes",
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "value",
-				Value: event.BytesOf(([]byte)(`bytes "need" quote`)),
-			}},
+			Labels: []event.Label{
+				event.Bytes("value", ([]byte)(`bytes "need" quote`)),
+			},
 		},
 		expect: `value="bytes \"need\" quote"`,
 	}} {
@@ -191,10 +173,9 @@ func TestPrinterFlags(t *testing.T) {
 		name:    "quote values",
 		printer: logfmt.Printer{QuoteValues: true},
 		event: event.Event{
-			Labels: []event.Label{{
-				Name:  "value",
-				Value: event.StringOf("text"),
-			}},
+			Labels: []event.Label{
+				event.String("value", "text"),
+			},
 		},
 		before: `value=text`,
 		after:  `value="text"`,

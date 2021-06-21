@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	MetricKey      = interfaceKey("metric")
-	MetricVal      = valueKey("metricValue")
+	MetricKey      = "metric"
+	MetricVal      = "metricValue"
 	DurationMetric = interfaceKey("durationMetric")
 )
 
@@ -78,22 +78,14 @@ func End(ctx context.Context, labels ...Label) {
 		// this was an end event, do we need to send a duration?
 		if v, ok := DurationMetric.Find(ev); ok {
 			//TODO: do we want the rest of the values from the end event?
-			v.(*Duration).Record(ctx, ev.At.Sub(ev.target.startTime))
+			v.(*DurationDistribution).Record(ctx, ev.At.Sub(ev.target.startTime))
 		}
 		ev.Deliver()
 	}
 }
 
-func (k valueKey) Of(v Value) Label {
-	return Label{Name: string(k), Value: v}
-}
-
-func (k valueKey) Find(ev *Event) (Value, bool) {
-	return lookupValue(string(k), ev.Labels)
-}
-
 func (k interfaceKey) Of(v interface{}) Label {
-	return Label{Name: string(k), Value: ValueOf(v)}
+	return Value(string(k), v)
 }
 
 func (k interfaceKey) Find(ev *Event) (interface{}, bool) {
@@ -105,11 +97,11 @@ func (k interfaceKey) Find(ev *Event) (interface{}, bool) {
 
 }
 
-func lookupValue(name string, labels []Label) (Value, bool) {
+func lookupValue(name string, labels []Label) (Label, bool) {
 	for i := len(labels) - 1; i >= 0; i-- {
 		if labels[i].Name == name {
-			return labels[i].Value, true
+			return labels[i], true
 		}
 	}
-	return Value{}, false
+	return Label{}, false
 }

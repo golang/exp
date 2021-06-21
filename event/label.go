@@ -13,22 +13,12 @@ import (
 	"unsafe"
 )
 
-// Value holds any value in an efficient way that avoids allocations for
-// most types.
-type Value struct {
-	packed  uint64
-	untyped interface{}
-}
-
 // Label is a named value.
 type Label struct {
-	Name  string
-	Value Value
-}
+	Name string
 
-// Equal reports whether two labels are equal.
-func (l1 Label) Equal(l2 Label) bool {
-	return l1.Name == l2.Name && l1.Value.Equal(l2.Value)
+	packed  uint64
+	untyped interface{}
 }
 
 // stringptr is used in untyped when the Value is a string
@@ -53,43 +43,46 @@ type boolKind struct{}
 type durationKind struct{}
 
 // HasValue returns true if the value is set to any type.
-func (v *Value) HasValue() bool { return v.untyped != nil }
+func (l Label) HasValue() bool { return l.untyped != nil }
 
-// Equal reports whether two values are equal.
-func (v1 *Value) Equal(v2 Value) bool {
-	if !v1.HasValue() {
-		return !v2.HasValue()
+// Equal reports whether two labels are equal.
+func (l Label) Equal(l2 Label) bool {
+	if l.Name != l2.Name {
+		return false
 	}
-	if !v2.HasValue() {
+	if !l.HasValue() {
+		return !l2.HasValue()
+	}
+	if !l2.HasValue() {
 		return false
 	}
 	switch {
-	case v1.IsString():
-		return v2.IsString() && v1.String() == v2.String()
-	case v1.IsInt64():
-		return v2.IsInt64() && v1.packed == v2.packed
-	case v1.IsUint64():
-		return v2.IsUint64() && v1.packed == v2.packed
-	case v1.IsFloat64():
-		return v2.IsFloat64() && v1.Float64() == v2.Float64()
-	case v1.IsBool():
-		return v2.IsBool() && v1.packed == v2.packed
-	case v1.IsDuration():
-		return v2.IsDuration() && v1.packed == v2.packed
+	case l.IsString():
+		return l2.IsString() && l.String() == l2.String()
+	case l.IsInt64():
+		return l2.IsInt64() && l.packed == l2.packed
+	case l.IsUint64():
+		return l2.IsUint64() && l.packed == l2.packed
+	case l.IsFloat64():
+		return l2.IsFloat64() && l.Float64() == l2.Float64()
+	case l.IsBool():
+		return l2.IsBool() && l.packed == l2.packed
+	case l.IsDuration():
+		return l2.IsDuration() && l.packed == l2.packed
 	default:
-		return v1.untyped == v2.untyped
+		return l.untyped == l2.untyped
 	}
 }
 
-// ValueOf returns a Value for the supplied value.
-func ValueOf(value interface{}) Value {
-	return Value{untyped: value}
+// Value returns a Label for the supplied value.
+func Value(name string, value interface{}) Label {
+	return Label{Name: name, untyped: value}
 }
 
 // Interface returns the value.
 // This will never panic, things that were not set using SetInterface will be
 // unpacked and returned anyway.
-func (v Value) Interface() interface{} {
+func (v Label) Interface() interface{} {
 	switch {
 	case v.IsString():
 		return v.String()
@@ -108,16 +101,16 @@ func (v Value) Interface() interface{} {
 	}
 }
 
-// StringOf returns a new Value for a string.
-func StringOf(s string) Value {
+// String returns a new Value for a string.
+func String(name string, s string) Label {
 	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	return Value{packed: uint64(hdr.Len), untyped: stringptr(hdr.Data)}
+	return Label{Name: name, packed: uint64(hdr.Len), untyped: stringptr(hdr.Data)}
 }
 
 // String returns the value as a string.
 // This does not panic if v's Kind is not String, instead, it returns a string
 // representation of the value in all cases.
-func (v Value) String() string {
+func (v Label) String() string {
 	if sp, ok := v.untyped.(stringptr); ok {
 		var s string
 		hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
@@ -145,19 +138,19 @@ func (v Value) String() string {
 }
 
 // IsString returns true if the value was built with StringOf.
-func (v Value) IsString() bool {
+func (v Label) IsString() bool {
 	_, ok := v.untyped.(stringptr)
 	return ok
 }
 
-// BytesOf returns a new Value for a string.
-func BytesOf(data []byte) Value {
+// Bytes returns a new Value for a string.
+func Bytes(name string, data []byte) Label {
 	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&data))
-	return Value{packed: uint64(hdr.Len), untyped: bytesptr(hdr.Data)}
+	return Label{Name: name, packed: uint64(hdr.Len), untyped: bytesptr(hdr.Data)}
 }
 
 // Bytes returns the value as a bytes array.
-func (v Value) Bytes() []byte {
+func (v Label) Bytes() []byte {
 	bp, ok := v.untyped.(bytesptr)
 	if !ok {
 		panic("Bytes called on non []byte value")
@@ -171,19 +164,19 @@ func (v Value) Bytes() []byte {
 }
 
 // IsBytes returns true if the value was built with BytesOf.
-func (v Value) IsBytes() bool {
+func (v Label) IsBytes() bool {
 	_, ok := v.untyped.(bytesptr)
 	return ok
 }
 
-// Int64Of returns a new Value for a signed integer.
-func Int64Of(u int64) Value {
-	return Value{packed: uint64(u), untyped: int64Kind{}}
+// Int64 returns a new Value for a signed integer.
+func Int64(name string, u int64) Label {
+	return Label{Name: name, packed: uint64(u), untyped: int64Kind{}}
 }
 
 // Int64 returns the int64 from a value that was set with SetInt64.
 // It will panic for any value for which IsInt64 is not true.
-func (v Value) Int64() int64 {
+func (v Label) Int64() int64 {
 	if !v.IsInt64() {
 		panic("Int64 called on non int64 value")
 	}
@@ -191,19 +184,19 @@ func (v Value) Int64() int64 {
 }
 
 // IsInt64 returns true if the value was built with SetInt64.
-func (v Value) IsInt64() bool {
+func (v Label) IsInt64() bool {
 	_, ok := v.untyped.(int64Kind)
 	return ok
 }
 
-// Uint64Of returns a new Value for an unsigned integer.
-func Uint64Of(u uint64) Value {
-	return Value{packed: u, untyped: uint64Kind{}}
+// Uint64 returns a new Value for an unsigned integer.
+func Uint64(name string, u uint64) Label {
+	return Label{Name: name, packed: u, untyped: uint64Kind{}}
 }
 
 // Uint64 returns the uint64 from a value that was set with SetUint64.
 // It will panic for any value for which IsUint64 is not true.
-func (v Value) Uint64() uint64 {
+func (v Label) Uint64() uint64 {
 	if !v.IsUint64() {
 		panic("Uint64 called on non uint64 value")
 	}
@@ -211,19 +204,19 @@ func (v Value) Uint64() uint64 {
 }
 
 // IsUint64 returns true if the value was built with SetUint64.
-func (v Value) IsUint64() bool {
+func (v Label) IsUint64() bool {
 	_, ok := v.untyped.(uint64Kind)
 	return ok
 }
 
-// Float64Of returns a new Value for a floating point number.
-func Float64Of(f float64) Value {
-	return Value{packed: math.Float64bits(f), untyped: float64Kind{}}
+// Float64 returns a new Value for a floating point number.
+func Float64(name string, f float64) Label {
+	return Label{Name: name, packed: math.Float64bits(f), untyped: float64Kind{}}
 }
 
 // Float64 returns the float64 from a value that was set with SetFloat64.
 // It will panic for any value for which IsFloat64 is not true.
-func (v Value) Float64() float64 {
+func (v Label) Float64() float64 {
 	if !v.IsFloat64() {
 		panic("Float64 called on non float64 value")
 	}
@@ -231,22 +224,22 @@ func (v Value) Float64() float64 {
 }
 
 // IsFloat64 returns true if the value was built with SetFloat64.
-func (v Value) IsFloat64() bool {
+func (v Label) IsFloat64() bool {
 	_, ok := v.untyped.(float64Kind)
 	return ok
 }
 
-// BoolOf returns a new Value for a bool.
-func BoolOf(b bool) Value {
+// Bool returns a new Value for a bool.
+func Bool(name string, b bool) Label {
 	if b {
-		return Value{packed: 1, untyped: boolKind{}}
+		return Label{Name: name, packed: 1, untyped: boolKind{}}
 	}
-	return Value{packed: 0, untyped: boolKind{}}
+	return Label{Name: name, packed: 0, untyped: boolKind{}}
 }
 
 // Bool returns the bool from a value that was set with SetBool.
 // It will panic for any value for which IsBool is not true.
-func (v Value) Bool() bool {
+func (v Label) Bool() bool {
 	if !v.IsBool() {
 		panic("Bool called on non bool value")
 	}
@@ -257,23 +250,23 @@ func (v Value) Bool() bool {
 }
 
 // IsBool returns true if the value was built with SetBool.
-func (v Value) IsBool() bool {
+func (v Label) IsBool() bool {
 	_, ok := v.untyped.(boolKind)
 	return ok
 }
 
-func DurationOf(d time.Duration) Value {
-	return Value{packed: uint64(d), untyped: durationKind{}}
+func Duration(name string, d time.Duration) Label {
+	return Label{Name: name, packed: uint64(d), untyped: durationKind{}}
 }
 
-func (v Value) Duration() time.Duration {
+func (v Label) Duration() time.Duration {
 	if !v.IsDuration() {
 		panic("Duration called on non-Duration value")
 	}
 	return time.Duration(v.packed)
 }
 
-func (v Value) IsDuration() bool {
+func (v Label) IsDuration() bool {
 	_, ok := v.untyped.(durationKind)
 	return ok
 }

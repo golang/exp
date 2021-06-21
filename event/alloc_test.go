@@ -17,8 +17,8 @@ import (
 )
 
 func TestAllocs(t *testing.T) {
-	anInt := event.Label{Name: "int", Value: event.Int64Of(4)}
-	aString := event.Label{Name: "string", Value: event.StringOf("value")}
+	anInt := event.Int64("int", 4)
+	aString := event.String("string", "value")
 
 	e := event.NewExporter(logfmt.NewHandler(ioutil.Discard), &event.ExporterOptions{EnableNamespaces: true})
 	ctx := event.WithExporter(context.Background(), e)
