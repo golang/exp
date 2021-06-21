@@ -1,0 +1,21 @@
+[
+  {
+    "package": {
+      "name": "bogus.org/module/vuln"
+    },
+    "affects": {
+      "ranges": [
+        {
+          "type": "SEMVER",
+          "fixed": "v2.0.0"
+        }
+      ]
+    },
+    "ecosystem_specific": {
+      "symbols": [
+        "Bogus"
+      ],
+      "url": "bogus.org/bogus/README.doc"
+    }
+  }
+]

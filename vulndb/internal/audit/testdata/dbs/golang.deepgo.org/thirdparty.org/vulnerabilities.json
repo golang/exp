@@ -1,0 +1,70 @@
+[
+  {
+    "package": {
+      "name": "thirdparty.org/vulnerabilities/vuln"
+    },
+    "affects": {
+      "ranges": [
+        {
+          "type": "SEMVER",
+          "introduced": "v1.0.0",
+          "fixed": "v1.0.4"
+        },
+        {
+          "type": "SEMVER",
+          "introduced": "v1.1.2"
+        }
+      ]
+    },
+    "ecosystem_specific": {
+      "symbols": [
+        "VulnData.Vuln",
+        "VulnData.VulnOnPtr"
+      ],
+      "url": "thirdparty.org/vulnerabilities/README.doc"
+    }
+  },
+  {
+    "package": {
+      "name": "thirdparty.org/vulnerabilities/vuln"
+    },
+    "affects": {
+      "ranges": [
+        {
+          "type": "SEMVER",
+          "introduced": "v1.2.0",
+          "fixed": "v1.3.2"
+        }
+      ]
+    },
+    "ecosystem_specific": {
+      "goarch": [
+        "amd64"
+      ],
+      "goos": [
+        "linux"
+      ],
+      "url": "thirdparty.org/vulnerabilities/README_amd64.doc"
+    }
+  },
+  {
+    "package": {
+      "name": "thirdparty.org/vulnerabilities/vuln"
+    },
+    "affects": {
+      "ranges": [
+        {
+          "type": "SEMVER",
+          "introduced": "v1.0.1",
+          "fixed": "v1.0.2"
+        }
+      ]
+    },
+    "ecosystem_specific": {
+      "symbols": [
+        "VG"
+      ],
+      "url": "thirdparty.org/vulnerabilities/README_global.doc"
+    }
+  }
+]
