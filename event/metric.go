@@ -75,13 +75,12 @@ func (c *Counter) Descriptor() *MetricDescriptor {
 	return c.MetricDescriptor
 }
 
-// Record converts its argument into a Value and returns a MetricValue with the
-// receiver and the value. It is intended to be used as an argument to
-// Builder.Metric.
-func (c *Counter) Record(ctx context.Context, v uint64, labels ...Label) {
+// Record delivers a metric event with the given metric, value and labels to the
+// exporter in the context.
+func (c *Counter) Record(ctx context.Context, v int64, labels ...Label) {
 	ev := New(ctx, MetricKind)
 	if ev != nil {
-		record(ev, c, Uint64(MetricVal, v))
+		record(ev, c, Int64(MetricVal, v))
 		ev.Labels = append(ev.Labels, labels...)
 		ev.Deliver()
 	}
