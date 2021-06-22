@@ -101,8 +101,8 @@ func (e *Exporter) prepare(ev *Event) {
 	if e.opts.Now != nil && ev.At.IsZero() {
 		ev.At = e.opts.Now()
 	}
-	if e.opts.EnableNamespaces && ev.Namespace == "" {
-		ev.Namespace = e.sources.scanStack().Space
+	if e.opts.EnableNamespaces && ev.Source.Space == "" {
+		ev.Source = e.sources.scanStack()
 	}
 }
 

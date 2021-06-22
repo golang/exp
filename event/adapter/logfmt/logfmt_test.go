@@ -28,7 +28,7 @@ func TestPrint(t *testing.T) {
 		expect: ``,
 	}, {
 		name:   "span",
-		event:  event.Event{TraceID: 34},
+		event:  event.Event{ID: 34},
 		expect: `trace=34`,
 	}, {
 		name:   "parent",
@@ -36,7 +36,7 @@ func TestPrint(t *testing.T) {
 		expect: `parent=14`,
 	}, {
 		name:   "namespace",
-		event:  event.Event{Namespace: "golang.org/x/exp/event"},
+		event:  event.Event{Source: event.Source{Space: "golang.org/x/exp/event"}},
 		expect: `in=golang.org/x/exp/event`,
 	}, {
 		name:   "at",
@@ -174,8 +174,8 @@ func TestPrinterFlags(t *testing.T) {
 		name:    "suppress namespace",
 		printer: logfmt.Printer{SuppressNamespace: true},
 		event: event.Event{
-			Namespace: "golang.org/x/exp/event",
-			Labels:    []event.Label{event.String("msg", "some text")},
+			Source: event.Source{Space: "golang.org/x/exp/event"},
+			Labels: []event.Label{event.String("msg", "some text")},
 		},
 		before: `in=golang.org/x/exp/event msg="some text"`,
 		after:  `msg="some text"`,

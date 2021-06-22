@@ -200,8 +200,8 @@ func splitName(full string) Source {
 		entry.Space = full[:slash+dot]
 		entry.Name = full[slash+dot+1:]
 		if dot = strings.LastIndexByte(entry.Name, '.'); dot >= 0 {
-			entry.Owner = entry.Name[dot+1:]
-			entry.Name = entry.Name[:dot]
+			entry.Owner = entry.Name[:dot]
+			entry.Name = entry.Name[dot+1:]
 		}
 	}
 	return entry

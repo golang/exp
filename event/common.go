@@ -62,9 +62,9 @@ func Start(ctx context.Context, name string, labels ...Label) context.Context {
 	if ev != nil {
 		ev.Labels = append(ev.Labels, String("name", name))
 		ev.Labels = append(ev.Labels, labels...)
-		ev.TraceID = atomic.AddUint64(&ev.target.exporter.lastEvent, 1)
+		ev.ID = atomic.AddUint64(&ev.target.exporter.lastEvent, 1)
 		ev.target.exporter.prepare(ev)
-		ev.ctx = newContext(ev.ctx, ev.target.exporter, ev.TraceID, ev.At)
+		ev.ctx = newContext(ev.ctx, ev.target.exporter, ev.ID, ev.At)
 		ctx = ev.Deliver()
 	}
 	return ctx

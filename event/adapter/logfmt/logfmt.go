@@ -54,8 +54,14 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 		io.WriteString(w, `"`)
 	}
 
-	if !p.SuppressNamespace && ev.Namespace != "" {
-		p.Label(w, event.String("in", ev.Namespace))
+	if !p.SuppressNamespace && ev.Source.Space != "" {
+		p.Label(w, event.String("in", ev.Source.Space))
+	}
+	if ev.Source.Owner != "" {
+		p.Label(w, event.String("owner", ev.Source.Owner))
+	}
+	if ev.Source.Name != "" {
+		p.Label(w, event.String("name", ev.Source.Name))
 	}
 
 	if ev.Parent != 0 {
@@ -70,10 +76,10 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 		p.Label(w, l)
 	}
 
-	if ev.TraceID != 0 {
+	if ev.ID != 0 {
 		p.separator(w)
 		io.WriteString(w, `trace=`)
-		w.Write(strconv.AppendUint(p.buf[:0], ev.TraceID, 10))
+		w.Write(strconv.AppendUint(p.buf[:0], ev.ID, 10))
 	}
 
 	if ev.Kind == event.EndKind {
