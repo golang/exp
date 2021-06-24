@@ -118,3 +118,12 @@ func (ev *Event) Deliver() context.Context {
 	eventPool.Put(ev)
 	return ctx
 }
+
+func (ev *Event) Find(name string) Label {
+	for _, l := range ev.Labels {
+		if l.Name == name {
+			return l
+		}
+	}
+	return Label{}
+}

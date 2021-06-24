@@ -414,7 +414,7 @@ func (c *Connection) reply(entry *incoming, result interface{}, rerr error) {
 	if err := c.respond(entry, result, rerr); err != nil {
 		// no way to propagate this error
 		//TODO: should we do more than just log it?
-		event.Log(entry.baseCtx, "jsonrpc2 message delivery failed", event.Value("error", err))
+		event.Error(entry.baseCtx, "jsonrpc2 message delivery failed", err)
 	}
 }
 

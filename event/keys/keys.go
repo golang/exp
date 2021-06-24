@@ -185,3 +185,14 @@ func (k Bool) Of(v bool) event.Label {
 
 // From can be used to get a value from a Label.
 func (k Bool) From(l event.Label) bool { return l.Bool() }
+
+// Error represents a key
+type Error string
+
+// Of creates a new Label with this key and the supplied value.
+func (k Error) Of(v error) event.Label {
+	return event.Value(string(k), v)
+}
+
+// From can be used to get a value from a Label.
+func (k Error) From(l event.Label) error { return l.Interface().(error) }

@@ -49,6 +49,15 @@ func Logf(ctx context.Context, msg string, args ...interface{}) {
 	}
 }
 
+func Error(ctx context.Context, msg string, err error, labels ...Label) {
+	ev := New(ctx, LogKind)
+	if ev != nil {
+		ev.Labels = append(ev.Labels, labels...)
+		ev.Labels = append(ev.Labels, String("msg", msg), Value("error", err))
+		ev.Deliver()
+	}
+}
+
 func Annotate(ctx context.Context, labels ...Label) {
 	ev := New(ctx, 0)
 	if ev != nil {
