@@ -254,7 +254,7 @@ func runRelease(ctx context.Context, w io.Writer, dir string, args []string) (su
 	if err != nil {
 		return false, err
 	}
-	if err := report.Text(w); err != nil {
+	if _, err := fmt.Fprint(w, report.String()); err != nil {
 		return false, err
 	}
 	return report.isSuccessful(), nil

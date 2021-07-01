@@ -5,9 +5,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"strings"
 
 	"golang.org/x/exp/apidiff"
@@ -53,16 +51,14 @@ type report struct {
 	haveReleaseErrors bool
 }
 
-// Text formats and writes a report to w. The report lists errors, compatible
-// changes, and incompatible changes in each package. If releaseVersion is set,
-// it states whether releaseVersion is valid (and why). If releaseVersion is not
-// set, it suggests a new version.
-func (r *report) Text(w io.Writer) error {
-	buf := &bytes.Buffer{}
+// String returns a human-readable report that lists errors, compatible changes,
+// and incompatible changes in each package. If releaseVersion is set, the
+// report states whether releaseVersion is valid (and why). If releaseVersion is
+// not set, it suggests a new version.
+func (r *report) String() string {
+	buf := &strings.Builder{}
 	for _, p := range r.packages {
-		if err := p.Text(buf); err != nil {
-			return err
-		}
+		buf.WriteString(p.String())
 	}
 
 	baseVersion := r.base.version
@@ -104,8 +100,7 @@ unexpected for users. So, it may be better to choose a different suffix.`, r.rel
 		fmt.Fprintln(buf, "Errors were found in the base version. Some API changes may be omitted.")
 	}
 
-	_, err := io.Copy(w, buf)
-	return err
+	return buf.String()
 }
 
 func (r *report) addPackage(p packageReport) {
@@ -387,11 +382,11 @@ type packageReport struct {
 	baseErrors, releaseErrors []packages.Error
 }
 
-func (p *packageReport) Text(w io.Writer) error {
+func (p *packageReport) String() string {
 	if len(p.Changes) == 0 && len(p.baseErrors) == 0 && len(p.releaseErrors) == 0 {
-		return nil
+		return ""
 	}
-	buf := &bytes.Buffer{}
+	buf := &strings.Builder{}
 	fmt.Fprintf(buf, "%s\n%s\n", p.path, strings.Repeat("-", len(p.path)))
 	if len(p.baseErrors) > 0 {
 		fmt.Fprintf(buf, "errors in base version:\n")
@@ -409,12 +404,11 @@ func (p *packageReport) Text(w io.Writer) error {
 	}
 	if len(p.Changes) > 0 {
 		if err := p.Report.Text(buf); err != nil {
-			return err
+			panic(fmt.Sprintf("internal error printing apidiff report: %v", err))
 		}
 		buf.WriteByte('\n')
 	}
-	_, err := io.Copy(w, buf)
-	return err
+	return buf.String()
 }
 
 // parseVersion returns the major, minor, and patch numbers, prerelease text,
