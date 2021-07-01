@@ -655,7 +655,7 @@ func existingVersions(ctx context.Context, modPath, modRoot string) (versions []
 	}()
 
 	type listVersions struct {
-		Versions []string `json: "Versions"`
+		Versions []string
 	}
 	cmd := exec.CommandContext(ctx, "go", "list", "-json", "-m", "-versions", modPath)
 	cmd.Env = copyEnv(ctx, cmd.Env)

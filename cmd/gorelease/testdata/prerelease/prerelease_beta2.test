@@ -1,6 +1,7 @@
 mod=example.com/prerelease
 release=v0.0.0-beta2
 -- want --
+# summary
 Inferred base version: none
 v0.0.0-beta2 is a valid semantic version for this release.
 -- go.mod --

@@ -3,6 +3,7 @@ base=none
 release=v1.2.3
 proxyVersions=
 -- want --
+# summary
 v1.2.3 is a valid semantic version for this release.
 -- go.mod --
 module example.com/first

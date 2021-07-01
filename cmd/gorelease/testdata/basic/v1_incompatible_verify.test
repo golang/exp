@@ -5,15 +5,14 @@ success=false
 release=v1.1.2
 proxyVersions=example.com/basic@v1.1.1
 -- want --
-example.com/basic/a
--------------------
-Incompatible changes:
-- A2: removed
+# example.com/basic/a
+## incompatible changes
+A2: removed
 
-example.com/basic/b
--------------------
-Incompatible changes:
-- package removed
+# example.com/basic/b
+## incompatible changes
+package removed
 
+# summary
 v1.1.2 is not a valid semantic version for this release.
 There are incompatible changes.

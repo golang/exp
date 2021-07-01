@@ -4,13 +4,13 @@ success=false
 # A() was removed, which is a breaking change: it shouldn't try to suggest a
 # higher version.
 -- want --
-example.com/basic/a
--------------------
-Incompatible changes:
-- A: removed
-Compatible changes:
-- B: added
+# example.com/basic/a
+## incompatible changes
+A: removed
+## compatible changes
+B: added
 
+# summary
 Cannot suggest a release version.
 Incompatible changes were detected.
 -- go.mod --

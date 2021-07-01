@@ -5,11 +5,11 @@ success=false
 # later version that already exists: so it should not try to suggest anything at
 # all.
 -- want --
-example.com/basic/a
--------------------
-Compatible changes:
-- B: added
+# example.com/basic/a
+## compatible changes
+B: added
 
+# summary
 Cannot suggest a release version.
 Can only suggest a release version when compared against the most recent version of this major: v0.1.2.
 -- go.mod --

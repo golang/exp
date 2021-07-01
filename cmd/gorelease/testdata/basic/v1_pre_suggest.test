@@ -3,14 +3,13 @@ version=v1.1.2
 base=v1.1.1-pre
 proxyVersions=example.com/basic@v1.1.1-pre
 -- want --
-example.com/basic/a
--------------------
-Incompatible changes:
-- A2: removed
+# example.com/basic/a
+## incompatible changes
+A2: removed
 
-example.com/basic/b
--------------------
-Incompatible changes:
-- package removed
+# example.com/basic/b
+## incompatible changes
+package removed
 
+# summary
 Suggested version: v1.1.1

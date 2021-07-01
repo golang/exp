@@ -2,6 +2,7 @@ mod=example.com/require
 base=v0.0.1
 proxyVersions=example.com/require@v0.0.1
 -- want --
+# summary
 Suggested version: v0.0.2
 -- go.mod --
 module example.com/require

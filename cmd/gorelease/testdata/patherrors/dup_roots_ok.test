@@ -11,4 +11,5 @@ module example.com/dup/v2
 
 go 1.13
 -- want --
+# summary
 Suggested version: v2.0.0 (with tag dup/v2.0.0)

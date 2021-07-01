@@ -1,6 +1,7 @@
 mod=example.com/sub/v2
 base=v2.0.0
 -- want --
+# summary
 Suggested version: v2.0.1
 -- .git/HEAD --
 -- go.mod --

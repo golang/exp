@@ -22,6 +22,10 @@ package tidy
 import _ "example.com/tidy/a"
 import _ "example.com/tidy/b"
 -- want --
+# diagnostics
 go.mod: the following requirements are needed
 	example.com/tidy/b@v0.2.0
 Run 'go mod tidy' to add missing requirements.
+
+# summary
+Suggested version: v0.1.0

@@ -3,7 +3,11 @@ dir=x
 base=none
 success=false
 -- want --
+# diagnostics
 example.com/y: module path must end with "x", since it is in subdirectory "x"
+
+# summary
+Suggested version: v0.1.0
 -- .mod --
 module example.com/patherrors
 -- .git/HEAD --

@@ -2,9 +2,13 @@ mod=example.com/tidy
 base=v0.0.1
 success=false
 -- want --
+# diagnostics
 go.mod: the following requirements are needed
 	example.com/basic@v1.1.2
 Run 'go mod tidy' to add missing requirements.
+
+# summary
+Suggested version: v0.0.2
 -- go.mod --
 module example.com/tidy
 

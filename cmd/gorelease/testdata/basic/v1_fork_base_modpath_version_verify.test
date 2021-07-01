@@ -4,9 +4,10 @@ version=v1.1.2
 release=v1.1.2
 proxyVersions=example.com/basic@v1.1.1
 -- want --
-example.com/basic/a
--------------------
-Incompatible changes:
-- A2: removed
-Compatible changes:
-- A3: added
+# example.com/basic/a
+## incompatible changes
+A2: removed
+## compatible changes
+A3: added
+
+# summary

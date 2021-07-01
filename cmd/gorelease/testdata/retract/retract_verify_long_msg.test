@@ -1,8 +1,12 @@
 mod=example.com/retract
 success=false
 -- want --
-Inferred base version: v0.0.1
+# diagnostics
 required module example.com/retractdep/v3@v3.0.0 retracted by module author
+
+# summary
+Inferred base version: v0.0.1
+Suggested version: v0.1.0
 -- go.mod --
 module example.com/retract
 

@@ -61,6 +61,15 @@ func (r *report) String() string {
 		buf.WriteString(p.String())
 	}
 
+	if len(r.release.diagnostics) > 0 {
+		buf.WriteString("# diagnostics\n")
+		for _, d := range r.release.diagnostics {
+			fmt.Fprintln(buf, d)
+		}
+		buf.WriteByte('\n')
+	}
+
+	buf.WriteString("# summary\n")
 	baseVersion := r.base.version
 	if r.base.modPath != r.release.modPath {
 		baseVersion = r.base.modPath + "@" + baseVersion
@@ -71,11 +80,7 @@ func (r *report) String() string {
 		fmt.Fprintf(buf, "Base version: %s (%s)\n", baseVersion, r.base.versionQuery)
 	}
 
-	if len(r.release.diagnostics) > 0 {
-		for _, d := range r.release.diagnostics {
-			fmt.Fprintln(buf, d)
-		}
-	} else if r.versionInvalid != nil {
+	if r.versionInvalid != nil {
 		fmt.Fprintln(buf, r.versionInvalid)
 	} else if r.release.versionInferred {
 		if r.release.tagPrefix == "" {
@@ -387,24 +392,41 @@ func (p *packageReport) String() string {
 		return ""
 	}
 	buf := &strings.Builder{}
-	fmt.Fprintf(buf, "%s\n%s\n", p.path, strings.Repeat("-", len(p.path)))
+	fmt.Fprintf(buf, "# %s\n", p.path)
 	if len(p.baseErrors) > 0 {
-		fmt.Fprintf(buf, "errors in base version:\n")
+		fmt.Fprintf(buf, "## errors in base version:\n")
 		for _, e := range p.baseErrors {
-			fmt.Fprintf(buf, "\t%v\n", e)
+			fmt.Fprintln(buf, e)
 		}
 		buf.WriteByte('\n')
 	}
 	if len(p.releaseErrors) > 0 {
-		fmt.Fprintf(buf, "errors in release version:\n")
+		fmt.Fprintf(buf, "## errors in release version:\n")
 		for _, e := range p.releaseErrors {
-			fmt.Fprintf(buf, "\t%v\n", e)
+			fmt.Fprintln(buf, e)
 		}
 		buf.WriteByte('\n')
 	}
 	if len(p.Changes) > 0 {
-		if err := p.Report.Text(buf); err != nil {
-			panic(fmt.Sprintf("internal error printing apidiff report: %v", err))
+		var compatible, incompatible []apidiff.Change
+		for _, c := range p.Changes {
+			if c.Compatible {
+				compatible = append(compatible, c)
+			} else {
+				incompatible = append(incompatible, c)
+			}
+		}
+		if len(incompatible) > 0 {
+			fmt.Fprintf(buf, "## incompatible changes\n")
+			for _, c := range incompatible {
+				fmt.Fprintln(buf, c.Message)
+			}
+		}
+		if len(compatible) > 0 {
+			fmt.Fprintf(buf, "## compatible changes\n")
+			for _, c := range compatible {
+				fmt.Fprintln(buf, c.Message)
+			}
 		}
 		buf.WriteByte('\n')
 	}

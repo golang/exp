@@ -5,6 +5,7 @@ success=false
 # But, there's a later version that already exists: so it should not try to
 # suggest anything at all.
 -- want --
+# summary
 Cannot suggest a release version.
 Can only suggest a release version when compared against the most recent version of this major: v0.1.2.
 -- go.mod --

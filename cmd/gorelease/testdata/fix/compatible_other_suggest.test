@@ -3,18 +3,17 @@ base=v1.0.0
 version=v1.1.0-compatible-other
 success=false
 -- want --
-example.com/fix/bad
--------------------
-errors in base version:
-	bad/bad.go:3:15: undeclared name: NOTYPE
+# example.com/fix/bad
+## errors in base version:
+bad/bad.go:3:15: undeclared name: NOTYPE
 
-Incompatible changes:
-- Broken: changed from func() invalid type to func() int
+## incompatible changes
+Broken: changed from func() invalid type to func() int
 
-example.com/fix/good
---------------------
-Compatible changes:
-- Better: added
+# example.com/fix/good
+## compatible changes
+Better: added
 
+# summary
 Cannot suggest a release version.
 Errors were found.

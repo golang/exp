@@ -12,4 +12,5 @@ import "C"
 
 func X() int { return int(C.x) }
 -- want --
+# summary
 v1.0.0 is a valid semantic version for this release.

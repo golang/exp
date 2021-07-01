@@ -6,12 +6,12 @@ version=v1.1.2
 base=example.com/basicfork@v1.1.2
 release=v1.1.3
 -- want --
-example.com/basicfork/a
------------------------
-Incompatible changes:
-- A3: removed
+# example.com/basicfork/a
+## incompatible changes
+A3: removed
 
-example.com/basicfork/b
------------------------
-Incompatible changes:
-- package removed
+# example.com/basicfork/b
+## incompatible changes
+package removed
+
+# summary
