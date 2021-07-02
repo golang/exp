@@ -127,6 +127,15 @@ startDriver() {
 	};
 	e_ctx = eglCreateContext(e_dpy, e_config, EGL_NO_CONTEXT, ctx_attribs);
 	if (!e_ctx) {
+		// Try again with OpenGL ES 2.0.
+		static const EGLint ctx2_attribs[] = {
+			EGL_CONTEXT_CLIENT_VERSION, 2,
+			EGL_NONE
+		};
+
+		e_ctx = eglCreateContext(e_dpy, e_config, EGL_NO_CONTEXT, ctx2_attribs);
+	}
+	if (!e_ctx) {
 		fprintf(stderr, "eglCreateContext failed: %s\n", eglGetErrorStr());
 		exit(1);
 	}
