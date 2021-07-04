@@ -24,10 +24,11 @@ var errUnsupported = fmt.Errorf("gldriver: unsupported GOOS/GOARCH %s/%s or cgo 
 
 func newWindow(opts *screen.NewWindowOptions) (uintptr, error) { return 0, errUnsupported }
 
-func initWindow(id *windowImpl) {}
-func showWindow(id *windowImpl) {}
-func closeWindow(id uintptr)    {}
-func drawLoop(w *windowImpl)    {}
+func initWindow(id *windowImpl)         {}
+func showWindow(id *windowImpl)         {}
+func closeWindow(id uintptr)            {}
+func drawLoop(w *windowImpl)            {}
+func setTitle(id uintptr, title string) {}
 
 func surfaceCreate() error             { return errUnsupported }
 func main(f func(screen.Screen)) error { return errUnsupported }

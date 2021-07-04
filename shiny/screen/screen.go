@@ -218,6 +218,7 @@ type Window interface {
 	// swaps the back buffer to the front.
 	Publish() PublishResult
 
+	// SetTitle changes the window's title.
 	SetTitle(title string)
 }
 

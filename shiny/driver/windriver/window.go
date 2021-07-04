@@ -171,6 +171,10 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	return screen.PublishResult{}
 }
 
+func (w *windowImpl) SetTitle(title string) {
+	_ = win32.SetWindowTitle(w.hwnd, title)
+}
+
 func init() {
 	send := func(hwnd syscall.Handle, e interface{}) {
 		theScreen.mu.Lock()
