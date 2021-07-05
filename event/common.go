@@ -70,8 +70,7 @@ func Start(ctx context.Context, name string, labels ...Label) context.Context {
 	if ev != nil {
 		ev.Labels = append(ev.Labels, String("name", name))
 		ev.Labels = append(ev.Labels, labels...)
-		ev.prepare()
-		ev.ctx = newContext(ev.ctx, ev.target.exporter, ev.ID, ev.At)
+		ev.Trace()
 		ctx = ev.Deliver()
 	}
 	return ctx

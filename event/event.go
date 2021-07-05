@@ -104,6 +104,11 @@ func (ev *Event) Clone() *Event {
 	return ev2
 }
 
+func (ev *Event) Trace() {
+	ev.prepare()
+	ev.ctx = newContext(ev.ctx, ev.target.exporter, ev.ID, ev.At)
+}
+
 // Deliver the event to the exporter that was found in New.
 // This also returns the event to the pool, it is an error to do anything
 // with the event after it is delivered.
