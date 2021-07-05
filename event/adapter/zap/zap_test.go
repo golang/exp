@@ -23,6 +23,7 @@ func Test(t *testing.T) {
 	log = log.Named("n/m")
 	log.Info("mess", zap.Float64("pi", 3.14))
 	want := []event.Event{{
+		ID:   1,
 		Kind: event.LogKind,
 		Labels: []event.Label{
 			event.Int64("traceID", 17),

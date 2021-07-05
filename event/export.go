@@ -97,7 +97,11 @@ func newContext(ctx context.Context, exporter *Exporter, parent uint64, start ti
 // then the timestamp will be updated.
 // If automatic namespaces are enabled and the event doesn't have a namespace,
 // one based on the caller's import path will be provided.
-func (e *Exporter) prepare(ev *Event) {
+func (ev *Event) prepare() {
+	e := ev.target.exporter
+	if ev.ID == 0 {
+		ev.ID = atomic.AddUint64(&e.lastEvent, 1)
+	}
 	if e.opts.Now != nil && ev.At.IsZero() {
 		ev.At = e.opts.Now()
 	}

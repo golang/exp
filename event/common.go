@@ -7,7 +7,6 @@ package event
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 )
 
 const (
@@ -71,8 +70,7 @@ func Start(ctx context.Context, name string, labels ...Label) context.Context {
 	if ev != nil {
 		ev.Labels = append(ev.Labels, String("name", name))
 		ev.Labels = append(ev.Labels, labels...)
-		ev.ID = atomic.AddUint64(&ev.target.exporter.lastEvent, 1)
-		ev.target.exporter.prepare(ev)
+		ev.prepare()
 		ev.ctx = newContext(ev.ctx, ev.target.exporter, ev.ID, ev.At)
 		ctx = ev.Deliver()
 	}
@@ -83,7 +81,7 @@ func End(ctx context.Context, labels ...Label) {
 	ev := New(ctx, EndKind)
 	if ev != nil {
 		ev.Labels = append(ev.Labels, labels...)
-		ev.target.exporter.prepare(ev)
+		ev.prepare()
 		// this was an end event, do we need to send a duration?
 		if v, ok := DurationMetric.Find(ev); ok {
 			//TODO: do we want the rest of the values from the end event?

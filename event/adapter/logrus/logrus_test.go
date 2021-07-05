@@ -28,6 +28,7 @@ func Test(t *testing.T) {
 	log.WithContext(ctx).WithField("traceID", 17).WithField("resource", "R").Info("mess")
 
 	want := []event.Event{{
+		ID:   1,
 		Kind: event.LogKind,
 		Labels: []event.Label{
 			severity.Info.Label(),

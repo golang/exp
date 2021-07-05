@@ -22,7 +22,7 @@ func TestInfo(t *testing.T) {
 	log = log.WithName("m")
 	log.Info("mess", "traceID", 17, "resource", "R")
 	want := []event.Event{{
-		At:   eventtest.InitialTime,
+		ID:   1,
 		Kind: event.LogKind,
 		Labels: []event.Label{
 			severity.Debug.Label(),

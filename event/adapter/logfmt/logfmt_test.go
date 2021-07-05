@@ -28,7 +28,7 @@ func TestPrint(t *testing.T) {
 		expect: ``,
 	}, {
 		name:   "span",
-		event:  event.Event{ID: 34},
+		event:  event.Event{ID: 34, Kind: event.StartKind},
 		expect: `trace=34`,
 	}, {
 		name:   "parent",

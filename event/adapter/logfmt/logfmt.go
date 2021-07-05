@@ -76,7 +76,7 @@ func (p *Printer) Event(w io.Writer, ev *event.Event) {
 		p.Label(w, l)
 	}
 
-	if ev.ID != 0 {
+	if ev.ID != 0 && ev.Kind == event.StartKind {
 		p.separator(w)
 		io.WriteString(w, `trace=`)
 		w.Write(strconv.AppendUint(p.buf[:0], ev.ID, 10))

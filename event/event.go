@@ -108,15 +108,19 @@ func (ev *Event) Clone() *Event {
 // This also returns the event to the pool, it is an error to do anything
 // with the event after it is delivered.
 func (ev *Event) Deliver() context.Context {
-	e := ev.target.exporter
 	// get the event ready to send
-	e.prepare(ev)
-	// now hold the lock while we deliver the event
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	ctx := e.handler.Event(ev.ctx, ev)
+	ev.prepare()
+	ctx := ev.deliver()
 	eventPool.Put(ev)
 	return ctx
+}
+
+func (ev *Event) deliver() context.Context {
+	// hold the lock while we deliver the event
+	e := ev.target.exporter
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.handler.Event(ev.ctx, ev)
 }
 
 func (ev *Event) Find(name string) Label {

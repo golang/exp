@@ -20,7 +20,7 @@ func Test(t *testing.T) {
 	ctx, h := eventtest.NewCapture()
 	log.Log(ctx, "msg", "mess", "level", 1, "name", "n/m", "traceID", 17, "resource", "R")
 	want := []event.Event{{
-		At:   eventtest.InitialTime,
+		ID:   1,
 		Kind: event.LogKind,
 		Labels: []event.Label{
 			event.Value("level", 1),
