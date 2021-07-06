@@ -7,85 +7,79 @@
 package event_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/eventtest"
 )
 
 func TestCommon(t *testing.T) {
-	ctx, h := eventtest.NewCapture()
 	m := event.NewCounter("m", "")
-
-	const simple = "simple message"
-	const trace = "a trace"
-
-	event.Log(ctx, simple)
-	checkMessage(t, h, "Log", simple)
-	checkName(t, h, "Log", "")
-	h.Reset()
-
-	event.Logf(ctx, "logf %s message", "to")
-	checkMessage(t, h, "Logf", "logf to message")
-	checkName(t, h, "Logf", "")
-	h.Reset()
-
-	m.Record(ctx, 3)
-	checkMessage(t, h, "Metric", "")
-	checkName(t, h, "Metric", "")
-	h.Reset()
-
-	event.Annotate(ctx, event.String("", ""))
-	checkMessage(t, h, "Annotate", "")
-	checkName(t, h, "Annotate", "")
-	h.Reset()
-
-	ctx = event.Start(ctx, trace)
-	checkMessage(t, h, "Start", "")
-	checkName(t, h, "Start", trace)
-	h.Reset()
-
-	event.End(ctx)
-	checkMessage(t, h, "End", "")
-	checkName(t, h, "End", "")
-}
-
-type finder interface {
-	Find(*event.Event) (string, bool)
-}
-
-func checkMessage(t *testing.T, h *eventtest.CaptureHandler, method string, text string) {
-	if len(h.Got) != 1 {
-		t.Errorf("Got %d events, expected 1", len(h.Got))
-		return
-	}
-	for _, l := range h.Got[0].Labels {
-		if l.Name == "msg" {
-			if l.String() != text {
-				t.Errorf("Expected event with Message %q from %s got %q", text, method, l.String())
+	for _, test := range []struct {
+		method string
+		events func(context.Context)
+		expect []event.Event
+	}{{
+		method: "Log",
+		events: func(ctx context.Context) { event.Log(ctx, "simple message") },
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "simple message")},
+		}},
+	}, {
+		method: "Logf",
+		events: func(ctx context.Context) { event.Logf(ctx, "logf %s message", "to") },
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "logf to message")},
+		}},
+	}, {
+		method: "Metric",
+		events: func(ctx context.Context) {
+			m.Record(ctx, 3)
+		},
+		expect: []event.Event{{
+			ID:   1,
+			Kind: event.MetricKind,
+			Labels: []event.Label{
+				event.Int64("metricValue", 3),
+				event.Value("metric", m),
+			},
+		}},
+	}, {
+		method: "Annotate",
+		events: func(ctx context.Context) { event.Annotate(ctx, event.String("other", "some value")) },
+		expect: []event.Event{{
+			ID:     1,
+			Labels: []event.Label{event.String("other", "some value")},
+		}},
+	}, {
+		method: "Start",
+		events: func(ctx context.Context) {
+			ctx = event.Start(ctx, `a trace`)
+			event.End(ctx)
+		},
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.StartKind,
+			Labels: []event.Label{event.String("name", "a trace")},
+		}, {
+			ID:     2,
+			Parent: 1,
+			Kind:   event.EndKind,
+			Labels: []event.Label{},
+		}},
+	}} {
+		t.Run(test.method, func(t *testing.T) {
+			ctx, h := eventtest.NewCapture()
+			test.events(ctx)
+			if diff := cmp.Diff(test.expect, h.Got, eventtest.CmpOption()); diff != "" {
+				t.Errorf("mismatch (-want, +got):\n%s", diff)
 			}
-			return
-		}
-	}
-	if text != "" {
-		t.Errorf("Expected event with Message %q from %s got %q", text, method, "")
-	}
-}
-
-func checkName(t *testing.T, h *eventtest.CaptureHandler, method string, text string) {
-	if len(h.Got) != 1 {
-		t.Errorf("Got %d events, expected 1", len(h.Got))
-		return
-	}
-	for _, l := range h.Got[0].Labels {
-		if l.Name == "name" {
-			if l.String() != text {
-				t.Errorf("Expected event with Name %q from %s got %q", text, method, l.String())
-			}
-			return
-		}
-	}
-	if text != "" {
-		t.Errorf("Expected event with Name %q from %s got %q", text, method, "")
+		})
 	}
 }
