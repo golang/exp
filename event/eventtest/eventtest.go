@@ -55,6 +55,11 @@ func ExporterOptions() *event.ExporterOptions {
 	}
 }
 
-func CmpOption() cmp.Option {
-	return cmpopts.IgnoreFields(event.Event{}, "At", "ctx", "target", "labels")
+func CmpOptions() []cmp.Option {
+	return []cmp.Option{
+		cmpopts.SortSlices(func(x, y event.Label) bool {
+			return x.Name < y.Name
+		}),
+		cmpopts.IgnoreFields(event.Event{}, "At", "ctx", "target", "labels"),
+	}
 }

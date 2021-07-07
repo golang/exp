@@ -35,6 +35,10 @@ func TestOfAs(t *testing.T) {
 	if got := v.String(); got != s {
 		t.Errorf("got %v, want %v", got, s)
 	}
+	v = event.Bytes("key", []byte(s))
+	if got := v.Bytes(); string(got) != s {
+		t.Errorf("got %v, want %v", got, s)
+	}
 	tm := time.Now()
 	v = event.Value("key", tm)
 	if got := v.Interface(); got != tm {
@@ -91,6 +95,8 @@ func TestPanics(t *testing.T) {
 		{"uint64", func() { event.Int64("key", 3).Uint64() }},
 		{"float64", func() { event.Uint64("key", 3).Float64() }},
 		{"bool", func() { event.Int64("key", 3).Bool() }},
+		{"duration", func() { event.Value("key", "value").Duration() }},
+		{"bytes", func() { event.String("key", "value").Bytes() }},
 	} {
 		if !panics(test.f) {
 			t.Errorf("%s: got no panic, want panic", test.name)

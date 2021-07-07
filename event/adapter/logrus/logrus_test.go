@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/event"
 	elogrus "golang.org/x/exp/event/adapter/logrus"
@@ -39,8 +38,7 @@ func Test(t *testing.T) {
 	}}
 	// logrus fields are stored in a map, so we have to sort to overcome map
 	// iteration indeterminacy.
-	less := func(a, b event.Label) bool { return a.Name < b.Name }
-	if diff := cmp.Diff(want, th.Got, cmpopts.SortSlices(less), eventtest.CmpOption()); diff != "" {
+	if diff := cmp.Diff(want, th.Got, eventtest.CmpOptions()...); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

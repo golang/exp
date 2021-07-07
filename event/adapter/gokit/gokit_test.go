@@ -30,7 +30,7 @@ func Test(t *testing.T) {
 			event.String("msg", "mess"),
 		},
 	}}
-	if diff := cmp.Diff(want, h.Got, eventtest.CmpOption()); diff != "" {
+	if diff := cmp.Diff(want, h.Got, eventtest.CmpOptions()...); diff != "" {
 		t.Errorf("mismatch (-want, +got):\n%s", diff)
 	}
 }

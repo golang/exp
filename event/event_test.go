@@ -8,12 +8,13 @@ package event_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/adapter/logfmt"
 	"golang.org/x/exp/event/eventtest"
@@ -26,41 +27,84 @@ var (
 	counter = event.NewCounter("hits", "cache hits")
 	gauge   = event.NewFloatGauge("temperature", "CPU board temperature in Celsius")
 	latency = event.NewDuration("latency", "how long it took")
+	err     = errors.New("an error")
 )
 
-func TestPrint(t *testing.T) {
-	ctx := context.Background()
+func TestCommon(t *testing.T) {
 	for _, test := range []struct {
-		name   string
+		method string
 		events func(context.Context)
-		expect string
+		expect []event.Event
 	}{{
-		name:   "simple",
+		method: "simple",
 		events: func(ctx context.Context) { event.Log(ctx, "a message") },
-		expect: `time="2020/03/05 14:27:48" msg="a message"
-`}, {
-		name:   "log 1",
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "a message")},
+		}},
+	}, {
+		method: "log 1",
 		events: func(ctx context.Context) { event.Log(ctx, "a message", l1) },
-		expect: `time="2020/03/05 14:27:48" l1=1 msg="a message"`,
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "a message"), l1},
+		}},
 	}, {
-		name:   "log 2",
+		method: "log 2",
 		events: func(ctx context.Context) { event.Log(ctx, "a message", l1, l2) },
-		expect: `time="2020/03/05 14:27:48" l1=1 l2=2 msg="a message"`,
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "a message"), l1, l2},
+		}},
 	}, {
-		name:   "log 3",
+		method: "log 3",
 		events: func(ctx context.Context) { event.Log(ctx, "a message", l1, l2, l3) },
-		expect: `time="2020/03/05 14:27:48" l1=1 l2=2 l3=3 msg="a message"`,
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "a message"), l1, l2, l3},
+		}},
 	}, {
-		name: "span",
+		method: "logf",
+		events: func(ctx context.Context) { event.Logf(ctx, "logf %s message", "to") },
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "logf to message")},
+		}},
+	}, {
+		method: "error",
+		events: func(ctx context.Context) { event.Error(ctx, "failed", err, l1) },
+		expect: []event.Event{{
+			ID:   1,
+			Kind: event.LogKind,
+			Labels: []event.Label{
+				event.String("msg", "failed"),
+				event.Value("error", err),
+				l1,
+			},
+		}},
+	}, {
+		method: "span",
 		events: func(ctx context.Context) {
-			ctx = event.Start(ctx, "span")
+			ctx = event.Start(ctx, `span`)
 			event.End(ctx)
 		},
-		expect: `
-time="2020/03/05 14:27:48" name=span trace=1
-time="2020/03/05 14:27:49" parent=1 end
-`}, {
-		name: "span nested",
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.StartKind,
+			Labels: []event.Label{event.String("name", "span")},
+		}, {
+			ID:     2,
+			Parent: 1,
+			Kind:   event.EndKind,
+			Labels: []event.Label{},
+		}},
+	}, {
+		method: "span nested",
 		events: func(ctx context.Context) {
 			ctx = event.Start(ctx, "parent")
 			defer event.End(ctx)
@@ -68,36 +112,83 @@ time="2020/03/05 14:27:49" parent=1 end
 			defer event.End(child)
 			event.Log(child, "message")
 		},
-		expect: `
-time="2020/03/05 14:27:48" name=parent trace=1
-time="2020/03/05 14:27:49" parent=1 name=child trace=2
-time="2020/03/05 14:27:50" parent=2 msg=message
-time="2020/03/05 14:27:51" parent=2 end
-time="2020/03/05 14:27:52" parent=1 end
-`}, {
-		name:   "counter",
+		expect: []event.Event{{
+			ID:     1,
+			Kind:   event.StartKind,
+			Labels: []event.Label{event.String("name", "parent")},
+		}, {
+			ID:     2,
+			Parent: 1,
+			Kind:   event.StartKind,
+			Labels: []event.Label{event.String("name", "child")},
+		}, {
+			ID:     3,
+			Parent: 2,
+			Kind:   event.LogKind,
+			Labels: []event.Label{event.String("msg", "message")},
+		}, {
+			ID:     4,
+			Parent: 2,
+			Kind:   event.EndKind,
+			Labels: []event.Label{},
+		}, {
+			ID:     5,
+			Parent: 1,
+			Kind:   event.EndKind,
+			Labels: []event.Label{},
+		}},
+	}, {
+		method: "counter",
 		events: func(ctx context.Context) { counter.Record(ctx, 2, l1) },
-		expect: `time="2020/03/05 14:27:48" metricValue=2 metric="Metric(\"golang.org/x/exp/event_test/hits\")" l1=1`,
+		expect: []event.Event{{
+			ID:   1,
+			Kind: event.MetricKind,
+			Labels: []event.Label{
+				event.Int64("metricValue", 2),
+				event.Value("metric", counter),
+				l1,
+			},
+		}},
 	}, {
-		name:   "gauge",
+		method: "gauge",
 		events: func(ctx context.Context) { gauge.Record(ctx, 98.6, l1) },
-		expect: `time="2020/03/05 14:27:48" metricValue=98.6 metric="Metric(\"golang.org/x/exp/event_test/temperature\")" l1=1`,
+		expect: []event.Event{{
+			ID:   1,
+			Kind: event.MetricKind,
+			Labels: []event.Label{
+				event.Float64("metricValue", 98.6),
+				event.Value("metric", gauge),
+				l1,
+			},
+		}},
 	}, {
-		name: "duration",
-		events: func(ctx context.Context) {
-			latency.Record(ctx, 3*time.Second, l1, l2)
-		},
-		expect: `time="2020/03/05 14:27:48" metricValue=3s metric="Metric(\"golang.org/x/exp/event_test/latency\")" l1=1 l2=2`,
+		method: "duration",
+		events: func(ctx context.Context) { latency.Record(ctx, 3*time.Second, l1, l2) },
+		expect: []event.Event{{
+			ID:   1,
+			Kind: event.MetricKind,
+			Labels: []event.Label{
+				event.Duration("metricValue", 3*time.Second),
+				event.Value("metric", latency),
+				l1, l2,
+			},
+		}},
 	}, {
-		name:   "annotate",
+		method: "annotate",
 		events: func(ctx context.Context) { event.Annotate(ctx, l1) },
-		expect: `time="2020/03/05 14:27:48" l1=1`,
+		expect: []event.Event{{
+			ID:     1,
+			Labels: []event.Label{l1},
+		}},
 	}, {
-		name:   "annotate 2",
+		method: "annotate 2",
 		events: func(ctx context.Context) { event.Annotate(ctx, l1, l2) },
-		expect: `time="2020/03/05 14:27:48" l1=1 l2=2`,
+		expect: []event.Event{{
+			ID:     1,
+			Labels: []event.Label{l1, l2},
+		}},
 	}, {
-		name: "multiple events",
+		method: "multiple events",
 		events: func(ctx context.Context) {
 			/*TODO: this is supposed to be using a cached target
 			t := event.To(ctx)
@@ -108,18 +199,29 @@ time="2020/03/05 14:27:52" parent=1 end
 			event.Log(ctx, "my event", event.Int64("myInt", 6))
 			event.Log(ctx, "string event", event.String("myString", "some string value"))
 		},
-		expect: `
-time="2020/03/05 14:27:48" myInt=6 msg="my event"
-time="2020/03/05 14:27:49" myString="some string value" msg="string event"
-`}} {
-		buf := &strings.Builder{}
-		ctx := event.WithExporter(ctx, event.NewExporter(logfmt.NewHandler(buf), eventtest.ExporterOptions()))
-		test.events(ctx)
-		got := strings.TrimSpace(buf.String())
-		expect := strings.TrimSpace(test.expect)
-		if got != expect {
-			t.Errorf("%s failed\ngot   : %s\nexpect: %s", test.name, got, expect)
-		}
+		expect: []event.Event{{
+			ID:   1,
+			Kind: event.LogKind,
+			Labels: []event.Label{
+				event.String("msg", "my event"),
+				event.Int64("myInt", 6),
+			},
+		}, {
+			ID:   2,
+			Kind: event.LogKind,
+			Labels: []event.Label{
+				event.String("msg", "string event"),
+				event.String("myString", "some string value"),
+			},
+		}},
+	}} {
+		t.Run(test.method, func(t *testing.T) {
+			ctx, h := eventtest.NewCapture()
+			test.events(ctx)
+			if diff := cmp.Diff(test.expect, h.Got, eventtest.CmpOptions()...); diff != "" {
+				t.Errorf("mismatch (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
