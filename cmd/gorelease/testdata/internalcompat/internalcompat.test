@@ -3,4 +3,3 @@ version=v1.0.0
 release=v1.0.1
 base=example.com/internalcompat/a@v1.0.0
 -- want --
-# summary

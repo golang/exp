@@ -61,6 +61,10 @@ func (r *report) String() string {
 		buf.WriteString(p.String())
 	}
 
+	if !r.canVerifyReleaseVersion() {
+		return buf.String()
+	}
+
 	if len(r.release.diagnostics) > 0 {
 		buf.WriteString("# diagnostics\n")
 		for _, d := range r.release.diagnostics {
@@ -88,7 +92,7 @@ func (r *report) String() string {
 		} else {
 			fmt.Fprintf(buf, "Suggested version: %[1]s (with tag %[2]s%[1]s)\n", r.release.version, r.release.tagPrefix)
 		}
-	} else if r.release.version != "" && r.canVerifyReleaseVersion() {
+	} else if r.release.version != "" {
 		if r.release.tagPrefix == "" {
 			fmt.Fprintf(buf, "%s is a valid semantic version for this release.\n", r.release.version)
 
