@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"runtime"
 	"sort"
@@ -167,7 +168,7 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 
 	// Load packages.
 	if *verboseFlag {
-		fmt.Println("loading packages...")
+		log.Println("loading packages...")
 	}
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {
@@ -177,12 +178,12 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 		return nil, fmt.Errorf("packages contain errors")
 	}
 	if *verboseFlag {
-		fmt.Printf("\t%d loaded packages\n", len(pkgs))
+		log.Printf("\t%d loaded packages\n", len(pkgs))
 	}
 
 	// Load database.
 	if *verboseFlag {
-		fmt.Println("loading database...")
+		log.Println("loading database...")
 	}
 	vulns, err := audit.LoadVulnerabilities(dbs, allPkgPaths(pkgs))
 	if err != nil {
@@ -190,7 +191,7 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 	}
 
 	if *verboseFlag {
-		fmt.Printf("\t%d known vulnerabilities.\n", len(vulns))
+		log.Printf("\t%d known vulnerabilities.\n", len(vulns))
 	}
 
 	// Load package versions.
@@ -198,17 +199,17 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 
 	// Load SSA.
 	if *verboseFlag {
-		fmt.Println("building ssa...")
+		log.Println("building ssa...")
 	}
 	prog, ssaPkgs := ssautil.AllPackages(pkgs, 0)
 	prog.Build()
 	if *verboseFlag {
-		fmt.Println("\tbuilt ssa.")
+		log.Println("\tbuilt ssa")
 	}
 
 	// Compute the findings.
 	if *verboseFlag {
-		fmt.Println("detecting vulnerabilities...")
+		log.Println("detecting vulnerabilities...")
 	}
 	var findings []audit.Finding
 	env := audit.Env{OS: runtime.GOOS, Arch: runtime.GOARCH, PkgVersions: pkgVersions, Vulns: vulns}
@@ -218,7 +219,7 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 		findings = audit.VulnerableSymbols(ssaPkgs, env)
 	}
 	if *verboseFlag {
-		fmt.Printf("\t%d detected findings.\n", len(findings))
+		log.Printf("\t%d detected findings.\n", len(findings))
 	}
 	return findings, nil
 }
