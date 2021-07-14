@@ -329,7 +329,7 @@ func createEGLSurface(hwnd syscall.Handle, w *windowImpl) error {
 	}
 
 	contextAttribs := [...]eglInt{
-		_EGL_CONTEXT_CLIENT_VERSION, 2,
+		_EGL_CONTEXT_CLIENT_VERSION, 3,
 		_EGL_NONE,
 	}
 	context, _, _ := eglCreateContext.Call(
@@ -338,6 +338,19 @@ func createEGLSurface(hwnd syscall.Handle, w *windowImpl) error {
 		_EGL_NO_CONTEXT,
 		uintptr(unsafe.Pointer(&contextAttribs[0])),
 	)
+	if context == _EGL_NO_CONTEXT {
+		// Try again with OpenGL ES 2.0.
+		context2Attribs := [...]eglInt{
+			_EGL_CONTEXT_CLIENT_VERSION, 2,
+			_EGL_NONE,
+		}
+		context, _, _ = eglCreateContext.Call(
+			display,
+			uintptr(config),
+			_EGL_NO_CONTEXT,
+			uintptr(unsafe.Pointer(&context2Attribs[0])),
+		)
+	}
 	if context == _EGL_NO_CONTEXT {
 		return fmt.Errorf("eglCreateContext failed: %v", eglErr())
 	}
