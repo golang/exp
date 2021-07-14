@@ -37,8 +37,8 @@ type FontFaceOptions struct {
 // in general, a font.Face is not safe for concurrent use, as its methods may
 // re-use implementation-specific caches and mask image buffers.
 type FontFaceCatalog interface {
-	AcquireFontFace(FontFaceOptions) font.Face
-	ReleaseFontFace(FontFaceOptions, font.Face)
+	AcquireFontFace(opts FontFaceOptions, dpi float64) font.Face
+	ReleaseFontFace(opts FontFaceOptions, dpi float64, face font.Face)
 
 	// TODO: add a "Metrics(FontFaceOptions) font.Metrics" method?
 }
@@ -132,11 +132,11 @@ var (
 
 type defaultFontFaceCatalog struct{}
 
-func (defaultFontFaceCatalog) AcquireFontFace(FontFaceOptions) font.Face {
+func (defaultFontFaceCatalog) AcquireFontFace(FontFaceOptions, float64) font.Face {
 	return inconsolata.Regular8x16
 }
 
-func (defaultFontFaceCatalog) ReleaseFontFace(FontFaceOptions, font.Face) {}
+func (defaultFontFaceCatalog) ReleaseFontFace(FontFaceOptions, float64, font.Face) {}
 
 // Theme is used for measuring, laying out and painting widgets. It consists of
 // a screen DPI resolution, a set of font faces and colors.
@@ -186,12 +186,12 @@ func (t *Theme) GetPalette() *Palette {
 
 // AcquireFontFace calls the same method on the result of GetFontFaceCatalog.
 func (t *Theme) AcquireFontFace(o FontFaceOptions) font.Face {
-	return t.GetFontFaceCatalog().AcquireFontFace(o)
+	return t.GetFontFaceCatalog().AcquireFontFace(o, t.GetDPI())
 }
 
 // ReleaseFontFace calls the same method on the result of GetFontFaceCatalog.
 func (t *Theme) ReleaseFontFace(o FontFaceOptions, f font.Face) {
-	t.GetFontFaceCatalog().ReleaseFontFace(o, f)
+	t.GetFontFaceCatalog().ReleaseFontFace(o, t.GetDPI(), f)
 }
 
 // Pixels implements the unit.Converter interface.
