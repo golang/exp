@@ -89,6 +89,10 @@ func showWindow(w *windowImpl) {
 
 func closeWindow(id uintptr) {} // TODO
 
+func setTitle(id uintptr, title string) {
+	_ = win32.SetWindowTitle(syscall.Handle(id), title)
+}
+
 func drawLoop(w *windowImpl) {
 	runtime.LockOSThread()
 

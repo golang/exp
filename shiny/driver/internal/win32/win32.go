@@ -175,6 +175,15 @@ func sendClose(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResul
 	return _DefWindowProc(hwnd, uMsg, wParam, lParam)
 }
 
+func SetWindowTitle(hwnd syscall.Handle, title string) error {
+	ctitle, err := syscall.UTF16PtrFromString(title)
+	if err != nil {
+		return err
+	}
+
+	return _SetWindowTextW(hwnd, ctitle)
+}
+
 func sendMouseEvent(hwnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) (lResult uintptr) {
 	e := mouse.Event{
 		X:         float32(_GET_X_LPARAM(lParam)),

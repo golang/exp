@@ -106,6 +106,10 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	return screen.PublishResult{}
 }
 
+func (w *windowImpl) SetTitle(title string) {
+	xproto.ChangeProperty(w.s.xc, xproto.PropModeReplace, w.xw, w.s.atomNETWMName, w.s.atomUTF8String, 8, uint32(len(title)), []byte(title))
+}
+
 func (w *windowImpl) handleConfigureNotify(ev xproto.ConfigureNotifyEvent) {
 	// TODO: does the order of these lifecycle and size events matter? Should
 	// they really be a single, atomic event?

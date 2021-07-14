@@ -22,6 +22,7 @@ void stopDriver();
 void makeCurrentContext(uintptr_t ctx);
 void flushContext(uintptr_t ctx);
 uintptr_t doNewWindow(int width, int height, char* title);
+void doSetTitle(uintptr_t id, char* title);
 void doShowWindow(uintptr_t id);
 void doCloseWindow(uintptr_t id);
 uint64_t threadID();
@@ -79,6 +80,13 @@ func initWindow(w *windowImpl) {
 
 func showWindow(w *windowImpl) {
 	C.doShowWindow(C.uintptr_t(w.id))
+}
+
+func setTitle(id uintptr, title string) {
+	ctitle := C.CString(title)
+	defer C.free(unsafe.Pointer(ctitle))
+
+	C.doSetTitle(C.uintptr_t(id), ctitle)
 }
 
 //export preparedOpenGL

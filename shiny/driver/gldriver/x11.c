@@ -231,6 +231,12 @@ doCloseWindow(uintptr_t id) {
 	XDestroyWindow(x_dpy, win);
 }
 
+void
+doSetTitle(uintptr_t id, char* title, int title_len) {
+	Window win = (Window)(id);
+	XChangeProperty(x_dpy, win, net_wm_name, utf8_string, 8, PropModeReplace, title, title_len);
+}
+
 uintptr_t
 doNewWindow(int width, int height, char* title, int title_len) {
 	XSetWindowAttributes attr;
