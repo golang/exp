@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"golang.org/x/exp/vulndb/internal/audit"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/packages/packagestest"
+	"golang.org/x/vulndb/osv"
 )
 
 // TODO(zpavlinovic): improve integration tests.
@@ -210,12 +212,12 @@ func TestHashicorpVault(t *testing.T) {
 			}
 		}
 
-		finds, err := run(cfg, []string{hashiVaultOkta}, false, []string{test.source})
+		r, err := run(cfg, []string{hashiVaultOkta}, false, []string{test.source})
 		if err != nil {
 			t.Fatal(err)
 		}
-		sort.SliceStable(finds, func(i int, j int) bool { return audit.FindingCompare(finds[i], finds[j]) })
-		if fs := testFindings(finds); !subset(test.want, fs) {
+		sort.SliceStable(r.Findings, func(i int, j int) bool { return audit.FindingCompare(r.Findings[i], r.Findings[j]) })
+		if fs := testFindings(r.Findings); !subset(test.want, fs) {
 			t.Errorf("want %v subset of findings; got %v", test.want, fs)
 		}
 	}
@@ -362,13 +364,64 @@ func TestKubernetes(t *testing.T) {
 			}
 		}
 
-		finds, err := run(cfg, []string{"./..."}, false, []string{test.source})
+		r, err := run(cfg, []string{"./..."}, false, []string{test.source})
 		if err != nil {
 			t.Fatal(err)
 		}
-		sort.SliceStable(finds, func(i int, j int) bool { return audit.FindingCompare(finds[i], finds[j]) })
-		if fs := testFindings(finds); !subset(test.want, fs) {
+		sort.SliceStable(r.Findings, func(i int, j int) bool { return audit.FindingCompare(r.Findings[i], r.Findings[j]) })
+		if fs := testFindings(r.Findings); !subset(test.want, fs) {
 			t.Errorf("want %v subset of findings; got %v", test.want, fs)
 		}
+	}
+}
+
+func vulnsToString(vulns []*osv.Entry) string {
+	var s string
+	for _, v := range vulns {
+		s += fmt.Sprintf("\t%v\n", v)
+	}
+	return s
+}
+
+func TestFilterVulsn(t *testing.T) {
+	vulns := []*osv.Entry{
+		{Package: osv.Package{Name: "example.com/a"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "1.0.0"}}}},
+		{Package: osv.Package{Name: "example.com/b"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "2.0.0"}}}},
+		{Package: osv.Package{Name: "example.com/c"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "3.0.0"}}}},
+	}
+	pkgs := map[string]string{
+		"example.com/a": "v0.0.1",
+		"example.com/b": "v1.0.0",
+		"example.com/c": "v9.0.0",
+	}
+
+	filtered := filterVulns(vulns, pkgs)
+
+	expected := []*osv.Entry{
+		{Package: osv.Package{Name: "example.com/a"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "1.0.0"}}}},
+		{Package: osv.Package{Name: "example.com/b"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "2.0.0"}}}},
+	}
+	if !reflect.DeepEqual(filtered, expected) {
+		t.Errorf("filterVulns returned unexpected results: got\n%swant\n%s", vulnsToString(filtered), vulnsToString(expected))
+	}
+}
+
+func TestUnreachable(t *testing.T) {
+	r := &results{
+		Vulns: []*osv.Entry{
+			{ID: "0", Package: osv.Package{Name: "example.com/a"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "1.0.0"}}}},
+			{ID: "1", Package: osv.Package{Name: "example.com/b"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "2.0.0"}}}},
+		},
+		Findings: []audit.Finding{
+			{Vulns: []osv.Entry{{ID: "0"}}},
+		},
+	}
+
+	expected := []*osv.Entry{
+		{ID: "1", Package: osv.Package{Name: "example.com/b"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "2.0.0"}}}},
+	}
+	unreachable := r.unreachable()
+	if !reflect.DeepEqual(unreachable, expected) {
+		t.Errorf("unreachable returned unexpected results: got\n%swant\n%s", vulnsToString(unreachable), vulnsToString(expected))
 	}
 }
