@@ -269,6 +269,15 @@ func TestKubernetes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
+
+	// make sure the dependencies are present
+	if _, err := exec.LookPath("tar"); err != nil {
+		t.Skip("tar needed for this test.")
+	}
+	if _, err := exec.LookPath("unzip"); err != nil {
+		t.Skip("unzip needed for this test.")
+	}
+
 	e := packagestest.Export(t, packagestest.Modules, []packagestest.Module{
 		{
 			Name: "foo",
