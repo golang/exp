@@ -195,6 +195,11 @@ func ExtractPackagesAndSymbols(binPath string) ([]*packages.Module, map[string][
 	}
 
 	pclntab, textOffset := x.PCLNTab()
+	if pclntab == nil {
+		// TODO(roland): if we have build information, but not PCLN table, we should be able to
+		// fall back to much higher granularity vulnerability checking.
+		return nil, nil, errors.New("unable to load the PCLN table")
+	}
 	lineTab := gosym.NewLineTable(pclntab, textOffset)
 	if lineTab == nil {
 		return nil, nil, errors.New("invalid line table")

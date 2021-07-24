@@ -12,6 +12,7 @@ import (
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
+	"encoding/binary"
 	"fmt"
 
 	// "internal/xcoff"
@@ -124,6 +125,9 @@ func (x *elfExe) DataStart() uint64 {
 	return 0
 }
 
+const go12magic = 0xfffffffb
+const go116magic = 0xfffffffa
+
 func (x *elfExe) PCLNTab() ([]byte, uint64) {
 	var offset uint64
 	text := x.f.Section(".text")
@@ -134,12 +138,45 @@ func (x *elfExe) PCLNTab() ([]byte, uint64) {
 	if pclntab == nil {
 		pclntab = x.f.Section(".data.rel.ro.gopclntab")
 		if pclntab == nil {
-			panic("no pclntab")
+			pclntab = x.f.Section(".data.rel.ro")
+			if pclntab == nil {
+				return nil, 0
+			}
+			// Possibly the PCLN table has been stuck in the .data.rel.ro section, but without
+			// its own section header. We can search for for the start by looking for the four
+			// byte magic and the go magic.
+			b, err := pclntab.Data()
+			if err != nil {
+				return nil, 0
+			}
+			// TODO(rolandshoemaker): I'm not sure if the 16 byte increment during the search is
+			// actually correct. During testing it worked, but that may be because I got lucky
+			// with the binary I was using, and we need to do four byte jumps to exhaustively
+			// search the section?
+			for i := 0; i < len(b); i += 16 {
+				if len(b)-i > 16 && b[i+4] == 0 && b[i+5] == 0 &&
+					(b[i+6] == 1 || b[i+6] == 2 || b[i+6] == 4) &&
+					(b[i+7] == 4 || b[i+7] == 8) {
+					// Also check for the go magic
+					leMagic := binary.LittleEndian.Uint32(b[i:])
+					beMagic := binary.BigEndian.Uint32(b[i:])
+					switch {
+					case leMagic == go12magic:
+						fallthrough
+					case beMagic == go12magic:
+						fallthrough
+					case leMagic == go116magic:
+						fallthrough
+					case beMagic == go116magic:
+						return b[i:], offset
+					}
+				}
+			}
 		}
 	}
 	b, err := pclntab.Data()
 	if err != nil {
-		panic(err)
+		return nil, 0
 	}
 	return b, offset
 }
@@ -225,14 +262,14 @@ func (x *peExe) PCLNTab() ([]byte, uint64) {
 		}
 	}
 	if start == 0 || end == 0 {
-		panic("didn't find both start and enc")
+		return nil, 0
 	}
 	offset := int64(x.f.Sections[section].Offset) + start
 	size := end - start
 
 	pclntab := make([]byte, size)
 	if _, err := x.os.ReadAt(pclntab, offset); err != nil {
-		panic(err)
+		return nil, 0
 	}
 
 	return pclntab, textOffset
@@ -299,11 +336,11 @@ func (x *machoExe) PCLNTab() ([]byte, uint64) {
 	}
 	pclntab := x.f.Section("__gopclntab")
 	if pclntab == nil {
-		panic("no pclntab")
+		return nil, 0
 	}
 	b, err := pclntab.Data()
 	if err != nil {
-		panic("err")
+		return nil, 0
 	}
 	return b, textOffset
 }
