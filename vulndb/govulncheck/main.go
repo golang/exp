@@ -19,11 +19,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 
 	"golang.org/x/exp/vulndb/internal/audit"
@@ -31,7 +29,6 @@ import (
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa/ssautil"
 	"golang.org/x/vulndb/client"
-	"golang.org/x/vulndb/osv"
 )
 
 var (
@@ -68,59 +65,6 @@ database URLs, with http://, https://, or file:// protocols. Entries from multip
 databases are merged.
 `
 
-type results struct {
-	Modules  []*packages.Module
-	Vulns    []*osv.Entry
-	Findings []audit.Finding
-}
-
-func (r *results) unreachable() []*osv.Entry {
-	seen := map[string]bool{}
-	for _, f := range r.Findings {
-		for _, v := range f.Vulns {
-			seen[v.ID] = true
-		}
-	}
-	unseen := []*osv.Entry{}
-	for _, v := range r.Vulns {
-		if seen[v.ID] {
-			continue
-		}
-		unseen = append(unseen, v)
-	}
-	return unseen
-}
-
-// presentTo pretty-prints results to out.
-func (r *results) presentTo(out io.Writer) {
-	sort.Slice(r.Vulns, func(i, j int) bool { return r.Vulns[i].ID < r.Vulns[j].ID })
-	sort.SliceStable(r.Findings, func(i int, j int) bool { return audit.FindingCompare(r.Findings[i], r.Findings[j]) })
-	if !*jsonFlag {
-		for _, finding := range r.Findings {
-			finding.Write(out)
-			out.Write([]byte{'\n'})
-		}
-		if unreachable := r.unreachable(); len(unreachable) > 0 {
-			fmt.Fprintf(out, "The following %d vulnerabilities don't affect this project:\n", len(unreachable))
-			for _, u := range unreachable {
-				var aliases string
-				if len(u.Aliases) > 0 {
-					aliases = fmt.Sprintf(" (%s)", strings.Join(u.Aliases, ", "))
-				}
-				fmt.Fprintf(out, "- %s%s (package imported, but vulnerable symbol is not reachable)\n", u.ID, aliases)
-			}
-		}
-		return
-	}
-	b, err := json.MarshalIndent(r, "", "\t")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
-		os.Exit(1)
-	}
-	out.Write(b)
-	out.Write([]byte{'\n'})
-}
-
 func main() {
 	flag.Usage = func() { fmt.Fprintln(os.Stderr, usage) }
 	flag.Parse()
@@ -145,7 +89,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	r.presentTo(os.Stdout)
+	writeOut(r, *jsonFlag)
+}
+
+func writeOut(r *audit.Results, toJson bool) {
+	if !toJson {
+		os.Stdout.Write([]byte(r.String()))
+		return
+	}
+
+	b, err := json.MarshalIndent(r, "", "\t")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
+		os.Exit(1)
+	}
+	os.Stdout.Write(b)
+	os.Stdout.Write([]byte{'\n'})
 }
 
 // extractModules collects modules in `pkgs` up to uniqueness of
@@ -192,8 +151,7 @@ func isFile(path string) bool {
 	return !s.IsDir()
 }
 
-func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string) (*results, error) {
-	r := &results{}
+func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string) (*audit.Results, error) {
 	if len(patterns) == 1 && isFile(patterns[0]) {
 		modules, symbols, err := binscan.ExtractPackagesAndSymbols(patterns[0])
 		if err != nil {
@@ -204,14 +162,15 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 		if err != nil {
 			return nil, fmt.Errorf("failed to create database client: %s", err)
 		}
+
 		vulns, err := audit.FetchVulnerabilities(dbClient, modules)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load vulnerability dbs: %v", err)
 		}
 		vulns = vulns.Filter(runtime.GOOS, runtime.GOARCH)
 
-		r.Findings = audit.VulnerablePackageSymbols(symbols, vulns)
-		return r, nil
+		results := audit.VulnerablePackageSymbols(symbols, vulns)
+		return &results, nil
 	}
 
 	// Load packages.
@@ -233,17 +192,16 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 	if *verboseFlag {
 		log.Println("loading database...")
 	}
-	r.Modules = extractModules(pkgs)
 	dbClient, err := client.NewClient(dbs, client.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database client: %s", err)
 	}
-	modVulns, err := audit.FetchVulnerabilities(dbClient, r.Modules)
+
+	modVulns, err := audit.FetchVulnerabilities(dbClient, extractModules(pkgs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch vulnerabilities: %v", err)
 	}
 	modVulns = modVulns.Filter(runtime.GOOS, runtime.GOARCH)
-
 	if *verboseFlag {
 		log.Printf("\t%d known vulnerabilities.\n", modVulns.Num())
 	}
@@ -262,15 +220,11 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 	if *verboseFlag {
 		log.Println("detecting vulnerabilities...")
 	}
-	var findings []audit.Finding
+	var results audit.Results
 	if importsOnly {
-		r.Findings = audit.VulnerableImports(ssaPkgs, modVulns)
+		results = audit.VulnerableImports(ssaPkgs, modVulns)
 	} else {
-		r.Findings = audit.VulnerableSymbols(ssaPkgs, modVulns)
+		results = audit.VulnerableSymbols(ssaPkgs, modVulns)
 	}
-	if *verboseFlag {
-		log.Printf("\t%d detected findings.\n", len(findings))
-	}
-
-	return r, nil
+	return &results, nil
 }

@@ -73,11 +73,13 @@ func testContext(t *testing.T) ([]*ssa.Package, ModuleVulnerabilities) {
 			mod: &packages.Module{Path: "thirdparty.org/vulnerabilities", Version: "v1.0.1"},
 			vulns: []*osv.Entry{
 				{
+					ID:                "V1",
 					Package:           osv.Package{Name: "thirdparty.org/vulnerabilities/vuln"},
 					Affects:           osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "1.0.0", Fixed: "1.0.4"}, {Type: osv.TypeSemver, Introduced: "1.1.2"}}},
 					EcosystemSpecific: osv.GoSpecific{Symbols: []string{"VulnData.Vuln", "VulnData.VulnOnPtr"}},
 				},
 				{
+					ID:                "V2",
 					Package:           osv.Package{Name: "thirdparty.org/vulnerabilities/vuln"},
 					Affects:           osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "1.0.1", Fixed: "1.0.2"}}},
 					EcosystemSpecific: osv.GoSpecific{Symbols: []string{"VG"}},
@@ -146,7 +148,6 @@ func projectFindings(findings []Finding) []Finding {
 			Symbol:   f.Symbol,
 			Position: projectPosition(f.Position),
 			Trace:    projectTrace(f.Trace),
-			Vulns:    projectVulns(f.Vulns),
 			weight:   f.weight,
 		}
 		nfs = append(nfs, nf)

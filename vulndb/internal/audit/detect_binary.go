@@ -9,23 +9,32 @@ import (
 )
 
 // VulnerablePackageSymbols returns a list of vulnerability findings for per-package symbols
-// in packageSymbols, given the vulnerability and platform info captured in env.
+// in packageSymbols, given the `modVulns` vulnerabilities.
 //
-// Returned Findings only have Symbol, Type, and Vulns fields set.
-func VulnerablePackageSymbols(packageSymbols map[string][]string, modVulns ModuleVulnerabilities) []Finding {
-	var findings []Finding
+// Findings for each vulnerability are sorted by estimated usefulness to the user and do not
+// have an associated trace.
+func VulnerablePackageSymbols(packageSymbols map[string][]string, modVulns ModuleVulnerabilities) Results {
+	results := Results{
+		SearchMode:      BinarySearch,
+		Vulnerabilities: serialize(modVulns.Vulns()),
+		VulnFindings:    make(map[string][]Finding),
+	}
+	if len(modVulns) == 0 {
+		return results
+	}
+
 	for pkg, symbols := range packageSymbols {
 		for _, symbol := range symbols {
-			if vulns := modVulns.VulnsForSymbol(pkg, symbol); len(vulns) > 0 {
-				findings = append(findings,
-					Finding{
-						Symbol: fmt.Sprintf("%s.%s", pkg, symbol),
-						Type:   GlobalType,
-						Vulns:  serialize(vulns),
-					})
+			vulns := modVulns.VulnsForSymbol(pkg, symbol)
+			for _, v := range serialize(vulns) {
+				results.addFinding(v, Finding{
+					Symbol: fmt.Sprintf("%s.%s", pkg, symbol),
+					Type:   GlobalType,
+				})
 			}
 		}
 	}
 
-	return findings
+	results.sort()
+	return results
 }

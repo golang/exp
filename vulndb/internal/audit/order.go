@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-// FindingCompare compares two findings in terms of their approximate usefulness to the user.
+// findingCompare compares two findings in terms of their approximate usefulness to the user.
 // A finding that either has 1) shorter trace, or 2) less unresolved call sites in the trace
 // is considered smaller, i.e., better.
-func FindingCompare(finding1, finding2 Finding) bool {
+func findingCompare(finding1, finding2 Finding) bool {
 	if len(finding1.Trace) < len(finding2.Trace) {
 		return true
 	} else if len(finding2.Trace) < len(finding1.Trace) {

@@ -18,9 +18,9 @@ import (
 	"golang.org/x/tools/go/callgraph/vta"
 )
 
-// VulnerableSymbols returns a list of vulnerability findings for symbols transitively reachable
-// through the callgraph built using VTA analysis from the entry points of pkgs, given the
-// vulnerability and platform info captured in env.
+// VulnerableSymbols returns vulnerability findings for symbols transitively reachable
+// through the callgraph built using VTA analysis from the entry points of pkgs, given
+// the vulnerability and platform info captured in env.
 //
 // Returns all findings reachable from pkgs while analyzing each package only once, prefering findings
 // of shorter import traces. For instance, given call chains
@@ -33,8 +33,19 @@ import (
 //   D() -> B() -> V
 // as traces of transitively using a vulnerable symbol V.
 //
+// Findings for each vulnerability are sorted by estimated usefulness to the user.
+//
 // Panics if packages in pkgs do not belong to the same program.
-func VulnerableSymbols(pkgs []*ssa.Package, modVulns ModuleVulnerabilities) []Finding {
+func VulnerableSymbols(pkgs []*ssa.Package, modVulns ModuleVulnerabilities) Results {
+	results := Results{
+		SearchMode:      CallGraphSearch,
+		Vulnerabilities: serialize(modVulns.Vulns()),
+		VulnFindings:    make(map[string][]Finding),
+	}
+	if len(modVulns) == 0 {
+		return results
+	}
+
 	prog := pkgsProgram(pkgs)
 	if prog == nil {
 		panic("packages in pkgs must belong to a single common program")
@@ -47,7 +58,6 @@ func VulnerableSymbols(pkgs []*ssa.Package, modVulns ModuleVulnerabilities) []Fi
 		queue.PushBack(&callChain{f: entry})
 	}
 
-	var findings []Finding
 	seen := make(map[*ssa.Function]bool)
 	for queue.Len() > 0 {
 		front := queue.Front()
@@ -59,14 +69,14 @@ func VulnerableSymbols(pkgs []*ssa.Package, modVulns ModuleVulnerabilities) []Fi
 		}
 		seen[v.f] = true
 
-		finds, calls := funcVulnsAndCalls(v, modVulns, callGraph)
-		findings = append(findings, finds...)
+		calls := funcVulnsAndCalls(v, modVulns, &results, callGraph)
 		for _, call := range calls {
 			queue.PushBack(call)
 		}
 	}
 
-	return findings
+	results.sort()
+	return results
 }
 
 // callGraph builds a call graph of prog based on VTA analysis.
@@ -175,15 +185,14 @@ func (chain *callChain) weight() int {
 	return callWeight + chain.parent.weight()
 }
 
-// funcVulnsAndCalls returns a list of symbol findings for function at the top
-// of chain and next calls to analyze.
-func funcVulnsAndCalls(chain *callChain, modVulns ModuleVulnerabilities, callGraph *callgraph.Graph) ([]Finding, []*callChain) {
-	var findings []Finding
+// funcVulnsAndCalls adds symbol findings to results for
+// function at the top of chain and next calls to analyze.
+func funcVulnsAndCalls(chain *callChain, modVulns ModuleVulnerabilities, results *Results, callGraph *callgraph.Graph) []*callChain {
 	var calls []*callChain
 	for _, b := range chain.f.Blocks {
 		for _, instr := range b.Instrs {
 			// First collect all findings for globals except callees in function call statements.
-			findings = append(findings, globalFindings(globalUses(instr), chain, modVulns)...)
+			globalFindings(globalUses(instr), chain, modVulns, results)
 
 			// Callees are handled separately to produce call findings rather than global findings.
 			site, ok := instr.(ssa.CallInstruction)
@@ -191,78 +200,68 @@ func funcVulnsAndCalls(chain *callChain, modVulns ModuleVulnerabilities, callGra
 				continue
 			}
 
-			callees := siteCallees(site, callGraph)
-			for _, callee := range callees {
+			for _, callee := range siteCallees(site, callGraph) {
 				c := &callChain{call: site, f: callee, parent: chain}
 				calls = append(calls, c)
-
-				if f := callFinding(c, modVulns); f != nil {
-					findings = append(findings, *f)
-				}
+				callFinding(c, modVulns, results)
 			}
 		}
 	}
-	return findings, calls
+	return calls
 }
 
-// globalFindings returns findings for vulnerable globals among globalUses.
+// globalFindings adds findings for vulnerable globals among globalUses to results.
 // Assumes each use in globalUses is a use of a global variable. Can generate
 // duplicates when globalUses contains duplicates.
-func globalFindings(globalUses []*ssa.Value, chain *callChain, modVulns ModuleVulnerabilities) []Finding {
+func globalFindings(globalUses []*ssa.Value, chain *callChain, modVulns ModuleVulnerabilities, results *Results) {
 	if underRelatedVuln(chain, modVulns) {
-		return nil
+		return
 	}
 
-	var findings []Finding
 	for _, o := range globalUses {
 		g := (*o).(*ssa.Global)
 		vulns := modVulns.VulnsForSymbol(g.Package().Pkg.Path(), g.Name())
-		if len(vulns) > 0 {
-			findings = append(findings,
-				Finding{
-					Symbol:   fmt.Sprintf("%s.%s", g.Package().Pkg.Path(), g.Name()),
-					Trace:    chain.trace(),
-					Position: valPosition(*o, chain.f),
-					Type:     GlobalType,
-					Vulns:    serialize(vulns),
-					weight:   chain.weight()})
+		for _, v := range serialize(vulns) {
+			results.addFinding(v, Finding{
+				Symbol:   fmt.Sprintf("%s.%s", g.Package().Pkg.Path(), g.Name()),
+				Trace:    chain.trace(),
+				Position: valPosition(*o, chain.f),
+				Type:     GlobalType,
+				weight:   chain.weight()})
 		}
 	}
-	return findings
 }
 
-// callFinding returns vulnerability finding for the call made at the top of the chain.
+// callFinding adds findings to results for the call made at the top of the chain.
 // If there is no vulnerability or no call information, then nil is returned.
 // TODO(zpavlinovic): remove ssa info from higher-order calls.
-func callFinding(chain *callChain, modVulns ModuleVulnerabilities) *Finding {
+func callFinding(chain *callChain, modVulns ModuleVulnerabilities, results *Results) {
 	if underRelatedVuln(chain, modVulns) {
-		return nil
+		return
 	}
 
 	callee := chain.f
 	call := chain.call
 	if callee == nil || call == nil {
-		return nil
+		return
+	}
+
+	c := chain
+	if !unresolved(call) {
+		// If the last call is a resolved callsite, remove the edge from the trace as that
+		// information is provided in the symbol field.
+		c = c.parent
 	}
 
 	vulns := modVulns.VulnsForSymbol(callee.Package().Pkg.Path(), dbFuncName(callee))
-	if len(vulns) > 0 {
-		c := chain
-		if !unresolved(call) {
-			// If the last call is a resolved callsite, remove the edge from the trace as that
-			// information is provided in the symbol field.
-			c = c.parent
-		}
-		return &Finding{
+	for _, v := range serialize(vulns) {
+		results.addFinding(v, Finding{
 			Symbol:   fmt.Sprintf("%s.%s", callee.Package().Pkg.Path(), dbFuncName(callee)),
 			Trace:    c.trace(),
 			Position: instrPosition(call),
 			Type:     FunctionType,
-			Vulns:    serialize(vulns),
-			weight:   c.weight()}
+			weight:   c.weight()})
 	}
-
-	return nil
 }
 
 // Checks if a potential vulnerability in chain.f is analyzed only because
