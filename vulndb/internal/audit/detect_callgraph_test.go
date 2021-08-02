@@ -14,8 +14,8 @@ import (
 )
 
 func TestSymbolVulnDetectionVTA(t *testing.T) {
-	pkgs, env := testProgAndEnv(t)
-	got := projectFindings(VulnerableSymbols(pkgs, env))
+	pkgs, modVulns := testContext(t)
+	got := projectFindings(VulnerableSymbols(pkgs, modVulns))
 
 	// There should be four call chains reported with VTA-VTA version, in the following order:
 	//   T:T1() -> vuln.VG                                     [use of global at line 4]

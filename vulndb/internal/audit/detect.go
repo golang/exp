@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"go/token"
 	"io"
+	"strings"
 
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/vulndb/osv"
 )
 
@@ -43,17 +45,6 @@ const (
 type TraceElem struct {
 	Description string
 	Position    *token.Position `json:",omitempty"`
-}
-
-// Env encapsulates information for querying if an imported symbol/package is vulnerable:
-//  - platform info
-//  - package versions
-//  - vulnerability db
-type Env struct {
-	OS          string
-	Arch        string
-	PkgVersions map[string]string
-	Vulns       []*osv.Entry
 }
 
 // Write method for findings showing the trace and the associated vulnerabilities.
@@ -108,124 +99,104 @@ func (s SymbolType) MarshalText() ([]byte, error) {
 	return []byte(name), nil
 }
 
-func matchingVulns(os, arch, version string, vulns []*osv.Entry) []*osv.Entry {
-	var matches []*osv.Entry
-	for _, vuln := range vulns {
-		if matchesPlatformAndVersion(os, arch, version, vuln) {
-			matches = append(matches, vuln)
+type modVulns struct {
+	mod   *packages.Module
+	vulns []*osv.Entry
+}
+
+type ModuleVulnerabilities []modVulns
+
+func matchesPlatform(os, arch string, e osv.GoSpecific) bool {
+	matchesOS := len(e.GOOS) == 0
+	matchesArch := len(e.GOARCH) == 0
+	for _, o := range e.GOOS {
+		if os == o {
+			matchesOS = true
+			break
 		}
 	}
-	return matches
-}
-
-// matchesPlatformAndVersion checks if `os`, `arch`, and `version` match the vulnerability `vuln`.
-func matchesPlatformAndVersion(os, arch, version string, vuln *osv.Entry) bool {
-	return matchesPlatform(os, vuln.EcosystemSpecific.GOOS) && matchesPlatform(arch, vuln.EcosystemSpecific.GOARCH) && vuln.Affects.AffectsSemver(version)
-}
-
-// matchesPlatform checks if `platform`, typically os or system architecture,
-// matches `platforms`. Empty `platforms` is also a match.
-func matchesPlatform(platform string, platforms []string) bool {
-	if len(platforms) == 0 {
-		return true
-	}
-
-	for _, p := range platforms {
-		if platform == p {
-			return true
+	for _, a := range e.GOARCH {
+		if arch == a {
+			matchesArch = true
+			break
 		}
 	}
-	return false
+	return matchesOS && matchesArch
 }
 
-// pkgVulnerabilities map for fast lookup on vulnerable packages.
-// Maps package paths to their vulnerabilities.
-type pkgVulnerabilities map[string][]*osv.Entry
-
-// createPkgVulns creates a fast package-vulnerability look-up map for `vulns`.
-func createPkgVulns(vulns []*osv.Entry) pkgVulnerabilities {
-	pkgVulns := make(pkgVulnerabilities)
-	for _, vuln := range vulns {
-		pkgVulns[vuln.Package.Name] = append(pkgVulns[vuln.Package.Name], vuln)
+func (mv ModuleVulnerabilities) Filter(os, arch string) ModuleVulnerabilities {
+	var filteredMod ModuleVulnerabilities
+	for _, mod := range mv {
+		var filteredVulns []*osv.Entry
+		for _, v := range mod.vulns {
+			if matchesPlatform(os, arch, v.EcosystemSpecific) {
+				filteredVulns = append(filteredVulns, v)
+			}
+		}
+		filteredMod = append(filteredMod, modVulns{
+			mod:   mod.mod,
+			vulns: filteredVulns,
+		})
 	}
-	return pkgVulns
+	return filteredMod
 }
 
-// vulnerabilities returns a list of vulnerabilities that deem `pkgPath` vulnerable at `version` as well
-// as `arch` architecture and `os` operating system. Assumes version strings in `pkgVulns` are well-formed;
-// otherwise, the correctness of the results is not guaranteed.
-func (pkgVulns pkgVulnerabilities) vulnerabilities(pkgPath, version, arch, os string) []*osv.Entry {
-	vulns, ok := pkgVulns[pkgPath]
-	if !ok {
-		return nil
+func (mv ModuleVulnerabilities) Num() int {
+	var num int
+	for _, m := range mv {
+		num += len(m.vulns)
 	}
-	return matchingVulns(os, arch, version, vulns)
+	return num
 }
 
-func queryPkgVulns(pkgPath string, env Env, pkgVulns pkgVulnerabilities) []*osv.Entry {
-	version, ok := env.PkgVersions[pkgPath]
-	if !ok {
-		return nil
-	}
-	return pkgVulns.vulnerabilities(pkgPath, version, env.Arch, env.OS)
-}
-
-// symVulnerabilities map for fast lookup on vulnerable symbols.
-// Maps package paths to symbols to their vulnerabilities.
-type symVulnerabilities map[string]map[string][]*osv.Entry
-
-// Represents any symbol. Used to model vulnerabilities in
-// symVulnerabilties that define every symbol as vulnerable.
-const symWildCard = "*"
-
-// createSymVulns creates a fast symbol-vulnerability look-up map for `vulns`.
-func createSymVulns(vulns []*osv.Entry) symVulnerabilities {
-	symVulns := make(symVulnerabilities)
-	for _, vuln := range vulns {
-		if len(vuln.EcosystemSpecific.Symbols) == 0 {
-			// If vuln.Symbols is empty, every symbol is vulnerable.
-			symVulns.add(symWildCard, vuln)
-		} else {
-			for _, sym := range vuln.EcosystemSpecific.Symbols {
-				symVulns.add(sym, vuln)
+// VulnsForPackage returns the vulnerabilities for the module which is the most
+// specific prefixof importPath, or nil if there is no matching module with
+// vulnerabilities.
+func (mv ModuleVulnerabilities) VulnsForPackage(importPath string) []*osv.Entry {
+	var mostSpecificMod *modVulns
+	for _, mod := range mv {
+		if strings.HasPrefix(importPath, mod.mod.Path) {
+			if mostSpecificMod == nil || len(mostSpecificMod.mod.Path) < len(mod.mod.Path) {
+				mostSpecificMod = &mod
 			}
 		}
 	}
-	return symVulns
-}
 
-func (symVulns symVulnerabilities) add(symbol string, v *osv.Entry) {
-	syms := symVulns[v.Package.Name]
-	if syms == nil {
-		syms = make(map[string][]*osv.Entry)
-		symVulns[v.Package.Name] = syms
-	}
-	syms[symbol] = append(syms[symbol], v)
-}
-
-// vulnerabilities returns a list of vulnerabilities that deem `symbol` from package `pkgPath` vulnerable at
-// `version`, architecture `arch`, and operating system `os`. Assumes version strings in `symVulns` are well-formed;
-// otherwise, the correctness of the results is not guaranteed.
-func (symVulns symVulnerabilities) vulnerabilities(symbol, pkgPath, version, arch, os string) []*osv.Entry {
-	pkgVulns, ok := symVulns[pkgPath]
-	if !ok {
+	if mostSpecificMod == nil {
 		return nil
 	}
 
-	var vulns []*osv.Entry
-	vulns = append(vulns, pkgVulns[symbol]...)
-	vulns = append(vulns, pkgVulns[symWildCard]...)
-	if len(vulns) == 0 {
-		return nil
+	if mostSpecificMod.mod.Replace != nil {
+		importPath = fmt.Sprintf("%s%s", mostSpecificMod.mod.Replace.Path, strings.TrimPrefix(importPath, mostSpecificMod.mod.Path))
 	}
-
-	return matchingVulns(os, arch, version, vulns)
+	vulns := mostSpecificMod.vulns
+	packageVulns := []*osv.Entry{}
+	for _, v := range vulns {
+		if v.Package.Name == importPath {
+			packageVulns = append(packageVulns, v)
+		}
+	}
+	return packageVulns
 }
 
-func querySymbolVulns(symbol, pkgPath string, symVulns symVulnerabilities, env Env) []*osv.Entry {
-	version, ok := env.PkgVersions[pkgPath]
-	if !ok {
+func (mv ModuleVulnerabilities) VulnsForSymbol(importPath, symbol string) []*osv.Entry {
+	vulns := mv.VulnsForPackage(importPath)
+	if vulns == nil {
 		return nil
 	}
-	return symVulns.vulnerabilities(symbol, pkgPath, version, env.Arch, env.OS)
+
+	symbolVulns := []*osv.Entry{}
+	for _, v := range vulns {
+		if len(v.EcosystemSpecific.Symbols) == 0 {
+			symbolVulns = append(symbolVulns, v)
+			continue
+		}
+		for _, s := range v.EcosystemSpecific.Symbols {
+			if s == symbol {
+				symbolVulns = append(symbolVulns, v)
+				break
+			}
+		}
+	}
+	return symbolVulns
 }

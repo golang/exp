@@ -13,8 +13,8 @@ import (
 )
 
 func TestImportedPackageVulnDetection(t *testing.T) {
-	pkgs, env := testProgAndEnv(t)
-	got := projectFindings(VulnerableImports(pkgs, env))
+	pkgs, modVulns := testContext(t)
+	got := projectFindings(VulnerableImports(pkgs, modVulns))
 
 	// There should be two chains reported in the following order:
 	//   T -> vuln

@@ -5,118 +5,187 @@
 package audit
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/vulndb/osv"
 )
 
-var testVulnerabilities = []*osv.Entry{
-	{
-		Package: osv.Package{
-			Name: "xyz.org/vuln",
-		},
-		Affects: osv.Affects{
-			Ranges: []osv.AffectsRange{
-				{
-					Type:       osv.TypeSemver,
-					Introduced: "v1.0.1",
-					Fixed:      "v3.2.6",
-				},
-			},
-		},
-		EcosystemSpecific: osv.GoSpecific{
-			Symbols: []string{"foo", "bar"},
-			GOOS:    []string{"amd64"},
-			GOARCH:  []string{"linux"},
-		},
-	},
-	{
-		Package: osv.Package{
-			Name: "xyz.org/vuln",
-		},
-		Affects: osv.Affects{
-			Ranges: []osv.AffectsRange{
-				{
-					Type:  osv.TypeSemver,
-					Fixed: "v4.0.0",
-				},
-			},
-		},
-		EcosystemSpecific: osv.GoSpecific{
-			Symbols: []string{"foo"},
-		},
-	},
-	{
-		Package: osv.Package{
-			Name: "abc.org/morevuln",
-		},
-	},
+func moduleVulnerabilitiesToString(mv ModuleVulnerabilities) string {
+	var s string
+	for _, m := range mv {
+		s += fmt.Sprintf("mod: %v\n", m.mod)
+		for _, v := range m.vulns {
+			s += fmt.Sprintf("\t%v\n", v)
+		}
+	}
+	return s
 }
 
-func TestPackageVulnCreationAndChecking(t *testing.T) {
-	pkgVulns := createPkgVulns(testVulnerabilities)
-	if len(pkgVulns) != 2 {
-		t.Errorf("want 2 package paths; got %d", len(pkgVulns))
+func TestFilterVulns(t *testing.T) {
+	mv := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "a"},
+				{ID: "b", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows", "linux"}}},
+				{ID: "c", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64", "amd64"}}},
+				{ID: "d", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows"}}},
+			},
+		},
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/b",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "e", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64"}}},
+				{ID: "f", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"linux"}}},
+				{ID: "g", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}},
+				{ID: "h", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows"}, GOARCH: []string{"amd64"}}},
+			},
+		},
 	}
 
-	for _, test := range []struct {
-		path    string
-		version string
-		os      string
-		arch    string
-		noVulns int
-	}{
-		// xyz.org/vuln has foo and bar vulns for linux, and just foo for windows.
-		{"xyz.org/vuln", "v1.0.1", "amd64", "linux", 2},
-		{"xyz.org/vuln", "v1.0.1", "amd64", "windows", 1},
-		{"xyz.org/vuln", "v2.4.5", "amd64", "linux", 2},
-		{"xyz.org/vuln", "v3.2.7", "amd64", "linux", 1},
-		// foo for linux must be at version before v4.0.0.
-		{"xyz.org/vuln", "v5.4.5", "amd64", "linux", 0},
-		// abc.org/morevuln has vulnerabilities for any symbol, platform, and version
-		{"abc.org/morevuln", "v11.0.1", "amd64", "linux", 1},
-		{"abc.org/morevuln", "v300.0.1", "i386", "windows", 1},
-	} {
-		if vulns := pkgVulns.vulnerabilities(test.path, test.version, test.arch, test.os); len(vulns) != test.noVulns {
-			t.Errorf("want %d vulnerabilities for %s (v:%s, o:%s, a:%s); got %d",
-				test.noVulns, test.path, test.version, test.os, test.path, len(vulns))
-		}
+	filtered := mv.Filter("linux", "amd64")
+
+	expected := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "a"},
+				{ID: "b", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows", "linux"}}},
+				{ID: "c", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64", "amd64"}}},
+			},
+		},
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/b",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "f", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"linux"}}},
+				{ID: "g", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}},
+			},
+		},
+	}
+	if !reflect.DeepEqual(filtered, expected) {
+		t.Fatalf("Filter returned unexpected results, got:\n%s\nwant:\n%s", moduleVulnerabilitiesToString(filtered), moduleVulnerabilitiesToString(expected))
 	}
 }
 
-func TestSymbolVulnCreationAndChecking(t *testing.T) {
-	symVulns := createSymVulns(testVulnerabilities)
-	if len(symVulns) != 2 {
-		t.Errorf("want 2 package paths; got %d", len(symVulns))
+func vulnsToString(vulns []*osv.Entry) string {
+	var s string
+	for _, v := range vulns {
+		s += fmt.Sprintf("\t%v\n", v)
+	}
+	return s
+}
+
+func TestVulnsForPackage(t *testing.T) {
+	mv := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "a", Package: osv.Package{Name: "example.mod/a/b/c"}},
+			},
+		},
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a/b",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "b", Package: osv.Package{Name: "example.mod/a/b/c"}},
+			},
+		},
 	}
 
-	for _, test := range []struct {
-		symbol   string
-		path     string
-		version  string
-		os       string
-		arch     string
-		numVulns int
-	}{
-		// foo appears twice as a vulnerable symbol for "xyz.org/vuln" and bar once.
-		{"foo", "xyz.org/vuln", "v1.0.1", "amd64", "linux", 2},
-		{"bar", "xyz.org/vuln", "v1.0.1", "amd64", "linux", 1},
-		// foo and bar detected vulns should go down by one for windows platform as well as i386 architecture.
-		{"foo", "xyz.org/vuln", "v1.0.1", "amd64", "windows", 1},
-		{"bar", "xyz.org/vuln", "v1.0.1", "i386", "linux", 0},
-		// There should be no findings for foo and bar at module version v5.0.0.
-		{"foo", "xyz.org/vuln", "v5.0.0", "amd64", "linux", 0},
-		{"bar", "xyz.org/vuln", "v5.0.0", "amd64", "linux", 0},
-		// symbol is not a vulnerable symbol for xyz.org/vuln and bogus package is not in the database.
-		{"symbol", "xyz.org/vuln", "v1.0.1", "amd64", "linux", 0},
-		{"foo", "bogus", "v1.0.1", "amd64", "linux", 0},
-		// abc.org/morevuln has vulnerabilities for any symbol, platform, and version
-		{"symbol", "abc.org/morevuln", "v2.0.1", "amd64", "linux", 1},
-		{"lobmys", "abc.org/morevuln", "v300.0.1", "i386", "windows", 1},
-	} {
-		if vulns := symVulns.vulnerabilities(test.symbol, test.path, test.version, test.arch, test.os); len(vulns) != test.numVulns {
-			t.Errorf("want %d vulnerabilities for %s (p:%s v:%s, o:%s, a:%s); got %d",
-				test.numVulns, test.symbol, test.path, test.version, test.os, test.arch, len(vulns))
-		}
+	filtered := mv.VulnsForPackage("example.mod/a/b/c")
+	expected := []*osv.Entry{
+		{ID: "b", Package: osv.Package{Name: "example.mod/a/b/c"}},
+	}
+
+	if !reflect.DeepEqual(filtered, expected) {
+		t.Fatalf("VulnsForPackage returned unexpected results, got:\n%s\nwant:\n%s", vulnsToString(filtered), vulnsToString(expected))
+	}
+}
+
+func TestVulnsForPackageReplaced(t *testing.T) {
+	mv := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "a", Package: osv.Package{Name: "example.mod/a/b/c"}},
+			},
+		},
+		{
+			mod: &packages.Module{
+				Path: "example.mod/a/b",
+				Replace: &packages.Module{
+					Path: "example.mod/b",
+				},
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "c", Package: osv.Package{Name: "example.mod/b/c"}},
+			},
+		},
+	}
+
+	filtered := mv.VulnsForPackage("example.mod/a/b/c")
+	expected := []*osv.Entry{
+		{ID: "c", Package: osv.Package{Name: "example.mod/b/c"}},
+	}
+
+	if !reflect.DeepEqual(filtered, expected) {
+		t.Fatalf("VulnsForPackage returned unexpected results, got:\n%s\nwant:\n%s", vulnsToString(filtered), vulnsToString(expected))
+	}
+}
+
+func TestVulnsForSymbol(t *testing.T) {
+	mv := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "a", Package: osv.Package{Name: "example.mod/a/b/c"}},
+			},
+		},
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/a/b",
+				Version: "v1.0.0",
+			},
+			vulns: []*osv.Entry{
+				{ID: "b", Package: osv.Package{Name: "example.mod/a/b/c"}, EcosystemSpecific: osv.GoSpecific{Symbols: []string{"a"}}},
+				{ID: "c", Package: osv.Package{Name: "example.mod/a/b/c"}, EcosystemSpecific: osv.GoSpecific{Symbols: []string{"b"}}},
+			},
+		},
+	}
+
+	filtered := mv.VulnsForSymbol("example.mod/a/b/c", "a")
+	expected := []*osv.Entry{
+		{ID: "b", Package: osv.Package{Name: "example.mod/a/b/c"}, EcosystemSpecific: osv.GoSpecific{Symbols: []string{"a"}}},
+	}
+
+	if !reflect.DeepEqual(filtered, expected) {
+		t.Fatalf("VulnsForPackage returned unexpected results, got:\n%s\nwant:\n%s", vulnsToString(filtered), vulnsToString(expected))
 	}
 }

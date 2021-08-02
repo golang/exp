@@ -18,6 +18,8 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // buildInfoMagic, findVers, and readString are copied from
@@ -167,31 +169,29 @@ func readBuildInfo(data string) (*debug.BuildInfo, bool) {
 	return info, true
 }
 
+func debugModulesToPackagesModules(debugModules []*debug.Module) []*packages.Module {
+	packagesModules := make([]*packages.Module, len(debugModules))
+	for i, mod := range debugModules {
+		packagesModules[i] = &packages.Module{
+			Path:    mod.Path,
+			Version: mod.Version,
+		}
+		if mod.Replace != nil {
+			packagesModules[i].Replace = &packages.Module{
+				Path:    mod.Replace.Path,
+				Version: mod.Replace.Version,
+			}
+		}
+	}
+	return packagesModules
+}
+
 // ExtractPackagesAndSymbols extracts the symbols, packages, and their associated module versions
 // from a Go binary. Stripped binaries are not supported.
-func ExtractPackagesAndSymbols(binPath string) (map[string]string, map[string][]string, error) {
+func ExtractPackagesAndSymbols(binPath string) ([]*packages.Module, map[string][]string, error) {
 	x, err := openExe(binPath)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	mod := findVers(x)
-
-	bi, ok := readBuildInfo(mod)
-	if !ok {
-		return nil, nil, err
-	}
-
-	deps := map[string]string{}
-	for _, dep := range bi.Deps {
-		if dep == nil {
-			continue
-		}
-		if dep.Replace != nil {
-			deps[dep.Replace.Path] = dep.Replace.Version
-			continue
-		}
-		deps[dep.Path] = dep.Version
 	}
 
 	pclntab, textOffset := x.PCLNTab()
@@ -229,14 +229,10 @@ func ExtractPackagesAndSymbols(binPath string) (map[string]string, map[string][]
 		packageSymbols[pkgName] = append(packageSymbols[pkgName], symName)
 	}
 
-	versionedPackages := map[string]string{}
-	// TODO: this is rather inefficient, but probably fine for most programs
-	for pkg := range packageSymbols {
-		for mod, version := range deps {
-			if strings.HasPrefix(pkg, mod) {
-				versionedPackages[pkg] = version
-			}
-		}
+	bi, ok := readBuildInfo(findVers(x))
+	if !ok {
+		return nil, nil, err
 	}
-	return versionedPackages, packageSymbols, nil
+
+	return debugModulesToPackagesModules(bi.Deps), packageSymbols, nil
 }

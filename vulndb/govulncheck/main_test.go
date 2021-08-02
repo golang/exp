@@ -47,9 +47,9 @@ var index string = `{
 }`
 
 var vulns = map[string]string{
-	"github.com/go-yaml/yaml.json":                      goYamlVuln,
-	"golang.org/x/crypto/ssh.json":                      cryptoSSHVuln,
-	"k8s.io/apiextensions-apiserver/pkg/apiserver.json": k8sAPIServerVuln,
+	"github.com/go-yaml/yaml.json":        goYamlVuln,
+	"golang.org/x/crypto.json":            cryptoSSHVuln,
+	"k8s.io/apiextensions-apiserver.json": k8sAPIServerVuln,
 }
 
 // addToLocalDb adds vuln for package p to local db at path db.
@@ -163,6 +163,10 @@ func TestHashicorpVault(t *testing.T) {
 		t.Logf("failed to get %s: %s", hashiVaultOkta+"@v1.6.3", out)
 		t.Fatal(err)
 	}
+	// if out, err := execCmd(e.Config.Dir, env, "go", "mod", "tidy"); err != nil {
+	// 	t.Logf("failed to mod tidy: %s", out)
+	// 	t.Fatal(err)
+	// }
 
 	// run goaudit.
 	cfg := &packages.Config{
@@ -189,7 +193,7 @@ func TestHashicorpVault(t *testing.T) {
 	}{
 		// test local db without yaml, which should result in no findings.
 		{source: "file://" + dbPath, want: nil,
-			toAdd: []string{"golang.org/x/crypto/ssh.json", "k8s.io/apiextensions-apiserver/pkg/apiserver.json"}},
+			toAdd: []string{"golang.org/x/crypto.json", "k8s.io/apiextensions-apiserver.json"}},
 		// add yaml to the local db, which should produce 2 findings.
 		{source: "file://" + dbPath, toAdd: []string{"github.com/go-yaml/yaml.json"},
 			want: []finding{
@@ -197,8 +201,8 @@ func TestHashicorpVault(t *testing.T) {
 				{"github.com/go-yaml/yaml.yaml_parser_fetch_more_tokens", 12}},
 		},
 		// repeat the similar experiment with a server db.
-		{source: "http://localhost:8080", toAdd: []string{"k8s.io/apiextensions-apiserver/pkg/apiserver.json"}, want: nil},
-		{source: "http://localhost:8080", toAdd: []string{"golang.org/x/crypto/ssh.json", "github.com/go-yaml/yaml.json"},
+		{source: "http://localhost:8080", toAdd: []string{"k8s.io/apiextensions-apiserver.json"}, want: nil},
+		{source: "http://localhost:8080", toAdd: []string{"golang.org/x/crypto.json", "github.com/go-yaml/yaml.json"},
 			want: []finding{
 				{"github.com/go-yaml/yaml.decoder.unmarshal", 6},
 				{"github.com/go-yaml/yaml.yaml_parser_fetch_more_tokens", 12}},
@@ -381,29 +385,6 @@ func vulnsToString(vulns []*osv.Entry) string {
 		s += fmt.Sprintf("\t%v\n", v)
 	}
 	return s
-}
-
-func TestFilterVulsn(t *testing.T) {
-	vulns := []*osv.Entry{
-		{Package: osv.Package{Name: "example.com/a"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "1.0.0"}}}},
-		{Package: osv.Package{Name: "example.com/b"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "2.0.0"}}}},
-		{Package: osv.Package{Name: "example.com/c"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "3.0.0"}}}},
-	}
-	pkgs := map[string]string{
-		"example.com/a": "v0.0.1",
-		"example.com/b": "v1.0.0",
-		"example.com/c": "v9.0.0",
-	}
-
-	filtered := filterVulns(vulns, pkgs)
-
-	expected := []*osv.Entry{
-		{Package: osv.Package{Name: "example.com/a"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "1.0.0"}}}},
-		{Package: osv.Package{Name: "example.com/b"}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "2.0.0"}}}},
-	}
-	if !reflect.DeepEqual(filtered, expected) {
-		t.Errorf("filterVulns returned unexpected results: got\n%swant\n%s", vulnsToString(filtered), vulnsToString(expected))
-	}
 }
 
 func TestUnreachable(t *testing.T) {

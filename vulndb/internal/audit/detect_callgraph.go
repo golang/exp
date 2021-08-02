@@ -34,7 +34,7 @@ import (
 // as traces of transitively using a vulnerable symbol V.
 //
 // Panics if packages in pkgs do not belong to the same program.
-func VulnerableSymbols(pkgs []*ssa.Package, env Env) []Finding {
+func VulnerableSymbols(pkgs []*ssa.Package, modVulns ModuleVulnerabilities) []Finding {
 	prog := pkgsProgram(pkgs)
 	if prog == nil {
 		panic("packages in pkgs must belong to a single common program")
@@ -47,7 +47,6 @@ func VulnerableSymbols(pkgs []*ssa.Package, env Env) []Finding {
 		queue.PushBack(&callChain{f: entry})
 	}
 
-	symVulns := createSymVulns(env.Vulns)
 	var findings []Finding
 	seen := make(map[*ssa.Function]bool)
 	for queue.Len() > 0 {
@@ -60,7 +59,7 @@ func VulnerableSymbols(pkgs []*ssa.Package, env Env) []Finding {
 		}
 		seen[v.f] = true
 
-		finds, calls := funcVulnsAndCalls(v, symVulns, env, callGraph)
+		finds, calls := funcVulnsAndCalls(v, modVulns, callGraph)
 		findings = append(findings, finds...)
 		for _, call := range calls {
 			queue.PushBack(call)
@@ -178,13 +177,13 @@ func (chain *callChain) weight() int {
 
 // funcVulnsAndCalls returns a list of symbol findings for function at the top
 // of chain and next calls to analyze.
-func funcVulnsAndCalls(chain *callChain, symVulns symVulnerabilities, env Env, callGraph *callgraph.Graph) ([]Finding, []*callChain) {
+func funcVulnsAndCalls(chain *callChain, modVulns ModuleVulnerabilities, callGraph *callgraph.Graph) ([]Finding, []*callChain) {
 	var findings []Finding
 	var calls []*callChain
 	for _, b := range chain.f.Blocks {
 		for _, instr := range b.Instrs {
 			// First collect all findings for globals except callees in function call statements.
-			findings = append(findings, globalFindings(globalUses(instr), chain, symVulns, env)...)
+			findings = append(findings, globalFindings(globalUses(instr), chain, modVulns)...)
 
 			// Callees are handled separately to produce call findings rather than global findings.
 			site, ok := instr.(ssa.CallInstruction)
@@ -197,7 +196,7 @@ func funcVulnsAndCalls(chain *callChain, symVulns symVulnerabilities, env Env, c
 				c := &callChain{call: site, f: callee, parent: chain}
 				calls = append(calls, c)
 
-				if f := callFinding(c, symVulns, env); f != nil {
+				if f := callFinding(c, modVulns); f != nil {
 					findings = append(findings, *f)
 				}
 			}
@@ -209,15 +208,15 @@ func funcVulnsAndCalls(chain *callChain, symVulns symVulnerabilities, env Env, c
 // globalFindings returns findings for vulnerable globals among globalUses.
 // Assumes each use in globalUses is a use of a global variable. Can generate
 // duplicates when globalUses contains duplicates.
-func globalFindings(globalUses []*ssa.Value, chain *callChain, symVulns symVulnerabilities, env Env) []Finding {
-	if underRelatedVuln(chain, symVulns, env) {
+func globalFindings(globalUses []*ssa.Value, chain *callChain, modVulns ModuleVulnerabilities) []Finding {
+	if underRelatedVuln(chain, modVulns) {
 		return nil
 	}
 
 	var findings []Finding
 	for _, o := range globalUses {
 		g := (*o).(*ssa.Global)
-		vulns := querySymbolVulns(g.Name(), g.Package().Pkg.Path(), symVulns, env)
+		vulns := modVulns.VulnsForSymbol(g.Package().Pkg.Path(), g.Name())
 		if len(vulns) > 0 {
 			findings = append(findings,
 				Finding{
@@ -235,8 +234,8 @@ func globalFindings(globalUses []*ssa.Value, chain *callChain, symVulns symVulne
 // callFinding returns vulnerability finding for the call made at the top of the chain.
 // If there is no vulnerability or no call information, then nil is returned.
 // TODO(zpavlinovic): remove ssa info from higher-order calls.
-func callFinding(chain *callChain, symVulns symVulnerabilities, env Env) *Finding {
-	if underRelatedVuln(chain, symVulns, env) {
+func callFinding(chain *callChain, modVulns ModuleVulnerabilities) *Finding {
+	if underRelatedVuln(chain, modVulns) {
 		return nil
 	}
 
@@ -246,7 +245,7 @@ func callFinding(chain *callChain, symVulns symVulnerabilities, env Env) *Findin
 		return nil
 	}
 
-	vulns := querySymbolVulns(dbFuncName(callee), callee.Package().Pkg.Path(), symVulns, env)
+	vulns := modVulns.VulnsForSymbol(callee.Package().Pkg.Path(), dbFuncName(callee))
 	if len(vulns) > 0 {
 		c := chain
 		if !unresolved(call) {
@@ -277,7 +276,7 @@ func callFinding(chain *callChain, symVulns symVulnerabilities, env Env) *Findin
 //
 // Note that for P1:A -> P2:B -> P3:D -> P2:C the function returns false. This
 // is because C is called from D that comes from a different package.
-func underRelatedVuln(chain *callChain, symVulns symVulnerabilities, env Env) bool {
+func underRelatedVuln(chain *callChain, modVulns ModuleVulnerabilities) bool {
 	pkg := pkgPath(chain.f)
 
 	c := chain
@@ -288,7 +287,7 @@ func underRelatedVuln(chain *callChain, symVulns symVulnerabilities, env Env) bo
 			break
 		}
 		// TODO: can we optimize using the information on findings already reported?
-		if len(querySymbolVulns(dbFuncName(c.f), c.f.Pkg.Pkg.Path(), symVulns, env)) > 0 {
+		if len(modVulns.VulnsForSymbol(c.f.Pkg.Pkg.Path(), dbFuncName(c.f))) > 0 {
 			return true
 		}
 	}

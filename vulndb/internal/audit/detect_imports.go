@@ -24,9 +24,7 @@ import (
 // or
 //   D -> B -> V
 // as traces of importing a vulnerable package V.
-func VulnerableImports(pkgs []*ssa.Package, env Env) []Finding {
-	pkgVulns := createPkgVulns(env.Vulns)
-
+func VulnerableImports(pkgs []*ssa.Package, modVulns ModuleVulnerabilities) []Finding {
 	var findings []Finding
 	seen := make(map[string]bool)
 	queue := list.New()
@@ -50,7 +48,7 @@ func VulnerableImports(pkgs []*ssa.Package, env Env) []Finding {
 		seen[pkg.Path()] = true
 
 		for _, imp := range pkg.Imports() {
-			vulns := queryPkgVulns(imp.Path(), env, pkgVulns)
+			vulns := modVulns.VulnsForPackage(imp.Path())
 			if len(vulns) > 0 {
 				findings = append(findings,
 					Finding{

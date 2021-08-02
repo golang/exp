@@ -7,7 +7,6 @@ package audit
 import (
 	"go/token"
 	"io/ioutil"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -40,9 +39,7 @@ import (
 //
 // The following vulnerability should not be reported as it is redundant:
 //   T:T1() -> A:A1() -> B:B1() -> vuln.VulnData.Vuln()
-//
-// The produced environment is based on testdata/dbs vulnerability databases.
-func testProgAndEnv(t *testing.T) ([]*ssa.Package, Env) {
+func testContext(t *testing.T) ([]*ssa.Package, ModuleVulnerabilities) {
 	e := packagestest.Export(t, packagestest.Modules, []packagestest.Module{
 		{
 			Name:  "golang.org/vulntest",
@@ -63,7 +60,7 @@ func testProgAndEnv(t *testing.T) ([]*ssa.Package, Env) {
 	})
 	defer e.Cleanup()
 
-	_, ssaPkgs, pkgs, err := loadAndBuildPackages(e, "/vulntest/T/T.go")
+	_, ssaPkgs, _, err := loadAndBuildPackages(e, "/vulntest/T/T.go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,14 +68,25 @@ func testProgAndEnv(t *testing.T) ([]*ssa.Package, Env) {
 		t.Errorf("want 1 top level SSA package; got %d", len(ssaPkgs))
 	}
 
-	vulnsToLoad := []string{"thirdparty.org/vulnerabilities", "bogus.org/module"}
-	dbSources := []string{fileSource(t, "testdata/dbs/bogus.db.org"), fileSource(t, "testdata/dbs/golang.deepgo.org")}
-	vulns, err := LoadVulnerabilities(dbSources, vulnsToLoad)
-	if err != nil {
-		t.Fatal(err)
+	modVulns := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{Path: "thirdparty.org/vulnerabilities", Version: "v1.0.1"},
+			vulns: []*osv.Entry{
+				{
+					Package:           osv.Package{Name: "thirdparty.org/vulnerabilities/vuln"},
+					Affects:           osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "1.0.0", Fixed: "1.0.4"}, {Type: osv.TypeSemver, Introduced: "1.1.2"}}},
+					EcosystemSpecific: osv.GoSpecific{Symbols: []string{"VulnData.Vuln", "VulnData.VulnOnPtr"}},
+				},
+				{
+					Package:           osv.Package{Name: "thirdparty.org/vulnerabilities/vuln"},
+					Affects:           osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "1.0.1", Fixed: "1.0.2"}}},
+					EcosystemSpecific: osv.GoSpecific{Symbols: []string{"VG"}},
+				},
+			},
+		},
 	}
 
-	return ssaPkgs, Env{OS: "linux", Arch: "amd64", Vulns: vulns, PkgVersions: PackageVersions(pkgs)}
+	return ssaPkgs, modVulns
 }
 
 func loadAndBuildPackages(e *packagestest.Exported, file string) (*ssa.Program, []*ssa.Package, []*packages.Package, error) {
@@ -144,16 +152,6 @@ func projectFindings(findings []Finding) []Finding {
 		nfs = append(nfs, nf)
 	}
 	return nfs
-}
-
-// fileSource creates a file URI for a database path `db`. If `db` is
-// relative, the source is made absolute w.r.t. the current directory.
-func fileSource(t *testing.T, db string) string {
-	cd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return "file://" + path.Join(cd, db)
 }
 
 func readFile(t *testing.T, path string) string {

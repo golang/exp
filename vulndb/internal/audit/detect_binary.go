@@ -12,13 +12,11 @@ import (
 // in packageSymbols, given the vulnerability and platform info captured in env.
 //
 // Returned Findings only have Symbol, Type, and Vulns fields set.
-func VulnerablePackageSymbols(packageSymbols map[string][]string, env Env) []Finding {
-	symVulns := createSymVulns(env.Vulns)
-
+func VulnerablePackageSymbols(packageSymbols map[string][]string, modVulns ModuleVulnerabilities) []Finding {
 	var findings []Finding
 	for pkg, symbols := range packageSymbols {
 		for _, symbol := range symbols {
-			if vulns := querySymbolVulns(symbol, pkg, symVulns, env); len(vulns) > 0 {
+			if vulns := modVulns.VulnsForSymbol(pkg, symbol); len(vulns) > 0 {
 				findings = append(findings,
 					Finding{
 						Symbol: fmt.Sprintf("%s.%s", pkg, symbol),

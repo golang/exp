@@ -1,4 +1,0 @@
-Contains json files modeling vulnerability info for the module
-`thirdparty.org/vulnerabilities`.
-
-Also used for testing the robustness of loading a local vulnerability database.

@@ -30,6 +30,7 @@ import (
 	"golang.org/x/exp/vulndb/internal/binscan"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa/ssautil"
+	"golang.org/x/vulndb/client"
 	"golang.org/x/vulndb/osv"
 )
 
@@ -68,9 +69,9 @@ databases are merged.
 `
 
 type results struct {
-	ImportedPackages []string
-	Vulns            []*osv.Entry
-	Findings         []audit.Finding
+	Modules  []*packages.Module
+	Vulns    []*osv.Entry
+	Findings []audit.Finding
 }
 
 func (r *results) unreachable() []*osv.Entry {
@@ -92,7 +93,6 @@ func (r *results) unreachable() []*osv.Entry {
 
 // presentTo pretty-prints results to out.
 func (r *results) presentTo(out io.Writer) {
-	sort.Strings(r.ImportedPackages)
 	sort.Slice(r.Vulns, func(i, j int) bool { return r.Vulns[i].ID < r.Vulns[j].ID })
 	sort.SliceStable(r.Findings, func(i int, j int) bool { return audit.FindingCompare(r.Findings[i], r.Findings[j]) })
 	if !*jsonFlag {
@@ -148,29 +148,30 @@ func main() {
 	r.presentTo(os.Stdout)
 }
 
-// allPkgPaths computes a list of all packages, in
-// the form of their paths, reachable from pkgs.
-func allPkgPaths(pkgs []*packages.Package) []string {
-	paths := make(map[string]bool)
+func extractModules(pkgs []*packages.Package) []*packages.Module {
+	modMap := map[*packages.Module]bool{}
+	seen := map[*packages.Package]bool{}
+	var extract func(*packages.Package, map[*packages.Module]bool)
+	extract = func(pkg *packages.Package, modMap map[*packages.Module]bool) {
+		if pkg == nil || seen[pkg] {
+			return
+		}
+		if pkg.Module != nil {
+			modMap[pkg.Module] = true
+		}
+		seen[pkg] = true
+		for _, imp := range pkg.Imports {
+			extract(imp, modMap)
+		}
+	}
 	for _, pkg := range pkgs {
-		pkgPaths(pkg, paths)
+		extract(pkg, modMap)
 	}
-
-	var ps []string
-	for p := range paths {
-		ps = append(ps, p)
+	modules := []*packages.Module{}
+	for mod := range modMap {
+		modules = append(modules, mod)
 	}
-	return ps
-}
-
-func pkgPaths(pkg *packages.Package, paths map[string]bool) {
-	if _, ok := paths[pkg.PkgPath]; ok {
-		return
-	}
-	paths[pkg.PkgPath] = true
-	for _, imp := range pkg.Imports {
-		pkgPaths(imp, paths)
-	}
+	return modules
 }
 
 func isFile(path string) bool {
@@ -181,43 +182,25 @@ func isFile(path string) bool {
 	return !s.IsDir()
 }
 
-func filterVulns(vulns []*osv.Entry, packageVersions map[string]string) []*osv.Entry {
-	filtered := []*osv.Entry{}
-	for _, v := range vulns {
-		version, ok := packageVersions[v.Package.Name]
-		if !ok || !v.Affects.AffectsSemver(version) {
-			continue
-		}
-		filtered = append(filtered, v)
-	}
-	return filtered
-}
-
 func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string) (*results, error) {
 	r := &results{}
 	if len(patterns) == 1 && isFile(patterns[0]) {
-		packages, symbols, err := binscan.ExtractPackagesAndSymbols(patterns[0])
+		modules, symbols, err := binscan.ExtractPackagesAndSymbols(patterns[0])
 		if err != nil {
 			return nil, err
 		}
 
-		paths := make([]string, 0, len(packages))
-		for pkg := range packages {
-			paths = append(paths, pkg)
+		dbClient, err := client.NewClient(dbs, client.Options{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create database client: %s", err)
 		}
-		r.ImportedPackages = paths
-
-		vulns, err := audit.LoadVulnerabilities(dbs, paths)
+		vulns, err := audit.FetchVulnerabilities(dbClient, modules)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load vulnerability dbs: %v", err)
 		}
-		vulns = filterVulns(vulns, packages)
-		if len(vulns) == 0 {
-			return r, nil
-		}
-		r.Vulns = vulns
+		vulns = vulns.Filter(runtime.GOOS, runtime.GOARCH)
 
-		r.Findings = audit.VulnerablePackageSymbols(symbols, audit.Env{OS: runtime.GOOS, Arch: runtime.GOARCH, PkgVersions: packages, Vulns: vulns})
+		r.Findings = audit.VulnerablePackageSymbols(symbols, vulns)
 		return r, nil
 	}
 
@@ -236,27 +219,23 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 		log.Printf("\t%d loaded packages\n", len(pkgs))
 	}
 
-	// Load package versions.
-	pkgVersions := audit.PackageVersions(pkgs)
-
 	// Load database.
 	if *verboseFlag {
 		log.Println("loading database...")
 	}
-	importedPackages := allPkgPaths(pkgs)
-	r.ImportedPackages = importedPackages
-	vulns, err := audit.LoadVulnerabilities(dbs, importedPackages)
+	r.Modules = extractModules(pkgs)
+	dbClient, err := client.NewClient(dbs, client.Options{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to load vulnerability dbs: %v", err)
+		return nil, fmt.Errorf("failed to create database client: %s", err)
 	}
-	vulns = filterVulns(vulns, pkgVersions)
-	if len(vulns) == 0 {
-		return r, nil
+	modVulns, err := audit.FetchVulnerabilities(dbClient, r.Modules)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch vulnerabilities: %v", err)
 	}
-	r.Vulns = vulns
+	modVulns = modVulns.Filter(runtime.GOOS, runtime.GOARCH)
 
 	if *verboseFlag {
-		log.Printf("\t%d known vulnerabilities.\n", len(vulns))
+		log.Printf("\t%d known vulnerabilities.\n", modVulns.Num())
 	}
 
 	// Load SSA.
@@ -274,11 +253,10 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 		log.Println("detecting vulnerabilities...")
 	}
 	var findings []audit.Finding
-	env := audit.Env{OS: runtime.GOOS, Arch: runtime.GOARCH, PkgVersions: pkgVersions, Vulns: vulns}
 	if importsOnly {
-		r.Findings = audit.VulnerableImports(ssaPkgs, env)
+		r.Findings = audit.VulnerableImports(ssaPkgs, modVulns)
 	} else {
-		r.Findings = audit.VulnerableSymbols(ssaPkgs, env)
+		r.Findings = audit.VulnerableSymbols(ssaPkgs, modVulns)
 	}
 	if *verboseFlag {
 		log.Printf("\t%d detected findings.\n", len(findings))
