@@ -9,58 +9,42 @@ import (
 	"strings"
 )
 
-// findingCompare compares two findings in terms of their approximate usefulness to the user.
-// A finding that either has 1) shorter trace, or 2) less unresolved call sites in the trace
-// is considered smaller, i.e., better.
-func findingCompare(finding1, finding2 Finding) bool {
-	if len(finding1.Trace) < len(finding2.Trace) {
-		return true
-	} else if len(finding2.Trace) < len(finding1.Trace) {
-		return false
+// findingCompare compares two findings in terms of their estimated value to the user.
+// Findings of shorter traces generally come earlier in the ordering.
+//
+// Two findings produced by audit call graph search are lexicographically ordered by:
+// 1) their estimated level of confidence in being a true positive, 2) the length of
+// their traces, and 3) the number of unresolved call sites in the traces.
+func findingCompare(finding1, finding2 *Finding) bool {
+	if finding1.confidence != finding2.confidence {
+		return finding1.confidence < finding2.confidence
 	}
-	if finding1.weight < finding2.weight {
-		return true
-	} else if finding2.weight < finding1.weight {
-		return false
+
+	if len(finding1.Trace) != len(finding2.Trace) {
+		return len(finding1.Trace) < len(finding2.Trace)
+	}
+
+	if finding1.weight != finding2.weight {
+		return finding1.weight < finding2.weight
 	}
 	// At this point we just need to make sure the ordering is deterministic.
 	// TODO(zpavlinovic): is there a more meaningful ordering?
 	return findingStrCompare(finding1, finding2)
 }
 
-// findingStrCompare compares string representation of findings pointwise by fields.
-func findingStrCompare(finding1, finding2 Finding) bool {
-	symCmp := strings.Compare(finding1.Symbol, finding2.Symbol)
-	if symCmp == -1 {
-		return true
-	} else if symCmp == 1 {
-		return false
+// findingStrCompare compares string representation of findings pointwise by their fields.
+func findingStrCompare(finding1, finding2 *Finding) bool {
+	if cmp := strings.Compare(finding1.Symbol, finding2.Symbol); cmp != 0 {
+		return cmp < 0
 	}
 
-	typeStr1 := fmt.Sprintf("%v", finding1.Type)
-	typeStr2 := fmt.Sprintf("%v", finding2.Type)
-	typeCmp := strings.Compare(typeStr1, typeStr2)
-	if typeCmp == -1 {
-		return true
-	} else if typeCmp == 1 {
-		return false
+	if cmp := strings.Compare(fmt.Sprintf("%v", finding1.Type), fmt.Sprintf("%v", finding2.Type)); cmp != 0 {
+		return cmp < 0
 	}
 
-	posStr1 := fmt.Sprintf("%v", finding1.Position)
-	posStr2 := fmt.Sprintf("%v", finding2.Position)
-	posCmp := strings.Compare(posStr1, posStr2)
-	if posCmp == -1 {
-		return true
-	} else if posCmp == 1 {
-		return false
+	if cmp := strings.Compare(fmt.Sprintf("%v", finding1.Position), fmt.Sprintf("%v", finding2.Position)); cmp != 0 {
+		return cmp < 0
 	}
 
-	traceStr1 := fmt.Sprintf("%v", finding1.Trace)
-	traceStr2 := fmt.Sprintf("%v", finding2.Trace)
-	traceCmp := strings.Compare(traceStr1, traceStr2)
-	if traceCmp == 1 {
-		return false
-	}
-
-	return true
+	return strings.Compare(fmt.Sprintf("%v", finding1.Trace), fmt.Sprintf("%v", finding2.Trace)) <= 0
 }

@@ -74,7 +74,7 @@ func (r Results) addFinding(v osv.Entry, f Finding) {
 // perceived usefulness to the user.
 func (r Results) sort() {
 	for _, fs := range r.VulnFindings {
-		sort.SliceStable(fs, func(i int, j int) bool { return findingCompare(fs[i], fs[j]) })
+		sort.SliceStable(fs, func(i int, j int) bool { return findingCompare(&fs[i], &fs[j]) })
 	}
 }
 
@@ -86,9 +86,13 @@ type Finding struct {
 	Type     SymbolType
 	Trace    []TraceElem
 
-	// Approximate measure for indicating how useful the finding might be to the audit client.
-	// The smaller the weight, the more useful is the finding.
+	// Approximate measure for indicating how understandable the finding is to the client.
+	// The smaller the weight, the more understandable is the finding.
 	weight int
+
+	// Approximate measure for indicating confidence in finding being a true positive. The
+	// smaller the value, the bigger the confidence.
+	confidence int
 }
 
 // String method for findings.
