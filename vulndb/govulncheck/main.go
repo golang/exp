@@ -35,13 +35,14 @@ var (
 	jsonFlag    = flag.Bool("json", false, "")
 	verboseFlag = flag.Bool("verbose", false, "")
 	importsFlag = flag.Bool("imports", false, "")
+	allFlag     = flag.Bool("all", false, "")
 )
 
 const usage = `govulncheck: identify known vulnerabilities by call graph traversal.
 
 Usage:
 
-	govulncheck [-imports] {package pattern...}
+	govulncheck [-imports] [-json] [-all] {package pattern...}
 
 	govulncheck {binary path}
 
@@ -52,6 +53,10 @@ Flags:
 	           of whether they are reachable.
 
 	-json  	   Print vulnerability findings in JSON format.
+
+	-all       Show all representative findings for each vulnerability. A best effort
+		   is made to order findings by relevance. When false [default], show only
+		   the most relevant finding.
 
 	-verbose   Print progress information.
 
@@ -89,7 +94,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	if !*allFlag {
+		r = projectToSingleFinding(r)
+	}
+
 	writeOut(r, *jsonFlag)
+}
+
+func projectToSingleFinding(r *audit.Results) *audit.Results {
+	nr := &audit.Results{
+		SearchMode:      r.SearchMode,
+		Vulnerabilities: r.Vulnerabilities,
+		VulnFindings:    make(map[string][]audit.Finding),
+	}
+
+	for id, findings := range r.VulnFindings {
+		if len(findings) > 0 {
+			nr.VulnFindings[id] = []audit.Finding{findings[0]}
+		}
+	}
+
+	return nr
 }
 
 func writeOut(r *audit.Results, toJson bool) {
