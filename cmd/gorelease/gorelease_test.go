@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"golang.org/x/mod/module"
@@ -25,6 +26,22 @@ var (
 	testwork     = flag.Bool("testwork", false, "preserve work directory")
 	updateGolden = flag.Bool("u", false, "update expected text in test files instead of failing")
 )
+
+var hasGitCache struct {
+	once  sync.Once
+	found bool
+}
+
+// hasGit reports whether the git executable exists on the PATH.
+func hasGit() bool {
+	hasGitCache.once.Do(func() {
+		if _, err := exec.LookPath("git"); err != nil {
+			return
+		}
+		hasGitCache.found = true
+	})
+	return hasGitCache.found
+}
 
 // prepareProxy creates a proxy dir and returns an associated ctx.
 //
@@ -130,6 +147,10 @@ type test struct {
 	// If it is not empty, each entry must be of the form <modpath>@v<version>
 	// and exist in testdata/mod/.
 	proxyVersions map[module.Version]bool
+
+	// vcs is used to set the VCS that the root of the test should
+	// emulate. Allowed values are git, and hg.
+	vcs string
 }
 
 // readTest reads and parses a .test file with the given name.
@@ -203,6 +224,8 @@ func readTest(testPath string) (*test, error) {
 				proxyVersions[mv] = true
 			}
 			t.proxyVersions = proxyVersions
+		case "vcs":
+			t.vcs = value
 		default:
 			return nil, fmt.Errorf("%s:%d: unknown key: %q", testPath, lineNum, key)
 		}
@@ -277,6 +300,33 @@ func TestRelease(t *testing.T) {
 	}
 }
 
+func TestRelease_gitRepo_uncommittedChanges(t *testing.T) {
+	ctx := context.Background()
+	buf := &bytes.Buffer{}
+	releaseDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	goModInit(t, releaseDir)
+	gitInit(t, releaseDir)
+
+	// Create an uncommitted change.
+	bContents := `package b
+const B = "b"`
+	if err := ioutil.WriteFile(filepath.Join(releaseDir, "b.go"), []byte(bContents), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	success, err := runRelease(ctx, buf, releaseDir, nil)
+	if got, want := err.Error(), fmt.Sprintf("repo %s has uncommitted changes", releaseDir); got != want {
+		t.Errorf("runRelease:\ngot error:\n%q\nwant error\n%q", got, want)
+	}
+	if success {
+		t.Errorf("runRelease: expected failure, got success")
+	}
+}
+
 func testRelease(ctx context.Context, tests []*test, test *test) func(t *testing.T) {
 	return func(t *testing.T) {
 		if test.skip != "" {
@@ -325,6 +375,21 @@ func testRelease(ctx context.Context, tests []*test, test *test) func(t *testing
 			t.Fatal(err)
 		}
 
+		switch test.vcs {
+		case "git":
+			// Convert testDir to a git repository with a single commit, to
+			// simulate a real user's module-in-a-git-repo.
+			gitInit(t, testDir)
+		case "hg":
+			// Convert testDir to a mercurial repository to simulate a real
+			// user's module-in-a-hg-repo.
+			hgInit(t, testDir)
+		case "":
+			// No VCS.
+		default:
+			t.Fatalf("unknown vcs %q", test.vcs)
+		}
+
 		// Generate the report and compare it against the expected text.
 		var args []string
 		if test.baseVersion != "" {
@@ -371,5 +436,67 @@ func testRelease(ctx context.Context, tests []*test, test *test) func(t *testing
 		if success != test.wantSuccess {
 			t.Fatalf("got success: %v; want success %v", success, test.wantSuccess)
 		}
+	}
+}
+
+// hgInit initialises a directory as a mercurial repo.
+func hgInit(t *testing.T, dir string) {
+	t.Helper()
+
+	if err := os.Mkdir(filepath.Join(dir, ".hg"), 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(dir, ".hg", "branch"), []byte("default"), 0777); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// gitInit initialises a directory as a git repo, and adds a simple commit.
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+
+	if !hasGit() {
+		t.Skip("PATH does not contain git")
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	for _, args := range [][]string{
+		{"git", "init"},
+		{"git", "checkout", "-b", "test"},
+		{"git", "add", "-A"},
+		{"git", "commit", "-m", "test"},
+	} {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		if err := cmd.Run(); err != nil {
+			cmdArgs := strings.Join(args, " ")
+			t.Fatalf("%s\n%s\nerror running %q on dir %s: %v", stdout.String(), stderr.String(), cmdArgs, dir, err)
+		}
+	}
+}
+
+// goModInit runs `go mod init` in the given directory.
+func goModInit(t *testing.T, dir string) {
+	t.Helper()
+
+	aContents := `package a
+const A = "a"`
+	if err := ioutil.WriteFile(filepath.Join(dir, "a.go"), []byte(aContents), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd := exec.Command("go", "mod", "init", "example.com/uncommitted")
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.Dir = dir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("error running `go mod init`: %s, %v", stderr.String(), err)
 	}
 }

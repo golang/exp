@@ -2,10 +2,10 @@ mod=example.com/ziperrors
 dir=x
 base=none
 error=true
+vcs=git
 -- want --
 testdata/this_file_also_has_a_bad_filename'.txt: malformed file path "testdata/this_file_also_has_a_bad_filename'.txt": invalid char '\''
 testdata/this_file_has_a_bad_filename'.txt: malformed file path "testdata/this_file_has_a_bad_filename'.txt": invalid char '\''
--- .git/HEAD --
 -- x/go.mod --
 module example.com/x
 

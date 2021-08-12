@@ -1,7 +1,6 @@
 dir=dup/v2
 base=none
--- .git/empty --
-empty file to mark repository root
+vcs=git
 -- dup/go.mod --
 module example.com/dup
 

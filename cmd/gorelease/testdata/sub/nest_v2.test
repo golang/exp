@@ -1,10 +1,10 @@
 mod=example.com/sub/nest/v2
 dir=nest
 base=v2.0.0
+vcs=git
 -- want --
 # summary
 Suggested version: v2.0.1 (with tag nest/v2.0.1)
--- .git/HEAD --
 -- nest/go.mod --
 module example.com/sub/nest/v2
 

@@ -2,6 +2,7 @@ mod=example.com/patherrors
 dir=x
 base=none
 success=false
+vcs=git
 -- want --
 # diagnostics
 example.com/y: module path must end with "x", since it is in subdirectory "x"
@@ -10,7 +11,6 @@ example.com/y: module path must end with "x", since it is in subdirectory "x"
 Suggested version: v0.1.0
 -- .mod --
 module example.com/patherrors
--- .git/HEAD --
 -- x/go.mod --
 module example.com/y
 
