@@ -148,16 +148,25 @@ func main() {
 	r.presentTo(os.Stdout)
 }
 
+// extractModules collects modules in `pkgs` up to uniqueness of
+// module path and version.
 func extractModules(pkgs []*packages.Package) []*packages.Module {
-	modMap := map[*packages.Module]bool{}
+	modMap := map[string]*packages.Module{}
+	modKey := func(mod *packages.Module) string {
+		if mod.Replace != nil {
+			return fmt.Sprintf("%s@%s", mod.Replace.Path, mod.Replace.Version)
+		}
+		return fmt.Sprintf("%s@%s", mod.Path, mod.Version)
+	}
+
 	seen := map[*packages.Package]bool{}
-	var extract func(*packages.Package, map[*packages.Module]bool)
-	extract = func(pkg *packages.Package, modMap map[*packages.Module]bool) {
+	var extract func(*packages.Package, map[string]*packages.Module)
+	extract = func(pkg *packages.Package, modMap map[string]*packages.Module) {
 		if pkg == nil || seen[pkg] {
 			return
 		}
 		if pkg.Module != nil {
-			modMap[pkg.Module] = true
+			modMap[modKey(pkg.Module)] = pkg.Module
 		}
 		seen[pkg] = true
 		for _, imp := range pkg.Imports {
@@ -167,8 +176,9 @@ func extractModules(pkgs []*packages.Package) []*packages.Module {
 	for _, pkg := range pkgs {
 		extract(pkg, modMap)
 	}
+
 	modules := []*packages.Module{}
-	for mod := range modMap {
+	for _, mod := range modMap {
 		modules = append(modules, mod)
 	}
 	return modules
