@@ -155,9 +155,10 @@ func (mv ModuleVulnerabilities) Num() int {
 func (mv ModuleVulnerabilities) VulnsForPackage(importPath string) []*osv.Entry {
 	var mostSpecificMod *modVulns
 	for _, mod := range mv {
-		if strings.HasPrefix(importPath, mod.mod.Path) {
-			if mostSpecificMod == nil || len(mostSpecificMod.mod.Path) < len(mod.mod.Path) {
-				mostSpecificMod = &mod
+		md := mod
+		if strings.HasPrefix(importPath, md.mod.Path) {
+			if mostSpecificMod == nil || len(mostSpecificMod.mod.Path) < len(md.mod.Path) {
+				mostSpecificMod = &md
 			}
 		}
 	}

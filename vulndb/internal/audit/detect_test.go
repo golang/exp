@@ -110,6 +110,15 @@ func TestVulnsForPackage(t *testing.T) {
 				{ID: "b", Package: osv.Package{Name: "example.mod/a/b/c"}},
 			},
 		},
+		{
+			mod: &packages.Module{
+				Path:    "example.mod/d",
+				Version: "v0.0.1",
+			},
+			vulns: []*osv.Entry{
+				{ID: "d", Package: osv.Package{Name: "example.mod/d"}},
+			},
+		},
 	}
 
 	filtered := mv.VulnsForPackage("example.mod/a/b/c")
