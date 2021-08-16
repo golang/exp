@@ -32,9 +32,9 @@ func TestFilterVulns(t *testing.T) {
 				Version: "v1.0.0",
 			},
 			vulns: []*osv.Entry{
-				{ID: "a"},
-				{ID: "b", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows", "linux"}}},
-				{ID: "c", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64", "amd64"}}},
+				{ID: "a", Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "v2.0.0"}}}},
+				{ID: "b", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows", "linux"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v1.0.1"}}}},
+				{ID: "c", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64", "amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v1.0.0", Fixed: "v1.0.1"}}}},
 				{ID: "d", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows"}}},
 			},
 		},
@@ -46,8 +46,18 @@ func TestFilterVulns(t *testing.T) {
 			vulns: []*osv.Entry{
 				{ID: "e", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64"}}},
 				{ID: "f", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"linux"}}},
-				{ID: "g", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}},
+				{ID: "g", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v0.0.1", Fixed: "v2.0.1"}}}},
 				{ID: "h", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows"}, GOARCH: []string{"amd64"}}},
+			},
+		},
+		{
+			mod: &packages.Module{
+				Path: "example.mod/c",
+			},
+			vulns: []*osv.Entry{
+				{ID: "i", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v0.0.0"}}}},
+				{ID: "j", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "v3.0.0"}}}},
+				{ID: "k"},
 			},
 		},
 	}
@@ -61,9 +71,8 @@ func TestFilterVulns(t *testing.T) {
 				Version: "v1.0.0",
 			},
 			vulns: []*osv.Entry{
-				{ID: "a"},
-				{ID: "b", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"windows", "linux"}}},
-				{ID: "c", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64", "amd64"}}},
+				{ID: "a", Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "v2.0.0"}}}},
+				{ID: "c", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"arm64", "amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v1.0.0", Fixed: "v1.0.1"}}}},
 			},
 		},
 		{
@@ -73,8 +82,17 @@ func TestFilterVulns(t *testing.T) {
 			},
 			vulns: []*osv.Entry{
 				{ID: "f", EcosystemSpecific: osv.GoSpecific{GOOS: []string{"linux"}}},
-				{ID: "g", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}},
+				{ID: "g", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v0.0.1", Fixed: "v2.0.1"}}}},
 			},
+		},
+		{
+			mod: &packages.Module{
+				Path: "example.mod/c",
+			},
+			vulns: []*osv.Entry{
+				{ID: "i", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v0.0.0"}}}},
+				{ID: "j", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "v3.0.0"}}}},
+				{ID: "k"}},
 		},
 	}
 	if !reflect.DeepEqual(filtered, expected) {
