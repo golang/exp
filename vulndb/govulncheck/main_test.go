@@ -22,6 +22,7 @@ import (
 	"golang.org/x/exp/vulndb/internal/audit"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/packages/packagestest"
+	"golang.org/x/vulndb/client"
 )
 
 // TODO(zpavlinovic): improve integration tests.
@@ -223,7 +224,13 @@ func TestHashicorpVault(t *testing.T) {
 			}
 		}
 
-		r, err := run(cfg, []string{hashiVaultOkta}, false, []string{test.source})
+		// TODO: add caching
+		dbClient, err := client.NewClient([]string{test.source}, client.Options{})
+		if err != nil {
+			t.Error(err)
+		}
+
+		r, err := run(cfg, []string{hashiVaultOkta}, false, dbClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -374,7 +381,13 @@ func TestKubernetes(t *testing.T) {
 			}
 		}
 
-		r, err := run(cfg, []string{"./..."}, false, []string{test.source})
+		// TODO: add caching
+		dbClient, err := client.NewClient([]string{test.source}, client.Options{})
+		if err != nil {
+			t.Error(err)
+		}
+
+		r, err := run(cfg, []string{"./..."}, false, dbClient)
 		if err != nil {
 			t.Fatal(err)
 		}

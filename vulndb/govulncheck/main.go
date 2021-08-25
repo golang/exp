@@ -83,12 +83,14 @@ func main() {
 	if GOVULNDB := os.Getenv("GOVULNDB"); GOVULNDB != "" {
 		dbs = strings.Split(GOVULNDB, ",")
 	}
-
-	cfg := &packages.Config{
-		Mode: packages.LoadAllSyntax | packages.NeedModule,
+	dbClient, err := client.NewClient(dbs, client.Options{HTTPCache: client.NewFsCache()})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
+		os.Exit(1)
 	}
 
-	r, err := run(cfg, flag.Args(), *importsFlag, dbs)
+	cfg := &packages.Config{Mode: packages.LoadAllSyntax | packages.NeedModule}
+	r, err := run(cfg, flag.Args(), *importsFlag, dbClient)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
 		os.Exit(1)
@@ -176,16 +178,11 @@ func isFile(path string) bool {
 	return !s.IsDir()
 }
 
-func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string) (*audit.Results, error) {
+func run(cfg *packages.Config, patterns []string, importsOnly bool, dbClient *client.Client) (*audit.Results, error) {
 	if len(patterns) == 1 && isFile(patterns[0]) {
 		modules, symbols, err := binscan.ExtractPackagesAndSymbols(patterns[0])
 		if err != nil {
 			return nil, err
-		}
-
-		dbClient, err := client.NewClient(dbs, client.Options{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create database client: %s", err)
 		}
 
 		vulns, err := audit.FetchVulnerabilities(dbClient, modules)
@@ -216,10 +213,6 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbs []string
 	// Load database.
 	if *verboseFlag {
 		log.Println("loading database...")
-	}
-	dbClient, err := client.NewClient(dbs, client.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create database client: %s", err)
 	}
 
 	modVulns, err := audit.FetchVulnerabilities(dbClient, extractModules(pkgs))
