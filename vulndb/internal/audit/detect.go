@@ -189,16 +189,16 @@ func (mv ModuleVulnerabilities) Filter(os, arch string) ModuleVulnerabilities {
 		if module.Replace != nil {
 			modVersion = module.Replace.Version
 		}
+		// TODO: if modVersion == "", try vcs to get the version?
 		var filteredVulns []*osv.Entry
 		for _, v := range mod.vulns {
 			// A module version is affected if
-			//  - it is incuded in one of the affected version ranges
-			//  - module version is ""
-			//  The latter means the module version is not available, which
-			//  should happen only for top-level packages for which we want
-			//  to be more conservative.
+			//  - it is included in one of the affected version ranges
+			//  - and module version is not ""
+			//  The latter means the module version is not available, so
+			//  we don't want to spam users with potential false alarms.
 			//  TODO: issue warning for "" cases above?
-			affectsVersion := modVersion == "" || v.Affects.AffectsSemver(modVersion)
+			affectsVersion := modVersion != "" && v.Affects.AffectsSemver(modVersion)
 			if affectsVersion && matchesPlatform(os, arch, v.EcosystemSpecific) {
 				filteredVulns = append(filteredVulns, v)
 			}

@@ -89,10 +89,6 @@ func TestFilterVulns(t *testing.T) {
 			mod: &packages.Module{
 				Path: "example.mod/c",
 			},
-			vulns: []*osv.Entry{
-				{ID: "i", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Introduced: "v0.0.0"}}}},
-				{ID: "j", EcosystemSpecific: osv.GoSpecific{GOARCH: []string{"amd64"}}, Affects: osv.Affects{Ranges: []osv.AffectsRange{{Type: osv.TypeSemver, Fixed: "v3.0.0"}}}},
-				{ID: "k"}},
 		},
 	}
 	if !reflect.DeepEqual(filtered, expected) {
