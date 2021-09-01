@@ -11,8 +11,7 @@
 // WARNING WARNING WARNING
 //
 // govulncheck is still experimental and neither its output or the vulnerability
-// database should be relied on to be stable or comprehensive. It also performs no
-// caching of vulnerability database entries.
+// database should be relied on to be stable or comprehensive.
 package main
 
 import (
@@ -94,7 +93,7 @@ func main() {
 	if GOVULNDB := os.Getenv("GOVULNDB"); GOVULNDB != "" {
 		dbs = strings.Split(GOVULNDB, ",")
 	}
-	dbClient, err := client.NewClient(dbs, client.Options{HTTPCache: client.NewFsCache()})
+	dbClient, err := client.NewClient(dbs, client.Options{HTTPCache: defaultCache()})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
 		os.Exit(1)

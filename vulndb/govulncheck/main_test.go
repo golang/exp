@@ -171,10 +171,6 @@ func TestHashicorpVault(t *testing.T) {
 		t.Logf("failed to get %s: %s", hashiVaultOkta+"@v1.6.3", out)
 		t.Fatal(err)
 	}
-	// if out, err := execCmd(e.Config.Dir, env, "go", "mod", "tidy"); err != nil {
-	// 	t.Logf("failed to mod tidy: %s", out)
-	// 	t.Fatal(err)
-	// }
 
 	// run goaudit.
 	cfg := &packages.Config{
@@ -198,6 +194,8 @@ func TestHashicorpVault(t *testing.T) {
 		// list of packages whose vulns should be addded to source
 		toAdd []string
 		want  []finding
+		// "" indicates no cache should be used
+		cacheRoot string
 	}{
 		// test local db without yaml, which should result in no findings.
 		{source: "file://" + dbPath, want: nil,
@@ -215,6 +213,12 @@ func TestHashicorpVault(t *testing.T) {
 				{"github.com/go-yaml/yaml.decoder.unmarshal", 6},
 				{"github.com/go-yaml/yaml.yaml_parser_fetch_more_tokens", 12}},
 		},
+		// repeat the last test but with cache
+		{source: "http://localhost:8080", cacheRoot: filepath.Join(e.Config.Dir, "/pkg/mod/cache/download/vulndb"),
+			want: []finding{
+				{"github.com/go-yaml/yaml.decoder.unmarshal", 6},
+				{"github.com/go-yaml/yaml.yaml_parser_fetch_more_tokens", 12}},
+		},
 	} {
 		for _, add := range test.toAdd {
 			if strings.HasPrefix(test.source, "file://") {
@@ -224,8 +228,11 @@ func TestHashicorpVault(t *testing.T) {
 			}
 		}
 
-		// TODO: add caching
-		dbClient, err := client.NewClient([]string{test.source}, client.Options{})
+		var opts client.Options
+		if test.cacheRoot != "" {
+			opts.HTTPCache = &fsCache{rootDir: test.cacheRoot}
+		}
+		dbClient, err := client.NewClient([]string{test.source}, opts)
 		if err != nil {
 			t.Error(err)
 		}
@@ -351,6 +358,8 @@ func TestKubernetes(t *testing.T) {
 		// list of packages whose vulns should be addded to source
 		toAdd []string
 		want  []finding
+		// "" indicates no cache should be used
+		cacheRoot string
 	}{
 		// test local db with only apiserver vuln, which should result in a single finding.
 		{source: "file://" + dbPath, toAdd: []string{"github.com/go-yaml/yaml.json", "k8s.io/apiextensions-apiserver/pkg/apiserver.json"},
@@ -372,6 +381,14 @@ func TestKubernetes(t *testing.T) {
 				{"golang.org/x/crypto/ssh.NewPublicKey", 4},
 				{"golang.org/x/crypto/ssh.parseED25519", 9},
 			}},
+		//repeat the last test but with a cache
+		{source: "http://localhost:8080", cacheRoot: filepath.Join(e.Config.Dir, "/pkg/mod/cache/download/vulndb"),
+			want: []finding{
+				{"golang.org/x/crypto/ssh.NewPublicKey", 1},
+				{"k8s.io/apiextensions-apiserver/pkg/apiserver.NewCustomResourceDefinitionHandler", 3},
+				{"golang.org/x/crypto/ssh.NewPublicKey", 4},
+				{"golang.org/x/crypto/ssh.parseED25519", 9},
+			}},
 	} {
 		for _, add := range test.toAdd {
 			if strings.HasPrefix(test.source, "file://") {
@@ -381,8 +398,11 @@ func TestKubernetes(t *testing.T) {
 			}
 		}
 
-		// TODO: add caching
-		dbClient, err := client.NewClient([]string{test.source}, client.Options{})
+		var opts client.Options
+		if test.cacheRoot != "" {
+			opts.HTTPCache = &fsCache{rootDir: test.cacheRoot}
+		}
+		dbClient, err := client.NewClient([]string{test.source}, opts)
 		if err != nil {
 			t.Error(err)
 		}
