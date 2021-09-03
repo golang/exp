@@ -15,7 +15,32 @@ import (
 	"golang.org/x/vulndb/osv"
 )
 
+// NOTE: this cache implementation should be kept internal to the go tooling
+// (i.e. cmd/go/internal/something) so that the vulndb cache is owned by the
+// go command. Also it is currently NOT CONCURRENCY SAFE since it does not
+// implement file locking. If ported to the stdlib it should use
+// cmd/go/internal/lockedfile.
+
+// The cache uses a single JSON index file for each vulnerability database
+// which contains the map from packages to the time the last
+// vulnerability for that package was added/modified and the time that
+// the index was retrieved from the vulnerability database. The JSON
+// format is as follows:
+//
+// $GOPATH/pkg/mod/cache/download/vulndb/{db hostname}/indexes/index.json
+//   {
+//       Retrieved time.Time
+//       Index osv.DBIndex
+//   }
+//
+// Each package also has a JSON file which contains the array of vulnerability
+// entries for the package. The JSON format is as follows:
+//
+// $GOPATH/pkg/mod/cache/download/vulndb/{db hostname}/{import path}/vulns.json
+//   []*osv.Entry
+
 // fsCache is file-system cache implementing osv.Cache
+// TODO: make cache thread-safe
 type fsCache struct {
 	rootDir string
 }
