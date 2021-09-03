@@ -50,13 +50,11 @@ func (r Results) String() string {
 			continue
 		}
 
-		var alias string
-		if len(v.Aliases) == 0 {
-			alias = v.EcosystemSpecific.URL
-		} else {
-			alias = strings.Join(v.Aliases, ", ")
+		var aliases string
+		if len(v.Aliases) != 0 {
+			aliases = fmt.Sprintf(" (%s)", strings.Join(v.Aliases, ", "))
 		}
-		rStr += fmt.Sprintf("Findings for vulnerability: %s (of package %s):\n\n", alias, v.Package.Name)
+		rStr += fmt.Sprintf("Findings for vulnerability: %s%s:\n\n", v.ID, aliases)
 
 		for _, finding := range findings {
 			rStr += finding.String() + "\n"
@@ -163,7 +161,7 @@ type modVulns struct {
 
 type ModuleVulnerabilities []modVulns
 
-func matchesPlatform(os, arch string, e osv.GoSpecific) bool {
+func matchesPlatform(os, arch string, e osv.EcosystemSpecific) bool {
 	matchesOS := len(e.GOOS) == 0
 	matchesArch := len(e.GOARCH) == 0
 	for _, o := range e.GOOS {
@@ -192,15 +190,18 @@ func (mv ModuleVulnerabilities) Filter(os, arch string) ModuleVulnerabilities {
 		// TODO: if modVersion == "", try vcs to get the version?
 		var filteredVulns []*osv.Entry
 		for _, v := range mod.vulns {
-			// A module version is affected if
-			//  - it is included in one of the affected version ranges
-			//  - and module version is not ""
-			//  The latter means the module version is not available, so
-			//  we don't want to spam users with potential false alarms.
-			//  TODO: issue warning for "" cases above?
-			affectsVersion := modVersion != "" && v.Affects.AffectsSemver(modVersion)
-			if affectsVersion && matchesPlatform(os, arch, v.EcosystemSpecific) {
-				filteredVulns = append(filteredVulns, v)
+			for _, a := range v.Affected {
+				// A module version is affected if
+				//  - it is included in one of the affected version ranges
+				//  - and module version is not ""
+				//  The latter means the module version is not available, so
+				//  we don't want to spam users with potential false alarms.
+				//  TODO: issue warning for "" cases above?
+				affected := modVersion != "" && a.Ranges.AffectsSemver(modVersion) && matchesPlatform(os, arch, a.EcosystemSpecific)
+				if affected {
+					filteredVulns = append(filteredVulns, v)
+					break
+				}
 			}
 		}
 		filteredMod = append(filteredMod, modVulns{
@@ -243,8 +244,11 @@ func (mv ModuleVulnerabilities) VulnsForPackage(importPath string) []*osv.Entry 
 	vulns := mostSpecificMod.vulns
 	packageVulns := []*osv.Entry{}
 	for _, v := range vulns {
-		if v.Package.Name == importPath {
-			packageVulns = append(packageVulns, v)
+		for _, a := range v.Affected {
+			if a.Package.Name == importPath {
+				packageVulns = append(packageVulns, v)
+				break
+			}
 		}
 	}
 	return packageVulns
@@ -259,14 +263,20 @@ func (mv ModuleVulnerabilities) VulnsForSymbol(importPath, symbol string) []*osv
 
 	symbolVulns := []*osv.Entry{}
 	for _, v := range vulns {
-		if len(v.EcosystemSpecific.Symbols) == 0 {
-			symbolVulns = append(symbolVulns, v)
-			continue
-		}
-		for _, s := range v.EcosystemSpecific.Symbols {
-			if s == symbol {
+	vulnLoop:
+		for _, a := range v.Affected {
+			if a.Package.Name != importPath {
+				continue
+			}
+			if len(a.EcosystemSpecific.Symbols) == 0 {
 				symbolVulns = append(symbolVulns, v)
-				break
+				continue vulnLoop
+			}
+			for _, s := range a.EcosystemSpecific.Symbols {
+				if s == symbol {
+					symbolVulns = append(symbolVulns, v)
+					continue vulnLoop
+				}
 			}
 		}
 	}
