@@ -8,6 +8,10 @@ import (
 	"go/token"
 	"reflect"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/packages/packagestest"
+	"golang.org/x/vulndb/osv"
 )
 
 func TestSymbolVulnDetectionVTA(t *testing.T) {
@@ -78,5 +82,78 @@ func TestSymbolVulnDetectionVTA(t *testing.T) {
 		if !reflect.DeepEqual(test.findings, got) {
 			t.Errorf("want %v findings (projected); got %v", test.findings, got)
 		}
+	}
+}
+
+func TestInitReachability(t *testing.T) {
+	e := packagestest.Export(t, packagestest.Modules, []packagestest.Module{
+		{
+			Name: "golang.org/inittest",
+			Files: map[string]interface{}{"main.go": `
+			package main
+
+			import "example.com/vuln"
+
+			func main() {
+				vuln.Foo() // benign
+			}
+			`},
+		},
+		{
+			Name: "example.com@v1.1.1",
+			Files: map[string]interface{}{"vuln/vuln.go": `
+			package vuln
+
+			func init() {
+				Bad() // bad
+			}
+
+			func Foo() {}
+			func Bad() {}
+			`},
+		},
+	})
+	defer e.Cleanup()
+
+	_, pkgs, _, err := loadAndBuildPackages(e, "/inittest/main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	modVulns := ModuleVulnerabilities{
+		{
+			mod: &packages.Module{Path: "example.com", Version: "v1.1.1"},
+			vulns: []*osv.Entry{
+				{
+					ID: "V3",
+					Affected: []osv.Affected{{
+						Package:           osv.Package{Name: "example.com/vuln"},
+						Ranges:            osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Introduced: "1.0.0"}, {Fixed: "1.1.2"}}}},
+						EcosystemSpecific: osv.EcosystemSpecific{Symbols: []string{"Bad"}},
+					}},
+				},
+			},
+		},
+	}
+	results := VulnerableSymbols(pkgs, modVulns)
+
+	if results.SearchMode != CallGraphSearch {
+		t.Errorf("want call graph search mode; got %v", results.SearchMode)
+	}
+
+	want := []Finding{
+		{
+			Symbol: "example.com/vuln.Bad",
+			Trace: []TraceElem{
+				{Description: "command-line-arguments.init(...)", Position: &token.Position{}},
+				{Description: "example.com/vuln.init(...)", Position: &token.Position{}},
+				{Description: "example.com/vuln.init#1(...)", Position: &token.Position{}}},
+			Type:     FunctionType,
+			Position: &token.Position{Line: 5, Filename: "vuln.go"},
+			weight:   0,
+		},
+	}
+	if got := projectFindings(results.VulnFindings["V3"]); !reflect.DeepEqual(want, got) {
+		t.Errorf("want %v findings (projected); got %v", want, got)
 	}
 }
