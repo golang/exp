@@ -193,7 +193,7 @@ func isFile(path string) bool {
 	return !s.IsDir()
 }
 
-func run(cfg *packages.Config, patterns []string, importsOnly bool, dbClient *client.Client) (*audit.Results, error) {
+func run(cfg *packages.Config, patterns []string, importsOnly bool, dbClient client.Client) (*audit.Results, error) {
 	if len(patterns) == 1 && isFile(patterns[0]) {
 		modules, symbols, err := binscan.ExtractPackagesAndSymbols(patterns[0])
 		if err != nil {
