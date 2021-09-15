@@ -158,7 +158,7 @@ func (chain *callChain) trace() []TraceElem {
 	}
 
 	var pos *token.Position
-	desc := fmt.Sprintf("%s.%s(...)", pkgPath(chain.f), chain.f.Name())
+	desc := fmt.Sprintf("%s.%s(...)", pkgPath(chain.f), dbFuncName(chain.f))
 	if chain.call != nil {
 		pos = instrPosition(chain.call)
 		if unresolved(chain.call) {
