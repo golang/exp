@@ -190,6 +190,7 @@ func (mv ModuleVulnerabilities) Filter(os, arch string) ModuleVulnerabilities {
 		// TODO: if modVersion == "", try vcs to get the version?
 		var filteredVulns []*osv.Entry
 		for _, v := range mod.vulns {
+			var filteredAffected []osv.Affected
 			for _, a := range v.Affected {
 				// A module version is affected if
 				//  - it is included in one of the affected version ranges
@@ -199,10 +200,15 @@ func (mv ModuleVulnerabilities) Filter(os, arch string) ModuleVulnerabilities {
 				//  TODO: issue warning for "" cases above?
 				affected := modVersion != "" && a.Ranges.AffectsSemver(modVersion) && matchesPlatform(os, arch, a.EcosystemSpecific)
 				if affected {
-					filteredVulns = append(filteredVulns, v)
-					break
+					filteredAffected = append(filteredAffected, a)
 				}
 			}
+			if len(filteredAffected) == 0 {
+				continue
+			}
+			newV := *v
+			newV.Affected = filteredAffected
+			filteredVulns = append(filteredVulns, &newV)
 		}
 		filteredMod = append(filteredMod, modVulns{
 			mod:   module,

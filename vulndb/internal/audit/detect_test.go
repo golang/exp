@@ -32,7 +32,10 @@ func TestFilterVulns(t *testing.T) {
 				Version: "v1.0.0",
 			},
 			vulns: []*osv.Entry{
-				{ID: "a", Affected: []osv.Affected{{Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "2.0.0"}}}}}}},
+				{ID: "a", Affected: []osv.Affected{
+					{Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "2.0.0"}}}}},
+					{Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "1.0.0"}}}}}, // should be filtered out
+				}},
 				{ID: "b", Affected: []osv.Affected{{Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Introduced: "1.0.1"}}}}, EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"windows", "linux"}}}}},
 				{ID: "c", Affected: []osv.Affected{{Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Introduced: "1.0.1"}, {Fixed: "1.0.1"}}}}, EcosystemSpecific: osv.EcosystemSpecific{GOARCH: []string{"arm64", "amd64"}}}}},
 				{ID: "d", Affected: []osv.Affected{{EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"windows"}}}}},
@@ -66,7 +69,10 @@ func TestFilterVulns(t *testing.T) {
 				Version: "v1.2.0",
 			},
 			vulns: []*osv.Entry{
-				{ID: "l", Affected: []osv.Affected{{EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"windows"}}}, {EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"linux"}}}}},
+				{ID: "l", Affected: []osv.Affected{
+					{EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"windows"}}}, // should be filtered out
+					{EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"linux"}}},
+				}},
 			},
 		},
 	}
@@ -103,7 +109,7 @@ func TestFilterVulns(t *testing.T) {
 				Version: "v1.2.0",
 			},
 			vulns: []*osv.Entry{
-				{ID: "l", Affected: []osv.Affected{{EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"windows"}}}, {EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"linux"}}}}},
+				{ID: "l", Affected: []osv.Affected{{EcosystemSpecific: osv.EcosystemSpecific{GOOS: []string{"linux"}}}}},
 			},
 		},
 	}
