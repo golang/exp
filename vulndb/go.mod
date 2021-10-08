@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	golang.org/x/tools v0.0.0-20210910171127-a568412ca0e6
-	golang.org/x/vulndb v0.0.0-20210915213402-5966fd2d3f26
+	golang.org/x/vulndb v0.0.0-20211007173039-a3830b7c4b29
 )
 
 require (
