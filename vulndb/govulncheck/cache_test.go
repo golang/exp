@@ -59,9 +59,9 @@ func TestCache(t *testing.T) {
 	}
 
 	expectedEntries := []*osv.Entry{
-		&osv.Entry{ID: "001"},
-		&osv.Entry{ID: "002"},
-		&osv.Entry{ID: "003"},
+		{ID: "001"},
+		{ID: "002"},
+		{ID: "003"},
 	}
 	if err := cache.WriteEntries(dbName, "vuln.example.com", expectedEntries); err != nil {
 		t.Fatalf("WriteEntries failed: %v", err)

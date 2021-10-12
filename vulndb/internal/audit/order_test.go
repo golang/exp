@@ -8,20 +8,20 @@ import (
 
 func TestFindingsOrdering(t *testing.T) {
 	f1 := Finding{Trace: []TraceElem{
-		TraceElem{Description: "T1"},
+		{Description: "T1"},
 	},
 	}
 	f2 := Finding{Trace: []TraceElem{
-		TraceElem{Description: "T1"},
-		TraceElem{Description: "T2"},
+		{Description: "T1"},
+		{Description: "T2"},
 	},
 	}
 	f3 := Finding{Trace: []TraceElem{
-		TraceElem{Description: "T1"}},
+		{Description: "T1"}},
 		confidence: 1,
 	}
 	f4 := Finding{Trace: []TraceElem{
-		TraceElem{Description: "T1"}},
+		{Description: "T1"}},
 		confidence: 1,
 		weight:     2,
 	}

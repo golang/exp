@@ -100,7 +100,7 @@ func main() {
 	}
 
 	cfg := &packages.Config{
-		Mode:       packages.LoadAllSyntax | packages.NeedModule,
+		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedDeps | packages.NeedModule,
 		Tests:      *testsFlag,
 		BuildFlags: []string{fmt.Sprintf("-tags=%s", strings.Join(build.Default.BuildTags, ","))},
 	}

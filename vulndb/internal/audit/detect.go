@@ -133,7 +133,7 @@ type TraceElem struct {
 // String method for trace elements.
 func (e TraceElem) String() string {
 	if e.Position == nil {
-		return fmt.Sprintf("%s", e.Description)
+		return e.Description
 	}
 	return fmt.Sprintf("%s (%s)", e.Description, e.Position)
 }

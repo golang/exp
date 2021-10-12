@@ -96,7 +96,7 @@ func testContext(t *testing.T) ([]*ssa.Package, ModuleVulnerabilities) {
 }
 
 func loadAndBuildPackages(e *packagestest.Exported, file string) (*ssa.Program, []*ssa.Package, []*packages.Package, error) {
-	e.Config.Mode |= packages.NeedModule | packages.LoadAllSyntax
+	e.Config.Mode |= packages.NeedModule | packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedDeps
 	// Get the path to the test file.
 	filepath := path.Join(e.Temp(), file)
 	pkgs, err := packages.Load(e.Config, filepath)
