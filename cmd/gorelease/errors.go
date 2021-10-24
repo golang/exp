@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"golang.org/x/mod/module"
-	"golang.org/x/xerrors"
 )
 
 type usageError struct {
@@ -27,7 +26,7 @@ const usageText = `usage: gorelease [-base=version] [-version=version]`
 
 func (e *usageError) Error() string {
 	msg := ""
-	if !xerrors.Is(e.err, flag.ErrHelp) {
+	if !errors.Is(e.err, flag.ErrHelp) {
 		msg = e.err.Error()
 	}
 	return usageText + "\n" + msg + "\nFor more information, run go doc golang.org/x/exp/cmd/gorelease"
