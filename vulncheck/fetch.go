@@ -97,7 +97,14 @@ func fetchVulnerabilities(client client.Client, modules []*packages.Module) (mod
 	return mv, nil
 }
 
+// fetchingInTesting is a flag used to avoid skipping
+// loading local vulnerabilities in testing.
+var fetchingInTesting bool = false
+
 func isLocal(mod *packages.Module) bool {
+	if fetchingInTesting {
+		return false
+	}
 	modDir := mod.Dir
 	if mod.Replace != nil {
 		modDir = mod.Replace.Dir
