@@ -465,6 +465,8 @@ func gitInit(t *testing.T, dir string) {
 
 	for _, args := range [][]string{
 		{"git", "init"},
+		{"git", "config", "user.name", "Gopher"},
+		{"git", "config", "user.email", "gopher@golang.org"},
 		{"git", "checkout", "-b", "test"},
 		{"git", "add", "-A"},
 		{"git", "commit", "-m", "test"},
