@@ -7,8 +7,11 @@
 package vulncheck
 
 import (
+	"fmt"
 	"go/token"
+	"strings"
 
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/vulndb/client"
 	"golang.org/x/vulndb/osv"
 )
@@ -147,4 +150,159 @@ type PkgNode struct {
 	Module int
 	// ImportedBy contains IDs of packages directly importing this package.
 	ImportedBy []int
+}
+
+// moduleVulnerabilities is an internal structure for
+// holding and querying vulnerabilities provided by a
+// vulnerability database client.
+type moduleVulnerabilities []modVulns
+
+// modVulns groups vulnerabilities per module.
+type modVulns struct {
+	mod   *packages.Module
+	vulns []*osv.Entry
+}
+
+func (mv moduleVulnerabilities) Filter(os, arch string) moduleVulnerabilities {
+	var filteredMod moduleVulnerabilities
+	for _, mod := range mv {
+		module := mod.mod
+		modVersion := module.Version
+		if module.Replace != nil {
+			modVersion = module.Replace.Version
+		}
+		// TODO(https://golang.org/issues/49264): if modVersion == "", try vcs?
+		var filteredVulns []*osv.Entry
+		for _, v := range mod.vulns {
+			var filteredAffected []osv.Affected
+			for _, a := range v.Affected {
+				// A module version is affected if
+				//  - it is included in one of the affected version ranges
+				//  - and module version is not ""
+				//  The latter means the module version is not available, so
+				//  we don't want to spam users with potential false alarms.
+				//  TODO: issue warning for "" cases above?
+				affected := modVersion != "" && a.Ranges.AffectsSemver(modVersion) && matchesPlatform(os, arch, a.EcosystemSpecific)
+				if affected {
+					filteredAffected = append(filteredAffected, a)
+				}
+			}
+			if len(filteredAffected) == 0 {
+				continue
+			}
+			// save the non-empty vulnerability with only
+			// affected symbols.
+			newV := *v
+			newV.Affected = filteredAffected
+			filteredVulns = append(filteredVulns, &newV)
+		}
+		filteredMod = append(filteredMod, modVulns{
+			mod:   module,
+			vulns: filteredVulns,
+		})
+	}
+	return filteredMod
+}
+
+func matchesPlatform(os, arch string, e osv.EcosystemSpecific) bool {
+	matchesOS := len(e.GOOS) == 0
+	matchesArch := len(e.GOARCH) == 0
+	for _, o := range e.GOOS {
+		if os == o {
+			matchesOS = true
+			break
+		}
+	}
+	for _, a := range e.GOARCH {
+		if arch == a {
+			matchesArch = true
+			break
+		}
+	}
+	return matchesOS && matchesArch
+}
+func (mv moduleVulnerabilities) Num() int {
+	var num int
+	for _, m := range mv {
+		num += len(m.vulns)
+	}
+	return num
+}
+
+// VulnsForPackage returns the vulnerabilities for the module which is the most
+// specific prefix of importPath, or nil if there is no matching module with
+// vulnerabilities.
+func (mv moduleVulnerabilities) VulnsForPackage(importPath string) []*osv.Entry {
+	var mostSpecificMod *modVulns
+	for _, mod := range mv {
+		md := mod
+		if strings.HasPrefix(importPath, md.mod.Path) {
+			if mostSpecificMod == nil || len(mostSpecificMod.mod.Path) < len(md.mod.Path) {
+				mostSpecificMod = &md
+			}
+		}
+	}
+
+	if mostSpecificMod == nil {
+		return nil
+	}
+
+	if mostSpecificMod.mod.Replace != nil {
+		importPath = fmt.Sprintf("%s%s", mostSpecificMod.mod.Replace.Path, strings.TrimPrefix(importPath, mostSpecificMod.mod.Path))
+	}
+	vulns := mostSpecificMod.vulns
+	packageVulns := []*osv.Entry{}
+	for _, v := range vulns {
+		for _, a := range v.Affected {
+			if a.Package.Name == importPath {
+				packageVulns = append(packageVulns, v)
+				break
+			}
+		}
+	}
+	return packageVulns
+}
+
+// VulnsForSymbol returns vulnerabilites for `symbol` in `mv.VulnsForPackage(importPath)`.
+func (mv moduleVulnerabilities) VulnsForSymbol(importPath, symbol string) []*osv.Entry {
+	vulns := mv.VulnsForPackage(importPath)
+	if vulns == nil {
+		return nil
+	}
+
+	symbolVulns := []*osv.Entry{}
+	for _, v := range vulns {
+	vulnLoop:
+		for _, a := range v.Affected {
+			if a.Package.Name != importPath {
+				continue
+			}
+			if len(a.EcosystemSpecific.Symbols) == 0 {
+				symbolVulns = append(symbolVulns, v)
+				continue vulnLoop
+			}
+			for _, s := range a.EcosystemSpecific.Symbols {
+				if s == symbol {
+					symbolVulns = append(symbolVulns, v)
+					continue vulnLoop
+				}
+			}
+		}
+	}
+	return symbolVulns
+}
+
+// Vulns returns vulnerabilities for all modules in `mv`.
+func (mv moduleVulnerabilities) Vulns() []*osv.Entry {
+	var vulns []*osv.Entry
+	seen := make(map[string]bool)
+	for _, mv := range mv {
+		for _, v := range mv.vulns {
+			if !seen[v.ID] {
+				vulns = append(vulns, v)
+				seen[v.ID] = true
+			}
+		}
+	}
+	return vulns
 }
