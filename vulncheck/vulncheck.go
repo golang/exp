@@ -80,9 +80,11 @@ type Vuln struct {
 	RequireSink int
 }
 
-// CallGraph whose sinks are vulnerable functions and sources are entry points of user
-// packages. CallGraph is backwards directed, i.e., from a function node to the place
-// where the function is called.
+// CallGraph is a slice of a full program call graph whose sinks are conceptually
+// vulnerable functions and sources are entry points of user packages. In order to
+// support succinct traversal of the slice related to a particular vulnerability,
+// CallGraph is technically backwards directed, i.e., from a vulnerable function
+// towards the program entry functions (see FuncNode).
 type CallGraph struct {
 	// Funcs contains all call graph nodes as a map: func node id -> func node.
 	Funcs map[int]*FuncNode
@@ -113,10 +115,11 @@ type CallSite struct {
 	Resolved bool
 }
 
-// RequireGraph models part of module requires graph where sinks are modules with
-// some known vulnerabilities and sources are modules of user entry packages.
-// RequireGraph is backwards directed, i.e., from a module to the set of modules
-// it is required by.
+// RequireGraph is a slice of a full program module requires graph whose sinks
+// are conceptually modules with some known vulnerabilities and sources are modules
+// of user entry packages. In order to support succinct traversal of the slice
+// related to a particular vulnerability, RequireGraph is technically backwards
+// directed, i.e., from a vulnerable module towards the program entry modules (see ModNode).
 type RequireGraph struct {
 	// Modules contains all module nodes as a map: module node id -> module node.
 	Modules map[int]*ModNode
@@ -127,14 +130,17 @@ type RequireGraph struct {
 type ModNode struct {
 	Path    string
 	Version string
-	Replace *ModNode
+	// Replace is the ID of the replacement module node, if any.
+	Replace int
 	// RequiredBy contains IDs of the modules requiring this module.
 	RequiredBy []int
 }
 
-// ImportGraph models part of package import graph where sinks are packages with
-// some known vulnerabilities and sources are user specified packages. The graph
-// is backwards directed, i.e., from a package to the set of packages importing it.
+// ImportGraph is a slice of a full program package import graph whose sinks are
+// conceptually packages with some known vulnerabilities and sources are user
+// specified packages. In order to support succinct traversal of the slice related
+// to a particular vulnerability, ImportGraph is technically backwards directed,
+// i.e., from a vulnerable package towards the program entry packages (see PkgNode).
 type ImportGraph struct {
 	// Packages contains all package nodes as a map: package node id -> package node.
 	Packages map[int]*PkgNode
@@ -150,6 +156,9 @@ type PkgNode struct {
 	Module int
 	// ImportedBy contains IDs of packages directly importing this package.
 	ImportedBy []int
+
+	// pkg is used for connecting package node to module and call graph nodes.
+	pkg *packages.Package
 }
 
 // moduleVulnerabilities is an internal structure for

@@ -20,21 +20,7 @@ func modKey(mod *packages.Module) string {
 	if mod == nil {
 		return ""
 	}
-	return fmt.Sprintf("%s@%s", modPath(mod), modVersion(mod))
-}
-
-func modPath(mod *packages.Module) string {
-	if mod.Replace != nil {
-		return mod.Replace.Path
-	}
-	return mod.Path
-}
-
-func modVersion(mod *packages.Module) string {
-	if mod.Replace != nil {
-		return mod.Replace.Version
-	}
-	return mod.Version
+	return fmt.Sprintf("%s@%s", mod.Path, mod.Version)
 }
 
 // extractModules collects modules in `pkgs` up to uniqueness of
@@ -49,7 +35,11 @@ func extractModules(pkgs []*packages.Package) []*packages.Module {
 			return
 		}
 		if pkg.Module != nil {
-			modMap[modKey(pkg.Module)] = pkg.Module
+			if pkg.Module.Replace != nil {
+				modMap[modKey(pkg.Module.Replace)] = pkg.Module
+			} else {
+				modMap[modKey(pkg.Module)] = pkg.Module
+			}
 		}
 		seen[pkg] = true
 		for _, imp := range pkg.Imports {

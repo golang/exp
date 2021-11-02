@@ -82,6 +82,17 @@ func impGraphToStrMap(ig *ImportGraph) map[string][]string {
 	return m
 }
 
+func reqGraphToStrMap(rg *RequireGraph) map[string][]string {
+	m := make(map[string][]string)
+	for _, n := range rg.Modules {
+		for _, predId := range n.RequiredBy {
+			pred := rg.Modules[predId]
+			m[pred.Path] = append(m[pred.Path], n.Path)
+		}
+	}
+	return m
+}
+
 func loadPackages(e *packagestest.Exported, patterns ...string) ([]*packages.Package, error) {
 	e.Config.Mode |= packages.NeedModule | packages.NeedName | packages.NeedFiles |
 		packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes |

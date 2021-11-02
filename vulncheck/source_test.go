@@ -114,8 +114,6 @@ func TestImportsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO(zpavlinovic): add test below for module graph too.
-
 	// Check that we find the right number of vulnerabilities.
 	// There should be three entries as there are three vulnerable
 	// symbols in the two import-reachable OSVs.
@@ -123,14 +121,15 @@ func TestImportsOnly(t *testing.T) {
 		t.Errorf("want 3 Vulns, got %d", len(result.Vulns))
 	}
 
-	// Check that vulnerabilities are connected to the imports graph.
+	// Check that vulnerabilities are connected to the imports
+	// and requires graph.
 	for _, v := range result.Vulns {
-		if v.ImportSink == 0 {
-			t.Errorf("want ImportSink !=0 for vuln %v:%v; got 0", v.Symbol, v.PkgPath)
+		if v.ImportSink == 0 || v.RequireSink == 0 {
+			t.Errorf("want ImportSink !=0 and RequireSink !=0 for %v:%v; got %v and %v", v.Symbol, v.PkgPath, v.ImportSink, v.RequireSink)
 		}
 	}
 
-	// The slice should include import chains:
+	// The imports slice should include import chains:
 	//   x -> avuln -> w -> bvuln
 	//         |
 	//   y ---->
@@ -144,5 +143,18 @@ func TestImportsOnly(t *testing.T) {
 
 	if igStrMap := impGraphToStrMap(result.Imports); !reflect.DeepEqual(wantImports, igStrMap) {
 		t.Errorf("want %v imports graph; got %v", wantImports, igStrMap)
+	}
+
+	// The requires slice should include requires chains:
+	//   entry -> amod -> wmod -> bmod
+	// That is, zmod module shoud not appear in the slice.
+	wantRequires := map[string][]string{
+		"golang.org/entry": {"golang.org/amod"},
+		"golang.org/amod":  {"golang.org/wmod"},
+		"golang.org/wmod":  {"golang.org/bmod"},
+	}
+
+	if rgStrMap := reqGraphToStrMap(result.Requires); !reflect.DeepEqual(wantRequires, rgStrMap) {
+		t.Errorf("want %v requires graph; got %v", wantRequires, rgStrMap)
 	}
 }
