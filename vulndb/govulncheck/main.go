@@ -81,11 +81,11 @@ func init() {
 }
 
 func main() {
-	flag.Usage = func() { fmt.Fprintln(os.Stderr, usage) }
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
-		fmt.Fprintln(os.Stderr, usage)
+		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}
 
