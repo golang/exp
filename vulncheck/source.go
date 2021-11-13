@@ -5,7 +5,11 @@
 package vulncheck
 
 import (
+	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/ssa"
+	"golang.org/x/tools/go/ssa/ssautil"
+	"golang.org/x/vulndb/osv"
 )
 
 // Source detects vulnerabilities in pkgs and computes slices of
@@ -16,10 +20,6 @@ import (
 //  - call graph leading to the use of a known vulnerable function
 //    or method
 func Source(pkgs []*packages.Package, cfg *Config) (*Result, error) {
-	if !cfg.ImportsOnly {
-		panic("call graph feature is currently unsupported")
-	}
-
 	modVulns, err := fetchVulnerabilities(cfg.Client, extractModules(pkgs))
 	if err != nil {
 		return nil, err
@@ -28,8 +28,21 @@ func Source(pkgs []*packages.Package, cfg *Config) (*Result, error) {
 	result := &Result{
 		Imports:  &ImportGraph{Packages: make(map[int]*PkgNode)},
 		Requires: &RequireGraph{Modules: make(map[int]*ModNode)},
+		Calls:    &CallGraph{Funcs: make(map[int]*FuncNode)},
 	}
+
 	vulnPkgModSlice(pkgs, modVulns, result)
+
+	if cfg.ImportsOnly {
+		return result, nil
+	}
+
+	prog, ssaPkgs := ssautil.AllPackages(pkgs, 0)
+	prog.Build()
+	entries := entryPoints(ssaPkgs)
+	cg := callGraph(prog, entries)
+	vulnCallGraphSlice(entries, modVulns, cg, result)
+
 	return result, nil
 }
 
@@ -222,4 +235,129 @@ func moduleNodeID(pkgNode *PkgNode, result *Result, modNodeIDs map[string]int) i
 		}
 	}
 	return id
+}
+
+func vulnCallGraphSlice(entries []*ssa.Function, modVulns moduleVulnerabilities, cg *callgraph.Graph, result *Result) {
+	// analyzedFuncs contains information on functions analyzed thus far.
+	// If a function is mapped to nil, this means it has been visited
+	// but it does not lead to a vulnerable call. Otherwise, a visited
+	// function is mapped to Calls function node.
+	analyzedFuncs := make(map[*ssa.Function]*FuncNode)
+	for _, entry := range entries {
+		// Top level entries that lead to vulnerable calls
+		// are stored as result.Calls graph entry points.
+		if e := vulnCallSlice(entry, modVulns, cg, result, analyzedFuncs); e != nil {
+			result.Calls.Entries = append(result.Calls.Entries, e)
+		}
+	}
+}
+
+// funID is an id counter for nodes of Calls graph.
+var funID int = 0
+
+func nextFunID() int {
+	funID++
+	return funID
+}
+
+// vulnCallSlice checks if f has some vulnerabilities or transitively calls
+// a function with known vulnerabilities. If so, populates result.Calls
+// graph with this reachability information and returns the result.Call
+// function node. Otherwise, returns nil.
+func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgraph.Graph, result *Result, analyzed map[*ssa.Function]*FuncNode) *FuncNode {
+	if fn, ok := analyzed[f]; ok {
+		return fn
+	}
+
+	fn := cg.Nodes[f]
+	if fn == nil {
+		return nil
+	}
+
+	// Check if f has known vulnerabilities.
+	vulns := modVulns.VulnsForSymbol(f.Package().Pkg.Path(), dbFuncName(f))
+
+	var funNode *FuncNode
+	// If there are vulnerabilities for f, create node for f and
+	// save it immediatelly. This allows us to include F in the
+	// slice when analyzing chain V -> F -> V where V is vulnerable.
+	if len(vulns) > 0 {
+		funNode = funcNode(f)
+	}
+	analyzed[f] = funNode
+
+	// Recursively compute which callees lead to a call of a
+	// vulnerable function. Remember the nodes of such callees.
+	type siteNode struct {
+		call ssa.CallInstruction
+		fn   *FuncNode
+	}
+	var onSlice []siteNode
+	for _, edge := range fn.Out {
+		if calleeNode := vulnCallSlice(edge.Callee.Func, modVulns, cg, result, analyzed); calleeNode != nil {
+			onSlice = append(onSlice, siteNode{call: edge.Site, fn: calleeNode})
+		}
+	}
+
+	// If f is not vulnerable nor it transitively leads
+	// to vulnerable calls, jump out.
+	if len(onSlice) == 0 && len(vulns) == 0 {
+		return nil
+	}
+
+	// If f is not vulnerable, then at this point it has
+	// to be on the path leading to a vulnerable call.
+	if funNode == nil {
+		funNode = funcNode(f)
+		analyzed[f] = funNode
+	}
+	result.Calls.Funcs[funNode.ID] = funNode
+
+	// Save node predecessor information.
+	for _, calleeSliceInfo := range onSlice {
+		call, node := calleeSliceInfo.call, calleeSliceInfo.fn
+		cs := &CallSite{
+			Parent:   funNode.ID,
+			Name:     call.Common().Value.Name(),
+			RecvType: callRecvType(call),
+			Resolved: resolved(call),
+			Pos:      instrPosition(call),
+		}
+		node.CallSites = append(node.CallSites, cs)
+	}
+
+	// Populate CallSink field for each detected vuln symbol.
+	for _, osv := range vulns {
+		for _, affected := range osv.Affected {
+			if affected.Package.Name != funNode.PkgPath {
+				continue
+			}
+			for _, symbol := range affected.EcosystemSpecific.Symbols {
+				addCallSinkForVuln(funNode.ID, osv, symbol, funNode.PkgPath, result)
+			}
+		}
+	}
+	return funNode
+}
+
+func funcNode(f *ssa.Function) *FuncNode {
+	id := nextFunID()
+	return &FuncNode{
+		ID:       id,
+		Name:     f.Name(),
+		PkgPath:  f.Package().Pkg.Path(),
+		RecvType: funcRecvType(f),
+		Pos:      funcPosition(f),
+	}
+}
+
+// addCallSinkForVuln adds callID as call sink to vuln of result.Vulns
+// identified with <osv, symbol, pkg>.
+func addCallSinkForVuln(callID int, osv *osv.Entry, symbol, pkg string, result *Result) {
+	for _, vuln := range result.Vulns {
+		if vuln.OSV == osv && vuln.Symbol == symbol && vuln.PkgPath == pkg {
+			vuln.CallSink = callID
+			return
+		}
+	}
 }

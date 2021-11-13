@@ -6,6 +6,7 @@ package vulncheck
 
 import (
 	"fmt"
+	"sort"
 
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/packages/packagestest"
@@ -79,6 +80,8 @@ func impGraphToStrMap(ig *ImportGraph) map[string][]string {
 			m[pred.Path] = append(m[pred.Path], n.Path)
 		}
 	}
+
+	sortStrMap(m)
 	return m
 }
 
@@ -90,7 +93,50 @@ func reqGraphToStrMap(rg *RequireGraph) map[string][]string {
 			m[pred.Path] = append(m[pred.Path], n.Path)
 		}
 	}
+
+	sortStrMap(m)
 	return m
+}
+
+func callGraphToStrMap(cg *CallGraph) map[string][]string {
+	type edge struct {
+		// src and dest are ids ofr source and
+		// destination nodes in a callgraph edge.
+		src, dst int
+	}
+	// seen edges, to avoid repetitions
+	seen := make(map[edge]bool)
+
+	funcName := func(fn *FuncNode) string {
+		if fn.RecvType == "" {
+			return fmt.Sprintf("%s.%s", fn.PkgPath, fn.Name)
+		}
+		return fmt.Sprintf("%s.%s", fn.RecvType, fn.Name)
+	}
+
+	m := make(map[string][]string)
+	for _, n := range cg.Funcs {
+		fName := funcName(n)
+		for _, callsite := range n.CallSites {
+			e := edge{src: callsite.Parent, dst: n.ID}
+			if seen[e] {
+				continue
+			}
+			caller := cg.Funcs[e.src]
+			callerName := funcName(caller)
+			m[callerName] = append(m[callerName], fName)
+		}
+	}
+
+	sortStrMap(m)
+	return m
+}
+
+// sortStrMap sorts the map string slice values to make them deterministic.
+func sortStrMap(m map[string][]string) {
+	for _, strs := range m {
+		sort.Strings(strs)
+	}
 }
 
 func loadPackages(e *packagestest.Exported, patterns ...string) ([]*packages.Package, error) {
