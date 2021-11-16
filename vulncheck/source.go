@@ -91,14 +91,15 @@ func vulnImportSlice(pkg *packages.Package, modVulns moduleVulnerabilities, resu
 	}
 
 	// Module id gets populated later.
+	id := nextPkgID()
 	pkgNode := &PkgNode{
+		ID:   id,
 		Name: pkg.Name,
 		Path: pkg.PkgPath,
 		pkg:  pkg,
 	}
 	analyzed[pkg] = pkgNode
 
-	id := nextPkgID()
 	result.Imports.Packages[id] = pkgNode
 
 	// Save node predecessor information.
@@ -197,6 +198,7 @@ func moduleNodeID(pkgNode *PkgNode, result *Result, modNodeIDs map[string]int) i
 
 	id := nextModID()
 	n := &ModNode{
+		ID:      id,
 		Path:    mod.Path,
 		Version: mod.Version,
 	}

@@ -128,6 +128,7 @@ type RequireGraph struct {
 }
 
 type ModNode struct {
+	ID      int
 	Path    string
 	Version string
 	// Replace is the ID of the replacement module node, if any.
@@ -149,6 +150,7 @@ type ImportGraph struct {
 }
 
 type PkgNode struct {
+	ID int
 	// Name is the package identifier as it appears in the source code.
 	Name string
 	Path string
