@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/packages/packagestest"
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 func TestSymbolVulnDetectionVTA(t *testing.T) {

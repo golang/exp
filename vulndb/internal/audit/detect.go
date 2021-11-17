@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 // Preamble with types and common functionality used by vulnerability detection mechanisms in detect_*.go files.

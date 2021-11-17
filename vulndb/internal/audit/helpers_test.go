@@ -16,7 +16,7 @@ import (
 	"golang.org/x/tools/go/packages/packagestest"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 // Loads test program and environment with the following import structure

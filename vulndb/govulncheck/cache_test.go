@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 func TestCache(t *testing.T) {

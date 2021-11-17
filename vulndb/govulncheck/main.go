@@ -29,7 +29,7 @@ import (
 	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa/ssautil"
-	"golang.org/x/vulndb/client"
+	"golang.org/x/vuln/client"
 )
 
 var (

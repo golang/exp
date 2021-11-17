@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 // NOTE: this cache implementation should be kept internal to the go tooling

@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 // instrPosition gives the position of `instr`. Returns empty token.Position
