@@ -457,6 +457,12 @@ func TestClone(t *testing.T) {
 	if !Equal(s2, want) {
 		t.Errorf("Clone(%v) changed unexpectedly to %v", want, s2)
 	}
+	if got := Clone([]int(nil)); got != nil {
+		t.Errorf("Clone(nil) = %#v, want nil", got)
+	}
+	if got := Clone(s1[:0]); got == nil || len(got) != 0 {
+		t.Errorf("Clone(%v) = %#v, want %#v", s1[:0], got, s1[:0])
+	}
 }
 
 var compactTests = []struct {

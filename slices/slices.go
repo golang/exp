@@ -156,7 +156,11 @@ func Delete[S ~[]E, E any](s S, i, j int) S {
 // Clone returns a copy of the slice.
 // The elements are copied using assignment, so this is a shallow clone.
 func Clone[S ~[]E, E any](s S) S {
-	return append(S(nil), s...)
+	// Preserve nil in case it matters.
+	if s == nil {
+		return nil
+	}
+	return append(S([]E{}), s...)
 }
 
 // Compact replaces consecutive runs of equal elements with a single copy.
