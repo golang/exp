@@ -74,7 +74,7 @@ func Clone[M ~map[K]V, K comparable, V any](m M) M {
 // When a key in src is already present in dst,
 // the value in dst will be overwritten by the value associated
 // with the key in src.
-func Copy[M map[K]V, K comparable, V any](dst, src M) {
+func Copy[M ~map[K]V, K comparable, V any](dst, src M) {
 	for k, v := range src {
 		dst[k] = v
 	}
