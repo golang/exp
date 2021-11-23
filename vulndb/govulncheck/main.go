@@ -204,7 +204,7 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbClient cli
 		if err != nil {
 			return nil, fmt.Errorf("failed to load vulnerability dbs: %v", err)
 		}
-		vulns = vulns.Filter(runtime.GOOS, runtime.GOARCH)
+		vulns = vulns.Filter(lookupEnv("GOOS", runtime.GOOS), lookupEnv("GOARCH", runtime.GOARCH))
 
 		results := audit.VulnerablePackageSymbols(symbols, vulns)
 		return &results, nil
@@ -260,4 +260,11 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbClient cli
 		results = audit.VulnerableSymbols(ssaPkgs, modVulns)
 	}
 	return &results, nil
+}
+
+func lookupEnv(key string, defaultValue string) (value string) {
+	if v, ok := os.LookupEnv(key); ok {
+		return v
+	}
+	return defaultValue
 }
