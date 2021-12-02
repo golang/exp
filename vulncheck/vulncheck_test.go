@@ -5,10 +5,12 @@
 package vulncheck
 
 import (
+	"path"
 	"reflect"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/packages/packagestest"
 	"golang.org/x/vulndb/osv"
 )
 
@@ -214,5 +216,76 @@ func TestVulnsForSymbol(t *testing.T) {
 
 	if !reflect.DeepEqual(filtered, expected) {
 		t.Fatalf("VulnsForPackage returned unexpected results, got:\n%s\nwant:\n%s", vulnsToString(filtered), vulnsToString(expected))
+	}
+}
+
+func TestConvert(t *testing.T) {
+	e := packagestest.Export(t, packagestest.Modules, []packagestest.Module{
+		{
+			Name: "golang.org/entry",
+			Files: map[string]interface{}{
+				"x/x.go": `
+			package x
+
+			import "golang.org/amod/avuln"
+		`}},
+		{
+			Name: "golang.org/zmod@v0.0.0",
+			Files: map[string]interface{}{"z/z.go": `
+			package z
+			`},
+		},
+		{
+			Name: "golang.org/amod@v1.1.3",
+			Files: map[string]interface{}{"avuln/avuln.go": `
+			package avuln
+
+			import "golang.org/wmod/w"
+			`},
+		},
+		{
+			Name: "golang.org/bmod@v0.5.0",
+			Files: map[string]interface{}{"bvuln/bvuln.go": `
+			package bvuln
+			`},
+		},
+		{
+			Name: "golang.org/wmod@v0.0.0",
+			Files: map[string]interface{}{"w/w.go": `
+			package w
+
+			import "golang.org/bmod/bvuln"
+			`},
+		},
+	})
+	defer e.Cleanup()
+
+	// Load x and y as entry packages.
+	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"), path.Join(e.Temp(), "entry/y"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vpkgs := Convert(pkgs)
+
+	wantPkgs := map[string][]string{
+		"golang.org/amod/avuln": {"golang.org/wmod/w"},
+		"golang.org/bmod/bvuln": nil,
+		"golang.org/entry/x":    {"golang.org/amod/avuln"},
+		"golang.org/entry/y":    nil,
+		"golang.org/wmod/w":     {"golang.org/bmod/bvuln"},
+	}
+	if got := pkgPathToImports(vpkgs); !reflect.DeepEqual(got, wantPkgs) {
+		t.Errorf("want %v;got %v", wantPkgs, got)
+	}
+
+	wantMods := map[string]string{
+		"golang.org/amod":  "v1.1.3",
+		"golang.org/bmod":  "v0.5.0",
+		"golang.org/entry": "",
+		"golang.org/wmod":  "v0.0.0",
+	}
+	if got := modulePathToVersion(vpkgs); !reflect.DeepEqual(got, wantMods) {
+		t.Errorf("want %v;got %v", wantMods, got)
 	}
 }

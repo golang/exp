@@ -8,7 +8,9 @@ package vulncheck
 
 import (
 	"fmt"
+	"go/ast"
 	"go/token"
+	"go/types"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -23,6 +25,80 @@ type Config struct {
 	ImportsOnly bool
 	// Client is used for querying data from a vulnerability database.
 	Client client.Client
+}
+
+// Package models Go package for vulncheck analysis. A version
+// of packages.Package trimmed down to reduce memory consumption.
+type Package struct {
+	Name      string
+	PkgPath   string
+	Imports   []*Package
+	Pkg       *types.Package
+	Fset      *token.FileSet
+	Syntax    []*ast.File
+	TypesInfo *types.Info
+	Module    *Module
+}
+
+// Module models Go module for vulncheck analysis.
+type Module struct {
+	Path    string
+	Version string
+	Dir     string
+	Replace *Module
+}
+
+// Convert converts a slice of packages.Package to
+// a slice of corresponding vulncheck.Package.
+func Convert(pkgs []*packages.Package) []*Package {
+	ms := make(map[*packages.Module]*Module)
+	var mod func(*packages.Module) *Module
+	mod = func(m *packages.Module) *Module {
+		if m == nil {
+			return nil
+		}
+		if vm, ok := ms[m]; ok {
+			return vm
+		}
+		vm := &Module{
+			Path:    m.Path,
+			Version: m.Version,
+			Dir:     m.Dir,
+			Replace: mod(m.Replace),
+		}
+		ms[m] = vm
+		return vm
+	}
+
+	ps := make(map[*packages.Package]*Package)
+	var pkg func(*packages.Package) *Package
+	pkg = func(p *packages.Package) *Package {
+		if vp, ok := ps[p]; ok {
+			return vp
+		}
+
+		vp := &Package{
+			Name:      p.Name,
+			PkgPath:   p.PkgPath,
+			Pkg:       p.Types,
+			Fset:      p.Fset,
+			Syntax:    p.Syntax,
+			TypesInfo: p.TypesInfo,
+			Module:    mod(p.Module),
+		}
+		ps[p] = vp
+
+		for _, i := range p.Imports {
+			vp.Imports = append(vp.Imports, pkg(i))
+		}
+		return vp
+	}
+
+	var vpkgs []*Package
+	for _, p := range pkgs {
+		vpkgs = append(vpkgs, pkg(p))
+	}
+	return vpkgs
 }
 
 // Result contains information on which vulnerabilities are potentially affecting

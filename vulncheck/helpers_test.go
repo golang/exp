@@ -132,6 +132,49 @@ func callGraphToStrMap(cg *CallGraph) map[string][]string {
 	return m
 }
 
+func pkgPathToImports(pkgs []*Package) map[string][]string {
+	m := make(map[string][]string)
+	seen := make(map[*Package]bool)
+	var visit func(*Package)
+	visit = func(p *Package) {
+		if seen[p] {
+			return
+		}
+		seen[p] = true
+		var imports []string
+		for _, i := range p.Imports {
+			imports = append(imports, i.PkgPath)
+			visit(i)
+		}
+		m[p.PkgPath] = imports
+	}
+	for _, p := range pkgs {
+		visit(p)
+	}
+	sortStrMap(m)
+	return m
+}
+
+func modulePathToVersion(pkgs []*Package) map[string]string {
+	m := make(map[string]string)
+	seen := make(map[*Package]bool)
+	var visit func(*Package)
+	visit = func(p *Package) {
+		if seen[p] || p.Module == nil {
+			return
+		}
+		seen[p] = true
+		for _, i := range p.Imports {
+			visit(i)
+		}
+		m[p.Module.Path] = p.Module.Version
+	}
+	for _, p := range pkgs {
+		visit(p)
+	}
+	return m
+}
+
 // sortStrMap sorts the map string slice values to make them deterministic.
 func sortStrMap(m map[string][]string) {
 	for _, strs := range m {
