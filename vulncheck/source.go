@@ -6,9 +6,7 @@ package vulncheck
 
 import (
 	"golang.org/x/tools/go/callgraph"
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 	"golang.org/x/vulndb/osv"
 )
 
@@ -19,7 +17,7 @@ import (
 //    package that has some known vulnerabilities
 //  - call graph leading to the use of a known vulnerable function
 //    or method
-func Source(pkgs []*packages.Package, cfg *Config) (*Result, error) {
+func Source(pkgs []*Package, cfg *Config) (*Result, error) {
 	modVulns, err := fetchVulnerabilities(cfg.Client, extractModules(pkgs))
 	if err != nil {
 		return nil, err
@@ -37,8 +35,7 @@ func Source(pkgs []*packages.Package, cfg *Config) (*Result, error) {
 		return result, nil
 	}
 
-	prog, ssaPkgs := ssautil.AllPackages(pkgs, 0)
-	prog.Build()
+	prog, ssaPkgs := buildSSA(pkgs)
 	entries := entryPoints(ssaPkgs)
 	cg := callGraph(prog, entries)
 	vulnCallGraphSlice(entries, modVulns, cg, result)
@@ -57,12 +54,12 @@ func nextPkgID() int {
 // vulnPkgModSlice computes the slice of pkgs imports and requires graph
 // leading to imports/requires of vulnerable packages/modules in modVulns
 // and stores the computed slices to result.
-func vulnPkgModSlice(pkgs []*packages.Package, modVulns moduleVulnerabilities, result *Result) {
+func vulnPkgModSlice(pkgs []*Package, modVulns moduleVulnerabilities, result *Result) {
 	// analyzedPkgs contains information on packages analyzed thus far.
 	// If a package is mapped to nil, this means it has been visited
 	// but it does not lead to a vulnerable imports. Otherwise, a
 	// visited package is mapped to Imports package node.
-	analyzedPkgs := make(map[*packages.Package]*PkgNode)
+	analyzedPkgs := make(map[*Package]*PkgNode)
 	for _, pkg := range pkgs {
 		// Top level packages that lead to vulnerable imports are
 		// stored as result.Imports graph entry points.
@@ -80,7 +77,7 @@ func vulnPkgModSlice(pkgs []*packages.Package, modVulns moduleVulnerabilities, r
 // a package with known vulnerabilities. If that is the case, populates result.Imports
 // graph with this reachability information and returns the result.Imports package
 // node for pkg. Otherwise, returns nil.
-func vulnImportSlice(pkg *packages.Package, modVulns moduleVulnerabilities, result *Result, analyzed map[*packages.Package]*PkgNode) *PkgNode {
+func vulnImportSlice(pkg *Package, modVulns moduleVulnerabilities, result *Result, analyzed map[*Package]*PkgNode) *PkgNode {
 	if pn, ok := analyzed[pkg]; ok {
 		return pn
 	}

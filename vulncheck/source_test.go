@@ -109,7 +109,7 @@ func TestImportsOnly(t *testing.T) {
 		Client:      testClient,
 		ImportsOnly: true,
 	}
-	result, err := Source(pkgs, cfg)
+	result, err := Source(Convert(pkgs), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +345,7 @@ func TestCallGraph(t *testing.T) {
 	cfg := &Config{
 		Client: testClient,
 	}
-	result, err := Source(pkgs, cfg)
+	result, err := Source(Convert(pkgs), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

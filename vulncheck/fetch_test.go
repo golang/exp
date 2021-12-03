@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/vulndb/osv"
 )
 
@@ -22,11 +21,11 @@ func TestFetchVulnerabilities(t *testing.T) {
 		},
 	}
 
-	mv, err := fetchVulnerabilities(mc, []*packages.Module{
+	mv, err := fetchVulnerabilities(mc, []*Module{
 		{Path: "example.mod/a", Dir: modCacheDirectory(), Version: "v1.0.0"},
 		{Path: "example.mod/b", Dir: modCacheDirectory(), Version: "v1.0.4"},
-		{Path: "example.mod/c", Replace: &packages.Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},
-		{Path: "example.mod/e", Replace: &packages.Module{Path: "../local/example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.1"}, Version: "v2.1.0"},
+		{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},
+		{Path: "example.mod/e", Replace: &Module{Path: "../local/example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.1"}, Version: "v2.1.0"},
 	})
 	if err != nil {
 		t.Fatalf("FetchVulnerabilities failed: %s", err)
@@ -34,19 +33,19 @@ func TestFetchVulnerabilities(t *testing.T) {
 
 	expected := moduleVulnerabilities{
 		{
-			mod: &packages.Module{Path: "example.mod/a", Dir: modCacheDirectory(), Version: "v1.0.0"},
+			mod: &Module{Path: "example.mod/a", Dir: modCacheDirectory(), Version: "v1.0.0"},
 			vulns: []*osv.Entry{
 				{ID: "a", Affected: []osv.Affected{{Package: osv.Package{Name: "example.mod/a"}, Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "2.0.0"}}}}}}},
 			},
 		},
 		{
-			mod: &packages.Module{Path: "example.mod/b", Dir: modCacheDirectory(), Version: "v1.0.4"},
+			mod: &Module{Path: "example.mod/b", Dir: modCacheDirectory(), Version: "v1.0.4"},
 			vulns: []*osv.Entry{
 				{ID: "b", Affected: []osv.Affected{{Package: osv.Package{Name: "example.mod/b"}, Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "1.1.1"}}}}}}},
 			},
 		},
 		{
-			mod: &packages.Module{Path: "example.mod/c", Replace: &packages.Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},
+			mod: &Module{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},
 			vulns: []*osv.Entry{
 				{ID: "c", Affected: []osv.Affected{{Package: osv.Package{Name: "example.mod/d"}, Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "2.0.0"}}}}}}},
 			},

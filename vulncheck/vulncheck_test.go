@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/packages/packagestest"
 	"golang.org/x/vulndb/osv"
 )
@@ -17,7 +16,7 @@ import (
 func TestFilterVulns(t *testing.T) {
 	mv := moduleVulnerabilities{
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a",
 				Version: "v1.0.0",
 			},
@@ -32,7 +31,7 @@ func TestFilterVulns(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/b",
 				Version: "v1.0.0",
 			},
@@ -44,7 +43,7 @@ func TestFilterVulns(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path: "example.mod/c",
 			},
 			vulns: []*osv.Entry{
@@ -54,7 +53,7 @@ func TestFilterVulns(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/d",
 				Version: "v1.2.0",
 			},
@@ -69,7 +68,7 @@ func TestFilterVulns(t *testing.T) {
 
 	expected := moduleVulnerabilities{
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a",
 				Version: "v1.0.0",
 			},
@@ -79,7 +78,7 @@ func TestFilterVulns(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/b",
 				Version: "v1.0.0",
 			},
@@ -89,12 +88,12 @@ func TestFilterVulns(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path: "example.mod/c",
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/d",
 				Version: "v1.2.0",
 			},
@@ -113,7 +112,7 @@ func TestFilterVulns(t *testing.T) {
 func TestVulnsForPackage(t *testing.T) {
 	mv := moduleVulnerabilities{
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a",
 				Version: "v1.0.0",
 			},
@@ -122,7 +121,7 @@ func TestVulnsForPackage(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a/b",
 				Version: "v1.0.0",
 			},
@@ -131,7 +130,7 @@ func TestVulnsForPackage(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/d",
 				Version: "v0.0.1",
 			},
@@ -154,7 +153,7 @@ func TestVulnsForPackage(t *testing.T) {
 func TestVulnsForPackageReplaced(t *testing.T) {
 	mv := moduleVulnerabilities{
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a",
 				Version: "v1.0.0",
 			},
@@ -163,9 +162,9 @@ func TestVulnsForPackageReplaced(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path: "example.mod/a/b",
-				Replace: &packages.Module{
+				Replace: &Module{
 					Path: "example.mod/b",
 				},
 				Version: "v1.0.0",
@@ -189,7 +188,7 @@ func TestVulnsForPackageReplaced(t *testing.T) {
 func TestVulnsForSymbol(t *testing.T) {
 	mv := moduleVulnerabilities{
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a",
 				Version: "v1.0.0",
 			},
@@ -198,7 +197,7 @@ func TestVulnsForSymbol(t *testing.T) {
 			},
 		},
 		{
-			mod: &packages.Module{
+			mod: &Module{
 				Path:    "example.mod/a/b",
 				Version: "v1.0.0",
 			},

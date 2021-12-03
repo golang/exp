@@ -19,6 +19,41 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
+// buildSSA creates an ssa representation for pkgs. Returns
+// the ssa program encapsulating the packages and top level
+// ssa packages corresponding to pkgs.
+func buildSSA(pkgs []*Package) (*ssa.Program, []*ssa.Package) {
+	prog := ssa.NewProgram(token.NewFileSet(), ssa.BuilderMode(0))
+
+	imports := make(map[*Package]*ssa.Package)
+	var createImports func([]*Package)
+	createImports = func(pkgs []*Package) {
+		for _, p := range pkgs {
+			if _, ok := imports[p]; !ok {
+				i := prog.CreatePackage(p.Pkg, p.Syntax, p.TypesInfo, true)
+				imports[p] = i
+				createImports(p.Imports)
+			}
+		}
+	}
+
+	for _, tp := range pkgs {
+		createImports(tp.Imports)
+	}
+
+	var ssaPkgs []*ssa.Package
+	for _, tp := range pkgs {
+		if sp, ok := imports[tp]; ok {
+			ssaPkgs = append(ssaPkgs, sp)
+		} else {
+			sp := prog.CreatePackage(tp.Pkg, tp.Syntax, tp.TypesInfo, false)
+			ssaPkgs = append(ssaPkgs, sp)
+		}
+	}
+	prog.Build()
+	return prog, ssaPkgs
+}
+
 // callGraph builds a call graph of prog based on VTA analysis.
 func callGraph(prog *ssa.Program, entries []*ssa.Function) *callgraph.Graph {
 	entrySlice := make(map[*ssa.Function]bool)

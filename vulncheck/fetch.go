@@ -11,12 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/vulndb/client"
 )
 
 // modKey creates a unique string identifier for mod.
-func modKey(mod *packages.Module) string {
+func modKey(mod *Module) string {
 	if mod == nil {
 		return ""
 	}
@@ -25,12 +24,12 @@ func modKey(mod *packages.Module) string {
 
 // extractModules collects modules in `pkgs` up to uniqueness of
 // module path and version.
-func extractModules(pkgs []*packages.Package) []*packages.Module {
-	modMap := map[string]*packages.Module{}
+func extractModules(pkgs []*Package) []*Module {
+	modMap := map[string]*Module{}
 
-	seen := map[*packages.Package]bool{}
-	var extract func(*packages.Package, map[string]*packages.Module)
-	extract = func(pkg *packages.Package, modMap map[string]*packages.Module) {
+	seen := map[*Package]bool{}
+	var extract func(*Package, map[string]*Module)
+	extract = func(pkg *Package, modMap map[string]*Module) {
 		if pkg == nil || seen[pkg] {
 			return
 		}
@@ -50,7 +49,7 @@ func extractModules(pkgs []*packages.Package) []*packages.Module {
 		extract(pkg, modMap)
 	}
 
-	modules := []*packages.Module{}
+	modules := []*Module{}
 	for _, mod := range modMap {
 		modules = append(modules, mod)
 	}
@@ -58,7 +57,7 @@ func extractModules(pkgs []*packages.Package) []*packages.Module {
 }
 
 // fetchVulnerabilities fetches vulnerabilities that affect the supplied modules.
-func fetchVulnerabilities(client client.Client, modules []*packages.Module) (moduleVulnerabilities, error) {
+func fetchVulnerabilities(client client.Client, modules []*Module) (moduleVulnerabilities, error) {
 	mv := moduleVulnerabilities{}
 	for _, mod := range modules {
 		modPath := mod.Path
@@ -91,7 +90,7 @@ func fetchVulnerabilities(client client.Client, modules []*packages.Module) (mod
 // loading local vulnerabilities in testing.
 var fetchingInTesting bool = false
 
-func isLocal(mod *packages.Module) bool {
+func isLocal(mod *Module) bool {
 	if fetchingInTesting {
 		return false
 	}
@@ -101,7 +100,6 @@ func isLocal(mod *packages.Module) bool {
 	}
 	return !strings.HasPrefix(modDir, modCacheDirectory())
 }
-
 func modCacheDirectory() string {
 	var modCacheDir string
 	// TODO: define modCacheDir using something similar to cmd/go/internal/cfg.GOMODCACHE?

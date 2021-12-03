@@ -8,16 +8,17 @@ import (
 	"io"
 
 	"golang.org/x/exp/vulncheck/internal/binscan"
+	"golang.org/x/tools/go/packages"
 )
 
 // Binary detects presence of vulnerable symbols in exe. The
 // imports, require, and call graph are all unavailable (nil).
 func Binary(exe io.ReaderAt, cfg *Config) (*Result, error) {
-	modules, packageSymbols, err := binscan.ExtractPackagesAndSymbols(exe)
+	mods, packageSymbols, err := binscan.ExtractPackagesAndSymbols(exe)
 	if err != nil {
 		return nil, err
 	}
-	modVulns, err := fetchVulnerabilities(cfg.Client, modules)
+	modVulns, err := fetchVulnerabilities(cfg.Client, convertModules(mods))
 	if err != nil {
 		return nil, err
 	}
@@ -44,4 +45,23 @@ func Binary(exe io.ReaderAt, cfg *Config) (*Result, error) {
 		}
 	}
 	return result, nil
+}
+
+func convertModules(mods []*packages.Module) []*Module {
+	vmods := make([]*Module, len(mods))
+	// TODO(github.com/golang/go/issues/50030): should we share unique
+	// modules? Not needed nowas module info is not returned by Binary.
+	for i, mod := range mods {
+		vmods[i] = &Module{
+			Path:    mod.Path,
+			Version: mod.Version,
+		}
+		if mod.Replace != nil {
+			vmods[i].Replace = &Module{
+				Path:    mod.Replace.Path,
+				Version: mod.Replace.Version,
+			}
+		}
+	}
+	return vmods
 }

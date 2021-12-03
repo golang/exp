@@ -236,7 +236,7 @@ type PkgNode struct {
 	ImportedBy []int
 
 	// pkg is used for connecting package node to module and call graph nodes.
-	pkg *packages.Package
+	pkg *Package
 }
 
 // moduleVulnerabilities is an internal structure for
@@ -246,7 +246,7 @@ type moduleVulnerabilities []modVulns
 
 // modVulns groups vulnerabilities per module.
 type modVulns struct {
-	mod   *packages.Module
+	mod   *Module
 	vulns []*osv.Entry
 }
 
