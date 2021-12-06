@@ -47,9 +47,8 @@ ensure_go_binary() {
   local binary=$(basename $1)
   if ! [ -x "$(command -v $binary)" ]; then
     info "Installing: $1"
-    # Run in a subshell for convenience, so that we don't have to worry about
-    # our PWD.
-    (set -x; cd && env GO111MODULE=on go get -u $1)
+    # Install the binary in a way that doesn't affect our go.mod file.
+    go install $1@latest
   fi
 }
 
@@ -106,13 +105,13 @@ check_vet() {
 # check_staticcheck runs staticcheck on source files.
 check_staticcheck() {
   ensure_go_binary honnef.co/go/tools/cmd/staticcheck
-  runcmd staticcheck $(go list ./... | grep -v third_party | grep -v internal/doc | grep -v internal/render)
+  runcmd staticcheck ./...
 }
 
 # check_misspell runs misspell on source files.
 check_misspell() {
   ensure_go_binary github.com/client9/misspell/cmd/misspell
-  runcmd misspell cmd/**/*.{go,sh} internal/**/* README.md
+  runcmd misspell -error .
 }
 
 go_linters() {
@@ -166,6 +165,10 @@ main() {
       usage
       exit 1
   esac
+  if [[ $EXIT_CODE != 0 ]]; then
+    err "FAILED; see errors above"
+  fi
+  exit $EXIT_CODE
 }
 
 main $@
