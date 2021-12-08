@@ -6,11 +6,13 @@ package vulncheck
 
 import (
 	"context"
+	"os"
 	"path"
 	"reflect"
 	"testing"
 
 	"golang.org/x/tools/go/packages/packagestest"
+	"golang.org/x/vuln/osv"
 )
 
 // TestImportsOnly checks for module and imports graph correctness
@@ -377,5 +379,91 @@ func TestCallGraph(t *testing.T) {
 
 	if callStrMap := callGraphToStrMap(result.Calls); !reflect.DeepEqual(wantCalls, callStrMap) {
 		t.Errorf("want %v call graph; got %v", wantCalls, callStrMap)
+	}
+}
+
+func TestFiltering(t *testing.T) {
+	e := packagestest.Export(t, packagestest.Modules, []packagestest.Module{
+		{
+			Name: "golang.org/entry",
+			Files: map[string]interface{}{
+				"x/x.go": `
+			package x
+
+			import "golang.org/vmod/vuln"
+
+			func X() {
+				vuln.V()
+			}`,
+			},
+		},
+		{
+			Name: "golang.org/vmod@v1.2.3",
+			Files: map[string]interface{}{"vuln/vuln.go": `
+			package vuln
+
+			func V() {}
+			`},
+		},
+	})
+	defer e.Cleanup()
+
+	client := &mockClient{
+		ret: map[string][]*osv.Entry{
+			"golang.org/vmod": []*osv.Entry{
+				{
+					ID: "V",
+					Affected: []osv.Affected{{
+						Package: osv.Package{Name: "golang.org/vmod/vuln"},
+						Ranges:  osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Introduced: "1.2.0"}}}},
+						EcosystemSpecific: osv.EcosystemSpecific{
+							Symbols: []string{"V"},
+							GOOS:    []string{"linux"},
+							GOARCH:  []string{"amd64"},
+						},
+					}},
+				},
+			},
+		},
+	}
+
+	// Make sure local vulns can be loaded.
+	fetchingInTesting = true
+	// Load x as entry package.
+	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pkgs) != 1 {
+		t.Fatal("failed to load x test package")
+	}
+
+	cfg := &Config{
+		Client:      client,
+		ImportsOnly: true,
+	}
+
+	os.Setenv("GOOS", "linux")
+	os.Setenv("GOARCH", "amd64")
+
+	result, err := Source(context.Background(), Convert(pkgs), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Vulns) != 1 {
+		t.Errorf("want 1 Vuln, got %d", len(result.Vulns))
+	}
+
+	os.Setenv("GOOS", "freebsd")
+	os.Setenv("GOARCH", "arm64")
+
+	result, err = Source(context.Background(), Convert(pkgs), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Vulns) != 0 {
+		t.Errorf("want 0 Vulns, got %d", len(result.Vulns))
 	}
 }

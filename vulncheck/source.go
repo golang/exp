@@ -6,6 +6,7 @@ package vulncheck
 
 import (
 	"context"
+	"runtime"
 
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/ssa"
@@ -24,6 +25,7 @@ func Source(ctx context.Context, pkgs []*Package, cfg *Config) (*Result, error) 
 	if err != nil {
 		return nil, err
 	}
+	modVulns = modVulns.Filter(lookupEnv("GOOS", runtime.GOOS), lookupEnv("GOARCH", runtime.GOARCH))
 
 	result := &Result{
 		Imports:  &ImportGraph{Packages: make(map[int]*PkgNode)},
