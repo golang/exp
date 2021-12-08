@@ -5,9 +5,11 @@
 package vulncheck
 
 import (
+	"context"
+
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/ssa"
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 // Source detects vulnerabilities in pkgs and computes slices of
@@ -17,8 +19,8 @@ import (
 //    package that has some known vulnerabilities
 //  - call graph leading to the use of a known vulnerable function
 //    or method
-func Source(pkgs []*Package, cfg *Config) (*Result, error) {
-	modVulns, err := fetchVulnerabilities(cfg.Client, extractModules(pkgs))
+func Source(ctx context.Context, pkgs []*Package, cfg *Config) (*Result, error) {
+	modVulns, err := fetchVulnerabilities(ctx, cfg.Client, extractModules(pkgs))
 	if err != nil {
 		return nil, err
 	}

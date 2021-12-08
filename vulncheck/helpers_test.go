@@ -5,24 +5,23 @@
 package vulncheck
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/packages/packagestest"
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/client"
+	"golang.org/x/vuln/osv"
 )
 
 type mockClient struct {
+	client.Client
 	ret map[string][]*osv.Entry
 }
 
-func (mc *mockClient) GetByModule(a string) ([]*osv.Entry, error) {
+func (mc *mockClient) GetByModule(ctx context.Context, a string) ([]*osv.Entry, error) {
 	return mc.ret[a], nil
-}
-
-func (mc *mockClient) GetByID(a string) (*osv.Entry, error) {
-	return nil, nil
 }
 
 // testClient contains the following test vulnerabilities

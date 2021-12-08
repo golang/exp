@@ -5,10 +5,11 @@
 package vulncheck
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/osv"
 )
 
 func TestFetchVulnerabilities(t *testing.T) {
@@ -21,7 +22,7 @@ func TestFetchVulnerabilities(t *testing.T) {
 		},
 	}
 
-	mv, err := fetchVulnerabilities(mc, []*Module{
+	mv, err := fetchVulnerabilities(context.Background(), mc, []*Module{
 		{Path: "example.mod/a", Dir: modCacheDirectory(), Version: "v1.0.0"},
 		{Path: "example.mod/b", Dir: modCacheDirectory(), Version: "v1.0.4"},
 		{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},

@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
-	"golang.org/x/vulndb/client"
-	"golang.org/x/vulndb/osv"
+	"golang.org/x/vuln/client"
+	"golang.org/x/vuln/osv"
 )
 
 // Config is used for configuring vulncheck algorithms.
