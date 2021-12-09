@@ -96,6 +96,21 @@ func siteCallees(call ssa.CallInstruction, callgraph *callgraph.Graph) []*ssa.Fu
 	return matches
 }
 
+// dbTypeFormat formats the name of t according how types
+// are encoded in vulnerability database:
+//  - pointer designation * is skipped
+//  - full path prefix is skipped as well
+func dbTypeFormat(t types.Type) string {
+	switch tt := t.(type) {
+	case *types.Pointer:
+		return dbTypeFormat(tt.Elem())
+	case *types.Named:
+		return tt.Obj().Name()
+	default:
+		return types.TypeString(t, func(p *types.Package) string { return "" })
+	}
+}
+
 // dbFuncName computes a function name consistent with the namings used in vulnerability
 // databases. Effectively, a qualified name of a function local to its enclosing package.
 // If a receiver is a pointer, this information is not encoded in the resulting name. The
@@ -107,17 +122,6 @@ func siteCallees(call ssa.CallInstruction, callgraph *callgraph.Graph) []*ssa.Fu
 //   func foo(...) {...}         -> foo
 //   func (b *B) bar (...) {...} -> B.bar
 func dbFuncName(f *ssa.Function) string {
-	var typeFormat func(t types.Type) string
-	typeFormat = func(t types.Type) string {
-		switch tt := t.(type) {
-		case *types.Pointer:
-			return typeFormat(tt.Elem())
-		case *types.Named:
-			return tt.Obj().Name()
-		default:
-			return types.TypeString(t, func(p *types.Package) string { return "" })
-		}
-	}
 	selectBound := func(f *ssa.Function) types.Type {
 		// If f is a "bound" function introduced by ssa for a given type, return the type.
 		// When "f" is a "bound" function, it will have 1 free variable of that type within
@@ -141,17 +145,26 @@ func dbFuncName(f *ssa.Function) string {
 	}
 	var qprefix string
 	if recv := f.Signature.Recv(); recv != nil {
-		qprefix = typeFormat(recv.Type())
+		qprefix = dbTypeFormat(recv.Type())
 	} else if btype := selectBound(f); btype != nil {
-		qprefix = typeFormat(btype)
+		qprefix = dbTypeFormat(btype)
 	} else if ttype := selectThunk(f); ttype != nil {
-		qprefix = typeFormat(ttype)
+		qprefix = dbTypeFormat(ttype)
 	}
 
 	if qprefix == "" {
 		return f.Name()
 	}
 	return qprefix + "." + f.Name()
+}
+
+// dbTypesFuncName is dbFuncName defined over *types.Func.
+func dbTypesFuncName(f *types.Func) string {
+	sig := f.Type().(*types.Signature)
+	if sig.Recv() == nil {
+		return f.Name()
+	}
+	return dbTypeFormat(sig.Recv().Type()) + "." + f.Name()
 }
 
 // memberFuncs returns functions associated with the `member`:
@@ -221,4 +234,25 @@ func lookupEnv(key, defaultValue string) string {
 		return v
 	}
 	return defaultValue
+}
+
+// allSymbols returns all top-level functions and methods defined in pkg.
+func allSymbols(pkg *types.Package) []string {
+	var names []string
+	scope := pkg.Scope()
+	for _, name := range scope.Names() {
+		o := scope.Lookup(name)
+		switch o := o.(type) {
+		case *types.Func:
+			names = append(names, dbTypesFuncName(o))
+		case *types.TypeName:
+			ms := types.NewMethodSet(types.NewPointer(o.Type()))
+			for i := 0; i < ms.Len(); i++ {
+				if f, ok := ms.At(i).Obj().(*types.Func); ok {
+					names = append(names, dbTypesFuncName(f))
+				}
+			}
+		}
+	}
+	return names
 }

@@ -127,7 +127,15 @@ func vulnImportSlice(pkg *Package, modVulns moduleVulnerabilities, result *Resul
 			if affected.Package.Name != pkgNode.Path {
 				continue
 			}
-			for _, symbol := range affected.EcosystemSpecific.Symbols {
+
+			var symbols []string
+			if len(affected.EcosystemSpecific.Symbols) != 0 {
+				symbols = affected.EcosystemSpecific.Symbols
+			} else {
+				symbols = allSymbols(pkg.Pkg)
+			}
+
+			for _, symbol := range symbols {
 				vuln := &Vuln{
 					OSV:        osv,
 					Symbol:     symbol,
@@ -333,9 +341,7 @@ func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgrap
 			if affected.Package.Name != funNode.PkgPath {
 				continue
 			}
-			for _, symbol := range affected.EcosystemSpecific.Symbols {
-				addCallSinkForVuln(funNode.ID, osv, symbol, funNode.PkgPath, result)
-			}
+			addCallSinkForVuln(funNode.ID, osv, dbFuncName(f), funNode.PkgPath, result)
 		}
 	}
 	return funNode

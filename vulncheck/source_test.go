@@ -467,3 +467,81 @@ func TestFiltering(t *testing.T) {
 		t.Errorf("want 0 Vulns, got %d", len(result.Vulns))
 	}
 }
+
+func TestAllSymbolsVulnerable(t *testing.T) {
+	e := packagestest.Export(t, packagestest.Modules, []packagestest.Module{
+		{
+			Name: "golang.org/entry",
+			Files: map[string]interface{}{
+				"x/x.go": `
+			package x
+
+			import "golang.org/vmod/vuln"
+
+			func X() {
+				vuln.V1()
+			}`,
+			},
+		},
+		{
+			Name: "golang.org/vmod@v1.2.3",
+			Files: map[string]interface{}{"vuln/vuln.go": `
+			package vuln
+
+			func V1() {}
+			func V2() {}
+			func v() {}
+			type a struct{}
+			func (x a) foo() {}
+			func (x *a) bar() {}
+			`},
+		},
+	})
+	defer e.Cleanup()
+
+	client := &mockClient{
+		ret: map[string][]*osv.Entry{
+			"golang.org/vmod": []*osv.Entry{
+				{
+					ID: "V",
+					Affected: []osv.Affected{{
+						Package:           osv.Package{Name: "golang.org/vmod/vuln"},
+						Ranges:            osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Introduced: "1.2.0"}}}},
+						EcosystemSpecific: osv.EcosystemSpecific{Symbols: []string{}},
+					}},
+				},
+			},
+		},
+	}
+
+	// Make sure local vulns can be loaded.
+	fetchingInTesting = true
+	// Load x as entry package.
+	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pkgs) != 1 {
+		t.Fatal("failed to load x test package")
+	}
+
+	cfg := &Config{
+		Client: client,
+	}
+	result, err := Source(context.Background(), Convert(pkgs), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Vulns) != 5 {
+		t.Errorf("want 5 Vulns, got %d", len(result.Vulns))
+	}
+
+	for _, v := range result.Vulns {
+		if v.Symbol == "V1" && v.CallSink == 0 {
+			t.Errorf("expected a call sink for V1; got none")
+		} else if v.Symbol != "V1" && v.CallSink != 0 {
+			t.Errorf("expected no call sink for %v; got %v", v.Symbol, v.CallSink)
+		}
+	}
+}
