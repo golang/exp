@@ -234,7 +234,7 @@ func run(cfg *packages.Config, patterns []string, importsOnly bool, dbClient cli
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch vulnerabilities: %v", err)
 	}
-	modVulns = modVulns.Filter(runtime.GOOS, runtime.GOARCH)
+	modVulns = modVulns.Filter(lookupEnv("GOOS", runtime.GOOS), lookupEnv("GOARCH", runtime.GOARCH))
 	if *verboseFlag {
 		log.Printf("\t%d known vulnerabilities.\n", modVulns.Num())
 	}
