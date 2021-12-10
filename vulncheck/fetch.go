@@ -99,7 +99,7 @@ func isLocal(mod *Module) bool {
 	if mod.Replace != nil {
 		modDir = mod.Replace.Dir
 	}
-	return !strings.HasPrefix(modDir, modCacheDirectory())
+	return modDir != "" && !strings.HasPrefix(modDir, modCacheDirectory())
 }
 func modCacheDirectory() string {
 	var modCacheDir string
