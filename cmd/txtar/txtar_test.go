@@ -50,35 +50,93 @@ func TestRoundTrip(t *testing.T) {
 	if err := os.Mkdir(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if out := txtar(t, dir, testdata, "--extract"); out != comment {
+	if out, err := txtar(t, dir, testdata, "--extract"); err != nil {
+		t.Fatal(err)
+	} else if out != comment {
 		t.Fatalf("txtar --extract: stdout:\n%s\nwant:\n%s", out, comment)
 	}
 
 	// Now, re-archive its contents explicitly and ensure that the result matches
 	// the original.
 	args := []string{"one.txt", "dir", "$SPECIAL_LOCATION"}
-	if out := txtar(t, dir, comment, args...); out != testdata {
+	if out, err := txtar(t, dir, comment, args...); err != nil {
+		t.Fatal(err)
+	} else if out != testdata {
 		t.Fatalf("txtar %s: archive:\n%s\n\nwant:\n%s", strings.Join(args, " "), out, testdata)
+	}
+}
+
+func TestUnsafePaths(t *testing.T) {
+	// Set up temporary directories for test archives.
+	parentDir, err := ioutil.TempDir("", "txtar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(parentDir)
+	dir := filepath.Join(parentDir, "dir")
+	if err := os.Mkdir(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test --unsafe option for both absolute and relative paths
+	testcases := []struct{ name, path string }{
+		{"Absolute", filepath.Join(parentDir, "dirSpecial")},
+		{"Relative", "../special"},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set SPECIAL_LOCATION outside the current directory
+			t.Setenv("SPECIAL_LOCATION", tc.path)
+
+			// Expand the testdata archive into a temporary directory.
+
+			// Should fail without the --unsafe flag
+			if _, err := txtar(t, dir, testdata, "--extract"); err == nil {
+				t.Fatalf("txtar --extract: extracts to unsafe paths")
+			}
+
+			// Should allow paths outside the current dir with the --unsafe flags
+			out, err := txtar(t, dir, testdata, "--extract", "--unsafe")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out != comment {
+				t.Fatalf("txtar --extract --unsafe: stdout:\n%s\nwant:\n%s", out, comment)
+			}
+
+			// Now, re-archive its contents explicitly and ensure that the result matches
+			// the original.
+			args := []string{"one.txt", "dir", "$SPECIAL_LOCATION"}
+			out, err = txtar(t, dir, comment, args...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out != testdata {
+				t.Fatalf("txtar %s: archive:\n%s\n\nwant:\n%s", strings.Join(args, " "), out, testdata)
+			}
+		})
 	}
 }
 
 // txtar runs the txtar command in the given directory with the given input and
 // arguments.
-func txtar(t *testing.T, dir, input string, args ...string) string {
+func txtar(t *testing.T, dir, input string, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command(txtarName(t), args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "PWD="+dir)
 	cmd.Stdin = strings.NewReader(input)
 	stderr := new(strings.Builder)
 	cmd.Stderr = stderr
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("%s: %v\n%s", strings.Join(cmd.Args, " "), err, stderr)
+		return "", fmt.Errorf("%s: %v\n%s", strings.Join(cmd.Args, " "), err, stderr)
 	}
 	if stderr.String() != "" {
 		t.Logf("OK: %s\n%s", strings.Join(cmd.Args, " "), stderr)
 	}
-	return string(out)
+	return string(out), nil
 }
 
 var txtarBin struct {

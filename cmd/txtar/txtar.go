@@ -15,6 +15,10 @@
 // from stdin and extract all of its files to corresponding locations relative
 // to the current, writing the archive's comment to stdout.
 //
+// Archive files are by default extracted only to the current directory or its
+// subdirectories. To allow extracting outside the current directory, use the
+// --unsafe flag.
+//
 // Shell variables in paths are expanded (using os.Expand) if the corresponding
 // variable is set in the process environment. When writing an archive, the
 // variables (before expansion) are preserved in the archived paths.
@@ -44,6 +48,7 @@ import (
 
 var (
 	extractFlag = flag.Bool("extract", false, "if true, extract files from the archive instead of writing to it")
+	unsafeFlag  = flag.Bool("unsafe", false, "allow extraction of files outside the current directory")
 )
 
 func init() {
@@ -69,7 +74,7 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -81,6 +86,30 @@ func extract() (err error) {
 	}
 
 	ar := txtar.Parse(b)
+
+	if !*unsafeFlag {
+		// Check that no files are extracted outside the current directory
+		wd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		// Add trailing separator to terminate wd.
+		// This prevents extracting to outside paths which prefix wd,
+		// e.g. extracting to /home/foobar when wd is /home/foo
+		if !strings.HasSuffix(wd, string(filepath.Separator)) {
+			wd += string(filepath.Separator)
+		}
+
+		for _, f := range ar.Files {
+			fileName := filepath.Clean(expand(f.Name))
+
+			if strings.HasPrefix(fileName, "..") ||
+				(filepath.IsAbs(fileName) && !strings.HasPrefix(fileName, wd)) {
+				return fmt.Errorf("file path '%s' is outside the current directory", f.Name)
+			}
+		}
+	}
+
 	for _, f := range ar.Files {
 		fileName := filepath.FromSlash(path.Clean(expand(f.Name)))
 		if err := os.MkdirAll(filepath.Dir(fileName), 0777); err != nil {
