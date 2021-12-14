@@ -132,6 +132,14 @@ func TestImportsOnly(t *testing.T) {
 		}
 	}
 
+	// Check that module and package entry points are collected.
+	if got := len(result.Imports.Entries); got != 2 {
+		t.Errorf("want 2 package entry points; got %v", got)
+	}
+	if got := len(result.Requires.Entries); got != 1 {
+		t.Errorf("want 1 module entry point; got %v", got)
+	}
+
 	// The imports slice should include import chains:
 	//   x -> avuln -> w -> bvuln
 	//         |
@@ -358,6 +366,11 @@ func TestCallGraph(t *testing.T) {
 	// symbols in the two import-reachable OSVs.
 	if len(result.Vulns) != 3 {
 		t.Errorf("want 3 Vulns, got %d", len(result.Vulns))
+	}
+
+	// Check that call graph entry points are present.
+	if got := len(result.Calls.Entries); got != 2 {
+		t.Errorf("want 2 call graph entry points; got %v", got)
 	}
 
 	// Check that vulnerabilities are connected to the call graph.

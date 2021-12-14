@@ -162,10 +162,10 @@ type Vuln struct {
 // CallGraph is technically backwards directed, i.e., from a vulnerable function
 // towards the program entry functions (see FuncNode).
 type CallGraph struct {
-	// Funcs contains all call graph nodes as a map: func node id -> func node.
-	Funcs map[int]*FuncNode
-	// Entries are a subset of Funcs representing vulncheck entry points.
-	Entries []*FuncNode
+	// Functions contains all call graph nodes as a map: func node id -> func node.
+	Functions map[int]*FuncNode
+	// Entries are IDs of a subset of Functions representing vulncheck entry points.
+	Entries []int
 }
 
 type FuncNode struct {
@@ -199,8 +199,8 @@ type CallSite struct {
 type RequireGraph struct {
 	// Modules contains all module nodes as a map: module node id -> module node.
 	Modules map[int]*ModNode
-	// Entries are a subset of Modules representing modules of vulncheck entry points.
-	Entries []*ModNode
+	// Entries are IDs of a subset of Modules representing modules of vulncheck entry points.
+	Entries []int
 }
 
 type ModNode struct {
@@ -221,8 +221,8 @@ type ModNode struct {
 type ImportGraph struct {
 	// Packages contains all package nodes as a map: package node id -> package node.
 	Packages map[int]*PkgNode
-	// Entries are a subset of Packages representing packages of vulncheck entry points.
-	Entries []*PkgNode
+	// Entries are IDs of a subset of Packages representing packages of vulncheck entry points.
+	Entries []int
 }
 
 type PkgNode struct {

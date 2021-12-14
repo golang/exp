@@ -114,14 +114,14 @@ func callGraphToStrMap(cg *CallGraph) map[string][]string {
 	}
 
 	m := make(map[string][]string)
-	for _, n := range cg.Funcs {
+	for _, n := range cg.Functions {
 		fName := funcName(n)
 		for _, callsite := range n.CallSites {
 			e := edge{src: callsite.Parent, dst: n.ID}
 			if seen[e] {
 				continue
 			}
-			caller := cg.Funcs[e.src]
+			caller := cg.Functions[e.src]
 			callerName := funcName(caller)
 			m[callerName] = append(m[callerName], fName)
 		}

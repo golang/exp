@@ -30,7 +30,7 @@ func Source(ctx context.Context, pkgs []*Package, cfg *Config) (*Result, error) 
 	result := &Result{
 		Imports:  &ImportGraph{Packages: make(map[int]*PkgNode)},
 		Requires: &RequireGraph{Modules: make(map[int]*ModNode)},
-		Calls:    &CallGraph{Funcs: make(map[int]*FuncNode)},
+		Calls:    &CallGraph{Functions: make(map[int]*FuncNode)},
 	}
 
 	vulnPkgModSlice(pkgs, modVulns, result)
@@ -68,7 +68,7 @@ func vulnPkgModSlice(pkgs []*Package, modVulns moduleVulnerabilities, result *Re
 		// Top level packages that lead to vulnerable imports are
 		// stored as result.Imports graph entry points.
 		if e := vulnImportSlice(pkg, modVulns, result, analyzedPkgs); e != nil {
-			result.Imports.Entries = append(result.Imports.Entries, e)
+			result.Imports.Entries = append(result.Imports.Entries, e.ID)
 		}
 	}
 
@@ -172,6 +172,17 @@ func vulnModuleSlice(result *Result) {
 		modPredRelation[pkgModID] = predSet
 	}
 
+	// Add entry module IDs.
+	seenEntries := make(map[int]bool)
+	for _, epID := range result.Imports.Entries {
+		entryModID := moduleNodeID(result.Imports.Packages[epID], result, modNodeIDs)
+		if seenEntries[entryModID] {
+			continue
+		}
+		seenEntries[entryModID] = true
+		result.Requires.Entries = append(result.Requires.Entries, entryModID)
+	}
+
 	// Store the predecessor requires relation to result.
 	for modID := range modPredRelation {
 		if modID == 0 {
@@ -256,7 +267,7 @@ func vulnCallGraphSlice(entries []*ssa.Function, modVulns moduleVulnerabilities,
 		// Top level entries that lead to vulnerable calls
 		// are stored as result.Calls graph entry points.
 		if e := vulnCallSlice(entry, modVulns, cg, result, analyzedFuncs); e != nil {
-			result.Calls.Entries = append(result.Calls.Entries, e)
+			result.Calls.Entries = append(result.Calls.Entries, e.ID)
 		}
 	}
 }
@@ -320,7 +331,7 @@ func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgrap
 		funNode = funcNode(f)
 		analyzed[f] = funNode
 	}
-	result.Calls.Funcs[funNode.ID] = funNode
+	result.Calls.Functions[funNode.ID] = funNode
 
 	// Save node predecessor information.
 	for _, calleeSliceInfo := range onSlice {
