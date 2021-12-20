@@ -18,9 +18,8 @@ func Equal[E comparable](s1, s2 []E) bool {
 	if len(s1) != len(s2) {
 		return false
 	}
-	for i, v1 := range s1 {
-		v2 := s2[i]
-		if v1 != v2 {
+	for i := range s1 {
+		if s1[i] != s2[i] {
 			return false
 		}
 	}
