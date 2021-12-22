@@ -100,8 +100,8 @@ func CompareFunc[E1, E2 any](s1 []E1, s2 []E2, cmp func(E1, E2) int) int {
 // Index returns the index of the first occurrence of v in s,
 // or -1 if not present.
 func Index[E comparable](s []E, v E) int {
-	for i, vs := range s {
-		if v == vs {
+	for i := range s {
+		if v == s[i] {
 			return i
 		}
 	}
