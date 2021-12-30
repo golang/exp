@@ -299,7 +299,7 @@ func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgrap
 
 	var funNode *FuncNode
 	// If there are vulnerabilities for f, create node for f and
-	// save it immediatelly. This allows us to include F in the
+	// save it immediately. This allows us to include F in the
 	// slice when analyzing chain V -> F -> V where V is vulnerable.
 	if len(vulns) > 0 {
 		funNode = funcNode(f)

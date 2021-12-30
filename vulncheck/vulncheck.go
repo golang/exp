@@ -350,7 +350,7 @@ func (mv moduleVulnerabilities) VulnsForPackage(importPath string) []*osv.Entry 
 	return packageVulns
 }
 
-// VulnsForSymbol returns vulnerabilites for `symbol` in `mv.VulnsForPackage(importPath)`.
+// VulnsForSymbol returns vulnerabilities for `symbol` in `mv.VulnsForPackage(importPath)`.
 func (mv moduleVulnerabilities) VulnsForSymbol(importPath, symbol string) []*osv.Entry {
 	vulns := mv.VulnsForPackage(importPath)
 	if vulns == nil {
