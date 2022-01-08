@@ -8,11 +8,11 @@ require (
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 	github.com/go-kit/kit v0.10.0
 	github.com/go-logr/logr v1.2.2
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/rs/zerolog v1.21.0
 	github.com/sirupsen/logrus v1.8.1
-	go.opentelemetry.io/otel/sdk v0.20.0
-	go.opentelemetry.io/otel/trace v0.20.0
+	go.opentelemetry.io/otel/sdk v1.3.0
+	go.opentelemetry.io/otel/trace v1.3.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
@@ -24,9 +24,11 @@ require (
 
 require (
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
-	go.opentelemetry.io/otel v0.20.0 // indirect
+	github.com/go-logr/stdr v1.2.0 // indirect
+	go.opentelemetry.io/otel v1.3.0 // indirect
 	go.opentelemetry.io/otel/metric v0.20.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	honnef.co/go/tools v0.1.3 // indirect
 )
+

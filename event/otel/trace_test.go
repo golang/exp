@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !disable_events
 // +build !disable_events
 
 package otel_test
@@ -117,19 +118,19 @@ func setupOtel() (context.Context, trace.Tracer, func() string) {
 
 // testExporter is an otel exporter for traces
 type testExporter struct {
-	m   map[trace.SpanID][]*sdktrace.SpanSnapshot // key is parent SpanID
+	m   map[trace.SpanID][]sdktrace.ReadOnlySpan // key is parent SpanID
 	got string
 }
 
 var _ sdktrace.SpanExporter = (*testExporter)(nil)
 
 func newTestExporter() *testExporter {
-	return &testExporter{m: map[trace.SpanID][]*sdktrace.SpanSnapshot{}}
+	return &testExporter{m: map[trace.SpanID][]sdktrace.ReadOnlySpan{}}
 }
 
-func (e *testExporter) ExportSpans(ctx context.Context, ss []*sdktrace.SpanSnapshot) error {
+func (e *testExporter) ExportSpans(ctx context.Context, ss []sdktrace.ReadOnlySpan) error {
 	for _, s := range ss {
-		sid := s.Parent.SpanID()
+		sid := s.Parent().SpanID()
 		e.m[sid] = append(e.m[sid], s)
 	}
 	return nil
@@ -143,9 +144,9 @@ func (e *testExporter) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (e *testExporter) print(w io.Writer, ss *sdktrace.SpanSnapshot) {
-	fmt.Fprintf(w, "%s", ss.Name)
-	children := e.m[ss.SpanContext.SpanID()]
+func (e *testExporter) print(w io.Writer, ss sdktrace.ReadOnlySpan) {
+	fmt.Fprintf(w, "%s", ss.Name())
+	children := e.m[ss.SpanContext().SpanID()]
 	if len(children) > 0 {
 		fmt.Fprint(w, " (")
 		for i, ss := range children {
