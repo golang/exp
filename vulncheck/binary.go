@@ -10,12 +10,15 @@ import (
 	"runtime"
 
 	"golang.org/x/exp/vulncheck/internal/binscan"
+	"golang.org/x/exp/vulncheck/internal/derrors"
 	"golang.org/x/tools/go/packages"
 )
 
 // Binary detects presence of vulnerable symbols in exe. The
 // imports, require, and call graph are all unavailable (nil).
-func Binary(ctx context.Context, exe io.ReaderAt, cfg *Config) (*Result, error) {
+func Binary(ctx context.Context, exe io.ReaderAt, cfg *Config) (_ *Result, err error) {
+	defer derrors.Wrap(&err, "vulncheck.Binary")
+
 	mods, packageSymbols, err := binscan.ExtractPackagesAndSymbols(exe)
 	if err != nil {
 		return nil, err
