@@ -106,23 +106,16 @@ func callGraphToStrMap(cg *CallGraph) map[string][]string {
 	// seen edges, to avoid repetitions
 	seen := make(map[edge]bool)
 
-	funcName := func(fn *FuncNode) string {
-		if fn.RecvType == "" {
-			return fmt.Sprintf("%s.%s", fn.PkgPath, fn.Name)
-		}
-		return fmt.Sprintf("%s.%s", fn.RecvType, fn.Name)
-	}
-
 	m := make(map[string][]string)
 	for _, n := range cg.Functions {
-		fName := funcName(n)
+		fName := n.String()
 		for _, callsite := range n.CallSites {
 			e := edge{src: callsite.Parent, dst: n.ID}
 			if seen[e] {
 				continue
 			}
 			caller := cg.Functions[e.src]
-			callerName := funcName(caller)
+			callerName := caller.String()
 			m[callerName] = append(m[callerName], fName)
 		}
 	}

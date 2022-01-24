@@ -179,6 +179,13 @@ type FuncNode struct {
 	CallSites []*CallSite
 }
 
+func (fn *FuncNode) String() string {
+	if fn.RecvType == "" {
+		return fmt.Sprintf("%s.%s", fn.PkgPath, fn.Name)
+	}
+	return fmt.Sprintf("%s.%s", fn.RecvType, fn.Name)
+}
+
 type CallSite struct {
 	// Parent is ID of the enclosing function where the call is made.
 	Parent int
