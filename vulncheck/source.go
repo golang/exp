@@ -6,6 +6,7 @@ package vulncheck
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 
 	"golang.org/x/exp/vulncheck/internal/derrors"
@@ -37,7 +38,7 @@ func Source(ctx context.Context, pkgs []*Package, cfg *Config) (_ *Result, err e
 	}
 
 	vulnPkgModSlice(pkgs, modVulns, result)
-
+	fmt.Println("IMPORTS", result.Imports)
 	if cfg.ImportsOnly {
 		return result, nil
 	}
@@ -298,7 +299,10 @@ func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgrap
 	}
 
 	// Check if f has known vulnerabilities.
-	vulns := modVulns.VulnsForSymbol(f.Package().Pkg.Path(), dbFuncName(f))
+	var vulns []*osv.Entry
+	if f.Package() != nil {
+		vulns = modVulns.VulnsForSymbol(f.Package().Pkg.Path(), dbFuncName(f))
+	}
 
 	var funNode *FuncNode
 	// If there are vulnerabilities for f, create node for f and
