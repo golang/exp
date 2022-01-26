@@ -6,7 +6,6 @@ package vulncheck
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 
 	"golang.org/x/exp/vulncheck/internal/derrors"
@@ -38,7 +37,6 @@ func Source(ctx context.Context, pkgs []*Package, cfg *Config) (_ *Result, err e
 	}
 
 	vulnPkgModSlice(pkgs, modVulns, result)
-	fmt.Println("IMPORTS", result.Imports)
 	if cfg.ImportsOnly {
 		return result, nil
 	}
@@ -299,10 +297,7 @@ func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgrap
 	}
 
 	// Check if f has known vulnerabilities.
-	var vulns []*osv.Entry
-	if f.Package() != nil {
-		vulns = modVulns.VulnsForSymbol(f.Package().Pkg.Path(), dbFuncName(f))
-	}
+	vulns := modVulns.VulnsForSymbol(pkgPath(f), dbFuncName(f))
 
 	var funNode *FuncNode
 	// If there are vulnerabilities for f, create node for f and
@@ -365,12 +360,21 @@ func vulnCallSlice(f *ssa.Function, modVulns moduleVulnerabilities, cg *callgrap
 	return funNode
 }
 
+// pkgPath returns the path of the f's enclosing package, if any.
+// Otherwise, returns "".
+func pkgPath(f *ssa.Function) string {
+	if f.Package() != nil && f.Package().Pkg != nil {
+		return f.Package().Pkg.Path()
+	}
+	return ""
+}
+
 func funcNode(f *ssa.Function) *FuncNode {
 	id := nextFunID()
 	return &FuncNode{
 		ID:       id,
 		Name:     f.Name(),
-		PkgPath:  f.Package().Pkg.Path(),
+		PkgPath:  pkgPath(f),
 		RecvType: funcRecvType(f),
 		Pos:      funcPosition(f),
 	}
