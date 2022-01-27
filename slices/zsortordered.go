@@ -9,7 +9,7 @@ package slices
 import "constraints"
 
 // insertionSortOrdered sorts data[a:b] using insertion sort.
-func insertionSortOrdered[Elem constraints.Ordered](data []Elem, a, b int) {
+func insertionSortOrdered[E constraints.Ordered](data []E, a, b int) {
 	for i := a + 1; i < b; i++ {
 		for j := i; j > a && (data[j] < data[j-1]); j-- {
 			data[j], data[j-1] = data[j-1], data[j]
@@ -19,7 +19,7 @@ func insertionSortOrdered[Elem constraints.Ordered](data []Elem, a, b int) {
 
 // siftDownOrdered implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
-func siftDownOrdered[Elem constraints.Ordered](data []Elem, lo, hi, first int) {
+func siftDownOrdered[E constraints.Ordered](data []E, lo, hi, first int) {
 	root := lo
 	for {
 		child := 2*root + 1
@@ -37,7 +37,7 @@ func siftDownOrdered[Elem constraints.Ordered](data []Elem, lo, hi, first int) {
 	}
 }
 
-func heapSortOrdered[Elem constraints.Ordered](data []Elem, a, b int) {
+func heapSortOrdered[E constraints.Ordered](data []E, a, b int) {
 	first := a
 	lo := 0
 	hi := b - a
@@ -58,7 +58,7 @@ func heapSortOrdered[Elem constraints.Ordered](data []Elem, a, b int) {
 // "Engineering a Sort Function" SP&E November 1993.
 
 // medianOfThreeOrdered moves the median of the three values data[m0], data[m1], data[m2] into data[m1].
-func medianOfThreeOrdered[Elem constraints.Ordered](data []Elem, m1, m0, m2 int) {
+func medianOfThreeOrdered[E constraints.Ordered](data []E, m1, m0, m2 int) {
 	// sort 3 elements
 	if data[m1] < data[m0] {
 		data[m1], data[m0] = data[m0], data[m1]
@@ -74,13 +74,13 @@ func medianOfThreeOrdered[Elem constraints.Ordered](data []Elem, m1, m0, m2 int)
 	// now data[m0] <= data[m1] <= data[m2]
 }
 
-func swapRangeOrdered[Elem constraints.Ordered](data []Elem, a, b, n int) {
+func swapRangeOrdered[E constraints.Ordered](data []E, a, b, n int) {
 	for i := 0; i < n; i++ {
 		data[a+i], data[b+i] = data[b+i], data[a+i]
 	}
 }
 
-func doPivotOrdered[Elem constraints.Ordered](data []Elem, lo, hi int) (midlo, midhi int) {
+func doPivotOrdered[E constraints.Ordered](data []E, lo, hi int) (midlo, midhi int) {
 	m := int(uint(lo+hi) >> 1) // Written like this to avoid integer overflow.
 	if hi-lo > 40 {
 		// Tukey's "Ninther" median of three medians of three.
@@ -167,7 +167,7 @@ func doPivotOrdered[Elem constraints.Ordered](data []Elem, lo, hi int) (midlo, m
 	return b - 1, c
 }
 
-func quickSortOrdered[Elem constraints.Ordered](data []Elem, a, b, maxDepth int) {
+func quickSortOrdered[E constraints.Ordered](data []E, a, b, maxDepth int) {
 	for b-a > 12 { // Use ShellSort for slices <= 12 elements
 		if maxDepth == 0 {
 			heapSortOrdered(data, a, b)
@@ -197,7 +197,7 @@ func quickSortOrdered[Elem constraints.Ordered](data []Elem, a, b, maxDepth int)
 	}
 }
 
-func stableOrdered[Elem constraints.Ordered](data []Elem, n int) {
+func stableOrdered[E constraints.Ordered](data []E, n int) {
 	blockSize := 20 // must be > 0
 	a, b := 0, blockSize
 	for b <= n {
@@ -240,7 +240,7 @@ func stableOrdered[Elem constraints.Ordered](data []Elem, n int) {
 // symMerge assumes non-degenerate arguments: a < m && m < b.
 // Having the caller check this condition eliminates many leaf recursion calls,
 // which improves performance.
-func symMergeOrdered[Elem constraints.Ordered](data []Elem, a, m, b int) {
+func symMergeOrdered[E constraints.Ordered](data []E, a, m, b int) {
 	// Avoid unnecessary recursions of symMerge
 	// by direct insertion of data[a] into data[m:b]
 	// if data[a:m] only contains one element.
@@ -326,7 +326,7 @@ func symMergeOrdered[Elem constraints.Ordered](data []Elem, a, m, b int) {
 // Data of the form 'x u v y' is changed to 'x v u y'.
 // rotate performs at most b-a many calls to data.Swap,
 // and it assumes non-degenerate arguments: a < m && m < b.
-func rotateOrdered[Elem constraints.Ordered](data []Elem, a, m, b int) {
+func rotateOrdered[E constraints.Ordered](data []E, a, m, b int) {
 	i := m - a
 	j := b - m
 

@@ -7,26 +7,28 @@ package slices
 import "constraints"
 
 // Sort sorts a slice of any ordered type in ascending order.
-func Sort[Elem constraints.Ordered](x []Elem) {
+func Sort[S ~[]E, E constraints.Ordered](x S) {
 	n := len(x)
-	quickSortOrdered(x, 0, n, maxDepth(n))
+	// Due to golang/go#48619, constraints of quickSortOrdered and its related
+	// functsions are not changed. So cast S to []E for now.
+	quickSortOrdered([]E(x), 0, n, maxDepth(n))
 }
 
 // Sort sorts the slice x in ascending order as determined by the less function.
 // This sort is not guaranteed to be stable.
-func SortFunc[Elem any](x []Elem, less func(a, b Elem) bool) {
+func SortFunc[S ~[]E, E any](x S, less func(a, b E) bool) {
 	n := len(x)
 	quickSortLessFunc(x, 0, n, maxDepth(n), less)
 }
 
 // SortStable sorts the slice x while keeping the original order of equal
 // elements, using less to compare elements.
-func SortStableFunc[Elem any](x []Elem, less func(a, b Elem) bool) {
+func SortStableFunc[S ~[]E, E any](x S, less func(a, b E) bool) {
 	stableLessFunc(x, len(x), less)
 }
 
 // IsSorted reports whether x is sorted in ascending order.
-func IsSorted[Elem constraints.Ordered](x []Elem) bool {
+func IsSorted[S ~[]E, E constraints.Ordered](x S) bool {
 	for i := len(x) - 1; i > 0; i-- {
 		if x[i] < x[i-1] {
 			return false
@@ -37,7 +39,7 @@ func IsSorted[Elem constraints.Ordered](x []Elem) bool {
 
 // IsSortedFunc reports whether x is sorted in ascending order, with less as the
 // comparison function.
-func IsSortedFunc[Elem any](x []Elem, less func(a, b Elem) bool) bool {
+func IsSortedFunc[S ~[]E, E any](x S, less func(a, b E) bool) bool {
 	for i := len(x) - 1; i > 0; i-- {
 		if less(x[i], x[i-1]) {
 			return false
@@ -51,7 +53,7 @@ func IsSortedFunc[Elem any](x []Elem, less func(a, b Elem) bool) bool {
 // which it could be inserted into the slice is returned; therefore, if the
 // intention is to find target itself a separate check for equality with the
 // element at the returned index is required.
-func BinarySearch[Elem constraints.Ordered](x []Elem, target Elem) int {
+func BinarySearch[S ~[]E, E constraints.Ordered](x S, target E) int {
 	return search(len(x), func(i int) bool { return x[i] >= target })
 }
 
@@ -63,7 +65,7 @@ func BinarySearch[Elem constraints.Ordered](x []Elem, target Elem) int {
 // the first true index. If there is no such index, BinarySearchFunc returns n.
 // (Note that the "not found" return value is not -1 as in, for instance,
 // strings.Index.) Search calls ok(i) only for i in the range [0, n).
-func BinarySearchFunc[Elem any](x []Elem, ok func(Elem) bool) int {
+func BinarySearchFunc[S ~[]E, E any](x S, ok func(E) bool) int {
 	return search(len(x), func(i int) bool { return ok(x[i]) })
 }
 

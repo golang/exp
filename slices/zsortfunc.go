@@ -7,7 +7,7 @@
 package slices
 
 // insertionSortLessFunc sorts data[a:b] using insertion sort.
-func insertionSortLessFunc[Elem any](data []Elem, a, b int, less func(a, b Elem) bool) {
+func insertionSortLessFunc[S ~[]E, E any](data S, a, b int, less func(a, b E) bool) {
 	for i := a + 1; i < b; i++ {
 		for j := i; j > a && less(data[j], data[j-1]); j-- {
 			data[j], data[j-1] = data[j-1], data[j]
@@ -17,7 +17,7 @@ func insertionSortLessFunc[Elem any](data []Elem, a, b int, less func(a, b Elem)
 
 // siftDownLessFunc implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
-func siftDownLessFunc[Elem any](data []Elem, lo, hi, first int, less func(a, b Elem) bool) {
+func siftDownLessFunc[S ~[]E, E any](data S, lo, hi, first int, less func(a, b E) bool) {
 	root := lo
 	for {
 		child := 2*root + 1
@@ -35,7 +35,7 @@ func siftDownLessFunc[Elem any](data []Elem, lo, hi, first int, less func(a, b E
 	}
 }
 
-func heapSortLessFunc[Elem any](data []Elem, a, b int, less func(a, b Elem) bool) {
+func heapSortLessFunc[S ~[]E, E any](data S, a, b int, less func(a, b E) bool) {
 	first := a
 	lo := 0
 	hi := b - a
@@ -56,7 +56,7 @@ func heapSortLessFunc[Elem any](data []Elem, a, b int, less func(a, b Elem) bool
 // "Engineering a Sort Function" SP&E November 1993.
 
 // medianOfThreeLessFunc moves the median of the three values data[m0], data[m1], data[m2] into data[m1].
-func medianOfThreeLessFunc[Elem any](data []Elem, m1, m0, m2 int, less func(a, b Elem) bool) {
+func medianOfThreeLessFunc[S ~[]E, E any](data S, m1, m0, m2 int, less func(a, b E) bool) {
 	// sort 3 elements
 	if less(data[m1], data[m0]) {
 		data[m1], data[m0] = data[m0], data[m1]
@@ -72,13 +72,13 @@ func medianOfThreeLessFunc[Elem any](data []Elem, m1, m0, m2 int, less func(a, b
 	// now data[m0] <= data[m1] <= data[m2]
 }
 
-func swapRangeLessFunc[Elem any](data []Elem, a, b, n int, less func(a, b Elem) bool) {
+func swapRangeLessFunc[S ~[]E, E any](data S, a, b, n int, less func(a, b E) bool) {
 	for i := 0; i < n; i++ {
 		data[a+i], data[b+i] = data[b+i], data[a+i]
 	}
 }
 
-func doPivotLessFunc[Elem any](data []Elem, lo, hi int, less func(a, b Elem) bool) (midlo, midhi int) {
+func doPivotLessFunc[S ~[]E, E any](data S, lo, hi int, less func(a, b E) bool) (midlo, midhi int) {
 	m := int(uint(lo+hi) >> 1) // Written like this to avoid integer overflow.
 	if hi-lo > 40 {
 		// Tukey's "Ninther" median of three medians of three.
@@ -165,7 +165,7 @@ func doPivotLessFunc[Elem any](data []Elem, lo, hi int, less func(a, b Elem) boo
 	return b - 1, c
 }
 
-func quickSortLessFunc[Elem any](data []Elem, a, b, maxDepth int, less func(a, b Elem) bool) {
+func quickSortLessFunc[S ~[]E, E any](data S, a, b, maxDepth int, less func(a, b E) bool) {
 	for b-a > 12 { // Use ShellSort for slices <= 12 elements
 		if maxDepth == 0 {
 			heapSortLessFunc(data, a, b, less)
@@ -195,7 +195,7 @@ func quickSortLessFunc[Elem any](data []Elem, a, b, maxDepth int, less func(a, b
 	}
 }
 
-func stableLessFunc[Elem any](data []Elem, n int, less func(a, b Elem) bool) {
+func stableLessFunc[S ~[]E, E any](data S, n int, less func(a, b E) bool) {
 	blockSize := 20 // must be > 0
 	a, b := 0, blockSize
 	for b <= n {
@@ -238,7 +238,7 @@ func stableLessFunc[Elem any](data []Elem, n int, less func(a, b Elem) bool) {
 // symMerge assumes non-degenerate arguments: a < m && m < b.
 // Having the caller check this condition eliminates many leaf recursion calls,
 // which improves performance.
-func symMergeLessFunc[Elem any](data []Elem, a, m, b int, less func(a, b Elem) bool) {
+func symMergeLessFunc[S ~[]E, E any](data S, a, m, b int, less func(a, b E) bool) {
 	// Avoid unnecessary recursions of symMerge
 	// by direct insertion of data[a] into data[m:b]
 	// if data[a:m] only contains one element.
@@ -324,7 +324,7 @@ func symMergeLessFunc[Elem any](data []Elem, a, m, b int, less func(a, b Elem) b
 // Data of the form 'x u v y' is changed to 'x v u y'.
 // rotate performs at most b-a many calls to data.Swap,
 // and it assumes non-degenerate arguments: a < m && m < b.
-func rotateLessFunc[Elem any](data []Elem, a, m, b int, less func(a, b Elem) bool) {
+func rotateLessFunc[S ~[]E, E any](data S, a, m, b int, less func(a, b E) bool) {
 	i := m - a
 	j := b - m
 
