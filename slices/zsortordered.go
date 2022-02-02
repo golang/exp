@@ -6,7 +6,7 @@
 
 package slices
 
-import "constraints"
+import "golang.org/x/exp/constraints"
 
 // insertionSortOrdered sorts data[a:b] using insertion sort.
 func insertionSortOrdered[Elem constraints.Ordered](data []Elem, a, b int) {

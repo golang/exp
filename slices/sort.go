@@ -4,7 +4,7 @@
 
 package slices
 
-import "constraints"
+import "golang.org/x/exp/constraints"
 
 // Sort sorts a slice of any ordered type in ascending order.
 func Sort[Elem constraints.Ordered](x []Elem) {

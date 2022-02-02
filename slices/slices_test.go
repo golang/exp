@@ -5,10 +5,11 @@
 package slices
 
 import (
-	"constraints"
 	"math"
 	"strings"
 	"testing"
+
+	"golang.org/x/exp/constraints"
 )
 
 var equalIntTests = []struct {

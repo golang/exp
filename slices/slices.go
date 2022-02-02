@@ -7,7 +7,7 @@
 // of a slice at index 0 <= i < len(s).
 package slices
 
-import "constraints"
+import "golang.org/x/exp/constraints"
 
 // Equal reports whether two slices are equal: the same length and all
 // elements equal. If the lengths are different, Equal returns false.
