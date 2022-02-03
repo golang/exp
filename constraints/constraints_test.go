@@ -42,7 +42,7 @@ type TestTypes struct {
 var prolog = []byte(`
 package constrainttest
 
-import "constraints"
+import "golang.org/x/exp/constraints"
 
 type (
 	testSigned[T constraints.Signed]     struct{ f T }
@@ -71,8 +71,39 @@ func TestFailure(t *testing.T) {
 
 	tmpdir := t.TempDir()
 
-	if err := os.WriteFile(filepath.Join(tmpdir, "go.mod"), []byte("module constraintest"), 0666); err != nil {
+	cwd, err := os.Getwd()
+	if err != nil {
 		t.Fatal(err)
+	}
+	// This package is golang.org/x/exp/constraints, so the root of the x/exp
+	// module is the parent directory of the directory in which this test runs.
+	expModDir := filepath.Dir(cwd)
+
+	modFile := fmt.Sprintf(`module constraintest
+
+go 1.18
+
+replace golang.org/x/exp => %s
+`, expModDir)
+	if err := os.WriteFile(filepath.Join(tmpdir, "go.mod"), []byte(modFile), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write the prolog as its own file so that 'go mod tidy' has something to inspect.
+	// This will ensure that the go.mod and go.sum files include any dependencies
+	// needed by the constraints package (which should just be some version of
+	// x/exp itself).
+	if err := os.WriteFile(filepath.Join(tmpdir, "prolog.go"), []byte(prolog), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	tidyCmd := exec.Command(gocmd, "mod", "tidy")
+	tidyCmd.Dir = tmpdir
+	tidyCmd.Env = append(os.Environ(), "PWD="+tmpdir)
+	if out, err := tidyCmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %v\n%s", tidyCmd, err, out)
+	} else {
+		t.Logf("%v:\n%s", tidyCmd, out)
 	}
 
 	// Test for types that should not satisfy a constraint.
