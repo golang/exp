@@ -12,10 +12,11 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/BurntSushi/xgb"
-	"github.com/BurntSushi/xgb/render"
-	"github.com/BurntSushi/xgb/shm"
-	"github.com/BurntSushi/xgb/xproto"
+	"golang.org/x/exp/shiny/internal/xgb"
+	"golang.org/x/exp/shiny/internal/xgb/render"
+	"golang.org/x/exp/shiny/internal/xgb/shm"
+	"golang.org/x/exp/shiny/internal/xgb/xproto"
+
 	"golang.org/x/exp/shiny/driver/internal/swizzle"
 )
 

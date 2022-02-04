@@ -8,8 +8,9 @@ import (
 	"image"
 	"sync"
 
-	"github.com/BurntSushi/xgb"
-	"github.com/BurntSushi/xgb/xproto"
+	"golang.org/x/exp/shiny/internal/xgb"
+	"golang.org/x/exp/shiny/internal/xgb/xproto"
+
 	"golang.org/x/exp/shiny/driver/internal/swizzle"
 )
 

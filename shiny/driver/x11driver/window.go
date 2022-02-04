@@ -12,9 +12,9 @@ import (
 	"image/draw"
 	"sync"
 
-	"github.com/BurntSushi/xgb"
-	"github.com/BurntSushi/xgb/render"
-	"github.com/BurntSushi/xgb/xproto"
+	"golang.org/x/exp/shiny/internal/xgb"
+	"golang.org/x/exp/shiny/internal/xgb/render"
+	"golang.org/x/exp/shiny/internal/xgb/xproto"
 
 	"golang.org/x/exp/shiny/driver/internal/drawer"
 	"golang.org/x/exp/shiny/driver/internal/event"
