@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/exp/event/eventtest"
-	"golang.org/x/exp/internal/stack/stacktest"
 	"golang.org/x/exp/jsonrpc2"
+	"golang.org/x/exp/jsonrpc2/internal/stack/stacktest"
 	errors "golang.org/x/xerrors"
 )
 

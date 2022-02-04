@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/exp/internal/stack"
+	"golang.org/x/exp/jsonrpc2/internal/stack"
 )
 
 //this is only needed to support pre 1.14 when testing.TB did not have Cleanup

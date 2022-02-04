@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/exp/internal/stack"
+	"golang.org/x/exp/jsonrpc2/internal/stack"
 )
 
 func TestProcess(t *testing.T) {
