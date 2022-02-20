@@ -12,10 +12,10 @@ import (
 	"sync"
 	"unsafe"
 
-	"golang.org/x/exp/shiny/internal/xgb"
-	"golang.org/x/exp/shiny/internal/xgb/render"
-	"golang.org/x/exp/shiny/internal/xgb/shm"
-	"golang.org/x/exp/shiny/internal/xgb/xproto"
+	"github.com/jezek/xgb"
+	"github.com/jezek/xgb/render"
+	"github.com/jezek/xgb/shm"
+	"github.com/jezek/xgb/xproto"
 
 	"golang.org/x/exp/shiny/driver/internal/swizzle"
 )

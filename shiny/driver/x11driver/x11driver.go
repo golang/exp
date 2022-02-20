@@ -13,9 +13,9 @@ package x11driver // import "golang.org/x/exp/shiny/driver/x11driver"
 import (
 	"fmt"
 
-	"golang.org/x/exp/shiny/internal/xgb"
-	"golang.org/x/exp/shiny/internal/xgb/render"
-	"golang.org/x/exp/shiny/internal/xgb/shm"
+	"github.com/jezek/xgb"
+	"github.com/jezek/xgb/render"
+	"github.com/jezek/xgb/shm"
 
 	"golang.org/x/exp/shiny/driver/internal/errscreen"
 	"golang.org/x/exp/shiny/screen"
