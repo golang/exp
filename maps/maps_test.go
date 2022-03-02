@@ -52,10 +52,10 @@ func TestEqual(t *testing.T) {
 	if !Equal(m1, m1) {
 		t.Errorf("Equal(%v, %v) = false, want true", m1, m1)
 	}
-	if Equal(m1, nil) {
+	if Equal(m1, (map[int]int)(nil)) {
 		t.Errorf("Equal(%v, nil) = true, want false", m1)
 	}
-	if Equal(nil, m1) {
+	if Equal((map[int]int)(nil), m1) {
 		t.Errorf("Equal(nil, %v) = true, want false", m1)
 	}
 	if !Equal[map[int]int, map[int]int](nil, nil) {
@@ -92,10 +92,10 @@ func TestEqualFunc(t *testing.T) {
 	if !EqualFunc(m1, m1, equal[int]) {
 		t.Errorf("EqualFunc(%v, %v, equal) = false, want true", m1, m1)
 	}
-	if EqualFunc(m1, nil, equal[int]) {
+	if EqualFunc(m1, (map[int]int)(nil), equal[int]) {
 		t.Errorf("EqualFunc(%v, nil, equal) = true, want false", m1)
 	}
-	if EqualFunc(nil, m1, equal[int]) {
+	if EqualFunc((map[int]int)(nil), m1, equal[int]) {
 		t.Errorf("EqualFunc(nil, %v, equal) = true, want false", m1)
 	}
 	if !EqualFunc[map[int]int, map[int]int](nil, nil, equal[int]) {
@@ -126,7 +126,7 @@ func TestClear(t *testing.T) {
 	if got := len(ml); got != 0 {
 		t.Errorf("len(%v) = %d after Clear, want 0", ml, got)
 	}
-	if !Equal(ml, nil) {
+	if !Equal(ml, (map[int]int)(nil)) {
 		t.Errorf("Equal(%v, nil) = false, want true", ml)
 	}
 }
