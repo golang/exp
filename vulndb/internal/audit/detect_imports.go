@@ -14,7 +14,7 @@ import (
 // VulnerableImports returns vulnerability findings for packages imported by `pkgs`
 // given the vulnerability and platform info captured in `env`.
 //
-// Returns all findings reachable from `pkgs` while analyzing each package only once, prefering
+// Returns all findings reachable from `pkgs` while analyzing each package only once, preferring
 // findings of shorter import traces. For instance, given import chains
 //   A -> B -> V
 //   A -> D -> B -> V

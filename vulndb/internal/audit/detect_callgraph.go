@@ -26,7 +26,7 @@ import (
 // 'modVulns' vulnerabilities.
 //
 // Returns all findings reachable from pkgs while analyzing each package only once,
-// prefering findings of shorter import traces. For instance, given call chains
+// preferring findings of shorter import traces. For instance, given call chains
 //   A() -> B() -> V
 //   A() -> D() -> B() -> V
 //   D() -> B() -> V
@@ -163,7 +163,7 @@ func (chain *callChain) trace() []TraceElem {
 		pos = instrPosition(chain.call)
 		if unresolved(chain.call) {
 			// In case of a statically unresolved call site, communicate to the client
-			// that this was approximatelly resolved to chain.f.
+			// that this was approximately resolved to chain.f.
 			desc = fmt.Sprintf("%s(...) [approx. resolved to %s]", callName(chain.call), chain.f)
 		}
 	} else {

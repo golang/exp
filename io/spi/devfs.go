@@ -57,11 +57,11 @@ type Devfs struct {
 	// Mode is the SPI mode. SPI mode is a combination of polarity and phases.
 	// CPOL is the high order bit, CPHA is the low order. Pre-computed mode
 	// values are Mode0, Mode1, Mode2 and Mode3. The value of the mode argument
-	// can be overriden by the device's driver.
+	// can be overridden by the device's driver.
 	// Required.
 	Mode Mode
 
-	// MaxSpeed is the max clock speed (Hz) and can be overriden by the device's driver.
+	// MaxSpeed is the max clock speed (Hz) and can be overridden by the device's driver.
 	// Required.
 	MaxSpeed int64
 }

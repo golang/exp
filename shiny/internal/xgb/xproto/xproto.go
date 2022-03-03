@@ -913,7 +913,7 @@ func init() {
 	xgb.NewEventFuncs[33] = ClientMessageEventNew
 }
 
-// ClientMessageDataUnion is a represention of the ClientMessageDataUnion union type.
+// ClientMessageDataUnion is a representation of the ClientMessageDataUnion union type.
 // Note that to *create* a Union, you should *never* create
 // this struct directly (unless you know what you're doing).
 // Instead use one of the following constructors for 'ClientMessageDataUnion':
