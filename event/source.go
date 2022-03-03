@@ -37,7 +37,7 @@ type caller struct {
 var globalCallers chan *sources
 
 // RegisterHelper records a function as being an event helper that should not
-// be used when capturing the source infomation on events.
+// be used when capturing the source information on events.
 // v should be either a string or a function pointer.
 // If v is a string it is of the form
 //   Space.Owner.Name

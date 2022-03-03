@@ -27,7 +27,7 @@ const (
 	Mode3 = Mode(3)
 )
 
-// Order is the bit justification to be used while transfering
+// Order is the bit justification to be used while transferring
 // words to the SPI device. MSB-first encoding is more popular
 // than LSB-first.
 type Order int
@@ -50,7 +50,7 @@ func (d *Device) SetMode(mode Mode) error {
 }
 
 // SetMaxSpeed sets the maximum clock speed in Hz.
-// The value can be overriden by SPI device's driver.
+// The value can be overridden by SPI device's driver.
 func (d *Device) SetMaxSpeed(speed int) error {
 	return d.conn.Configure(driver.MaxSpeed, speed)
 }

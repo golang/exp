@@ -28,7 +28,7 @@ var (
 	ErrInternal = NewError(-32603, "JSON RPC internal error")
 
 	// The following errors are not part of the json specification, but
-	// compliant extensions specific to this implimentation.
+	// compliant extensions specific to this implementation.
 
 	// ErrServerOverloaded is returned when a message was refused due to a
 	// server being temporarily unable to accept any new messages.

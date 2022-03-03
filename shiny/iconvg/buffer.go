@@ -12,7 +12,7 @@ import (
 // buffer holds an encoded IconVG graphic.
 //
 // The decodeXxx methods return the decoded value and an integer n, the number
-// of bytes that value was encoded in. They return n == 0 if an error occured.
+// of bytes that value was encoded in. They return n == 0 if an error occurred.
 //
 // The encodeXxx methods append to the buffer, modifying the slice in place.
 type buffer []byte
