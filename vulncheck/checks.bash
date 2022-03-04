@@ -90,7 +90,8 @@ go_linters() {
   check_vet
   check_staticcheck
   check_misspell
-  check_unparam
+  # TODO: enable unparam when it supports generics
+  # check_unparam
 }
 
 go_modtidy() {
