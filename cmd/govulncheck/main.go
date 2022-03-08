@@ -25,9 +25,11 @@ import (
 	"strings"
 
 	"golang.org/x/exp/vulncheck"
+	"golang.org/x/mod/semver"
 	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/vuln/client"
+	"golang.org/x/vuln/osv"
 )
 
 var (
@@ -70,8 +72,7 @@ func main() {
 	flag.Parse()
 
 	if len(flag.Args()) == 0 {
-		fmt.Fprint(os.Stderr, usage)
-		os.Exit(1)
+		die("%s", usage)
 	}
 
 	dbs := []string{"https://storage.googleapis.com/go-vulndb"}
@@ -80,37 +81,88 @@ func main() {
 	}
 	dbClient, err := client.NewClient(dbs, client.Options{HTTPCache: defaultCache()})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
-		os.Exit(1)
+		die("govulncheck: %s", err)
+	}
+	vcfg := &vulncheck.Config{
+		Client: dbClient,
+	}
+	ctx := context.Background()
+
+	patterns := flag.Args()
+	var r *vulncheck.Result
+	var pkgs []*packages.Package
+	if len(patterns) == 1 && isFile(patterns[0]) {
+		f, err := os.Open(patterns[0])
+		if err != nil {
+			die("govulncheck: %v", err)
+		}
+		defer f.Close()
+		r, err = vulncheck.Binary(ctx, f, vcfg)
+		if err != nil {
+			die("govulncheck: %v", err)
+		}
+	} else {
+		cfg := &packages.Config{
+			Mode:       packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedDeps | packages.NeedModule,
+			Tests:      *testsFlag,
+			BuildFlags: []string{fmt.Sprintf("-tags=%s", strings.Join(build.Default.BuildTags, ","))},
+		}
+		pkgs, err = loadPackages(cfg, patterns)
+		if err != nil {
+			die("govulncheck: %v", err)
+		}
+		r, err = vulncheck.Source(ctx, vulncheck.Convert(pkgs), vcfg)
+		if err != nil {
+			die("govulncheck: %v", err)
+		}
+	}
+	if *jsonFlag {
+		writeJSON(r)
+	} else {
+		writeText(r, pkgs)
 	}
 
-	cfg := &packages.Config{
-		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedDeps | packages.NeedModule,
-		Tests:      *testsFlag,
-		BuildFlags: []string{fmt.Sprintf("-tags=%s", strings.Join(build.Default.BuildTags, ","))},
-	}
-
-	r, err := run(cfg, flag.Args(), dbClient)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
-		os.Exit(1)
-	}
-	writeOut(r, *jsonFlag)
 }
 
-func writeOut(r *vulncheck.Result, toJson bool) {
-	if !toJson {
-		fmt.Println(r)
-		return
-	}
-
+func writeJSON(r *vulncheck.Result) {
 	b, err := json.MarshalIndent(r, "", "\t")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "govulncheck: %s\n", err)
-		os.Exit(1)
+		die("govulncheck: %s", err)
 	}
 	os.Stdout.Write(b)
-	os.Stdout.Write([]byte{'\n'})
+	fmt.Println()
+}
+
+func writeText(r *vulncheck.Result, pkgs []*packages.Package) {
+	if len(r.Vulns) == 0 {
+		return
+	}
+	// Build a map from module paths to versions.
+	moduleVersions := map[string]string{}
+	packages.Visit(pkgs, nil, func(p *packages.Package) {
+		m := p.Module
+		if m != nil {
+			if m.Replace != nil {
+				m = m.Replace
+			}
+			moduleVersions[m.Path] = m.Version
+		}
+	})
+	t := newTable("Info", "Description", "Symbols")
+	for _, v := range r.Vulns {
+		desc := wrap(v.OSV.Details, 30)
+		current := moduleVersions[v.ModPath]
+		fixed := "v" + latestFixed(v.OSV.Affected)
+		ref := fmt.Sprintf("https://pkg.go.dev/vuln/%s", v.OSV.ID)
+		col1 := fmt.Sprintf("%s\nyours: %s\nfixed: %s\n%s",
+			v.PkgPath, current, fixed, ref)
+		t.row(col1, desc, " "+v.Symbol)
+		// empty row
+		t.row("", "", "")
+	}
+	if err := t.write(os.Stdout); err != nil {
+		die("govulncheck: %v", err)
+	}
 }
 
 func isFile(path string) bool {
@@ -121,20 +173,7 @@ func isFile(path string) bool {
 	return !s.IsDir()
 }
 
-func run(cfg *packages.Config, patterns []string, dbClient client.Client) (*vulncheck.Result, error) {
-	vcfg := &vulncheck.Config{
-		Client: dbClient,
-	}
-	if len(patterns) == 1 && isFile(patterns[0]) {
-		f, err := os.Open(patterns[0])
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		return vulncheck.Binary(context.Background(), f, vcfg)
-	}
-
-	// Load packages.
+func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package, error) {
 	if *verboseFlag {
 		log.Println("loading packages...")
 	}
@@ -148,7 +187,28 @@ func run(cfg *packages.Config, patterns []string, dbClient client.Client) (*vuln
 	if *verboseFlag {
 		log.Printf("\t%d loaded packages\n", len(pkgs))
 	}
+	return pkgs, nil
+}
 
-	return vulncheck.Source(context.Background(), vulncheck.Convert(pkgs), vcfg)
+// latestFixed returns the latest fixed version in the list of affected ranges,
+// or the empty string if there are no fixed versions.
+func latestFixed(as []osv.Affected) string {
+	v := ""
+	for _, a := range as {
+		for _, r := range a.Ranges {
+			if r.Type == osv.TypeSemver {
+				for _, e := range r.Events {
+					if e.Fixed != "" && (v == "" || semver.Compare(e.Fixed, v) > 0) {
+						v = e.Fixed
+					}
+				}
+			}
+		}
+	}
+	return v
+}
 
+func die(format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
+	os.Exit(1)
 }
