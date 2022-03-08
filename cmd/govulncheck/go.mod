@@ -3,14 +3,18 @@ module golang.org/x/exp/cmd/govulncheck
 go 1.17
 
 require (
+	github.com/client9/misspell v0.3.4
 	golang.org/x/exp/vulncheck v0.0.0-20220307200941-a1099baf94bf
 	golang.org/x/tools v0.1.8
 	golang.org/x/vuln v0.0.0-20211207171702-7209860d2c63
+	honnef.co/go/tools v0.3.0-0.dev.0.20220306074811-23e1086441d2
+	mvdan.cc/unparam v0.0.0-20211214103731-d0ef000c54e5
 )
 
 require (
 	cloud.google.com/go v0.97.0 // indirect
 	cloud.google.com/go/errorreporting v0.1.0 // indirect
+	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.2.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403 // indirect
@@ -22,6 +26,7 @@ require (
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20220218215828-6cf2b201936e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
 	golang.org/x/oauth2 v0.0.0-20211005180243-6b3c2da341f1 // indirect
