@@ -148,20 +148,32 @@ func writeText(r *vulncheck.Result, pkgs []*packages.Package) {
 			moduleVersions[m.Path] = m.Version
 		}
 	})
-	t := newTable("Info", "Description", "Symbols")
+
+	const labelWidth = 16
+
+	line := func(label, text string) {
+		fmt.Printf("%-*s%s\n", labelWidth, label, text)
+	}
+
 	for _, v := range r.Vulns {
-		desc := wrap(v.OSV.Details, 30)
 		current := moduleVersions[v.ModPath]
 		fixed := "v" + latestFixed(v.OSV.Affected)
 		ref := fmt.Sprintf("https://pkg.go.dev/vuln/%s", v.OSV.ID)
-		col1 := fmt.Sprintf("%s\nyours: %s\nfixed: %s\n%s",
-			v.PkgPath, current, fixed, ref)
-		t.row(col1, desc, " "+v.Symbol)
-		// empty row
-		t.row("", "", "")
-	}
-	if err := t.write(os.Stdout); err != nil {
-		die("govulncheck: %v", err)
+		line("package:", v.PkgPath)
+		line("your version:", current)
+		line("fixed version:", fixed)
+		line("symbol:", v.Symbol)
+		line("reference:", ref)
+
+		desc := strings.Split(wrap(v.OSV.Details, 80-labelWidth), "\n")
+		for i, l := range desc {
+			if i == 0 {
+				line("description:", l)
+			} else {
+				line("", l)
+			}
+		}
+		fmt.Println()
 	}
 }
 
