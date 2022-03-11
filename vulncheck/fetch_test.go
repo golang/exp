@@ -23,10 +23,10 @@ func TestFetchVulnerabilities(t *testing.T) {
 	}
 
 	mv, err := fetchVulnerabilities(context.Background(), mc, []*Module{
-		{Path: "example.mod/a", Dir: modCacheDirectory(), Version: "v1.0.0"},
-		{Path: "example.mod/b", Dir: modCacheDirectory(), Version: "v1.0.4"},
-		{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},
-		{Path: "example.mod/e", Replace: &Module{Path: "../local/example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.1"}, Version: "v2.1.0"},
+		{Path: "example.mod/a", Version: "v1.0.0"},
+		{Path: "example.mod/b", Version: "v1.0.4"},
+		{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Version: "v1.0.0"}, Version: "v2.0.0"},
+		{Path: "example.mod/e", Replace: &Module{Path: "../local/example.mod/d", Version: "v1.0.1"}, Version: "v2.1.0"},
 	})
 	if err != nil {
 		t.Fatalf("FetchVulnerabilities failed: %s", err)
@@ -34,19 +34,19 @@ func TestFetchVulnerabilities(t *testing.T) {
 
 	expected := moduleVulnerabilities{
 		{
-			mod: &Module{Path: "example.mod/a", Dir: modCacheDirectory(), Version: "v1.0.0"},
+			mod: &Module{Path: "example.mod/a", Version: "v1.0.0"},
 			vulns: []*osv.Entry{
 				{ID: "a", Affected: []osv.Affected{{Package: osv.Package{Name: "example.mod/a"}, Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "2.0.0"}}}}}}},
 			},
 		},
 		{
-			mod: &Module{Path: "example.mod/b", Dir: modCacheDirectory(), Version: "v1.0.4"},
+			mod: &Module{Path: "example.mod/b", Version: "v1.0.4"},
 			vulns: []*osv.Entry{
 				{ID: "b", Affected: []osv.Affected{{Package: osv.Package{Name: "example.mod/b"}, Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "1.1.1"}}}}}}},
 			},
 		},
 		{
-			mod: &Module{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Dir: modCacheDirectory(), Version: "v1.0.0"}, Version: "v2.0.0"},
+			mod: &Module{Path: "example.mod/c", Replace: &Module{Path: "example.mod/d", Version: "v1.0.0"}, Version: "v2.0.0"},
 			vulns: []*osv.Entry{
 				{ID: "c", Affected: []osv.Affected{{Package: osv.Package{Name: "example.mod/d"}, Ranges: osv.Affects{{Type: osv.TypeSemver, Events: []osv.RangeEvent{{Fixed: "2.0.0"}}}}}}},
 			},

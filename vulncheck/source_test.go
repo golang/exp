@@ -96,8 +96,6 @@ func TestImportsOnly(t *testing.T) {
 	})
 	defer e.Cleanup()
 
-	// Make sure local vulns can be loaded.
-	fetchingInTesting = true
 	// Load x and y as entry packages.
 	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"), path.Join(e.Temp(), "entry/y"))
 	if err != nil {
@@ -341,8 +339,6 @@ func TestCallGraph(t *testing.T) {
 	})
 	defer e.Cleanup()
 
-	// Make sure local vulns can be loaded.
-	fetchingInTesting = true
 	// Load x and y as entry packages.
 	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"), path.Join(e.Temp(), "entry/y"))
 	if err != nil {
@@ -440,8 +436,6 @@ func TestFiltering(t *testing.T) {
 		},
 	}
 
-	// Make sure local vulns can be loaded.
-	fetchingInTesting = true
 	// Load x as entry package.
 	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"))
 	if err != nil {
@@ -527,8 +521,6 @@ func TestAllSymbolsVulnerable(t *testing.T) {
 		},
 	}
 
-	// Make sure local vulns can be loaded.
-	fetchingInTesting = true
 	// Load x as entry package.
 	pkgs, err := loadPackages(e, path.Join(e.Temp(), "entry/x"))
 	if err != nil {

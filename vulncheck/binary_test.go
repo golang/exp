@@ -81,9 +81,6 @@ func TestBinary(t *testing.T) {
 	})
 	defer e.Cleanup()
 
-	// Make sure local vulns can be loaded.
-	fetchingInTesting = true
-
 	cmd := exec.Command("go", "build")
 	cmd.Dir = e.Config.Dir
 	cmd.Env = e.Config.Env
