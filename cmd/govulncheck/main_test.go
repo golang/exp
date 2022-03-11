@@ -7,6 +7,7 @@ package main
 import (
 	"testing"
 
+	"golang.org/x/exp/vulncheck"
 	"golang.org/x/vuln/osv"
 )
 
@@ -79,5 +80,30 @@ func TestLatestFixed(t *testing.T) {
 				t.Errorf("got %q, want %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestPkgPath(t *testing.T) {
+	for _, test := range []struct {
+		in   vulncheck.FuncNode
+		want string
+	}{
+		{
+			vulncheck.FuncNode{PkgPath: "math", Name: "Floor"},
+			"math",
+		},
+		{
+			vulncheck.FuncNode{RecvType: "a.com/b.T", Name: "M"},
+			"a.com/b",
+		},
+		{
+			vulncheck.FuncNode{RecvType: "*a.com/b.T", Name: "M"},
+			"a.com/b",
+		},
+	} {
+		got := pkgPath(&test.in)
+		if got != test.want {
+			t.Errorf("%+v: got %q, want %q", test.in, got, test.want)
+		}
 	}
 }

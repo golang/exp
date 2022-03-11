@@ -144,11 +144,7 @@ func writeText(r *vulncheck.Result, pkgs []*packages.Package) {
 	// Build a map from module paths to versions.
 	moduleVersions := map[string]string{}
 	packages.Visit(pkgs, nil, func(p *packages.Package) {
-		m := p.Module
-		if m != nil {
-			if m.Replace != nil {
-				m = m.Replace
-			}
+		if m := packageModule(p); m != nil {
 			moduleVersions[m.Path] = m.Version
 		}
 	})
@@ -159,6 +155,12 @@ func writeText(r *vulncheck.Result, pkgs []*packages.Package) {
 		fmt.Printf("%-*s%s\n", labelWidth, label, text)
 	}
 
+	// Create set of top-level packages, used to find
+	// representative symbols
+	topPackages := map[string]bool{}
+	for _, p := range pkgs {
+		topPackages[p.PkgPath] = true
+	}
 	vulnGroups := groupByIDAndPackage(r.Vulns)
 	for _, vg := range vulnGroups {
 		// All the vulns in vg have the same PkgPath, ModPath and OSV.
@@ -169,15 +171,9 @@ func writeText(r *vulncheck.Result, pkgs []*packages.Package) {
 		fixed := "v" + latestFixed(v0.OSV.Affected)
 		ref := fmt.Sprintf("https://pkg.go.dev/vuln/%s", v0.OSV.ID)
 
-		// Collect unique top of call stacks.
-		fns := map[*vulncheck.FuncNode]bool{}
-		for _, v := range vg {
-			for _, cs := range callStacks[v] {
-				fns[cs[0].Function] = true
-			}
-		}
-		// Use first top of first vuln as representative.
-		rep := funcName(callStacks[v0][0][0].Function)
+		fns := representativeFuncs(vg, topPackages, callStacks)
+		// Use first as representative.
+		rep := funcName(fns[0])
 		var syms string
 		if len(fns) == 1 {
 			syms = rep
@@ -224,6 +220,17 @@ func groupByIDAndPackage(vs []*vulncheck.Vuln) [][]*vulncheck.Vuln {
 	return res
 }
 
+func packageModule(p *packages.Package) *packages.Module {
+	m := p.Module
+	if m == nil {
+		return nil
+	}
+	if r := m.Replace; r != nil {
+		return r
+	}
+	return m
+}
+
 func isFile(path string) bool {
 	s, err := os.Stat(path)
 	if err != nil {
@@ -265,6 +272,42 @@ func latestFixed(as []osv.Affected) string {
 		}
 	}
 	return v
+}
+
+// representativeFuncs collects representative functions for the group
+// of vulns from the the call stacks.
+func representativeFuncs(vg []*vulncheck.Vuln, topPkgs map[string]bool, callStacks map[*vulncheck.Vuln][]vulncheck.CallStack) []*vulncheck.FuncNode {
+	// Collect unique top of call stacks.
+	fns := map[*vulncheck.FuncNode]bool{}
+	for _, v := range vg {
+		for _, cs := range callStacks[v] {
+			// Find the lowest function in the stack that is in
+			// one of the top packages.
+			for i := len(cs) - 1; i > 0; i-- {
+				pkg := pkgPath(cs[i].Function)
+				if topPkgs[pkg] {
+					fns[cs[i].Function] = true
+					break
+				}
+			}
+		}
+	}
+	var res []*vulncheck.FuncNode
+	for fn := range fns {
+		res = append(res, fn)
+	}
+	return res
+}
+
+func pkgPath(fn *vulncheck.FuncNode) string {
+	if fn.PkgPath != "" {
+		return fn.PkgPath
+	}
+	s := strings.TrimPrefix(fn.RecvType, "*")
+	if i := strings.LastIndexByte(s, '.'); i > 0 {
+		s = s[:i]
+	}
+	return s
 }
 
 func funcName(fn *vulncheck.FuncNode) string {
