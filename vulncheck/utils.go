@@ -23,8 +23,8 @@ import (
 // buildSSA creates an ssa representation for pkgs. Returns
 // the ssa program encapsulating the packages and top level
 // ssa packages corresponding to pkgs.
-func buildSSA(pkgs []*Package) (*ssa.Program, []*ssa.Package) {
-	prog := ssa.NewProgram(token.NewFileSet(), ssa.BuilderMode(0))
+func buildSSA(pkgs []*Package, fset *token.FileSet) (*ssa.Program, []*ssa.Package) {
+	prog := ssa.NewProgram(fset, ssa.BuilderMode(0))
 
 	imports := make(map[*Package]*ssa.Package)
 	var createImports func([]*Package)
