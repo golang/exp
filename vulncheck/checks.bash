@@ -34,11 +34,8 @@ check_misspell() {
   runcmd misspell -error .
 }
 
-# Support ** in globs for finding files throughout the tree.
-shopt -s globstar
-
 runchecks() {
-  check_header **/*.go **/*.bash
+  check_header *.go internal/*/*.go *.bash
   runcmd go vet -all ./...
   check_staticcheck
   check_unparam
