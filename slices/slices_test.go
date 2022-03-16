@@ -82,7 +82,7 @@ func equalNaN[T comparable](v1, v2 T) bool {
 }
 
 // offByOne returns true if integers v1 and v2 differ by 1.
-func offByOne[Elem constraints.Integer](v1, v2 Elem) bool {
+func offByOne[E constraints.Integer](v1, v2 E) bool {
 	return v1 == v2+1 || v1 == v2-1
 }
 
