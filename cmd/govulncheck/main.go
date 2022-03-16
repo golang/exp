@@ -120,7 +120,12 @@ func main() {
 	} else {
 		writeText(r, pkgs)
 	}
-
+	exitCode := 0
+	// Following go vet, fail with 3 if there are findings (in this case, vulns).
+	if len(r.Vulns) > 0 {
+		exitCode = 3
+	}
+	os.Exit(exitCode)
 }
 
 func writeJSON(r *vulncheck.Result) {
