@@ -7,6 +7,7 @@ package slices
 import (
 	"math/rand"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -32,7 +33,7 @@ func BenchmarkSortInts(b *testing.B) {
 	}
 }
 
-func BenchmarkSlicesSort(b *testing.B) {
+func BenchmarkSlicesSortInts(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		ints := makeRandomInts(N)
@@ -54,6 +55,57 @@ func TestIntSorts(t *testing.T) {
 		if ints[i] != ints2[i] {
 			t.Fatalf("ints2 mismatch at %d; %d != %d", i, ints[i], ints2[i])
 		}
+	}
+}
+
+// The following is a benchmark for sorting strings.
+
+// makeRandomStrings generates n random strings with alphabetic runes of
+// varying lenghts.
+func makeRandomStrings(n int) []string {
+	rand.Seed(42)
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	ss := make([]string, n)
+	for i := 0; i < n; i++ {
+		var sb strings.Builder
+		slen := 2 + rand.Intn(50)
+		for j := 0; j < slen; j++ {
+			sb.WriteRune(letters[rand.Intn(len(letters))])
+		}
+		ss[i] = sb.String()
+	}
+	return ss
+}
+
+func TestStringSorts(t *testing.T) {
+	ss := makeRandomStrings(200)
+	ss2 := Clone(ss)
+
+	sort.Strings(ss)
+	Sort(ss2)
+
+	for i := range ss {
+		if ss[i] != ss2[i] {
+			t.Fatalf("ss2 mismatch at %d; %s != %s", i, ss[i], ss2[i])
+		}
+	}
+}
+
+func BenchmarkSortStrings(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ss := makeRandomStrings(N)
+		b.StartTimer()
+		sort.Strings(ss)
+	}
+}
+
+func BenchmarkSlicesSortStrings(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ss := makeRandomStrings(N)
+		b.StartTimer()
+		Sort(ss)
 	}
 }
 
