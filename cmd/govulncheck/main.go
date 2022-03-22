@@ -88,8 +88,11 @@ func main() {
 	ctx := context.Background()
 
 	patterns := flag.Args()
-	var r *vulncheck.Result
-	var pkgs []*packages.Package
+	var (
+		r              *vulncheck.Result
+		pkgs           []*packages.Package
+		moduleVersions map[string]string
+	)
 	if len(patterns) == 1 && isFile(patterns[0]) {
 		f, err := os.Open(patterns[0])
 		if err != nil {
@@ -110,6 +113,17 @@ func main() {
 		if err != nil {
 			die("govulncheck: %v", err)
 		}
+		// Build a map from module paths to versions.
+		moduleVersions = map[string]string{}
+		packages.Visit(pkgs, nil, func(p *packages.Package) {
+			if m := packageModule(p); m != nil {
+				moduleVersions[m.Path] = m.Version
+			}
+		})
+
+		if len(moduleVersions) == 0 {
+			die("govulncheck: no modules found; are you in GOPATH mode? Module mode required.")
+		}
 		r, err = vulncheck.Source(ctx, vulncheck.Convert(pkgs), vcfg)
 		if err != nil {
 			die("govulncheck: %v", err)
@@ -118,7 +132,7 @@ func main() {
 	if *jsonFlag {
 		writeJSON(r)
 	} else {
-		writeText(r, pkgs)
+		writeText(r, pkgs, moduleVersions)
 	}
 	exitCode := 0
 	// Following go vet, fail with 3 if there are findings (in this case, vulns).
@@ -137,17 +151,10 @@ func writeJSON(r *vulncheck.Result) {
 	fmt.Println()
 }
 
-func writeText(r *vulncheck.Result, pkgs []*packages.Package) {
+func writeText(r *vulncheck.Result, pkgs []*packages.Package, moduleVersions map[string]string) {
 	if len(r.Vulns) == 0 {
 		return
 	}
-	// Build a map from module paths to versions.
-	moduleVersions := map[string]string{}
-	packages.Visit(pkgs, nil, func(p *packages.Package) {
-		if m := packageModule(p); m != nil {
-			moduleVersions[m.Path] = m.Version
-		}
-	})
 	callStacks := vulncheck.CallStacks(r)
 
 	const labelWidth = 16
@@ -283,7 +290,7 @@ func representativeFuncs(vg []*vulncheck.Vuln, topPkgs map[string]bool, callStac
 		for _, cs := range callStacks[v] {
 			// Find the lowest function in the stack that is in
 			// one of the top packages.
-			for i := len(cs) - 1; i > 0; i-- {
+			for i := len(cs) - 1; i >= 0; i-- {
 				pkg := pkgPath(cs[i].Function)
 				if topPkgs[pkg] {
 					fns[cs[i].Function] = true
