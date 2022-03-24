@@ -1,3 +1,4 @@
+// Deprecated: use golang.org/x/vuln instead.
 module golang.org/x/exp/vulndb
 
 go 1.17
