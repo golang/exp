@@ -46,25 +46,34 @@ func IsSortedFunc[E any](x []E, less func(a, b E) bool) bool {
 	return true
 }
 
-// BinarySearch searches for target in a sorted slice and returns the smallest
-// index at which target is found. If the target is not found, the index at
-// which it could be inserted into the slice is returned; therefore, if the
-// intention is to find target itself a separate check for equality with the
-// element at the returned index is required.
-func BinarySearch[E constraints.Ordered](x []E, target E) int {
-	return search(len(x), func(i int) bool { return x[i] >= target })
+// BinarySearch searches for target in a sorted slice and returns the position
+// where target is found, or the position where target would appear in the
+// sort order; it also returns a bool saying whether the target is really found
+// in the slice. The slice must be sorted in increasing order.
+func BinarySearch[E constraints.Ordered](x []E, target E) (int, bool) {
+	// search returns the leftmost position where f returns true, or len(x) if f
+	// returns false for all x. This is the insertion position for target in x,
+	// and could point to an element that's either == target or not.
+	pos := search(len(x), func(i int) bool { return x[i] >= target })
+	if pos >= len(x) || x[pos] != target {
+		return pos, false
+	} else {
+		return pos, true
+	}
 }
 
-// BinarySearchFunc uses binary search to find and return the smallest index i
-// in [0, n) at which ok(i) is true, assuming that on the range [0, n),
-// ok(i) == true implies ok(i+1) == true. That is, BinarySearchFunc requires
-// that ok is false for some (possibly empty) prefix of the input range [0, n)
-// and then true for the (possibly empty) remainder; BinarySearchFunc returns
-// the first true index. If there is no such index, BinarySearchFunc returns n.
-// (Note that the "not found" return value is not -1 as in, for instance,
-// strings.Index.) Search calls ok(i) only for i in the range [0, n).
-func BinarySearchFunc[E any](x []E, ok func(E) bool) int {
-	return search(len(x), func(i int) bool { return ok(x[i]) })
+// BinarySearchFunc works like BinarySearch, but uses a custom comparison
+// function. The slice must be sorted in increasing order, where "increasing" is
+// defined by cmp. cmp(a, b) is expected to return an integer comparing the two
+// parameters: 0 if a == b, a negative number if a < b and a positive number if
+// a > b.
+func BinarySearchFunc[E any](x []E, target E, cmp func(E, E) int) (int, bool) {
+	pos := search(len(x), func(i int) bool { return cmp(x[i], target) >= 0 })
+	if pos >= len(x) || cmp(x[pos], target) != 0 {
+		return pos, false
+	} else {
+		return pos, true
+	}
 }
 
 // maxDepth returns a threshold at which quicksort should switch
