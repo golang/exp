@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/exp/shiny/unit"
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/mouse"
@@ -157,13 +158,14 @@ func sendSize(hwnd syscall.Handle) {
 	width := int(r.Right - r.Left)
 	height := int(r.Bottom - r.Top)
 
-	// TODO(andlabs): don't assume that PixelsPerPt == 1
+	dpi := _GetDpiForWindow(hwnd)
+
 	SizeEvent(hwnd, size.Event{
 		WidthPx:     width,
 		HeightPx:    height,
 		WidthPt:     geom.Pt(width),
 		HeightPt:    geom.Pt(height),
-		PixelsPerPt: 1,
+		PixelsPerPt: float32(dpi) / unit.PointsPerInch,
 	})
 }
 
