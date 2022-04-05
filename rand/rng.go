@@ -58,6 +58,17 @@ func (pcg *PCGSource) Uint64() uint64 {
 	return bits.RotateLeft64(pcg.high^pcg.low, -int(pcg.high>>58))
 }
 
+// Seed64 sets both the high and low bits of the generator state to the provided values.
+func (pcg *PCGSource) Seed64(high, low uint64) {
+	pcg.high = high
+	pcg.low = low
+}
+
+// PCG returns the high and low bits of the generator state.
+func (pcg *PCGSource) PCG() (high, low uint64) {
+	return pcg.high, pcg.low
+}
+
 func (pcg *PCGSource) add() {
 	var carry uint64
 	pcg.low, carry = bits.Add64(pcg.low, incLow, 0)
