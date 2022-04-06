@@ -64,8 +64,8 @@ func (pcg *PCGSource) Seed64(high, low uint64) {
 	pcg.low = low
 }
 
-// PCG returns the high and low bits of the generator state.
-func (pcg *PCGSource) PCG() (high, low uint64) {
+// State returns the high and low bits of the generator state.
+func (pcg *PCGSource) State() (high, low uint64) {
 	return pcg.high, pcg.low
 }
 
