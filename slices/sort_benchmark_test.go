@@ -22,6 +22,22 @@ func makeRandomInts(n int) []int {
 	return ints
 }
 
+func makeSortedInts(n int) []int {
+	ints := make([]int, n)
+	for i := 0; i < n; i++ {
+		ints[i] = i
+	}
+	return ints
+}
+
+func makeReversedInts(n int) []int {
+	ints := make([]int, n)
+	for i := 0; i < n; i++ {
+		ints[i] = n - i
+	}
+	return ints
+}
+
 const N = 100_000
 
 func BenchmarkSortInts(b *testing.B) {
@@ -37,6 +53,24 @@ func BenchmarkSlicesSortInts(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		ints := makeRandomInts(N)
+		b.StartTimer()
+		Sort(ints)
+	}
+}
+
+func BenchmarkSlicesSortInts_Sorted(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ints := makeSortedInts(N)
+		b.StartTimer()
+		Sort(ints)
+	}
+}
+
+func BenchmarkSlicesSortInts_Reversed(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ints := makeReversedInts(N)
 		b.StartTimer()
 		Sort(ints)
 	}

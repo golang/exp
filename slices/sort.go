@@ -4,19 +4,30 @@
 
 package slices
 
-import "golang.org/x/exp/constraints"
+import (
+	"math/bits"
+
+	"golang.org/x/exp/constraints"
+)
 
 // Sort sorts a slice of any ordered type in ascending order.
+// Sort may fail to sort correctly when sorting slices of floating-point
+// numbers containing Not-a-number (NaN) values.
+// Use slices.SortFunc(x, func(a, b float64) bool {return a < b || (math.IsNaN(a) && !math.IsNaN(b))})
+// instead if the input may contain NaNs.
 func Sort[E constraints.Ordered](x []E) {
 	n := len(x)
-	quickSortOrdered(x, 0, n, maxDepth(n))
+	pdqsortOrdered(x, 0, n, bits.Len(uint(n)))
 }
 
-// Sort sorts the slice x in ascending order as determined by the less function.
+// SortFunc sorts the slice x in ascending order as determined by the less function.
 // This sort is not guaranteed to be stable.
+//
+// SortFunc requires that less is a strict weak ordering.
+// See https://en.wikipedia.org/wiki/Weak_ordering#Strict_weak_orderings.
 func SortFunc[E any](x []E, less func(a, b E) bool) {
 	n := len(x)
-	quickSortLessFunc(x, 0, n, maxDepth(n), less)
+	pdqsortLessFunc(x, 0, n, bits.Len(uint(n)), less)
 }
 
 // SortStable sorts the slice x while keeping the original order of equal
@@ -76,16 +87,6 @@ func BinarySearchFunc[E any](x []E, target E, cmp func(E, E) int) (int, bool) {
 	}
 }
 
-// maxDepth returns a threshold at which quicksort should switch
-// to heapsort. It returns 2*ceil(lg(n+1)).
-func maxDepth(n int) int {
-	var depth int
-	for i := n; i > 0; i >>= 1 {
-		depth++
-	}
-	return depth * 2
-}
-
 func search(n int, f func(int) bool) int {
 	// Define f(-1) == false and f(n) == true.
 	// Invariant: f(i-1) == false, f(j) == true.
@@ -101,4 +102,26 @@ func search(n int, f func(int) bool) int {
 	}
 	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
 	return i
+}
+
+type sortedHint int // hint for pdqsort when choosing the pivot
+
+const (
+	unknownHint sortedHint = iota
+	increasingHint
+	decreasingHint
+)
+
+// xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+type xorshift uint64
+
+func (r *xorshift) Next() uint64 {
+	*r ^= *r << 13
+	*r ^= *r >> 17
+	*r ^= *r << 5
+	return uint64(*r)
+}
+
+func nextPowerOfTwo(length int) uint {
+	return 1 << bits.Len(uint(length))
 }
