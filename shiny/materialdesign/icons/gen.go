@@ -40,7 +40,9 @@ const outSize = 48
 //
 // When manually debugging one particular icon, it can be useful to add
 // something like:
-// 	if baseName != "check_box" { return errSkip }
+//
+//	if baseName != "check_box" { return errSkip }
+//
 // at the top of func genFile.
 var errSkip = errors.New("skipping SVG to IconVG conversion")
 

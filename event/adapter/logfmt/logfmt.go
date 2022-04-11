@@ -16,7 +16,7 @@ import (
 	"golang.org/x/exp/event"
 )
 
-//TODO: some actual research into what this arbritray optimization number should be
+// TODO: some actual research into what this arbritray optimization number should be
 const bufCap = 50
 
 const TimeFormat = "2006/01/02 15:04:05"

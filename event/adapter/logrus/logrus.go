@@ -2,15 +2,19 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !disable_events
 // +build !disable_events
 
 // Package logrus provides a logrus Formatter for events.
 // To use for the global logger:
-//   logrus.SetFormatter(elogrus.NewFormatter(exporter))
-//   logrus.SetOutput(io.Discard)
+//
+//	logrus.SetFormatter(elogrus.NewFormatter(exporter))
+//	logrus.SetOutput(io.Discard)
+//
 // and for a Logger instance:
-//   logger.SetFormatter(elogrus.NewFormatter(exporter))
-//   logger.SetOutput(io.Discard)
+//
+//	logger.SetFormatter(elogrus.NewFormatter(exporter))
+//	logger.SetOutput(io.Discard)
 //
 // If you call elogging.SetExporter, then you can pass nil
 // for the exporter above and it will use the global one.

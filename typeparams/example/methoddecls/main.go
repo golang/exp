@@ -50,7 +50,7 @@ func (p Pair[L, R]) Equal(other Pair[L, R]) bool {
 //!-input
 `
 
-//!+describe
+// !+describe
 func Describe(fset *token.FileSet, file *ast.File) error {
 	conf := types.Config{Importer: importer.Default()}
 	info := &types.Info{

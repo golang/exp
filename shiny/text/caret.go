@@ -104,7 +104,9 @@ const (
 // Diagramatically, suppose we have two adjacent boxes (shown by square
 // brackets below), with the Caret (an integer location called Caret.pos in the
 // Frame's text) in the middle of the "foo2bar3" word:
+//
 //	[foo0 foo1 foo2]^[bar3 bar4 bar5]
+//
 // leanForwards moves Caret.k from fooBox.j to barBox.i, also updating the
 // Caret's p, l and b. Caret.pos remains unchanged.
 func (c *Caret) leanForwards() leanResult {

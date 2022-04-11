@@ -7,21 +7,21 @@
 //
 // Usage:
 //
-//    gorelease [-base={version|none}] [-version=version]
+//	gorelease [-base={version|none}] [-version=version]
 //
 // Examples:
 //
-//    # Compare with the latest version and suggest a new version.
-//    gorelease
+//	# Compare with the latest version and suggest a new version.
+//	gorelease
 //
-//    # Compare with a specific version and suggest a new version.
-//    gorelease -base=v1.2.3
+//	# Compare with a specific version and suggest a new version.
+//	gorelease -base=v1.2.3
 //
-//    # Compare with the latest version and check a specific new version for compatibility.
-//    gorelease -version=v1.3.0
+//	# Compare with the latest version and check a specific new version for compatibility.
+//	gorelease -version=v1.3.0
 //
-//    # Compare with a specific version and check a specific new version for compatibility.
-//    gorelease -base=v1.2.3 -version=v1.3.0
+//	# Compare with a specific version and check a specific new version for compatibility.
+//	gorelease -base=v1.2.3 -version=v1.3.0
 //
 // gorelease analyzes changes in the public API and dependencies of the main
 // module. It compares a base version (set with -base) with the currently

@@ -182,7 +182,6 @@ func (p *parser) parse(filename string, src io.Reader) Grammar {
 // for incorrect syntax and if a production is declared
 // more than once; the filename is used only for error
 // positions.
-//
 func Parse(filename string, src io.Reader) (Grammar, error) {
 	var p parser
 	grammar := p.parse(filename, src)

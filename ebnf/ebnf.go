@@ -19,7 +19,6 @@
 // non-terminal productions (i.e., productions which allow white-space
 // and comments between tokens); all other production names denote
 // lexical productions.
-//
 package ebnf // import "golang.org/x/exp/ebnf"
 
 import (
@@ -256,12 +255,11 @@ func (v *verifier) verify(grammar Grammar, start string) {
 }
 
 // Verify checks that:
-//	- all productions used are defined
-//	- all productions defined are used when beginning at start
-//	- lexical productions refer only to other lexical productions
+//   - all productions used are defined
+//   - all productions defined are used when beginning at start
+//   - lexical productions refer only to other lexical productions
 //
 // Position information is interpreted relative to the file set fset.
-//
 func Verify(grammar Grammar, start string) error {
 	var v verifier
 	v.verify(grammar, start)

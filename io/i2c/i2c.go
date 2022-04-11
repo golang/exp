@@ -4,7 +4,7 @@
 
 // Package i2c allows users to read from and write to a slave I2C device.
 //
-// Deprecated
+// # Deprecated
 //
 // This package is not maintained anymore. An actively supported cross-platform
 // alternative is https://periph.io/.

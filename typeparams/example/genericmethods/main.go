@@ -39,7 +39,7 @@ var IntPair Pair[int, int]
 //!-input
 `
 
-//!+printmethods
+// !+printmethods
 func PrintMethods(pkg *types.Package) {
 	// Look up *Named types in the package scope.
 	lookup := func(name string) *types.Named {
@@ -84,7 +84,7 @@ func (p.Pair[L, _]).Right() _
 //!-printoutput
 */
 
-//!+compareorigins
+// !+compareorigins
 func CompareOrigins(pkg *types.Package) {
 	Pair := pkg.Scope().Lookup("Pair").Type().(*types.Named)
 	IntPair := pkg.Scope().Lookup("IntPair").Type().(*types.Named)

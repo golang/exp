@@ -42,7 +42,7 @@ var E = Equal[int, string]
 //!-input
 `
 
-//!+check
+// !+check
 func CheckInstances(fset *token.FileSet, file *ast.File) (*types.Package, error) {
 	conf := types.Config{}
 	info := &types.Info{
@@ -82,7 +82,7 @@ func FormatTypeList(list *types.TypeList) string {
 	return buf.String()
 }
 
-//!+instantiate
+// !+instantiate
 func Instantiate(pkg *types.Package) error {
 	Pair := pkg.Scope().Lookup("Pair").Type()
 	X := pkg.Scope().Lookup("X").Type()

@@ -29,7 +29,7 @@ type D interface{ A|B; C }
 //!-input
 `
 
-//!+print
+// !+print
 func PrintNormalTerms(pkg *types.Package) error {
 	D := pkg.Scope().Lookup("D").Type()
 	terms, err := typeparams.NormalTerms(D)

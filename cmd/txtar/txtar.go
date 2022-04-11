@@ -25,10 +25,9 @@
 //
 // Example usage:
 //
-// 	txtar *.go <README >testdata/example.txt
+//	txtar *.go <README >testdata/example.txt
 //
-// 	txtar --extract <playground_example.txt >main.go
-//
+//	txtar --extract <playground_example.txt >main.go
 package main
 
 import (

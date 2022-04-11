@@ -43,7 +43,7 @@ func Find[T Findable](s []T, v T) int {
 //!-input
 `
 
-//!+printsyntax
+// !+printsyntax
 func PrintNumericSyntax(fset *token.FileSet, file *ast.File) {
 	// node is the AST node corresponding to the declaration for "Numeric."
 	node := file.Scope.Lookup("Numeric").Decl.(*ast.TypeSpec)
@@ -80,7 +80,7 @@ func PrintNumericSyntax(fset *token.FileSet, file *ast.File) {
 //!-outputsyntax
 */
 
-//!+printtypes
+// !+printtypes
 func PrintInterfaceTypes(fset *token.FileSet, file *ast.File) error {
 	conf := types.Config{}
 	pkg, err := conf.Check("hello", fset, []*ast.File{file}, nil)

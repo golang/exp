@@ -51,7 +51,7 @@ func H[R ~int](R) int { return 2 }
 //!-input
 `
 
-//!+ordinary
+// !+ordinary
 func OrdinaryPredicates(pkg *types.Package) {
 	var (
 		Pair        = pkg.Scope().Lookup("Pair").Type()
@@ -79,7 +79,7 @@ Identical(F, H) false
 //!-ordinaryoutput
 */
 
-//!+generic
+// !+generic
 func GenericPredicates(pkg *types.Package) {
 	var (
 		Pair        = pkg.Scope().Lookup("Pair").Type()

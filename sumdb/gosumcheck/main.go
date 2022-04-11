@@ -28,7 +28,6 @@
 //
 // To discourage misuse in automated settings, gosumcheck does not
 // set any exit status to report whether any problems were found.
-//
 package main
 
 import (

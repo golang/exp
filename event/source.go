@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !disable_events
 // +build !disable_events
 
 package event
@@ -40,7 +41,9 @@ var globalCallers chan *sources
 // be used when capturing the source information on events.
 // v should be either a string or a function pointer.
 // If v is a string it is of the form
-//   Space.Owner.Name
+//
+//	Space.Owner.Name
+//
 // where Owner and Name cannot contain '/' and Name also cannot contain '.'
 func RegisterHelper(v interface{}) {
 	g := <-globalCallers

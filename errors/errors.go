@@ -5,7 +5,8 @@
 // Package errors implements functions to manipulate errors.
 //
 // This package implements the Go 2 draft designs for error inspection and printing:
-//   https://go.googlesource.com/proposal/+/master/design/go2draft.md
+//
+//	https://go.googlesource.com/proposal/+/master/design/go2draft.md
 //
 // This is an EXPERIMENTAL package, and may change in arbitrary ways without notice.
 package errors

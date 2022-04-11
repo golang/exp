@@ -23,7 +23,7 @@
 // the concatenation of the server name, a newline, and
 // the encoded public key.
 //
-// Verifying Notes
+// # Verifying Notes
 //
 // A Verifier allows verification of signatures by one server public key.
 // It can report the name of the server and the uint32 hash of the key,
@@ -50,7 +50,7 @@
 // the message signatures and returns a Note structure
 // containing the message text and (verified or unverified) signatures.
 //
-// Signing Notes
+// # Signing Notes
 //
 // A Signer allows signing a text with a given key.
 // It can report the name of the server and the hash of the key
@@ -66,7 +66,7 @@
 // The Sign function takes as input a Note and a list of Signers
 // and returns an encoded, signed message.
 //
-// Signed Note Format
+// # Signed Note Format
 //
 // A signed note consists of a text ending in newline (U+000A),
 // followed by a blank line (only a newline),
@@ -88,7 +88,7 @@
 // to sign the note text (including the final newline but not the
 // separating blank line).
 //
-// Generating Keys
+// # Generating Keys
 //
 // There is only one key type, Ed25519 with algorithm identifier 1.
 // New key types may be introduced in the future as needed,
@@ -98,7 +98,7 @@
 // The GenerateKey function generates and returns a new signer
 // and corresponding verifier.
 //
-// Example
+// # Example
 //
 // Here is a well-formed signed note:
 //
@@ -178,7 +178,6 @@
 //
 //	— PeterNeumann x08go/ZJkuBS9UG/SffcvIAQxVBtiFupLLr8pAcElZInNIuGUgYN1FFYC2pZSNXgKvqfqdngotpRZb6KE6RyyBwJnAM=
 //	— EnochRoot rwz+eBzmZa0SO3NbfRGzPCpDckykFXSdeX+MNtCOXm2/5n2tiOHp+vAF1aGrQ5ovTG01oOTGwnWLox33WWd1RvMc+QQ=
-//
 package note
 
 import (

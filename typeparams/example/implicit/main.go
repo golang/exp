@@ -19,7 +19,7 @@ func Square[N ~int|~float64](n N) N {
 //!-input
 `
 
-//!+show
+// !+show
 func ShowImplicit(pkg *types.Package) {
 	Square := pkg.Scope().Lookup("Square").Type().(*types.Signature)
 	N := Square.TypeParams().At(0)

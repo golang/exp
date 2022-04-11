@@ -52,7 +52,6 @@ type Handler struct {
 //	for _, path := range sumweb.Paths {
 //		http.HandleFunc(path, handler)
 //	}
-//
 var Paths = []string{
 	"/lookup/",
 	"/latest",
