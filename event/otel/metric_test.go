@@ -11,46 +11,57 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric/metrictest"
-	"go.opentelemetry.io/otel/metric/number"
+	"go.opentelemetry.io/otel/sdk/metric/export/aggregation"
+	"go.opentelemetry.io/otel/sdk/metric/metrictest"
+	"go.opentelemetry.io/otel/sdk/metric/number"
 	"golang.org/x/exp/event"
 	"golang.org/x/exp/event/otel"
 )
 
 func TestMeter(t *testing.T) {
 	ctx := context.Background()
-	mp := metrictest.NewMeterProvider()
+	mp, exp := metrictest.NewTestMeterProvider()
 	mh := otel.NewMetricHandler(mp.Meter("test"))
 	ctx = event.WithExporter(ctx, event.NewExporter(mh, nil))
 	recordMetrics(ctx)
 
+	exp.Collect(ctx)
 	lib := metrictest.Library{InstrumentationName: "test"}
-	emptyLabels := map[attribute.Key]attribute.Value{}
-	got := metrictest.AsStructs(mp.MeasurementBatches)
-	want := []metrictest.Measured{
+	got := exp.Records
+	want := []metrictest.ExportRecord{
 		{
-			Name:    "golang.org/x/exp/event/otel_test/hits",
-			Number:  number.NewInt64Number(8),
-			Labels:  emptyLabels,
-			Library: lib,
+			InstrumentName:         "golang.org/x/exp/event/otel_test/hits",
+			Sum:                    number.NewInt64Number(8),
+			Attributes:             nil,
+			InstrumentationLibrary: lib,
+			AggregationKind:        aggregation.SumKind,
+			NumberKind:             number.Int64Kind,
 		},
 		{
-			Name:    "golang.org/x/exp/event/otel_test/temp",
-			Number:  number.NewFloat64Number(-100),
-			Labels:  map[attribute.Key]attribute.Value{"location": attribute.StringValue("Mare Imbrium")},
-			Library: lib,
+			InstrumentName: "golang.org/x/exp/event/otel_test/temp",
+			Sum:            number.NewFloat64Number(-100),
+			Attributes: []attribute.KeyValue{
+				{
+					Key:   attribute.Key("location"),
+					Value: attribute.StringValue("Mare Imbrium"),
+				},
+			},
+			InstrumentationLibrary: lib,
+			AggregationKind:        aggregation.SumKind,
+			NumberKind:             number.Float64Kind,
 		},
 		{
-			Name:    "golang.org/x/exp/event/otel_test/latency",
-			Number:  number.NewInt64Number(int64(1248 * time.Millisecond)),
-			Labels:  emptyLabels,
-			Library: lib,
-		},
-		{
-			Name:    "golang.org/x/exp/event/otel_test/latency",
-			Number:  number.NewInt64Number(int64(1255 * time.Millisecond)),
-			Labels:  emptyLabels,
-			Library: lib,
+			InstrumentName:         "golang.org/x/exp/event/otel_test/latency",
+			Sum:                    number.NewInt64Number(int64(2503 * time.Millisecond)),
+			Count:                  2,
+			Attributes:             nil,
+			InstrumentationLibrary: lib,
+			AggregationKind:        aggregation.HistogramKind,
+			NumberKind:             number.Int64Kind,
+			Histogram: aggregation.Buckets{
+				Boundaries: []float64{5000, 10000, 25000, 50000, 100000, 250000, 500000, 1e+06, 2.5e+06, 5e+06, 1e+07},
+				Counts:     []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+			},
 		},
 	}
 

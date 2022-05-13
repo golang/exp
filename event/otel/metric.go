@@ -12,6 +12,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/instrument"
 	otelunit "go.opentelemetry.io/otel/metric/unit"
 	"golang.org/x/exp/event"
 )
@@ -19,7 +20,7 @@ import (
 // MetricHandler is an event.Handler for OpenTelemetry metrics.
 // Its Event method handles Metric events and ignores all others.
 type MetricHandler struct {
-	meter metric.MeterMust
+	meter metric.Meter
 	mu    sync.Mutex
 	// A map from event.Metrics to, effectively, otel Meters.
 	// But since the only thing we need from the Meter is recording a value, we
@@ -34,7 +35,7 @@ var _ event.Handler = (*MetricHandler)(nil)
 // NewMetricHandler creates a new MetricHandler.
 func NewMetricHandler(m metric.Meter) *MetricHandler {
 	return &MetricHandler{
-		meter:       metric.Must(m),
+		meter:       m,
 		recordFuncs: map[event.Metric]recordFunc{},
 	}
 }
@@ -76,25 +77,25 @@ func (m *MetricHandler) getRecordFunc(em event.Metric) recordFunc {
 func (m *MetricHandler) newRecordFunc(em event.Metric) recordFunc {
 	opts := em.Options()
 	name := opts.Namespace + "/" + em.Name()
-	otelOpts := []metric.InstrumentOption{
-		metric.WithDescription(opts.Description),
-		metric.WithUnit(otelunit.Unit(opts.Unit)), // cast OK: same strings
+	otelOpts := []instrument.Option{
+		instrument.WithDescription(opts.Description),
+		instrument.WithUnit(otelunit.Unit(opts.Unit)), // cast OK: same strings
 	}
 	switch em.(type) {
 	case *event.Counter:
-		c := m.meter.NewInt64Counter(name, otelOpts...)
+		c, _ := m.meter.SyncInt64().Counter(name, otelOpts...)
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			c.Add(ctx, l.Int64(), attrs...)
 		}
 
 	case *event.FloatGauge:
-		g := m.meter.NewFloat64UpDownCounter(name, otelOpts...)
+		g, _ := m.meter.SyncFloat64().UpDownCounter(name, otelOpts...)
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			g.Add(ctx, l.Float64(), attrs...)
 		}
 
 	case *event.DurationDistribution:
-		r := m.meter.NewInt64Histogram(name, otelOpts...)
+		r, _ := m.meter.SyncInt64().Histogram(name, otelOpts...)
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			r.Record(ctx, l.Duration().Nanoseconds(), attrs...)
 		}
