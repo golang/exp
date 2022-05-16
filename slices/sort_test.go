@@ -90,6 +90,22 @@ func TestSortLarge_Random(t *testing.T) {
 	}
 }
 
+// It's hard to run heapSort from API, test it alone
+func TestHeapSort(t *testing.T) {
+	n := 100
+	data := make([]int, n)
+	for i := 0; i < len(data); i++ {
+		data[i] = rand.Intn(n)
+	}
+	if IsSorted(data) {
+		t.Fatalf("terrible rand.rand")
+	}
+	heapSort(data)
+	if !IsSorted(data) {
+		t.Errorf("heapsort didn't sort - 100 ints")
+	}
+}
+
 type intPair struct {
 	a, b int
 }

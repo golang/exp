@@ -16,8 +16,12 @@ import (
 // Use slices.SortFunc(x, func(a, b float64) bool {return a < b || (math.IsNaN(a) && !math.IsNaN(b))})
 // instead if the input may contain NaNs.
 func Sort[E constraints.Ordered](x []E) {
-	n := len(x)
-	pdqsortOrdered(x, 0, n, bits.Len(uint(n)))
+	sortFast(x)
+}
+
+// SortStable sorts the slice x while keeping the original order of equal
+func SortStable[E constraints.Ordered](x []E) {
+	sortStable(x)
 }
 
 // SortFunc sorts the slice x in ascending order as determined by the less function.
@@ -26,14 +30,13 @@ func Sort[E constraints.Ordered](x []E) {
 // SortFunc requires that less is a strict weak ordering.
 // See https://en.wikipedia.org/wiki/Weak_ordering#Strict_weak_orderings.
 func SortFunc[E any](x []E, less func(a, b E) bool) {
-	n := len(x)
-	pdqsortLessFunc(x, 0, n, bits.Len(uint(n)), less)
+	lessFunc[E](less).sortFast(x)
 }
 
 // SortStable sorts the slice x while keeping the original order of equal
 // elements, using less to compare elements.
 func SortStableFunc[E any](x []E, less func(a, b E) bool) {
-	stableLessFunc(x, len(x), less)
+	lessFunc[E](less).sortStable(x)
 }
 
 // IsSorted reports whether x is sorted in ascending order.
@@ -104,24 +107,27 @@ func search(n int, f func(int) bool) int {
 	return i
 }
 
-type sortedHint int // hint for pdqsort when choosing the pivot
+func log2Ceil(num uint) int {
+	return bits.Len(num)
+}
+
+func reverse[E any](list []E) {
+	for l, r := 0, len(list)-1; l < r; {
+		list[l], list[r] = list[r], list[l]
+		l++
+		r--
+	}
+}
+
+// With small E, double reversion is faster than the BlockSwap rotation.
+// BlockSwap rotation needs less swaps, but more branches.
+func rotate[E any](list []E, border int) {
+	reverse(list[:border])
+	reverse(list[border:])
+	reverse(list)
+}
 
 const (
-	unknownHint sortedHint = iota
-	increasingHint
-	decreasingHint
+	hintSorted uint8 = 1 << iota
+	hintRevered
 )
-
-// xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
-type xorshift uint64
-
-func (r *xorshift) Next() uint64 {
-	*r ^= *r << 13
-	*r ^= *r >> 17
-	*r ^= *r << 5
-	return uint64(*r)
-}
-
-func nextPowerOfTwo(length int) uint {
-	return 1 << bits.Len(uint(length))
-}

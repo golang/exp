@@ -14,27 +14,50 @@ import (
 // These benchmarks compare sorting a large slice of int with sort.Ints vs.
 // slices.Sort
 func makeRandomInts(n int) []int {
-	rand.Seed(42)
 	ints := make([]int, n)
-	for i := 0; i < n; i++ {
+	fillRandomInts(ints)
+	return ints
+}
+
+func fillRandomInts(ints []int) {
+	rand.Seed(42)
+	n := len(ints)
+	for i := 0; i < len(ints); i++ {
 		ints[i] = rand.Intn(n)
 	}
-	return ints
 }
 
 func makeSortedInts(n int) []int {
 	ints := make([]int, n)
-	for i := 0; i < n; i++ {
+	fillSortedInts(ints)
+	return ints
+}
+
+func fillSortedInts(ints []int) {
+	for i := 0; i < len(ints); i++ {
 		ints[i] = i
 	}
-	return ints
 }
 
 func makeReversedInts(n int) []int {
 	ints := make([]int, n)
+	fillReversedInts(ints)
+	return ints
+}
+
+func fillReversedInts(ints []int) {
+	n := len(ints)
 	for i := 0; i < n; i++ {
 		ints[i] = n - i
 	}
+}
+
+func makeMixedInts(n int) []int {
+	ints := make([]int, n)
+	m := n / 3
+	fillSortedInts(ints[:m])
+	fillRandomInts(ints[m : n-m])
+	fillReversedInts(ints[n-m:])
 	return ints
 }
 
@@ -71,6 +94,15 @@ func BenchmarkSlicesSortInts_Reversed(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		ints := makeReversedInts(N)
+		b.StartTimer()
+		Sort(ints)
+	}
+}
+
+func BenchmarkSlicesSortInts_Mixed(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ints := makeMixedInts(N)
 		b.StartTimer()
 		Sort(ints)
 	}
@@ -191,12 +223,31 @@ func BenchmarkSortStructs(b *testing.B) {
 	}
 }
 
-func BenchmarkSortFuncStructs(b *testing.B) {
-	lessFunc := func(a, b *myStruct) bool { return a.n < b.n }
+func BenchmarkSortStructs_Stable(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		ss := makeRandomStructs(N)
 		b.StartTimer()
-		SortFunc(ss, lessFunc)
+		sort.Stable(ss)
+	}
+}
+
+func BenchmarkSortFuncStructs(b *testing.B) {
+	less := func(a, b *myStruct) bool { return a.n < b.n }
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ss := makeRandomStructs(N)
+		b.StartTimer()
+		SortFunc(ss, less)
+	}
+}
+
+func BenchmarkSortFuncStructs_Stable(b *testing.B) {
+	less := func(a, b *myStruct) bool { return a.n < b.n }
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ss := makeRandomStructs(N)
+		b.StartTimer()
+		SortStableFunc(ss, less)
 	}
 }
