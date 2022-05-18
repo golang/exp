@@ -3,8 +3,8 @@ module golang.org/x/exp
 go 1.18
 
 require (
-	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57
-	golang.org/x/tools v0.1.8-0.20211029000441-d6a9af8af023
+	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
+	golang.org/x/tools v0.1.10
 )
 
 require (
