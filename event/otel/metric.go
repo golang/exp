@@ -100,6 +100,12 @@ func (m *MetricHandler) newRecordFunc(em event.Metric) recordFunc {
 			r.Record(ctx, l.Duration().Nanoseconds(), attrs...)
 		}
 
+	case *event.IntDistribution:
+		r, _ := m.meter.SyncInt64().Histogram(name, otelOpts...)
+		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
+			r.Record(ctx, l.Int64(), attrs...)
+		}
+
 	default:
 		return nil
 	}
