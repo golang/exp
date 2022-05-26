@@ -6,6 +6,7 @@ package otel_test
 
 import (
 	"context"
+	"sort"
 	"testing"
 	"time"
 
@@ -63,7 +64,27 @@ func TestMeter(t *testing.T) {
 				Counts:     []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
 			},
 		},
+		{
+			InstrumentName:         "golang.org/x/exp/event/otel_test/transmission",
+			InstrumentationLibrary: lib,
+			Sum:                    number.NewInt64Number(1234567),
+			Count:                  1,
+			AggregationKind:        aggregation.HistogramKind,
+			Histogram: aggregation.Buckets{
+				Boundaries: []float64{5000, 10000, 25000, 50000, 100000, 250000, 500000, 1e+06, 2.5e+06, 5e+06, 1e+07},
+				Counts:     []uint64{0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+			},
+		},
 	}
+
+	// Sort for comparison
+	sort.Slice(got, func(i, j int) bool {
+		return got[i].InstrumentName < got[j].InstrumentName
+	})
+
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].InstrumentName < want[j].InstrumentName
+	})
 
 	if diff := cmp.Diff(want, got, cmp.Comparer(valuesEqual)); diff != "" {
 		t.Errorf("mismatch (-want, got):\n%s", diff)
@@ -78,9 +99,11 @@ func recordMetrics(ctx context.Context) {
 	c := event.NewCounter("hits", &event.MetricOptions{Description: "Earth meteorite hits"})
 	g := event.NewFloatGauge("temp", &event.MetricOptions{Description: "moon surface temperature in Kelvin"})
 	d := event.NewDuration("latency", &event.MetricOptions{Description: "Earth-moon comms lag, milliseconds"})
+	h := event.NewIntDistribution("transmission", &event.MetricOptions{Description: "Earth-moon comms sent, bytes", Unit: event.UnitBytes})
 
 	c.Record(ctx, 8)
 	g.Record(ctx, -100, event.String("location", "Mare Imbrium"))
 	d.Record(ctx, 1248*time.Millisecond)
 	d.Record(ctx, 1255*time.Millisecond)
+	h.Record(ctx, 1234567)
 }
