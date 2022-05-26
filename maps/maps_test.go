@@ -153,6 +153,10 @@ func TestCopy(t *testing.T) {
 	if !Equal(mc, want) {
 		t.Errorf("Copy result = %v, want %v", mc, want)
 	}
+
+	type M1 map[int]bool
+	type M2 map[int]bool
+	Copy(make(M1), make(M2))
 }
 
 func TestDeleteFunc(t *testing.T) {
