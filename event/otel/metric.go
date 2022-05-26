@@ -83,25 +83,41 @@ func (m *MetricHandler) newRecordFunc(em event.Metric) recordFunc {
 	}
 	switch em.(type) {
 	case *event.Counter:
-		c, _ := m.meter.SyncInt64().Counter(name, otelOpts...)
+		c, err := m.meter.SyncInt64().Counter(name, otelOpts...)
+		if err != nil {
+			return nil
+		}
+
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			c.Add(ctx, l.Int64(), attrs...)
 		}
 
 	case *event.FloatGauge:
-		g, _ := m.meter.SyncFloat64().UpDownCounter(name, otelOpts...)
+		g, err := m.meter.SyncFloat64().UpDownCounter(name, otelOpts...)
+		if err != nil {
+			return nil
+		}
+
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			g.Add(ctx, l.Float64(), attrs...)
 		}
 
 	case *event.DurationDistribution:
-		r, _ := m.meter.SyncInt64().Histogram(name, otelOpts...)
+		r, err := m.meter.SyncInt64().Histogram(name, otelOpts...)
+		if err != nil {
+			return nil
+		}
+
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			r.Record(ctx, l.Duration().Nanoseconds(), attrs...)
 		}
 
 	case *event.IntDistribution:
-		r, _ := m.meter.SyncInt64().Histogram(name, otelOpts...)
+		r, err := m.meter.SyncInt64().Histogram(name, otelOpts...)
+		if err != nil {
+			return nil
+		}
+
 		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
 			r.Record(ctx, l.Int64(), attrs...)
 		}
