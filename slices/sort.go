@@ -36,6 +36,22 @@ func SortStableFunc[E any](x []E, less func(a, b E) bool) {
 	stableLessFunc(x, len(x), less)
 }
 
+// BubbleSort sort slice elements as bubble sort algorithm
+func BubbleSort[E constraints.Ordered](x []E) []E {
+	for {
+		swapped := false
+		for i := 1; i < len(x); i++ {
+			if x[i] < x[i-1] {
+				x[i-1], x[i] = x[i], x[i-1]
+				swapped = true
+			}
+		}
+		if !swapped {
+			return x
+		}
+	}
+}
+
 // IsSorted reports whether x is sorted in ascending order.
 func IsSorted[E constraints.Ordered](x []E) bool {
 	for i := len(x) - 1; i > 0; i-- {

@@ -49,6 +49,15 @@ func BenchmarkSortInts(b *testing.B) {
 	}
 }
 
+func BenchmarkBubbleSortInts(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ints := makeRandomInts(N)
+		b.StartTimer()
+		BubbleSort(ints)
+	}
+}
+
 func BenchmarkSlicesSortInts(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()

@@ -27,6 +27,15 @@ func TestSortIntSlice(t *testing.T) {
 	}
 }
 
+func TestBubbleSortIntSlice(t *testing.T) {
+	data := ints[:]
+	sorted := BubbleSort(data)
+	if !IsSorted(sorted) {
+		t.Errorf("sorted %v, but got %v", ints, data)
+	}
+	t.Logf("sorted %v", sorted)
+}
+
 func TestSortFuncIntSlice(t *testing.T) {
 	data := ints[:]
 	SortFunc(data, func(a, b int) bool { return a < b })
