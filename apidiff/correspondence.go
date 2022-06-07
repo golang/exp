@@ -126,6 +126,13 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 			return d.establishCorrespondence(old, new)
 		}
 
+	case *types.TypeParam:
+		if new, ok := new.(*types.TypeParam); ok {
+			if old.Index() == new.Index() {
+				return true
+			}
+		}
+
 	default:
 		panic(fmt.Sprintf("unknown type kind %T", old))
 	}
