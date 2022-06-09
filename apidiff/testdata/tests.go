@@ -672,7 +672,7 @@ type S7 struct {
 	E string
 }
 
-//////////////// Method sets
+//// Method sets
 
 // old
 type SM struct {
@@ -925,3 +925,45 @@ type j4 = k4
 // i Vj4: changed from k4 to j4
 // e.g. p.Vj4 = p.Vk4
 type j4 k4
+
+//// Generics
+
+// old
+type G[T any] []T
+
+// new
+// OK: param name change
+type G[A any] []A
+
+// old
+type GM[A, B comparable] map[A]B
+
+// new
+// i GM: changed from map[A]B to map[B]A
+type GM[A, B comparable] map[B]A
+
+// old
+type GT[V any] struct {
+}
+
+func (GT[V]) M(*GT[V]) {}
+
+// new
+// OK
+type GT[V any] struct {
+}
+
+func (GT[V]) M(*GT[V]) {}
+
+// old
+type GT2[V any] struct {
+}
+
+func (GT2[V]) M(*GT2[V]) {}
+
+// new
+// i GT2: changed from GT2[V any] to GT2[V comparable]
+type GT2[V comparable] struct {
+}
+
+func (GT2[V]) M(*GT2[V]) {}

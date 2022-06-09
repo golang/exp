@@ -185,6 +185,11 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 			if old.Obj().Pkg() != d.old || newn.Obj().Pkg() != d.new {
 				return old.Obj().Id() == newn.Obj().Id()
 			}
+			// Prior to generics, any two named types could correspond.
+			// Two named types cannot correspond if their type parameter lists don't match.
+			if !typeParamListsMatch(old.TypeParams(), newn.TypeParams()) {
+				return false
+			}
 		}
 		// If there is no correspondence, create one.
 		d.correspondMap[oldname] = new
@@ -192,7 +197,63 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 		d.checkCompatibleDefined(oldname, old, new)
 		return true
 	}
-	return types.Identical(oldc, new)
+	return typesEquivalent(oldc, new)
+}
+
+// Two list of type parameters match if they are the same length, and
+// the constraints of corresponding type parameters are identical.
+func typeParamListsMatch(tps1, tps2 *types.TypeParamList) bool {
+	if tps1.Len() != tps2.Len() {
+		return false
+	}
+	for i := 0; i < tps1.Len(); i++ {
+		if !types.Identical(tps1.At(i).Constraint(), tps2.At(i).Constraint()) {
+			return false
+		}
+	}
+	return true
+}
+
+// typesEquivalent reports whether two types are identical, or if
+// the types have identical type param lists except that one type has nil
+// constraints.
+//
+// This allows us to match a Type from a method receiver or arg to the Type from
+// the declaration.
+func typesEquivalent(old, new types.Type) bool {
+	if types.Identical(old, new) {
+		return true
+	}
+	// Handle two types with the same type params, one
+	// having constraints and one not.
+	oldn, ok := old.(*types.Named)
+	if !ok {
+		return false
+	}
+	newn, ok := new.(*types.Named)
+	if !ok {
+		return false
+	}
+	oldps := oldn.TypeParams()
+	newps := newn.TypeParams()
+	if oldps.Len() != newps.Len() {
+		return false
+	}
+	if oldps.Len() == 0 {
+		// Not generic types.
+		return false
+	}
+	for i := 0; i < oldps.Len(); i++ {
+		oldp := oldps.At(i)
+		newp := newps.At(i)
+		if oldp.Constraint() == nil || newp.Constraint() == nil {
+			return true
+		}
+		if !types.Identical(oldp.Constraint(), newp.Constraint()) {
+			return false
+		}
+	}
+	return true
 }
 
 func (d *differ) sortedMethods(iface *types.Interface) []*types.Func {

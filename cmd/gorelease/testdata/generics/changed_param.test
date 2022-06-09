@@ -3,7 +3,7 @@ base=v0.0.1
 -- want --
 # example.com/generics/a
 ## incompatible changes
-Foo[V any].Value: changed from func() V to func() any
+Foo: changed from Foo[V any] to Foo[V Number]
 ## compatible changes
 Number: added
 

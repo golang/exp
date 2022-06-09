@@ -97,7 +97,9 @@ func mustLoadPackage(importPath string) *packages.Package {
 }
 
 func loadPackage(importPath string) (*packages.Package, error) {
-	cfg := &packages.Config{Mode: packages.LoadTypes}
+	cfg := &packages.Config{Mode: packages.LoadTypes |
+		packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
+	}
 	pkgs, err := packages.Load(cfg, importPath)
 	if err != nil {
 		return nil, err
