@@ -5,10 +5,6 @@ go 1.18
 -- a/a.go --
 package a
 
-type Urk[T any] interface {
-    Value() T
-}
-
 type Foo[V any] interface {
     Value() V
 }
