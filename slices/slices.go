@@ -210,11 +210,19 @@ func CompactFunc[S ~[]E, E any](s S, eq func(E, E) bool) S {
 
 // Grow increases the slice's capacity, if necessary, to guarantee space for
 // another n elements. After Grow(n), at least n elements can be appended
-// to the slice without another allocation. Grow may modify elements of the
-// slice between the length and the capacity. If n is negative or too large to
+// to the slice without another allocation. If n is negative or too large to
 // allocate the memory, Grow panics.
 func Grow[S ~[]E, E any](s S, n int) S {
-	return append(s, make(S, n)...)[:len(s)]
+	if n < 0 {
+		panic("cannot be negative")
+	}
+	if n -= cap(s) - len(s); n > 0 {
+		// TODO(https://go.dev/issue/53888): Make using []E instead of S
+		// to workaround a compiler bug where the runtime.growslice optimization
+		// does not take effect. Revert when the compiler is fixed.
+		s = append([]E(s)[:cap(s)], make([]E, n)...)[:len(s)]
+	}
+	return s
 }
 
 // Clip removes unused capacity from the slice, returning s[:len(s):len(s)].
