@@ -154,6 +154,8 @@ func Insert[S ~[]E, E any](s S, i int, v ...E) S {
 // Delete is O(len(s)-(j-i)), so if many items must be deleted, it is better to
 // make a single call deleting them all together than to delete one at a time.
 func Delete[S ~[]E, E any](s S, i, j int) S {
+	_ = s[i:j] // bounds check
+
 	return append(s[:i], s[j:]...)
 }
 
