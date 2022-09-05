@@ -40,9 +40,6 @@ func TestNilAttr(t *testing.T) {
 	if g := n.Value(); g != nil {
 		t.Errorf("got %#v, want nil", g)
 	}
-	if n.HasValue() {
-		t.Error("n has value, wanted not")
-	}
 }
 
 func panics(f func()) (b bool) {

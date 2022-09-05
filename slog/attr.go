@@ -150,7 +150,6 @@ func Any(key string, value any) Attr {
 func (a Attr) Key() string { return a.key }
 
 // Value returns the Attr's value as an any.
-// If the Attr does not have a value, it returns nil.
 func (a Attr) Value() any {
 	switch a.Kind() {
 	case AnyKind:
@@ -173,9 +172,6 @@ func (a Attr) Value() any {
 		panic("bad kind")
 	}
 }
-
-// HasValue reports whether the Attr has a non-nil value.
-func (a Attr) HasValue() bool { return a.any != nil }
 
 // Int64 returns the Attr's value as an int64. It panics
 // if the value is not a signed integer.
