@@ -64,7 +64,7 @@ func TestString(t *testing.T) {
 		{Float64("key", .15), "0.15"},
 		{Bool("key", true), "true"},
 		{String("key", "foo"), "foo"},
-		{Any("key", time.Duration(3*time.Second)), "3s"},
+		{Any("key", 3*time.Second), "3s"},
 	} {
 		if got := test.v.String(); got != test.want {
 			t.Errorf("%#v: got %q, want %q", test.v, got, test.want)

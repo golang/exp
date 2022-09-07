@@ -93,7 +93,7 @@ replace golang.org/x/exp => %s
 	// This will ensure that the go.mod and go.sum files include any dependencies
 	// needed by the constraints package (which should just be some version of
 	// x/exp itself).
-	if err := os.WriteFile(filepath.Join(tmpdir, "prolog.go"), []byte(prolog), 0666); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpdir, "prolog.go"), prolog, 0666); err != nil {
 		t.Fatal(err)
 	}
 
