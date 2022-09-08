@@ -32,9 +32,11 @@ func NewTextHandler(w io.Writer) *TextHandler {
 func (opts HandlerOptions) NewTextHandler(w io.Writer) *TextHandler {
 	return &TextHandler{
 		&commonHandler{
-			newAppender: func(buf *buffer.Buffer) appender { return (*textAppender)(buf) },
-			w:           w,
-			opts:        opts,
+			newAppender: func(buf *buffer.Buffer) appender {
+				return (*textAppender)(buf)
+			},
+			w:    w,
+			opts: opts,
 		},
 	}
 }
@@ -106,8 +108,9 @@ func (a *textAppender) appendSep()   { a.buf().WriteByte(' ') }
 
 const maxCheckQuoteSize = 80
 
-func (a *textAppender) appendTime(t time.Time) {
+func (a *textAppender) appendTime(t time.Time) error {
 	*a.buf() = appendTimeRFC3339Millis(*a.buf(), t)
+	return nil
 }
 
 func (a *textAppender) appendSource(file string, line int) {
@@ -120,9 +123,10 @@ func (ap *textAppender) appendAttrValue(a Attr) error {
 	switch a.Kind() {
 	case StringKind:
 		ap.appendString(a.str())
-		return nil
 	case TimeKind:
-		ap.appendTime(a.Time())
+		if err := ap.appendTime(a.Time()); err != nil {
+			return err
+		}
 	case AnyKind:
 		if tm, ok := a.any.(encoding.TextMarshaler); ok {
 			data, err := tm.MarshalText()

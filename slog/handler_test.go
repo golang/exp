@@ -105,12 +105,16 @@ type memAppender struct {
 
 func (a *memAppender) set(v any) { a.m[a.key] = v }
 
-func (a *memAppender) appendStart()           {}
-func (a *memAppender) appendSep()             {}
-func (a *memAppender) appendEnd()             {}
-func (a *memAppender) appendKey(key string)   { a.key = key }
-func (a *memAppender) appendString(s string)  { a.set(s) }
-func (a *memAppender) appendTime(t time.Time) { a.set(t) }
+func (a *memAppender) appendStart()          {}
+func (a *memAppender) appendSep()            {}
+func (a *memAppender) appendEnd()            {}
+func (a *memAppender) appendKey(key string)  { a.key = key }
+func (a *memAppender) appendString(s string) { a.set(s) }
+
+func (a *memAppender) appendTime(t time.Time) error {
+	a.set(t)
+	return nil
+}
 
 func (a *memAppender) appendSource(file string, line int) {
 	a.set(fmt.Sprintf("%s:%d", file, line))
@@ -119,6 +123,24 @@ func (a *memAppender) appendSource(file string, line int) {
 func (a *memAppender) appendAttrValue(at Attr) error {
 	a.set(at.Value())
 	return nil
+}
+
+const rfc3339Millis = "2006-01-02T15:04:05.000Z07:00"
+
+func TestAppendTimeRFC3339(t *testing.T) {
+	for _, tm := range []time.Time{
+		time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC),
+		time.Date(2000, 1, 2, 3, 4, 5, 400, time.Local),
+		time.Date(2000, 11, 12, 3, 4, 500, 5e7, time.UTC),
+	} {
+		want := tm.Format(rfc3339Millis)
+		var buf []byte
+		buf = appendTimeRFC3339Millis(buf, tm)
+		got := string(buf)
+		if got != want {
+			t.Errorf("got %s, want %s", got, want)
+		}
+	}
 }
 
 func BenchmarkAppendTime(b *testing.B) {

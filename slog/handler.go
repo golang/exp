@@ -143,7 +143,9 @@ func (h *commonHandler) handle(r Record) error {
 		val := r.Time().Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
 			app.appendKey(key)
-			app.appendTime(val)
+			if err := app.appendTime(val); err != nil {
+				return err
+			}
 		} else {
 			replace(Time(key, val))
 		}
@@ -226,13 +228,15 @@ func appendAttr(app appender, a Attr) {
 
 // An appender appends keys and values to a buffer.
 // TextHandler and JSONHandler both implement it.
+// It factors out the format-specific parts of the job.
+// Other than growing the buffer, none of the methods should allocate.
 type appender interface {
 	appendStart()                       // start a sequence of Attrs
 	appendEnd()                         // end a sequence of Attrs
 	appendSep()                         // separate one Attr from the next
 	appendKey(key string)               // append a key
 	appendString(string)                // append a string that may need to be escaped
-	appendTime(time.Time)               // append a time
+	appendTime(time.Time) error         // append a time
 	appendSource(file string, line int) // append file:line
 	appendAttrValue(a Attr) error       // append the Attr's value (but not its key)
 }
