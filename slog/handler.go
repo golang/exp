@@ -88,7 +88,7 @@ type HandlerOptions struct {
 }
 
 type commonHandler struct {
-	appender
+	newAppender       func(*buffer.Buffer) appender
 	opts              HandlerOptions
 	attrs             []Attr
 	preformattedAttrs []byte
@@ -104,7 +104,7 @@ func (h *commonHandler) Enabled(l Level) bool {
 
 func (h *commonHandler) with(as []Attr) *commonHandler {
 	h2 := &commonHandler{
-		appender:          h.appender,
+		newAppender:       h.newAppender,
 		opts:              h.opts,
 		attrs:             concat(h.attrs, as),
 		preformattedAttrs: h.preformattedAttrs,
@@ -117,9 +117,9 @@ func (h *commonHandler) with(as []Attr) *commonHandler {
 	}
 
 	// Pre-format the attributes as an optimization.
-	h2.setBuffer((*buffer.Buffer)(&h2.preformattedAttrs))
+	app := h2.newAppender((*buffer.Buffer)(&h2.preformattedAttrs))
 	for _, p := range h2.attrs[len(h.attrs):] {
-		h2.appendAttr(p)
+		appendAttr(app, p)
 	}
 	return h2
 }
@@ -127,58 +127,56 @@ func (h *commonHandler) with(as []Attr) *commonHandler {
 func (h *commonHandler) handle(r Record) error {
 	buf := buffer.New()
 	defer buf.Free()
-	h.setBuffer(buf)
-
+	app := h.newAppender(buf)
 	rep := h.opts.ReplaceAttr
-
 	replace := func(a Attr) {
 		a = rep(a)
 		if a.Key() != "" {
-			h.appendKey(a.Key())
-			h.appendAttrValue(a)
+			app.appendKey(a.Key())
+			app.appendAttrValue(a)
 		}
 	}
 
-	h.appendStart()
+	app.appendStart()
 	if !r.Time().IsZero() {
 		key := "time"
 		val := r.Time().Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
-			h.appendKey(key)
-			h.appendTime(val)
+			app.appendKey(key)
+			app.appendTime(val)
 		} else {
 			replace(Time(key, val))
 		}
-		h.appendSep()
+		app.appendSep()
 	}
 	if r.Level() != 0 {
 		key := "level"
 		val := r.Level()
 		if rep == nil {
-			h.appendKey(key)
-			h.appendString(val.String())
+			app.appendKey(key)
+			app.appendString(val.String())
 		} else {
 			// Don't use replace: we want to output Levels as strings
 			// to match the above.
 			a := rep(Any(key, val))
 			if a.Key() != "" {
-				h.appendKey(a.Key())
+				app.appendKey(a.Key())
 				if l, ok := a.any.(Level); ok {
-					h.appendString(l.String())
+					app.appendString(l.String())
 				} else {
-					h.appendAttrValue(a)
+					app.appendAttrValue(a)
 				}
 			}
 		}
-		h.appendSep()
+		app.appendSep()
 	}
 	if h.opts.AddSource {
 		file, line := r.SourceLine()
 		if file != "" {
 			key := "source"
 			if rep == nil {
-				h.appendKey(key)
-				h.appendSource(file, line)
+				app.appendKey(key)
+				app.appendSource(file, line)
 			} else {
 				buf := buffer.New()
 				buf.WriteString(file)
@@ -188,14 +186,14 @@ func (h *commonHandler) handle(r Record) error {
 				buf.Free()
 				replace(String(key, s))
 			}
-			h.appendSep()
+			app.appendSep()
 		}
 	}
 	key := "msg"
 	val := r.Message()
 	if rep == nil {
-		h.appendKey(key)
-		h.appendString(val)
+		app.appendKey(key)
+		app.appendString(val)
 	} else {
 		replace(String(key, val))
 	}
@@ -205,9 +203,9 @@ func (h *commonHandler) handle(r Record) error {
 		if rep != nil {
 			a = rep(a)
 		}
-		h.appendAttr(a)
+		appendAttr(app, a)
 	}
-	h.appendEnd()
+	app.appendEnd()
 	buf.WriteByte('\n')
 
 	h.mu.Lock()
@@ -216,12 +214,12 @@ func (h *commonHandler) handle(r Record) error {
 	return err
 }
 
-func (h *commonHandler) appendAttr(a Attr) {
+func appendAttr(app appender, a Attr) {
 	if a.Key() != "" {
-		h.appendSep()
-		h.appendKey(a.Key())
-		if err := h.appendAttrValue(a); err != nil {
-			h.appendString(fmt.Sprintf("!ERROR:%v", err))
+		app.appendSep()
+		app.appendKey(a.Key())
+		if err := app.appendAttrValue(a); err != nil {
+			app.appendString(fmt.Sprintf("!ERROR:%v", err))
 		}
 	}
 }
@@ -229,7 +227,6 @@ func (h *commonHandler) appendAttr(a Attr) {
 // An appender appends keys and values to a buffer.
 // TextHandler and JSONHandler both implement it.
 type appender interface {
-	setBuffer(*buffer.Buffer)           // set the buffer to use for output
 	appendStart()                       // start a sequence of Attrs
 	appendEnd()                         // end a sequence of Attrs
 	appendSep()                         // separate one Attr from the next

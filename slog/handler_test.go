@@ -87,7 +87,7 @@ func TestCommonHandle(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ma := &memAppender{m: map[string]any{}}
 			test.h.w = &bytes.Buffer{}
-			test.h.appender = ma
+			test.h.newAppender = func(*buffer.Buffer) appender { return ma }
 			if err := test.h.handle(r); err != nil {
 				t.Fatal(err)
 			}
@@ -104,8 +104,6 @@ type memAppender struct {
 }
 
 func (a *memAppender) set(v any) { a.m[a.key] = v }
-
-func (a *memAppender) setBuffer(*buffer.Buffer) {}
 
 func (a *memAppender) appendStart()           {}
 func (a *memAppender) appendSep()             {}
