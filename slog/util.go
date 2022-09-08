@@ -4,16 +4,13 @@
 
 package slog
 
-func concat(l1, l2 []Attr) []Attr {
-	return concat3(l1, l2, nil)
-}
-
-func concat3(l1, l2, l3 []Attr) []Attr {
-	l := make([]Attr, len(l1)+len(l2)+len(l3))
-	copy(l, l1)
-	copy(l[len(l1):], l2)
-	copy(l[len(l1)+len(l2):], l3)
-	return l
+// concat returns a new slice with the elements of s1 followed
+// by those of s2. The slice has no additional capacity.
+func concat[T any](s1, s2 []T) []T {
+	s := make([]T, len(s1)+len(s2))
+	copy(s, s1)
+	copy(s[len(s1):], s2)
+	return s
 }
 
 // Cheap integer to fixed-width decimal ASCII. Give a negative width to avoid zero-padding.
