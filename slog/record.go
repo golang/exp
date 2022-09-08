@@ -125,3 +125,10 @@ func (r *Record) AddAttr(a Attr) {
 	r.tail[r.nTail] = a
 	r.nTail++
 }
+
+func (r *Record) addAttrs(attrs []Attr) {
+	// TODO: be cleverer.
+	for _, a := range attrs {
+		r.AddAttr(a)
+	}
+}
