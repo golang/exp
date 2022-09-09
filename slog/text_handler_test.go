@@ -132,3 +132,23 @@ func TestTextHandlerAlloc(t *testing.T) {
 	h := NewTextHandler(io.Discard)
 	wantAllocs(t, 0, func() { h.Handle(r) })
 }
+
+func TestNeedsQuoting(t *testing.T) {
+	for _, test := range []struct {
+		in   string
+		want bool
+	}{
+		{"", false},
+		{"ab", false},
+		{"a=b", true},
+		{`"ab"`, true},
+		{"\a\b", true},
+		{"a\tb", true},
+		{"µåπ", false},
+	} {
+		got := needsQuoting(test.in)
+		if got != test.want {
+			t.Errorf("%q: got %t, want %t", test.in, got, test.want)
+		}
+	}
+}

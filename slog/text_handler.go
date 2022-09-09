@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/exp/slog/internal/buffer"
 )
@@ -69,8 +69,8 @@ func (h *TextHandler) With(attrs []Attr) Handler {
 // If a value implements [encoding.TextMarshaler], the result of MarshalText is
 // written. Otherwise, the result of fmt.Sprint is written.
 //
-// Keys and values are quoted if they are long or contain Unicode space
-// characters, '"' or '='.
+// Keys and values are quoted if they contain Unicode space characters,
+// non-printing characters, '"' or '='.
 //
 // Each call to Handle results in a single serialized call to
 // io.Writer.Write.
@@ -95,18 +95,9 @@ func (a *textAppender) appendString(s string) {
 	}
 }
 
-func needsQuoting(s string) bool {
-	return len(s) > maxCheckQuoteSize ||
-		strings.IndexFunc(s, func(r rune) bool {
-			return unicode.IsSpace(r) || r == '"' || r == '='
-		}) >= 0
-}
-
 func (a *textAppender) appendStart() {}
 func (a *textAppender) appendEnd()   {}
 func (a *textAppender) appendSep()   { a.buf().WriteByte(' ') }
-
-const maxCheckQuoteSize = 80
 
 func (a *textAppender) appendTime(t time.Time) error {
 	*a.buf() = appendTimeRFC3339Millis(*a.buf(), t)
@@ -143,4 +134,37 @@ func (ap *textAppender) appendAttrValue(a Attr) error {
 		*ap.buf() = a.AppendValue(*ap.buf())
 	}
 	return nil
+}
+
+func needsQuoting(s string) bool {
+	for i := 0; i < len(s); {
+		b := s[i]
+		if b < utf8.RuneSelf {
+			if needsQuotingSet[b] {
+				return true
+			}
+			i++
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError || unicode.IsSpace(r) || !unicode.IsPrint(r) {
+			return true
+		}
+		i += size
+	}
+	return false
+}
+
+var needsQuotingSet = [utf8.RuneSelf]bool{
+	'"': true,
+	'=': true,
+}
+
+func init() {
+	for i := 0; i < utf8.RuneSelf; i++ {
+		r := rune(i)
+		if unicode.IsSpace(r) || !unicode.IsPrint(r) {
+			needsQuotingSet[i] = true
+		}
+	}
 }
