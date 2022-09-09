@@ -73,9 +73,9 @@ type HandlerOptions struct {
 	// "file:line".
 	AddSource bool
 
-	// Ignore records with levels above AtomicLevel.Level.
+	// Ignore records with levels above Level.Level.
 	// If nil, accept all levels.
-	AtomicLevel *AtomicLevel
+	Level *AtomicLevel
 
 	// If set, ReplaceAttr is called on each attribute of the message,
 	// and the returned value is used instead of the original. If the returned
@@ -99,7 +99,7 @@ type commonHandler struct {
 // Enabled reports whether l is less than or equal to the
 // maximum level.
 func (h *commonHandler) Enabled(l Level) bool {
-	return l <= h.opts.AtomicLevel.Level()
+	return l <= h.opts.Level.Level()
 }
 
 func (h *commonHandler) with(as []Attr) *commonHandler {
