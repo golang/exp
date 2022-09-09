@@ -97,7 +97,7 @@ func TestTextHandlerSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := buf.String()
-	wantRE := `source=[^:]+text_handler_test\.go:\d+ msg`
+	wantRE := `source=([A-Z]:)?[^:]+text_handler_test\.go:\d+ msg`
 	matched, err := regexp.MatchString(wantRE, got)
 	if err != nil {
 		t.Fatal(err)
