@@ -15,20 +15,25 @@ import (
 	"golang.org/x/exp/slog/internal/buffer"
 )
 
-// A Handler processes log records produced by Logger output.
+// A Handler handles log records produced by a Logger..
+//
+// A typical handler may print log records to standard error,
+// or write them to a file or database, or perhaps augment them
+// with additional attributes and pass them on to another handler.
+//
 // Any of the Handler's methods may be called concurrently with itself
 // or with other methods. It is the responsibility of the Handler to
 // manage this concurrency.
 type Handler interface {
-	// Enabled reports whether this handler is accepting records
-	// at the given level.
+	// Enabled reports whether the handler handles records at the given level.
+	// The handler ignores records whose level is lower.
 	Enabled(Level) bool
 
-	// Handle processes the Record.
+	// Handle handles the Record.
 	// Handle methods that produce output should observe the following rules:
-	//   - If r.Time() is the zero time, do not output the time.
-	//   - If r.Level() is Level(0), do not output the level.
-	//   - If an Attr's key is the empty string, do not output the Attr.
+	//   - If r.Time() is the zero time, ignore the time.
+	//   - If r.Level() is Level(0), ignore the level.
+	//   - If an Attr's key is the empty string, ignore the Attr.
 	Handle(r Record) error
 
 	// With returns a new Handler whose attributes consist of
