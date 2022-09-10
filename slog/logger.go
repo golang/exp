@@ -66,22 +66,24 @@ func (l *Logger) Handler() Handler { return l.handler }
 // With returns a new Logger whose handler's attributes are a concatenation of
 // l's attributes and the given arguments, converted to Attrs as in
 // [Logger.Log].
-func (l *Logger) With(attrs ...any) *Logger {
-	return &Logger{handler: l.handler.With(argsToAttrs(attrs))}
-}
-
-func argsToAttrs(args []any) []Attr {
-	var r Record
-	setAttrs(&r, args)
-	return r.Attrs()
+func (l *Logger) With(args ...any) *Logger {
+	var (
+		attr  Attr
+		attrs []Attr
+	)
+	for len(args) > 0 {
+		attr, args = argsToAttr(args)
+		attrs = append(attrs, attr)
+	}
+	return &Logger{handler: l.handler.With(attrs)}
 }
 
 // New creates a new Logger with the given Handler.
 func New(h Handler) *Logger { return &Logger{handler: h} }
 
 // With calls Logger.With on the default logger.
-func With(attrs ...any) *Logger {
-	return Default().With(attrs...)
+func With(args ...any) *Logger {
+	return Default().With(args...)
 }
 
 // Enabled reports whether l emits log records at the given level.
@@ -138,7 +140,7 @@ func setAttrs(r *Record, args []any) {
 	}
 }
 
-// argsToAttrs turns a prefix of the args slice into an Attr and returns
+// argsToAttr turns a prefix of the args slice into an Attr and returns
 // the unused portion of the slice.
 // If args[0] is an Attr, it returns it.
 // If args[0] is a string, it treats the first two elements as
