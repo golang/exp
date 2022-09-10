@@ -105,9 +105,14 @@ func (a *textAppender) appendTime(t time.Time) error {
 }
 
 func (a *textAppender) appendSource(file string, line int) {
-	a.appendString(file)
-	a.buf().WriteByte(':')
-	itoa((*[]byte)(a.buf()), line, -1)
+	if needsQuoting(file) {
+		a.appendString(file + ":" + strconv.Itoa(line))
+	} else {
+		// common case: no quoting needed.
+		a.appendString(file)
+		a.buf().WriteByte(':')
+		itoa((*[]byte)(a.buf()), line, -1)
+	}
 }
 
 func (ap *textAppender) appendAttrValue(a Attr) error {
