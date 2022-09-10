@@ -103,23 +103,21 @@ func TestAttrNoAlloc(t *testing.T) {
 	_ = x
 }
 
-func TestAnyLevel(t *testing.T) {
+func TestAnyLevelAlloc(t *testing.T) {
 	// Because typical Levels are small integers,
 	// they are zero-alloc.
 	var a Attr
 	x := DebugLevel + 100
 	wantAllocs(t, 0, func() { a = Any("k", x) })
+	_ = a
+}
+
+func TestAnyLevel(t *testing.T) {
+	x := DebugLevel + 100
+	a := Any("k", x)
 	v := a.Value()
 	if _, ok := v.(Level); !ok {
 		t.Errorf("wanted Level, got %T", v)
-	}
-}
-
-func wantAllocs(t *testing.T, want int, f func()) {
-	t.Helper()
-	got := int(testing.AllocsPerRun(5, f))
-	if got != want {
-		t.Errorf("got %d allocs, want %d", got, want)
 	}
 }
 
