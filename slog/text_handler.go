@@ -136,7 +136,7 @@ func (ap *textAppender) appendAttrValue(a Attr) error {
 		}
 		ap.appendString(fmt.Sprint(a.Value()))
 	default:
-		*ap.buf() = a.AppendValue(*ap.buf())
+		*ap.buf() = a.appendValue(*ap.buf())
 	}
 	return nil
 }

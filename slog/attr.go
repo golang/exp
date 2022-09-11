@@ -279,9 +279,9 @@ func (a1 Attr) Equal(a2 Attr) bool {
 	}
 }
 
-// AppendValue appends a text representation of the Attr's value to dst.
+// appendValue appends a text representation of the Attr's value to dst.
 // The value is formatted as with fmt.Sprint.
-func (a Attr) AppendValue(dst []byte) []byte {
+func (a Attr) appendValue(dst []byte) []byte {
 	switch a.Kind() {
 	case StringKind:
 		return append(dst, a.str()...)

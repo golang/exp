@@ -78,5 +78,5 @@ func (a Attr) String() string {
 		return s
 	}
 	var buf []byte
-	return string(a.AppendValue(buf))
+	return string(a.appendValue(buf))
 }
