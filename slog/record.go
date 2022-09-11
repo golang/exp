@@ -67,12 +67,6 @@ func NewRecord(t time.Time, level Level, msg string, calldepth int) Record {
 	}
 }
 
-func pc(depth int) uintptr {
-	var pcs [1]uintptr
-	runtime.Callers(depth, pcs[:])
-	return pcs[0]
-}
-
 // Time returns the time of the log event.
 func (r *Record) Time() time.Time { return r.time }
 

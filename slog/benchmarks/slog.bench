@@ -1,0 +1,66 @@
+goos: linux
+goarch: amd64
+pkg: golang.org/x/exp/slog/benchmarks
+cpu: Intel(R) Xeon(R) CPU @ 2.20GHz
+BenchmarkAttrs/async_discard/5_args-8  	15210396	        77.29 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	15145908	        77.67 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	15253398	        77.19 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	15179468	        77.85 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	15277597	        81.39 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 4787269	       261.8 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 4579984	       258.4 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 4704289	       262.6 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 4567789	       262.4 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 4439834	       260.9 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	 1343312	       896.3 ns/op	    1408 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	 1359198	       896.1 ns/op	    1408 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	 1245687	       906.5 ns/op	    1408 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	 1315179	       893.4 ns/op	    1408 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	 1324700	       908.3 ns/op	    1408 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 8722515	       155.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 6306207	       166.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 6654472	       201.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 6788815	       182.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 8685591	       138.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 2224696	       537.5 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 2216884	       528.4 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 2238348	       521.0 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 2045665	       513.9 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 2249340	       539.3 ns/op	     208 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  585816	      2111 ns/op	    1412 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  549836	      2177 ns/op	    1411 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  640612	      2149 ns/op	    1412 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  529753	      2189 ns/op	    1411 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  604201	      2063 ns/op	    1411 B/op	       1 allocs/op
+BenchmarkAttrs/Text_discard/5_args-8             	 2076205	       619.4 ns/op	       8 B/op	       2 allocs/op
+BenchmarkAttrs/Text_discard/5_args-8             	 1869274	       640.6 ns/op	       8 B/op	       2 allocs/op
+BenchmarkAttrs/Text_discard/5_args-8             	 1917584	       697.6 ns/op	       8 B/op	       2 allocs/op
+BenchmarkAttrs/Text_discard/5_args-8             	 1886079	       603.1 ns/op	       8 B/op	       2 allocs/op
+BenchmarkAttrs/Text_discard/5_args-8             	 2006808	       632.5 ns/op	       8 B/op	       2 allocs/op
+BenchmarkAttrs/Text_discard/10_args-8            	 1000000	      1124 ns/op	     224 B/op	       5 allocs/op
+BenchmarkAttrs/Text_discard/10_args-8            	 1000000	      1183 ns/op	     224 B/op	       5 allocs/op
+BenchmarkAttrs/Text_discard/10_args-8            	 1000000	      1168 ns/op	     224 B/op	       5 allocs/op
+BenchmarkAttrs/Text_discard/10_args-8            	 1000000	      1145 ns/op	     224 B/op	       5 allocs/op
+BenchmarkAttrs/Text_discard/10_args-8            	 1000000	      1124 ns/op	     224 B/op	       5 allocs/op
+BenchmarkAttrs/Text_discard/40_args-8            	  345771	      3787 ns/op	    1476 B/op	      17 allocs/op
+BenchmarkAttrs/Text_discard/40_args-8            	  326586	      3863 ns/op	    1476 B/op	      17 allocs/op
+BenchmarkAttrs/Text_discard/40_args-8            	  345025	      3803 ns/op	    1476 B/op	      17 allocs/op
+BenchmarkAttrs/Text_discard/40_args-8            	  327498	      3867 ns/op	    1476 B/op	      17 allocs/op
+BenchmarkAttrs/Text_discard/40_args-8            	  318794	      3861 ns/op	    1476 B/op	      17 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8             	 1824364	       689.2 ns/op	     104 B/op	       3 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8             	 1837174	       703.3 ns/op	     104 B/op	       3 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8             	 1941864	       690.8 ns/op	     104 B/op	       3 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8             	 1731802	       714.0 ns/op	     104 B/op	       3 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8             	 1729310	       744.1 ns/op	     104 B/op	       3 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8            	 1000000	      1217 ns/op	     368 B/op	       6 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8            	 1000000	      1194 ns/op	     368 B/op	       6 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8            	 1000000	      1233 ns/op	     368 B/op	       6 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8            	 1000000	      1205 ns/op	     368 B/op	       6 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8            	 1000000	      1197 ns/op	     368 B/op	       6 allocs/op
+BenchmarkAttrs/JSON_discard/40_args-8            	  334358	      4195 ns/op	    1908 B/op	      18 allocs/op
+BenchmarkAttrs/JSON_discard/40_args-8            	  309706	      4226 ns/op	    1908 B/op	      18 allocs/op
+BenchmarkAttrs/JSON_discard/40_args-8            	  288650	      4119 ns/op	    1909 B/op	      18 allocs/op
+BenchmarkAttrs/JSON_discard/40_args-8            	  300709	      4154 ns/op	    1909 B/op	      18 allocs/op
+BenchmarkAttrs/JSON_discard/40_args-8            	  265053	      4160 ns/op	    1908 B/op	      18 allocs/op
+PASS
+ok  	golang.org/x/exp/slog/benchmarks	90.441s

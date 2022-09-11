@@ -1,0 +1,36 @@
+goos: linux
+goarch: amd64
+pkg: golang.org/x/exp/slog/benchmarks
+cpu: Intel(R) Xeon(R) CPU @ 2.20GHz
+BenchmarkAttrs/async_discard/5_args-8  	 3614589	       345.7 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	 3518541	       346.1 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	 3373456	       348.6 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	 3373489	       353.1 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/5_args-8  	 3457050	       345.3 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 2093509	       560.9 ns/op	     640 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 2104582	       575.0 ns/op	     640 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 2083662	       577.7 ns/op	     640 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 2026076	       566.5 ns/op	     640 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/10_args-8 	 2111178	       572.2 ns/op	     640 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	  647089	      1848 ns/op	    2689 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	  635133	      1805 ns/op	    2689 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	  552322	      1867 ns/op	    2689 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	  600859	      1825 ns/op	    2689 B/op	       1 allocs/op
+BenchmarkAttrs/async_discard/40_args-8 	  541836	      1851 ns/op	    2689 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 2460378	       483.2 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 2506137	       479.3 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 2548584	       471.2 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 2588580	       469.0 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8         	 2514064	       476.8 ns/op	     320 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 1512806	       804.7 ns/op	     641 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 1531958	       812.4 ns/op	     641 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 1497993	       875.7 ns/op	     641 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 1514474	       793.1 ns/op	     641 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8        	 1499733	       823.4 ns/op	     641 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  427237	      2680 ns/op	    2696 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  448093	      2722 ns/op	    2696 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  384814	      2674 ns/op	    2696 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  430740	      2791 ns/op	    2698 B/op	       1 allocs/op
+BenchmarkAttrs/fastText_discard/40_args-8        	  421111	      2656 ns/op	    2696 B/op	       1 allocs/op
+PASS
+ok  	golang.org/x/exp/slog/benchmarks/zapbenchmarks	47.877s
