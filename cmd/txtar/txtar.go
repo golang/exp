@@ -34,7 +34,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -79,7 +79,7 @@ func main() {
 }
 
 func extract() (err error) {
-	b, err := ioutil.ReadAll(os.Stdin)
+	b, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func extract() (err error) {
 		if err := os.MkdirAll(filepath.Dir(fileName), 0777); err != nil {
 			return err
 		}
-		if err := ioutil.WriteFile(fileName, f.Data, 0666); err != nil {
+		if err := os.WriteFile(fileName, f.Data, 0666); err != nil {
 			return err
 		}
 	}
@@ -143,7 +143,7 @@ func archive(paths []string) (err error) {
 			}
 			name := filepath.ToSlash(filepath.Join(p, suffix))
 
-			data, err := ioutil.ReadFile(fileName)
+			data, err := os.ReadFile(fileName)
 			if err != nil {
 				return err
 			}
@@ -172,7 +172,7 @@ func archive(paths []string) (err error) {
 	timer := time.AfterFunc(200*time.Millisecond, func() {
 		fmt.Fprintln(os.Stderr, "Enter comment:")
 	})
-	comment, err := ioutil.ReadAll(os.Stdin)
+	comment, err := io.ReadAll(os.Stdin)
 	timer.Stop()
 	if err != nil {
 		return fmt.Errorf("reading comment from %s: %v", os.Stdin.Name(), err)

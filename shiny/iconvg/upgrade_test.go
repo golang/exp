@@ -5,14 +5,14 @@
 package iconvg
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestUpgradeToFileFormatVersion1(t *testing.T) {
 	for _, tc := range testdataTestCases {
-		original, err := ioutil.ReadFile(filepath.FromSlash(tc.filename) + ".ivg")
+		original, err := os.ReadFile(filepath.FromSlash(tc.filename) + ".ivg")
 		if err != nil {
 			t.Errorf("%s: ReadFile: %v", tc.filename, err)
 			continue

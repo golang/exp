@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -207,7 +206,7 @@ func TestSeek(t *testing.T) {
 func testRead(f *Frame, want string) error {
 	c := f.NewCaret()
 	defer c.Close()
-	asBytes, err := ioutil.ReadAll(c)
+	asBytes, err := io.ReadAll(c)
 	if err != nil {
 		return fmt.Errorf("ReadAll: %v", err)
 	}

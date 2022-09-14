@@ -9,7 +9,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,7 +60,7 @@ func prepareProxy(proxyVersions map[module.Version]bool, tests []*test) (ctx con
 	}
 	env = append(env, fmt.Sprintf("GOPROXY=%s", proxyURL))
 
-	cacheDir, err := ioutil.TempDir("", "gorelease_test-gocache")
+	cacheDir, err := os.MkdirTemp("", "gorelease_test-gocache")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -267,7 +266,7 @@ func updateTest(t *test, want []byte) error {
 
 	wantFile.Data = want
 	data := txtar.Format(&t.Archive)
-	return ioutil.WriteFile(t.testPath, data, 0666)
+	return os.WriteFile(t.testPath, data, 0666)
 }
 
 func TestRelease(t *testing.T) {
@@ -303,7 +302,7 @@ func TestRelease(t *testing.T) {
 func TestRelease_gitRepo_uncommittedChanges(t *testing.T) {
 	ctx := context.Background()
 	buf := &bytes.Buffer{}
-	releaseDir, err := ioutil.TempDir("", "")
+	releaseDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +313,7 @@ func TestRelease_gitRepo_uncommittedChanges(t *testing.T) {
 	// Create an uncommitted change.
 	bContents := `package b
 const B = "b"`
-	if err := ioutil.WriteFile(filepath.Join(releaseDir, "b.go"), []byte(bContents), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(releaseDir, "b.go"), []byte(bContents), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -347,7 +346,7 @@ func testRelease(ctx context.Context, tests []*test, test *test) func(t *testing
 
 		// Extract the files in the release version. They may be part of the
 		// test archive or in testdata/mod.
-		testDir, err := ioutil.TempDir("", "")
+		testDir, err := os.MkdirTemp("", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -447,7 +446,7 @@ func hgInit(t *testing.T, dir string) {
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(dir, ".hg", "branch"), []byte("default"), 0777); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".hg", "branch"), []byte("default"), 0777); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -488,7 +487,7 @@ func goModInit(t *testing.T, dir string) {
 
 	aContents := `package a
 const A = "a"`
-	if err := ioutil.WriteFile(filepath.Join(dir, "a.go"), []byte(aContents), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "a.go"), []byte(aContents), 0644); err != nil {
 		t.Fatal(err)
 	}
 

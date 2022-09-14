@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"go/types"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +17,7 @@ import (
 )
 
 func TestChanges(t *testing.T) {
-	dir, err := ioutil.TempDir("", "apidiff_test")
+	dir, err := os.MkdirTemp("", "apidiff_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +62,7 @@ func splitIntoPackages(t *testing.T, dir string) (incompatibles, compatibles []s
 	if err := os.MkdirAll(filepath.Join(dir, "src", "apidiff"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(dir, "src", "apidiff", "go.mod"), []byte("module apidiff\n"), 0666); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "src", "apidiff", "go.mod"), []byte("module apidiff\n"), 0666); err != nil {
 		t.Fatal(err)
 	}
 

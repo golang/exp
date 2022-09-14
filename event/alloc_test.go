@@ -9,7 +9,7 @@ package event_test
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"golang.org/x/exp/event"
@@ -21,7 +21,7 @@ func TestAllocs(t *testing.T) {
 	anInt := event.Int64("int", 4)
 	aString := event.String("string", "value")
 
-	e := event.NewExporter(logfmt.NewHandler(ioutil.Discard), &event.ExporterOptions{EnableNamespaces: true})
+	e := event.NewExporter(logfmt.NewHandler(io.Discard), &event.ExporterOptions{EnableNamespaces: true})
 	ctx := event.WithExporter(context.Background(), e)
 	allocs := int(testing.AllocsPerRun(5, func() {
 		event.Log(ctx, "message", aString, anInt)

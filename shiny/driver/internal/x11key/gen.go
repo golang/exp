@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -68,7 +67,7 @@ var keysymCodePoints = map[rune]rune{
 		log.Fatalf("formatting output: %v", err)
 	}
 
-	err = ioutil.WriteFile("table.go", fmted, 0644)
+	err = os.WriteFile("table.go", fmted, 0644)
 	if err != nil {
 		log.Fatalf("writing table.go: %v", err)
 	}

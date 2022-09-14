@@ -7,7 +7,7 @@ package tlog
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -80,7 +80,7 @@ func httpGET(t *testing.T, url string, targ interface{}) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

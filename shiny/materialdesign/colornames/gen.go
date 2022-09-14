@@ -15,7 +15,6 @@ import (
 	"go/format"
 	"image/color"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -174,7 +173,7 @@ func main() {
 		log.Fatalf("Error while formatting code: %s\n", err)
 	}
 
-	if err := ioutil.WriteFile("table.go", fmted, 0644); err != nil {
+	if err := os.WriteFile("table.go", fmted, 0644); err != nil {
 		log.Fatalf("Error writing table.go: %s\n", err)
 	}
 }

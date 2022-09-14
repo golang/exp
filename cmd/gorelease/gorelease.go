@@ -88,7 +88,6 @@ import (
 	"fmt"
 	"go/build"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -166,7 +165,7 @@ func runRelease(ctx context.Context, w io.Writer, dir string, args []string) (su
 	// test without printing to stderr.
 	fs := flag.NewFlagSet("gorelease", flag.ContinueOnError)
 	fs.Usage = func() {}
-	fs.SetOutput(ioutil.Discard)
+	fs.SetOutput(io.Discard)
 	var baseOpt, releaseVersion string
 	fs.StringVar(&baseOpt, "base", "", "previous version to compare against")
 	fs.StringVar(&releaseVersion, "version", "", "proposed version to be released")
@@ -309,7 +308,7 @@ func loadLocalModule(ctx context.Context, modRoot, repoRoot, version string) (m 
 		m.diagnostics = append(m.diagnostics, fmt.Sprintf("Version %s is lower than most pseudo-versions. Consider releasing v0.1.0-0 instead.", version))
 	}
 
-	m.goModData, err = ioutil.ReadFile(m.goModPath)
+	m.goModData, err = os.ReadFile(m.goModPath)
 	if err != nil {
 		return moduleInfo{}, err
 	}
@@ -371,7 +370,7 @@ func loadLocalModule(ctx context.Context, modRoot, repoRoot, version string) (m 
 			// Modules with major version suffixes can be defined in two places
 			// (e.g., sub/go.mod and sub/v2/go.mod). They must not be defined in both.
 			if altGoModPath != "" {
-				if data, err := ioutil.ReadFile(altGoModPath); err == nil {
+				if data, err := os.ReadFile(altGoModPath); err == nil {
 					if altModPath := modfile.ModulePath(data); m.modPath == altModPath {
 						goModRel, _ := filepath.Rel(repoRoot, m.goModPath)
 						altGoModRel, _ := filepath.Rel(repoRoot, altGoModPath)
@@ -511,7 +510,7 @@ func loadDownloadedModule(ctx context.Context, modPath, version, max string) (m 
 	if m.modRoot, m.goModPath, err = downloadModule(ctx, v); err != nil {
 		return moduleInfo{}, err
 	}
-	if m.goModData, err = ioutil.ReadFile(m.goModPath); err != nil {
+	if m.goModData, err = os.ReadFile(m.goModPath); err != nil {
 		return moduleInfo{}, err
 	}
 	if m.goModFile, err = modfile.ParseLax(m.goModPath, m.goModData, nil); err != nil {
@@ -774,7 +773,7 @@ func queryVersion(ctx context.Context, modPath, query string) (resolved string, 
 		return "", errors.New("query is based on requirements in main go.mod file")
 	}
 
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return "", err
 	}
@@ -805,7 +804,7 @@ func loadVersions(ctx context.Context, modPath string) (versions []string, err e
 		}
 	}()
 
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return nil, err
 	}
@@ -882,7 +881,7 @@ func copyModuleToTempDir(repoRoot, modPath, modRoot string) (dir string, err err
 	}
 	m := module.Version{Path: modPath, Version: version}
 
-	zipFile, err := ioutil.TempFile("", "gorelease-*.zip")
+	zipFile, err := os.CreateTemp("", "gorelease-*.zip")
 	if err != nil {
 		return "", err
 	}
@@ -891,7 +890,7 @@ func copyModuleToTempDir(repoRoot, modPath, modRoot string) (dir string, err err
 		os.Remove(zipFile.Name())
 	}()
 
-	dir, err = ioutil.TempDir("", "gorelease")
+	dir, err = os.MkdirTemp("", "gorelease")
 	if err != nil {
 		return "", err
 	}
@@ -980,7 +979,7 @@ func downloadModule(ctx context.Context, m module.Version) (modRoot, goModPath s
 	// TODO(golang.org/issue/36812): 'go mod download' reads go.mod even though
 	// we don't need information about the main module or the build list.
 	// If it didn't read go.mod in this case, we wouldn't need a temp directory.
-	tmpDir, err := ioutil.TempDir("", "gorelease-download")
+	tmpDir, err := os.MkdirTemp("", "gorelease-download")
 	if err != nil {
 		return "", "", err
 	}
@@ -1073,7 +1072,7 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 		}
 	}
 
-	dir, err = ioutil.TempDir("", "gorelease-load")
+	dir, err = os.MkdirTemp("", "gorelease-load")
 	if err != nil {
 		return "", nil, nil, nil, nil, err
 	}
@@ -1096,15 +1095,15 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 	if err != nil {
 		return "", nil, nil, nil, nil, err
 	}
-	if err := ioutil.WriteFile(filepath.Join(dir, "go.mod"), goModData, 0666); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goModData, 0666); err != nil {
 		return "", nil, nil, nil, nil, err
 	}
 
-	goSumData, err = ioutil.ReadFile(filepath.Join(modRoot, "go.sum"))
+	goSumData, err = os.ReadFile(filepath.Join(modRoot, "go.sum"))
 	if err != nil && !os.IsNotExist(err) {
 		return "", nil, nil, nil, nil, err
 	}
-	if err := ioutil.WriteFile(filepath.Join(dir, "go.sum"), goSumData, 0666); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.sum"), goSumData, 0666); err != nil {
 		return "", nil, nil, nil, nil, err
 	}
 
@@ -1119,7 +1118,7 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 	for _, imp := range imps {
 		fmt.Fprintf(fakeImports, "import _ %q\n", imp)
 	}
-	if err := ioutil.WriteFile(filepath.Join(dir, "tmp.go"), []byte(fakeImports.String()), 0666); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "tmp.go"), []byte(fakeImports.String()), 0666); err != nil {
 		return "", nil, nil, nil, nil, err
 	}
 
@@ -1148,7 +1147,7 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 	if err != nil {
 		return "", nil, nil, nil, nil, err
 	}
-	newGoModData, err := ioutil.ReadFile(goModPath)
+	newGoModData, err := os.ReadFile(goModPath)
 	if err != nil {
 		return "", nil, nil, nil, nil, err
 	}
@@ -1187,7 +1186,7 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 	if !cached {
 		// Check if 'go get' added new hashes to go.sum.
 		goSumPath := filepath.Join(dir, "go.sum")
-		newGoSumData, err := ioutil.ReadFile(goSumPath)
+		newGoSumData, err := os.ReadFile(goSumPath)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return "", nil, nil, nil, nil, err

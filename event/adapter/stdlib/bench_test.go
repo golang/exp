@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"testing"
 
@@ -94,7 +93,7 @@ func stdlibWriter(w io.Writer) context.Context {
 }
 
 func BenchmarkStdlibLogfDiscard(b *testing.B) {
-	eventtest.RunBenchmark(b, stdlibLogger(ioutil.Discard), stdlibLog)
+	eventtest.RunBenchmark(b, stdlibLogger(io.Discard), stdlibLog)
 }
 
 func BenchmarkStdlibPrintfDiscard(b *testing.B) {

@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -30,7 +29,7 @@ import (
 // versions is non-empty, only those modules in mod/ that match an entry in
 // proxyVersions will be included.
 func buildProxyDir(proxyVersions map[module.Version]bool, tests []*test) (proxyDir, proxyURL string, err error) {
-	proxyDir, err = ioutil.TempDir("", "gorelease-proxy")
+	proxyDir, err = os.MkdirTemp("", "gorelease-proxy")
 	if err != nil {
 		return "", "", err
 	}
@@ -101,7 +100,7 @@ func buildProxyDir(proxyVersions map[module.Version]bool, tests []*test) (proxyD
 					haveMod = true
 				}
 				outPath := filepath.Join(modDir, version+af.Name)
-				if err := ioutil.WriteFile(outPath, af.Data, 0666); err != nil {
+				if err := os.WriteFile(outPath, af.Data, 0666); err != nil {
 					return "", "", err
 				}
 				continue
@@ -119,13 +118,13 @@ func buildProxyDir(proxyVersions map[module.Version]bool, tests []*test) (proxyD
 		if !haveInfo {
 			outPath := filepath.Join(modDir, version+".info")
 			outContent := fmt.Sprintf(`{"Version":"%s"}`, version)
-			if err := ioutil.WriteFile(outPath, []byte(outContent), 0666); err != nil {
+			if err := os.WriteFile(outPath, []byte(outContent), 0666); err != nil {
 				return "", "", err
 			}
 		}
 		if !haveMod && goMod.Name != "" {
 			outPath := filepath.Join(modDir, version+".mod")
-			if err := ioutil.WriteFile(outPath, goMod.Data, 0666); err != nil {
+			if err := os.WriteFile(outPath, goMod.Data, 0666); err != nil {
 				return "", "", err
 			}
 		}
@@ -155,7 +154,7 @@ func buildProxyDir(proxyVersions map[module.Version]bool, tests []*test) (proxyD
 		for _, v := range versions {
 			fmt.Fprintln(buf, v)
 		}
-		if err := ioutil.WriteFile(outPath, buf.Bytes(), 0666); err != nil {
+		if err := os.WriteFile(outPath, buf.Bytes(), 0666); err != nil {
 			return "", "", err
 		}
 		buf.Reset()
@@ -179,7 +178,7 @@ type txtarFile struct {
 func (f txtarFile) Path() string                { return f.f.Name }
 func (f txtarFile) Lstat() (os.FileInfo, error) { return txtarFileInfo{f.f}, nil }
 func (f txtarFile) Open() (io.ReadCloser, error) {
-	return ioutil.NopCloser(bytes.NewReader(f.f.Data)), nil
+	return io.NopCloser(bytes.NewReader(f.f.Data)), nil
 }
 
 type txtarFileInfo struct {
@@ -199,7 +198,7 @@ func extractTxtar(destDir string, arc *txtar.Archive) error {
 		if err := os.MkdirAll(filepath.Dir(outPath), 0777); err != nil {
 			return err
 		}
-		if err := ioutil.WriteFile(outPath, f.Data, 0666); err != nil {
+		if err := os.WriteFile(outPath, f.Data, 0666); err != nil {
 			return err
 		}
 	}
