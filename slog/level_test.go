@@ -5,7 +5,6 @@
 package slog
 
 import (
-	"math"
 	"testing"
 )
 
@@ -33,16 +32,16 @@ func TestLevelString(t *testing.T) {
 }
 
 func TestAtomicLevel(t *testing.T) {
-	var r *AtomicLevel
-	if got, want := r.Level(), Level(math.MaxInt); got != want {
+	var al AtomicLevel
+	if got, want := al.Level(), InfoLevel; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	r = NewAtomicLevel(WarnLevel)
-	if got, want := r.Level(), WarnLevel; got != want {
+	al.Set(WarnLevel)
+	if got, want := al.Level(), WarnLevel; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	r.Set(InfoLevel)
-	if got, want := r.Level(), InfoLevel; got != want {
+	al.Set(InfoLevel)
+	if got, want := al.Level(), InfoLevel; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 

@@ -122,6 +122,32 @@ func upperCaseKey(a Attr) Attr {
 	return a.WithKey(strings.ToUpper(a.Key()))
 }
 
+func TestHandlerEnabled(t *testing.T) {
+	atomicLevel := func(l Level) *AtomicLevel {
+		var al AtomicLevel
+		al.Set(l)
+		return &al
+	}
+
+	for _, test := range []struct {
+		leveler Leveler
+		want    bool
+	}{
+		{nil, true},
+		{WarnLevel, false},
+		{&AtomicLevel{}, true}, // defaults to Info
+		{atomicLevel(WarnLevel), false},
+		{DebugLevel, true},
+		{atomicLevel(DebugLevel), true},
+	} {
+		h := &commonHandler{opts: HandlerOptions{Level: test.leveler}}
+		got := h.Enabled(InfoLevel)
+		if got != test.want {
+			t.Errorf("%v: got %t, want %t", test.leveler, got, test.want)
+		}
+	}
+}
+
 const rfc3339Millis = "2006-01-02T15:04:05.000Z07:00"
 
 func TestAppendTimeRFC3339(t *testing.T) {

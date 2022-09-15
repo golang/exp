@@ -25,7 +25,9 @@ func TestLogTextHandler(t *testing.T) {
 
 	check := func(want string) {
 		t.Helper()
-		want = "time=" + timeRE + " " + want
+		if want != "" {
+			want = "time=" + timeRE + " " + want
+		}
 		checkLogOutput(t, buf.String(), want)
 		buf.Reset()
 	}
@@ -33,8 +35,9 @@ func TestLogTextHandler(t *testing.T) {
 	l.Info("msg", "a", 1, "b", 2)
 	check(`level=INFO msg=msg a=1 b=2`)
 
+	// By default, debug messages are not printed.
 	l.Debug("bg", Int("a", 1), "b", 2)
-	check(`level=DEBUG msg=bg a=1 b=2`)
+	check("")
 
 	l.Warn("w", Duration("dur", 3*time.Second))
 	check(`level=WARN msg=w dur=3s`)
@@ -58,6 +61,14 @@ func TestConnections(t *testing.T) {
 	Info("msg", "a", 1)
 	checkLogOutput(t, logbuf.String(),
 		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO a=1 msg`)
+	logbuf.Reset()
+	Warn("msg", "b", 2)
+	checkLogOutput(t, logbuf.String(),
+		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: WARN b=2 msg`)
+	// Levels below Info are not printed.
+	logbuf.Reset()
+	Debug("msg", "c", 3)
+	checkLogOutput(t, logbuf.String(), "")
 
 	// Once slog.SetDefault is called, the direction is reversed: the default
 	// log.Logger's output goes through the handler.

@@ -45,7 +45,9 @@ type defaultHandler struct {
 	attrs []Attr
 }
 
-func (*defaultHandler) Enabled(Level) bool { return true }
+func (*defaultHandler) Enabled(l Level) bool {
+	return l >= InfoLevel
+}
 
 // Collect the level, attributes and message in a string and
 // write it with the default log.Logger.
@@ -75,9 +77,9 @@ type HandlerOptions struct {
 	// "file:line".
 	AddSource bool
 
-	// Ignore records with levels above Level.Level.
-	// If nil, accept all levels.
-	Level *AtomicLevel
+	// Ignore records with levels below Level.Level().
+	// The default is InfoLevel.
+	Level Leveler
 
 	// If set, ReplaceAttr is called on each attribute of the message,
 	// and the returned value is used instead of the original. If the returned
@@ -98,10 +100,14 @@ type commonHandler struct {
 	w                 io.Writer
 }
 
-// Enabled reports whether l is less than or equal to the
-// maximum level.
+// Enabled reports whether l is greater than or equal to the
+// minimum level.
 func (h *commonHandler) Enabled(l Level) bool {
-	return l <= h.opts.Level.Level()
+	minLevel := InfoLevel
+	if h.opts.Level != nil {
+		minLevel = h.opts.Level.Level()
+	}
+	return l >= minLevel
 }
 
 func (h *commonHandler) with(as []Attr) *commonHandler {

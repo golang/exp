@@ -6,7 +6,6 @@ package slog
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"sync/atomic"
 )
@@ -84,30 +83,37 @@ func (l Level) MarshalJSON() ([]byte, error) {
 	return strconv.AppendQuote(nil, l.String()), nil
 }
 
-// An AtomicLevel is Level that can be read and written safely by multiple
+// Level returns the receiver.
+// It implements Leveler.
+func (l Level) Level() Level { return l }
+
+// An AtomicLevel is a Level that can be read and written safely by multiple
 // goroutines.
-// Use NewAtomicLevel to create one.
+// The default value of AtomicLevel is InfoLevel.
 type AtomicLevel struct {
 	val atomic.Int64
 }
 
-// NewAtomicLevel creates an AtomicLevel initialized to the given Level.
-func NewAtomicLevel(l Level) *AtomicLevel {
-	var r AtomicLevel
-	r.Set(l)
-	return &r
-}
-
 // Level returns r's level.
-// If r is nil, it returns the maximum level.
-func (r *AtomicLevel) Level() Level {
-	if r == nil {
-		return Level(math.MaxInt)
-	}
-	return Level(int(r.val.Load()))
+func (a *AtomicLevel) Level() Level {
+	return Level(int(a.val.Load()))
 }
 
-// Set sets r's level to l.
-func (r *AtomicLevel) Set(l Level) {
-	r.val.Store(int64(l))
+// Set sets the receiver's level to l.
+func (a *AtomicLevel) Set(l Level) {
+	a.val.Store(int64(l))
+}
+
+func (a *AtomicLevel) String() string {
+	return fmt.Sprintf("AtomicLevel(%s)", a.Level())
+}
+
+// A Leveler provides a Level value.
+//
+// As Level itself implements Leveler, clients typically supply
+// a Level value wherever a Leveler is needed, such as in HandlerOptions.
+// Clients who need to vary the level dynamically can provide a more complex
+// Leveler implementation such as *AtomicLevel.
+type Leveler interface {
+	Level() Level
 }
