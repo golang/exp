@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"go/format"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -169,7 +168,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("gofmt failed: %v\n\nGenerated code:\n%s", err, raw)
 	}
-	if err := ioutil.WriteFile("data.go", formatted, 0644); err != nil {
+	if err := os.WriteFile("data.go", formatted, 0644); err != nil {
 		log.Fatalf("WriteFile failed: %s\n", err)
 	}
 
@@ -187,7 +186,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("gofmt failed: %v\n\nGenerated code:\n%s", err, raw)
 		}
-		if err := ioutil.WriteFile("data_test.go", formatted, 0644); err != nil {
+		if err := os.WriteFile("data_test.go", formatted, 0644); err != nil {
 			log.Fatalf("WriteFile failed: %s\n", err)
 		}
 	}
@@ -329,7 +328,7 @@ var skippedFiles = map[[2]string]bool{
 
 func genFile(fqSVGDirName, dirName, baseName, fileName string, size float32) error {
 	fqFileName := filepath.Join(fqSVGDirName, fileName)
-	svgData, err := ioutil.ReadFile(fqFileName)
+	svgData, err := os.ReadFile(fqFileName)
 	if err != nil {
 		return err
 	}

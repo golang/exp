@@ -11,7 +11,6 @@ import (
 	"go/scanner"
 	"go/token"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -105,7 +104,7 @@ func verify(name, start string, r io.Reader) error {
 		r = f
 	}
 
-	src, err := ioutil.ReadAll(r)
+	src, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

@@ -40,7 +40,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"regexp"
 	"runtime"
@@ -92,7 +92,7 @@ func countMatches(pat string, bytes []byte) int {
 
 func main() {
 	runtime.GOMAXPROCS(4)
-	bytes, err := ioutil.ReadAll(os.Stdin)
+	bytes, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "can't read input: %s\n", err)
 		os.Exit(2)

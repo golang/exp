@@ -7,7 +7,6 @@ package iconvg_test
 import (
 	"image"
 	"image/draw"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,7 +15,7 @@ import (
 )
 
 func Example() {
-	ivgData, err := ioutil.ReadFile(filepath.FromSlash("testdata/action-info.lores.ivg"))
+	ivgData, err := os.ReadFile(filepath.FromSlash("testdata/action-info.lores.ivg"))
 	if err != nil {
 		log.Fatal(err)
 	}

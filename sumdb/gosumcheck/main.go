@@ -34,7 +34,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -84,7 +83,7 @@ func main() {
 	conn.SetGONOSUMDB(env)
 
 	for _, arg := range flag.Args() {
-		data, err := ioutil.ReadFile(arg)
+		data, err := os.ReadFile(arg)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -201,7 +200,7 @@ func (*client) ReadRemote(path string) ([]byte, error) {
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("GET %v: %v", target, resp.Status)
 	}
-	data, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, err
 	}

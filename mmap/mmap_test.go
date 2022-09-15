@@ -7,7 +7,7 @@ package mmap
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -21,9 +21,9 @@ func TestOpen(t *testing.T) {
 	if _, err := r.ReadAt(got, 0); err != nil && err != io.EOF {
 		t.Fatalf("ReadAt: %v", err)
 	}
-	want, err := ioutil.ReadFile(filename)
+	want, err := os.ReadFile(filename)
 	if err != nil {
-		t.Fatalf("ioutil.ReadFile: %v", err)
+		t.Fatalf("os.ReadFile: %v", err)
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d bytes, want %d", len(got), len(want))

@@ -6,7 +6,6 @@ package main_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,7 +40,7 @@ func TestRoundTrip(t *testing.T) {
 	defer os.Unsetenv("SPECIAL_LOCATION")
 
 	// Expand the testdata archive into a temporary directory.
-	parentDir, err := ioutil.TempDir("", "txtar")
+	parentDir, err := os.MkdirTemp("", "txtar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func TestRoundTrip(t *testing.T) {
 
 func TestUnsafePaths(t *testing.T) {
 	// Set up temporary directories for test archives.
-	parentDir, err := ioutil.TempDir("", "txtar")
+	parentDir, err := os.MkdirTemp("", "txtar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +152,7 @@ func txtarName(t *testing.T) string {
 	}
 
 	txtarBin.once.Do(func() {
-		exe, err := ioutil.TempFile("", "txtar-*.exe")
+		exe, err := os.CreateTemp("", "txtar-*.exe")
 		if err != nil {
 			txtarBin.err = err
 			return

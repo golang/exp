@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -142,7 +141,7 @@ func verifyCertWithSystem(cert *x509.Certificate) bool {
 		Type: "CERTIFICATE", Bytes: cert.Raw,
 	})
 
-	f, err := ioutil.TempFile("", "cert")
+	f, err := os.CreateTemp("", "cert")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "can't create temporary file for cert: %v", err)
 		return false
