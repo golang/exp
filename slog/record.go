@@ -12,6 +12,9 @@ import (
 const nAttrsInline = 5
 
 // A Record holds information about a log event.
+// Copies of a Record share state.
+// Do not modify a Record after handing out a copy to it.
+// Use [Record.Clone] to create a copy with no shared state.
 type Record struct {
 	// The time at which the output method (Log, Info, etc.) was called.
 	time time.Time
@@ -28,26 +31,28 @@ type Record struct {
 
 	// Allocation optimization: an inline array sized to hold
 	// the majority of log calls (based on examination of open-source
-	// code). The array holds the end of the sequence of Attrs.
-	tail [nAttrsInline]Attr
+	// code). It holds the start of the list of Attrs.
+	front [nAttrsInline]Attr
 
-	// The number of Attrs in tail.
-	nTail int
+	// The number of Attrs in front.
+	nFront int
 
-	// The sequence of Attrs except for the tail, represented as a functional
-	// list of arrays.
-	attrs list[[nAttrsInline]Attr]
+	// The list of Attrs except for those in front.
+	// Invariants:
+	//   - len(back) > 0 iff nFront == len(front)
+	//   - Unused array elements are zero. Used to detect mistakes.
+	back []Attr
 }
 
-// MakeRecord creates a new Record from the given arguments.
-// Use [Record.AddAttr] to add attributes to the Record.
+// NewRecord creates a Record from the given arguments.
+// Use [Record.AddAttrs] to add attributes to the Record.
 // If calldepth is greater than zero, [Record.SourceLine] will
 // return the file and line number at that depth,
-// where 1 means the caller of MakeRecord.
+// where 1 means the caller of NewRecord.
 //
-// MakeRecord is intended for logging APIs that want to support a [Handler] as
+// NewRecord is intended for logging APIs that want to support a [Handler] as
 // a backend.
-func MakeRecord(t time.Time, level Level, msg string, calldepth int) Record {
+func NewRecord(t time.Time, level Level, msg string, calldepth int) Record {
 	var p uintptr
 	if calldepth > 0 {
 		p = pc(calldepth + 1)
@@ -85,50 +90,97 @@ func (r *Record) SourceLine() (file string, line int) {
 	return f.File, f.Line
 }
 
-// Attrs returns a copy of the sequence of Attrs in r.
-func (r *Record) Attrs() []Attr {
-	res := make([]Attr, 0, r.attrs.len()*nAttrsInline+r.nTail)
-	r.attrs = r.attrs.normalize()
-	for _, f := range r.attrs.front {
-		res = append(res, f[:]...)
+// Clone returns a copy of the record with no shared state.
+// The original record and the clone can both be modified
+// without interfering with each other.
+func (r *Record) Clone() Record {
+	c := *r
+	if len(c.back) > 0 {
+		c.back = make([]Attr, len(c.back))
+		copy(c.back, r.back)
 	}
-	for _, a := range r.tail[:r.nTail] {
-		res = append(res, a)
-	}
-	return res
+	return c
 }
 
-// NumAttrs returns the number of Attrs in r.
+// NumAttrs returns the number of attributes in the Record.
 func (r *Record) NumAttrs() int {
-	return r.attrs.len()*nAttrsInline + r.nTail
+	return r.nFront + len(r.back)
 }
 
-// Attr returns the i'th Attr in r.
-func (r *Record) Attr(i int) Attr {
-	if r.attrs.back != nil {
-		r.attrs = r.attrs.normalize()
+// Attrs calls f on each Attr in the Record.
+func (r *Record) Attrs(f func(Attr)) {
+	for i := 0; i < r.nFront; i++ {
+		f(r.front[i])
 	}
-	alen := r.attrs.len() * nAttrsInline
-	if i < alen {
-		return r.attrs.at(i / nAttrsInline)[i%nAttrsInline]
+	for _, a := range r.back {
+		f(a)
 	}
-	return r.tail[i-alen]
 }
 
-// AddAttr appends an attributes to the record's list of attributes.
-// It does not check for duplicate keys.
-func (r *Record) AddAttr(a Attr) {
-	if r.nTail == len(r.tail) {
-		r.attrs = r.attrs.append(r.tail)
-		r.nTail = 0
+// AddAttrs appends the given attrs to the Record's list of Attrs.
+func (r *Record) AddAttrs(attrs ...Attr) {
+	n := copy(r.front[r.nFront:], attrs)
+	r.nFront += n
+	// Check if a copy was modified by slicing past the end
+	// and seeing if the Attr there is non-zero.
+	if cap(r.back) > len(r.back) {
+		end := r.back[:len(r.back)+1][len(r.back)]
+		if end != (Attr{}) {
+			panic("copies of a slog.Record were both modified")
+		}
 	}
-	r.tail[r.nTail] = a
-	r.nTail++
+	r.back = append(r.back, attrs[n:]...)
 }
 
-func (r *Record) addAttrs(attrs []Attr) {
-	// TODO: be cleverer.
-	for _, a := range attrs {
-		r.AddAttr(a)
+func (r *Record) setAttrsFromArgs(args []any) {
+	var a Attr
+	for len(args) > 0 {
+		a, args = argsToAttr(args)
+		if r.nFront < len(r.front) {
+			r.front[r.nFront] = a
+			r.nFront++
+		} else {
+			if r.back == nil {
+				r.back = make([]Attr, 0, countAttrs(args))
+			}
+			r.back = append(r.back, a)
+		}
+	}
+
+}
+
+// countAttrs returns the number of Attrs that would be created from args.
+func countAttrs(args []any) int {
+	n := 0
+	for i := 0; i < len(args); i++ {
+		n++
+		if _, ok := args[i].(string); ok {
+			i++
+		}
+	}
+	return n
+}
+
+const badKey = "!BADKEY"
+
+// argsToAttr turns a prefix of the nonempty args slice into an Attr
+// and returns the unconsumed portion of the slice.
+// If args[0] is an Attr, it returns it.
+// If args[0] is a string, it treats the first two elements as
+// a key-value pair.
+// Otherwise, it treats args[0] as a value with a missing key.
+func argsToAttr(args []any) (Attr, []any) {
+	switch x := args[0].(type) {
+	case string:
+		if len(args) == 1 {
+			return String(badKey, x), nil
+		}
+		return Any(x, args[1]), args[2:]
+
+	case Attr:
+		return x, args[1:]
+
+	default:
+		return Any(badKey, x), args[1:]
 	}
 }

@@ -54,8 +54,8 @@ func TestTextHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			h := NewTextHandler(&buf)
-			r := MakeRecord(testTime, InfoLevel, "a message", 0)
-			r.AddAttr(test.attr)
+			r := NewRecord(testTime, InfoLevel, "a message", 0)
+			r.AddAttrs(test.attr)
 			if err := h.Handle(r); err != nil {
 				t.Fatal(err)
 			}
@@ -114,7 +114,7 @@ func TestTextAppendSource(t *testing.T) {
 func TestTextHandlerSource(t *testing.T) {
 	var buf bytes.Buffer
 	h := HandlerOptions{AddSource: true}.NewTextHandler(&buf)
-	r := MakeRecord(testTime, InfoLevel, "m", 2)
+	r := NewRecord(testTime, InfoLevel, "m", 2)
 	if err := h.Handle(r); err != nil {
 		t.Fatal(err)
 	}
@@ -142,8 +142,8 @@ func TestTextHandlerPreformatted(t *testing.T) {
 	var h Handler = NewTextHandler(&buf)
 	h = h.With([]Attr{Duration("dur", time.Minute), Bool("b", true)})
 	// Also test omitting time and level.
-	r := MakeRecord(time.Time{}, 0, "m", 0)
-	r.AddAttr(Int("a", 1))
+	r := NewRecord(time.Time{}, 0, "m", 0)
+	r.AddAttrs(Int("a", 1))
 	if err := h.Handle(r); err != nil {
 		t.Fatal(err)
 	}
@@ -155,9 +155,9 @@ func TestTextHandlerPreformatted(t *testing.T) {
 }
 
 func TestTextHandlerAlloc(t *testing.T) {
-	r := MakeRecord(time.Now(), InfoLevel, "msg", 0)
+	r := NewRecord(time.Now(), InfoLevel, "msg", 0)
 	for i := 0; i < 10; i++ {
-		r.AddAttr(Int("x = y", i))
+		r.AddAttrs(Int("x = y", i))
 	}
 	h := NewTextHandler(io.Discard)
 	wantAllocs(t, 0, func() { h.Handle(r) })

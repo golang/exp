@@ -57,10 +57,10 @@ func (h *defaultHandler) Handle(r Record) error {
 		b.WriteString(r.Level().String())
 		b.WriteByte(' ')
 	}
-	for i := 0; i < r.NumAttrs(); i++ {
-		fmt.Fprint(&b, r.Attr(i)) // Attr.Format will print key=value
+	r.Attrs(func(a Attr) {
+		fmt.Fprint(&b, a) // Attr.Format will print key=value
 		b.WriteByte(' ')
-	}
+	})
 	b.WriteString(r.Message())
 	return log.Output(4, b.String())
 }
@@ -205,13 +205,12 @@ func (h *commonHandler) handle(r Record) error {
 		replace(String(key, val))
 	}
 	*buf = append(*buf, h.preformattedAttrs...)
-	for i := 0; i < r.NumAttrs(); i++ {
-		a := r.Attr(i)
+	r.Attrs(func(a Attr) {
 		if rep != nil {
 			a = rep(a)
 		}
 		appendAttr(app, a)
-	}
+	})
 	app.appendEnd()
 	buf.WriteByte('\n')
 
