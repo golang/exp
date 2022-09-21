@@ -21,50 +21,72 @@ var testTime = time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC)
 
 func TestTextHandler(t *testing.T) {
 	for _, test := range []struct {
-		name string
-		attr Attr
-		want string
+		name             string
+		attr             Attr
+		wantKey, wantVal string
 	}{
 		{
 			"unquoted",
 			Int("a", 1),
-			"a=1",
+			"a", "1",
 		},
 		{
 			"quoted",
 			String("x = y", `qu"o`),
-			`"x = y"="qu\"o"`,
+			`"x = y"`, `"qu\"o"`,
 		},
 		{
 			"Sprint",
 			Any("name", name{"Ren", "Hoek"}),
-			`name="Hoek, Ren"`,
+			`name`, `"Hoek, Ren"`,
 		},
 		{
 			"TextMarshaler",
 			Any("t", text{"abc"}),
-			`t="text{\"abc\"}"`,
+			`t`, `"text{\"abc\"}"`,
 		},
 		{
 			"TextMarshaler error",
 			Any("t", text{""}),
-			`t="!ERROR:text: empty string"`,
+			`t`, `"!ERROR:text: empty string"`,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			h := NewTextHandler(&buf)
-			r := NewRecord(testTime, InfoLevel, "a message", 0)
-			r.AddAttrs(test.attr)
-			if err := h.Handle(r); err != nil {
-				t.Fatal(err)
-			}
-			got := buf.String()
-			// Remove final newline.
-			got = got[:len(got)-1]
-			want := `time=2000-01-02T03:04:05.000Z level=INFO msg="a message" ` + test.want
-			if got != want {
-				t.Errorf("\ngot  %s\nwant %s", got, want)
+			for _, opts := range []struct {
+				name       string
+				opts       HandlerOptions
+				wantPrefix string
+				modKey     func(string) string
+			}{
+				{
+					"none",
+					HandlerOptions{},
+					`time=2000-01-02T03:04:05.000Z level=INFO msg="a message"`,
+					func(s string) string { return s },
+				},
+				{
+					"replace",
+					HandlerOptions{ReplaceAttr: upperCaseKey},
+					`TIME=2000-01-02T03:04:05.000Z LEVEL=INFO MSG="a message"`,
+					strings.ToUpper,
+				},
+			} {
+				t.Run(opts.name, func(t *testing.T) {
+					var buf bytes.Buffer
+					h := opts.opts.NewTextHandler(&buf)
+					r := NewRecord(testTime, InfoLevel, "a message", 0)
+					r.AddAttrs(test.attr)
+					if err := h.Handle(r); err != nil {
+						t.Fatal(err)
+					}
+					got := buf.String()
+					// Remove final newline.
+					got = got[:len(got)-1]
+					want := opts.wantPrefix + " " + opts.modKey(test.wantKey) + "=" + test.wantVal
+					if got != want {
+						t.Errorf("\ngot  %s\nwant %s", got, want)
+					}
+				})
 			}
 		})
 	}

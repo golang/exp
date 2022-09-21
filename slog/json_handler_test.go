@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,18 +20,35 @@ import (
 )
 
 func TestJSONHandler(t *testing.T) {
-	var buf bytes.Buffer
-	h := NewJSONHandler(&buf)
-	r := NewRecord(testTime, InfoLevel, "m", 0)
-	r.AddAttrs(Int("a", 1))
-	if err := h.Handle(r); err != nil {
-		t.Fatal(err)
-	}
-	got := buf.String()
-	got = got[:len(got)-1] // Remove final newline.
-	want := `{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"m","a":1}`
-	if got != want {
-		t.Errorf("\ngot  %s\nwant %s", got, want)
+	for _, test := range []struct {
+		name string
+		opts HandlerOptions
+		want string
+	}{
+		{
+			"none",
+			HandlerOptions{},
+			`{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"m","a":1,"m":{"b":2}}`,
+		},
+		{
+			"replace",
+			HandlerOptions{ReplaceAttr: upperCaseKey},
+			`{"TIME":"2000-01-02T03:04:05Z","LEVEL":"INFO","MSG":"m","A":1,"M":{"b":2}}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			h := test.opts.NewJSONHandler(&buf)
+			r := NewRecord(testTime, InfoLevel, "m", 0)
+			r.AddAttrs(Int("a", 1), Any("m", map[string]int{"b": 2}))
+			if err := h.Handle(r); err != nil {
+				t.Fatal(err)
+			}
+			got := strings.TrimSuffix(buf.String(), "\n")
+			if got != test.want {
+				t.Errorf("\ngot  %s\nwant %s", got, test.want)
+			}
+		})
 	}
 }
 

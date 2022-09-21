@@ -51,11 +51,7 @@ func TestCommonHandle(t *testing.T) {
 		{
 			name: "cap keys",
 			h: &commonHandler{
-				opts: HandlerOptions{
-					ReplaceAttr: func(a Attr) Attr {
-						return a.WithKey(strings.ToUpper(a.Key()))
-					},
-				},
+				opts: HandlerOptions{ReplaceAttr: upperCaseKey},
 			},
 			want: "(TIME=2022-09-18T08:26:33.000Z;LEVEL=INFO;MSG=message;A=one;B=2)",
 		},
@@ -85,6 +81,10 @@ func TestCommonHandle(t *testing.T) {
 			}
 		})
 	}
+}
+
+func upperCaseKey(a Attr) Attr {
+	return a.WithKey(strings.ToUpper(a.Key()))
 }
 
 type testAppender struct {

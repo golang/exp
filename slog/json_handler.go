@@ -149,10 +149,7 @@ func (ap *jsonAppender) appendAttrValue(a Attr) error {
 			return err
 		}
 	case AnyKind:
-		v := a.Value()
-		if l, ok := v.(Level); ok {
-			ap.appendString(l.String())
-		} else if err := ap.appendJSONMarshal(v); err != nil {
+		if err := ap.appendJSONMarshal(a.Value()); err != nil {
 			return err
 		}
 	default:

@@ -7,6 +7,7 @@ package slog
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"sync/atomic"
 )
 
@@ -76,6 +77,13 @@ func (l Level) String() string {
 	default:
 		return str("DEBUG", l-DebugLevel)
 	}
+}
+
+func (l Level) MarshalJSON() ([]byte, error) {
+	// AppendQuote is sufficient for JSON-encoding all Level strings.
+	// They don't contain any runes that would produce invalid JSON
+	// when escaped.
+	return strconv.AppendQuote(nil, l.String()), nil
 }
 
 // An AtomicLevel is Level that can be read and written safely by multiple
