@@ -114,8 +114,6 @@ func (t text) MarshalText() ([]byte, error) {
 }
 
 func TestTextAppendSource(t *testing.T) {
-	var buf []byte
-	app := (*textAppender)((*buffer.Buffer)(&buf))
 	for _, test := range []struct {
 		file string
 		want string
@@ -124,12 +122,13 @@ func TestTextAppendSource(t *testing.T) {
 		{"a b.go", `"a b.go:1"`},
 		{`C:\windows\b.go`, `C:\windows\b.go:1`},
 	} {
-		app.appendSource(test.file, 1)
+		var buf []byte
+		(textAppender{}).appendSource((*buffer.Buffer)(&buf), test.file, 1)
 		got := string(buf)
 		if got != test.want {
 			t.Errorf("%s:\ngot  %s\nwant %s", test.file, got, test.want)
 		}
-		buf = buf[:0]
+
 	}
 }
 

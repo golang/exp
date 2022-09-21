@@ -32,11 +32,10 @@ func NewTextHandler(w io.Writer) *TextHandler {
 func (opts HandlerOptions) NewTextHandler(w io.Writer) *TextHandler {
 	return &TextHandler{
 		&commonHandler{
-			newAppender: func(buf *buffer.Buffer) appender {
-				return (*textAppender)(buf)
-			},
-			w:    w,
-			opts: opts,
+			app:     textAppender{},
+			attrSep: ' ',
+			w:       w,
+			opts:    opts,
 		},
 	}
 }
@@ -78,65 +77,59 @@ func (h *TextHandler) Handle(r Record) error {
 	return h.commonHandler.handle(r)
 }
 
-type textAppender buffer.Buffer
+type textAppender struct{}
 
-func (a *textAppender) buf() *buffer.Buffer { return (*buffer.Buffer)(a) }
+func (textAppender) appendStart(*buffer.Buffer) {}
 
-func (a *textAppender) appendKey(key string) {
-	a.appendString(key)
-	a.buf().WriteByte('=')
+func (textAppender) appendEnd(*buffer.Buffer) {}
+
+func (a textAppender) appendKey(buf *buffer.Buffer, key string) {
+	a.appendString(buf, key)
+	buf.WriteByte('=')
 }
 
-func (a *textAppender) appendString(s string) {
+func (textAppender) appendString(buf *buffer.Buffer, s string) {
 	if needsQuoting(s) {
-		*a.buf() = strconv.AppendQuote(*a.buf(), s)
+		*buf = strconv.AppendQuote(*buf, s)
 	} else {
-		a.buf().WriteString(s)
+		buf.WriteString(s)
 	}
 }
 
-func (a *textAppender) appendStart() {}
-func (a *textAppender) appendEnd()   {}
-func (a *textAppender) appendSep()   { a.buf().WriteByte(' ') }
-
-func (a *textAppender) appendTime(t time.Time) error {
-	*a.buf() = appendTimeRFC3339Millis(*a.buf(), t)
+func (textAppender) appendTime(buf *buffer.Buffer, t time.Time) error {
+	*buf = appendTimeRFC3339Millis(*buf, t)
 	return nil
 }
 
-func (a *textAppender) appendSource(file string, line int) {
+func (a textAppender) appendSource(buf *buffer.Buffer, file string, line int) {
 	if needsQuoting(file) {
-		a.appendString(file + ":" + strconv.Itoa(line))
+		a.appendString(buf, file+":"+strconv.Itoa(line))
 	} else {
 		// common case: no quoting needed.
-		a.appendString(file)
-		a.buf().WriteByte(':')
-		itoa((*[]byte)(a.buf()), line, -1)
+		a.appendString(buf, file)
+		buf.WriteByte(':')
+		itoa((*[]byte)(buf), line, -1)
 	}
 }
-
-func (ap *textAppender) appendAttrValue(a Attr) error {
+func (app textAppender) appendAttrValue(buf *buffer.Buffer, a Attr) error {
 	switch a.Kind() {
 	case StringKind:
-		ap.appendString(a.str())
+		app.appendString(buf, a.str())
 	case TimeKind:
-		if err := ap.appendTime(a.Time()); err != nil {
-			return err
-		}
+		_ = app.appendTime(buf, a.Time())
 	case AnyKind:
 		if tm, ok := a.any.(encoding.TextMarshaler); ok {
 			data, err := tm.MarshalText()
 			if err != nil {
-				ap.appendString("!ERROR:" + err.Error())
-			} else {
-				// TODO: avoid the conversion to string.
-				ap.appendString(string(data))
+				return err
 			}
+			// TODO: avoid the conversion to string.
+			app.appendString(buf, string(data))
 			return nil
 		}
-		ap.appendString(fmt.Sprint(a.Value()))
+		app.appendString(buf, fmt.Sprint(a.Value()))
 	default:
-		*ap.buf() = a.appendValue(*ap.buf())
+		*buf = a.appendValue(*buf)
 	}
 	return nil
 }

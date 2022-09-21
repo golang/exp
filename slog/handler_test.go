@@ -8,12 +8,9 @@ package slog
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/exp/slog/internal/buffer"
 )
 
 func TestDefaultWith(t *testing.T) {
@@ -33,10 +30,21 @@ func TestDefaultWith(t *testing.T) {
 	}
 }
 
+// NOTE TO REVIEWER: Ignore this test. The next CL revamps it.
 func TestCommonHandle(t *testing.T) {
 	tm := time.Date(2022, 9, 18, 8, 26, 33, 0, time.UTC)
 	r := NewRecord(tm, InfoLevel, "message", 1)
 	r.AddAttrs(String("a", "one"), Int("b", 2), Any("", "ignore me"))
+
+	newHandler := func(replace func(Attr) Attr) *commonHandler {
+		return &commonHandler{
+			app:     textAppender{},
+			attrSep: ' ',
+			opts:    HandlerOptions{ReplaceAttr: replace},
+		}
+	}
+
+	removeAttr := func(a Attr) Attr { return Attr{} }
 
 	for _, test := range []struct {
 		name string
@@ -45,33 +53,38 @@ func TestCommonHandle(t *testing.T) {
 	}{
 		{
 			name: "basic",
-			h:    &commonHandler{},
-			want: "(time=2022-09-18T08:26:33.000Z;level=INFO;msg=message;a=one;b=2)",
+			h:    newHandler(nil),
+			want: "time=2022-09-18T08:26:33.000Z level=INFO msg=message a=one b=2",
 		},
 		{
 			name: "cap keys",
-			h: &commonHandler{
-				opts: HandlerOptions{ReplaceAttr: upperCaseKey},
-			},
-			want: "(TIME=2022-09-18T08:26:33.000Z;LEVEL=INFO;MSG=message;A=one;B=2)",
+			h:    newHandler(upperCaseKey),
+			want: "TIME=2022-09-18T08:26:33.000Z LEVEL=INFO MSG=message A=one B=2",
 		},
 		{
 			name: "remove all",
-			h: &commonHandler{
-				opts: HandlerOptions{
-					ReplaceAttr: func(a Attr) Attr { return Attr{} },
-				},
-			},
-			// TODO: fix this. The correct result is "()".
-			want: "(;;)",
+			h:    newHandler(removeAttr),
+			want: "",
+		},
+		{
+			name: "preformatted",
+			h:    newHandler(nil).with([]Attr{Int("pre", 3), String("x", "y")}),
+			want: "time=2022-09-18T08:26:33.000Z level=INFO msg=message pre=3 x=y a=one b=2",
+		},
+		{
+			name: "preformatted cap keys",
+			h:    newHandler(upperCaseKey).with([]Attr{Int("pre", 3), String("x", "y")}),
+			want: "TIME=2022-09-18T08:26:33.000Z LEVEL=INFO MSG=message PRE=3 X=y A=one B=2",
+		},
+		{
+			name: "preformatted remove all",
+			h:    newHandler(removeAttr).with([]Attr{Int("pre", 3), String("x", "y")}),
+			want: "",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			test.h.w = &buf
-			test.h.newAppender = func(buf *buffer.Buffer) appender {
-				return &testAppender{buf}
-			}
 			if err := test.h.handle(r); err != nil {
 				t.Fatal(err)
 			}
@@ -85,41 +98,6 @@ func TestCommonHandle(t *testing.T) {
 
 func upperCaseKey(a Attr) Attr {
 	return a.WithKey(strings.ToUpper(a.Key()))
-}
-
-type testAppender struct {
-	buf *buffer.Buffer
-}
-
-func (a *testAppender) appendStart() { a.buf.WriteByte('(') }
-func (a *testAppender) appendSep()   { a.buf.WriteByte(';') }
-func (a *testAppender) appendEnd()   { a.buf.WriteByte(')') }
-
-func (a *testAppender) appendKey(key string) {
-	a.appendString(key)
-	a.buf.WriteByte('=')
-}
-func (a *testAppender) appendString(s string) { a.buf.WriteString(s) }
-
-func (a *testAppender) appendTime(t time.Time) error {
-	*a.buf = appendTimeRFC3339Millis(*a.buf, t)
-	return nil
-}
-
-func (a *testAppender) appendSource(file string, line int) {
-	a.appendString(fmt.Sprintf("%s:%d", file, line))
-}
-
-func (a *testAppender) appendAttrValue(at Attr) error {
-	switch at.Kind() {
-	case StringKind:
-		a.appendString(at.str())
-	case TimeKind:
-		a.appendTime(at.Time())
-	default:
-		*a.buf = at.appendValue(*a.buf)
-	}
-	return nil
 }
 
 const rfc3339Millis = "2006-01-02T15:04:05.000Z07:00"

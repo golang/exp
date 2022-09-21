@@ -32,15 +32,12 @@ func NewJSONHandler(w io.Writer) *JSONHandler {
 func (opts HandlerOptions) NewJSONHandler(w io.Writer) *JSONHandler {
 	return &JSONHandler{
 		&commonHandler{
-			newAppender: newJSONAppender,
-			w:           w,
-			opts:        opts,
+			app:     jsonAppender{},
+			attrSep: ',',
+			w:       w,
+			opts:    opts,
 		},
 	}
-}
-
-func newJSONAppender(buf *buffer.Buffer) appender {
-	return (*jsonAppender)(buf)
 }
 
 // With returns a new JSONHandler whose attributes consists
@@ -53,7 +50,7 @@ func (h *JSONHandler) With(attrs []Attr) Handler {
 //
 // If the Record's time is zero, the time is omitted.
 // Otherwise, the key is "time"
-// and the value is output in RFC3339 format with millisecond precision.
+// and the value is output as with json.Marshal.
 //
 // If the Record's level is zero, the level is omitted.
 // Otherwise, the key is "level"
@@ -79,77 +76,74 @@ func (h *JSONHandler) Handle(r Record) error {
 	return h.commonHandler.handle(r)
 }
 
-type jsonAppender buffer.Buffer
+type jsonAppender struct{}
 
-func (a *jsonAppender) buf() *buffer.Buffer { return (*buffer.Buffer)(a) }
+func (jsonAppender) appendStart(buf *buffer.Buffer) { buf.WriteByte('{') }
+func (jsonAppender) appendEnd(buf *buffer.Buffer)   { buf.WriteByte('}') }
 
-func (a *jsonAppender) appendKey(key string) {
-	a.appendString(key)
-	a.buf().WriteByte(':')
+func (a jsonAppender) appendKey(buf *buffer.Buffer, key string) {
+	a.appendString(buf, key)
+	buf.WriteByte(':')
 }
 
-func (a *jsonAppender) appendString(s string) {
-	*a.buf() = appendQuotedJSONString(*a.buf(), s)
+func (jsonAppender) appendString(buf *buffer.Buffer, s string) {
+	*buf = appendQuotedJSONString(*buf, s)
 }
 
-func (a *jsonAppender) appendStart() { a.buf().WriteByte('{') }
-func (a *jsonAppender) appendEnd()   { a.buf().WriteByte('}') }
-func (a *jsonAppender) appendSep()   { a.buf().WriteByte(',') }
+func (jsonAppender) appendSource(buf *buffer.Buffer, file string, line int) {
+	buf.WriteByte('"')
+	*buf = appendJSONString(*buf, file)
+	buf.WriteByte(':')
+	itoa((*[]byte)(buf), line, -1)
+	buf.WriteByte('"')
+}
 
-func (a *jsonAppender) appendTime(t time.Time) error {
+func (jsonAppender) appendTime(buf *buffer.Buffer, t time.Time) error {
 	b, err := t.MarshalJSON()
 	if err != nil {
 		return err
 	}
-	a.buf().Write(b)
+	buf.Write(b)
 	return nil
 }
 
-func (a *jsonAppender) appendSource(file string, line int) {
-	a.buf().WriteByte('"')
-	*a.buf() = appendJSONString(*a.buf(), file)
-	a.buf().WriteByte(':')
-	itoa((*[]byte)(a), line, -1)
-	a.buf().WriteByte('"')
-}
-
-func (ap *jsonAppender) appendAttrValue(a Attr) error {
+func (app jsonAppender) appendAttrValue(buf *buffer.Buffer, a Attr) error {
 	switch a.Kind() {
 	case StringKind:
-		ap.appendString(a.str())
+		app.appendString(buf, a.str())
 	case Int64Kind:
-		*ap.buf() = strconv.AppendInt(*ap.buf(), a.Int64(), 10)
+		*buf = strconv.AppendInt(*buf, a.Int64(), 10)
 	case Uint64Kind:
-		*ap.buf() = strconv.AppendUint(*ap.buf(), a.Uint64(), 10)
+		*buf = strconv.AppendUint(*buf, a.Uint64(), 10)
 	case Float64Kind:
 		f := a.Float64()
 		// json.Marshal fails on special floats, so handle them here.
 		switch {
 		case math.IsInf(f, 1):
-			ap.buf().WriteString(`"+Inf"`)
+			buf.WriteString(`"+Inf"`)
 		case math.IsInf(f, -1):
-			ap.buf().WriteString(`"-Inf"`)
+			buf.WriteString(`"-Inf"`)
 		case math.IsNaN(f):
-			ap.buf().WriteString(`"NaN"`)
+			buf.WriteString(`"NaN"`)
 		default:
 			// json.Marshal is funny about floats; it doesn't
 			// always match strconv.AppendFloat. So just call it.
 			// That's expensive, but floats are rare.
-			if err := ap.appendJSONMarshal(f); err != nil {
+			if err := appendJSONMarshal(buf, f); err != nil {
 				return err
 			}
 		}
 	case BoolKind:
-		*ap.buf() = strconv.AppendBool(*ap.buf(), a.Bool())
+		*buf = strconv.AppendBool(*buf, a.Bool())
 	case DurationKind:
 		// Do what json.Marshal does.
-		*ap.buf() = strconv.AppendInt(*ap.buf(), int64(a.Duration()), 10)
+		*buf = strconv.AppendInt(*buf, int64(a.Duration()), 10)
 	case TimeKind:
-		if err := ap.appendTime(a.Time()); err != nil {
+		if err := app.appendTime(buf, a.Time()); err != nil {
 			return err
 		}
 	case AnyKind:
-		if err := ap.appendJSONMarshal(a.Value()); err != nil {
+		if err := appendJSONMarshal(buf, a.Value()); err != nil {
 			return err
 		}
 	default:
@@ -158,12 +152,12 @@ func (ap *jsonAppender) appendAttrValue(a Attr) error {
 	return nil
 }
 
-func (a *jsonAppender) appendJSONMarshal(v any) error {
+func appendJSONMarshal(buf *buffer.Buffer, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	a.buf().Write(b)
+	buf.Write(b)
 	return nil
 }
 

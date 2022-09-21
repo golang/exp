@@ -93,9 +93,9 @@ type HandlerOptions struct {
 }
 
 type commonHandler struct {
-	newAppender       func(*buffer.Buffer) appender
 	opts              HandlerOptions
-	attrs             []Attr
+	app               appender
+	attrSep           byte // char separating attrs from each other
 	preformattedAttrs []byte
 	mu                sync.Mutex
 	w                 io.Writer
@@ -109,132 +109,162 @@ func (h *commonHandler) Enabled(l Level) bool {
 
 func (h *commonHandler) with(as []Attr) *commonHandler {
 	h2 := &commonHandler{
-		newAppender:       h.newAppender,
+		app:               h.app,
+		attrSep:           h.attrSep,
 		opts:              h.opts,
-		attrs:             concat(h.attrs, as),
 		preformattedAttrs: h.preformattedAttrs,
 		w:                 h.w,
 	}
-	if h.opts.ReplaceAttr != nil {
-		for i, p := range h2.attrs[len(h.attrs):] {
-			h2.attrs[i] = h.opts.ReplaceAttr(p)
-		}
-	}
-
 	// Pre-format the attributes as an optimization.
-	app := h2.newAppender((*buffer.Buffer)(&h2.preformattedAttrs))
-	for _, p := range h2.attrs[len(h.attrs):] {
-		appendAttr(app, p)
+	state := handleState{
+		h2,
+		(*buffer.Buffer)(&h2.preformattedAttrs),
+		false,
+	}
+	for _, a := range as {
+		state.appendAttr(a)
 	}
 	return h2
 }
 
 func (h *commonHandler) handle(r Record) error {
-	buf := buffer.New()
-	defer buf.Free()
-	app := h.newAppender(buf)
 	rep := h.opts.ReplaceAttr
-	replace := func(a Attr) {
-		a = rep(a)
-		if a.Key() != "" {
-			app.appendKey(a.Key())
-			if err := app.appendAttrValue(a); err != nil {
-				app.appendString(fmt.Sprintf("!ERROR:%v", err))
-			}
-		}
-	}
-
-	app.appendStart()
+	state := handleState{h, buffer.New(), false}
+	defer state.buf.Free()
+	h.app.appendStart(state.buf)
+	// time
 	if !r.Time().IsZero() {
 		key := "time"
 		val := r.Time().Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
-			app.appendKey(key)
-			if err := app.appendTime(val); err != nil {
-				return err
-			}
+			state.appendKey(key)
+			state.appendTime(val)
 		} else {
-			replace(Time(key, val))
+			state.appendAttr(Time(key, val))
 		}
-		app.appendSep()
 	}
+	// level
 	if r.Level() != 0 {
 		key := "level"
 		val := r.Level()
 		if rep == nil {
-			app.appendKey(key)
-			app.appendString(val.String())
+			state.appendKey(key)
+			state.appendString(val.String())
 		} else {
-			replace(Any(key, val))
+			state.appendAttr(Any(key, val))
 		}
-		app.appendSep()
 	}
+	// source
 	if h.opts.AddSource {
 		file, line := r.SourceLine()
 		if file != "" {
 			key := "source"
 			if rep == nil {
-				app.appendKey(key)
-				app.appendSource(file, line)
+				state.appendKey(key)
+				h.app.appendSource(state.buf, file, line)
 			} else {
 				buf := buffer.New()
-				buf.WriteString(file)
+				buf.WriteString(file) // TODO: escape?
 				buf.WriteByte(':')
 				itoa((*[]byte)(buf), line, -1)
 				s := buf.String()
 				buf.Free()
-				replace(String(key, s))
+				state.appendAttr(String(key, s))
 			}
-			app.appendSep()
 		}
 	}
+	// message
 	key := "msg"
 	val := r.Message()
 	if rep == nil {
-		app.appendKey(key)
-		app.appendString(val)
+		state.appendKey(key)
+		state.appendString(val)
 	} else {
-		replace(String(key, val))
+		state.appendAttr(String(key, val))
 	}
-	*buf = append(*buf, h.preformattedAttrs...)
+	// preformatted Attrs
+	if len(h.preformattedAttrs) > 0 {
+		state.appendSep()
+		state.buf.Write(h.preformattedAttrs)
+	}
+	// Attrs in Record
 	r.Attrs(func(a Attr) {
-		if rep != nil {
-			a = rep(a)
-		}
-		appendAttr(app, a)
+		state.appendAttr(a)
 	})
-	app.appendEnd()
-	buf.WriteByte('\n')
+	h.app.appendEnd(state.buf)
+	state.buf.WriteByte('\n')
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	_, err := h.w.Write(*buf)
+	_, err := h.w.Write(*state.buf)
 	return err
 }
 
-func appendAttr(app appender, a Attr) {
-	if a.Key() != "" {
-		app.appendSep()
-		app.appendKey(a.Key())
-		if err := app.appendAttrValue(a); err != nil {
-			app.appendString(fmt.Sprintf("!ERROR:%v", err))
-		}
+// handleState holds state for a single call to commonHandler.handle.
+// The initial value of sep determines whether to emit a separator
+// before the next key, after which it stays true.
+type handleState struct {
+	h   *commonHandler
+	buf *buffer.Buffer
+	sep bool // Append separator before next Attr?
+}
+
+// appendAttr appends the Attr's key and value using app.
+// If sep is true, it also prepends a separator.
+// It handles replacement and checking for an empty key.
+// It sets sep to true if it actually did the append (if the key was non-empty
+// after replacement).
+func (s *handleState) appendAttr(a Attr) {
+	if rep := s.h.opts.ReplaceAttr; rep != nil {
+		a = rep(a)
+	}
+	if a.Key() == "" {
+		return
+	}
+	s.appendKey(a.Key())
+	s.appendAttrValue(a)
+}
+
+func (s *handleState) appendError(err error) {
+	s.appendString(fmt.Sprintf("!ERROR:%v", err))
+}
+
+type appender interface {
+	appendStart(*buffer.Buffer)                 // start of output
+	appendEnd(*buffer.Buffer)                   // end of output
+	appendKey(*buffer.Buffer, string)           // append key and key-value separator
+	appendString(*buffer.Buffer, string)        // append a string
+	appendSource(*buffer.Buffer, string, int)   // append a filename and line
+	appendTime(*buffer.Buffer, time.Time) error // append a time
+	appendAttrValue(*buffer.Buffer, Attr) error // append Attr's value (but not key)
+}
+
+func (s *handleState) appendSep() {
+	if s.sep {
+		s.buf.WriteByte(s.h.attrSep)
 	}
 }
 
-// An appender appends keys and values to a buffer.
-// TextHandler and JSONHandler both implement it.
-// It factors out the format-specific parts of the job.
-// Other than growing the buffer, none of the methods should allocate.
-type appender interface {
-	appendStart()                       // start a sequence of Attrs
-	appendEnd()                         // end a sequence of Attrs
-	appendSep()                         // separate one Attr from the next
-	appendKey(key string)               // append a key
-	appendString(string)                // append a string that may need to be escaped
-	appendTime(time.Time) error         // append a time
-	appendSource(file string, line int) // append file:line
-	appendAttrValue(a Attr) error       // append the Attr's value (but not its key)
+func (s *handleState) appendKey(key string) {
+	s.appendSep()
+	s.h.app.appendKey(s.buf, key)
+	s.sep = true
+}
+
+func (s *handleState) appendString(str string) {
+	s.h.app.appendString(s.buf, str)
+}
+
+func (s *handleState) appendAttrValue(a Attr) {
+	if err := s.h.app.appendAttrValue(s.buf, a); err != nil {
+		s.appendError(err)
+	}
+}
+
+func (s *handleState) appendTime(t time.Time) {
+	if err := s.h.app.appendTime(s.buf, t); err != nil {
+		s.appendError(err)
+	}
 }
 
 // This takes half the time of Time.AppendFormat.
