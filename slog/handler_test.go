@@ -30,67 +30,89 @@ func TestDefaultWith(t *testing.T) {
 	}
 }
 
-// NOTE TO REVIEWER: Ignore this test. The next CL revamps it.
-func TestCommonHandle(t *testing.T) {
-	tm := time.Date(2022, 9, 18, 8, 26, 33, 0, time.UTC)
-	r := NewRecord(tm, InfoLevel, "message", 1)
-	r.AddAttrs(String("a", "one"), Int("b", 2), Any("", "ignore me"))
-
-	newHandler := func(replace func(Attr) Attr) *commonHandler {
-		return &commonHandler{
-			app:     textAppender{},
-			attrSep: ' ',
-			opts:    HandlerOptions{ReplaceAttr: replace},
-		}
-	}
-
+// Verify the common parts of TextHandler and JSONHandler.
+func TestJSONAndTextHandlers(t *testing.T) {
 	removeAttr := func(a Attr) Attr { return Attr{} }
 
+	attrs := []Attr{String("a", "one"), Int("b", 2), Any("", "ignore me")}
+	preAttrs := []Attr{Int("pre", 3), String("x", "y")}
+
 	for _, test := range []struct {
-		name string
-		h    *commonHandler
-		want string
+		name     string
+		replace  func(Attr) Attr
+		preAttrs []Attr
+		attrs    []Attr
+		wantText string
+		wantJSON string
 	}{
 		{
-			name: "basic",
-			h:    newHandler(nil),
-			want: "time=2022-09-18T08:26:33.000Z level=INFO msg=message a=one b=2",
+			name:     "basic",
+			attrs:    attrs,
+			wantText: "time=2000-01-02T03:04:05.000Z level=INFO msg=message a=one b=2",
+			wantJSON: `{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"message","a":"one","b":2}`,
 		},
 		{
-			name: "cap keys",
-			h:    newHandler(upperCaseKey),
-			want: "TIME=2022-09-18T08:26:33.000Z LEVEL=INFO MSG=message A=one B=2",
+			name:     "cap keys",
+			replace:  upperCaseKey,
+			attrs:    attrs,
+			wantText: "TIME=2000-01-02T03:04:05.000Z LEVEL=INFO MSG=message A=one B=2",
+			wantJSON: `{"TIME":"2000-01-02T03:04:05Z","LEVEL":"INFO","MSG":"message","A":"one","B":2}`,
 		},
 		{
-			name: "remove all",
-			h:    newHandler(removeAttr),
-			want: "",
+			name:     "remove all",
+			replace:  removeAttr,
+			attrs:    attrs,
+			wantText: "",
+			wantJSON: `{}`,
 		},
 		{
-			name: "preformatted",
-			h:    newHandler(nil).with([]Attr{Int("pre", 3), String("x", "y")}),
-			want: "time=2022-09-18T08:26:33.000Z level=INFO msg=message pre=3 x=y a=one b=2",
+			name:     "preformatted",
+			preAttrs: preAttrs,
+			attrs:    attrs,
+			wantText: "time=2000-01-02T03:04:05.000Z level=INFO msg=message pre=3 x=y a=one b=2",
+			wantJSON: `{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"message","pre":3,"x":"y","a":"one","b":2}`,
 		},
 		{
-			name: "preformatted cap keys",
-			h:    newHandler(upperCaseKey).with([]Attr{Int("pre", 3), String("x", "y")}),
-			want: "TIME=2022-09-18T08:26:33.000Z LEVEL=INFO MSG=message PRE=3 X=y A=one B=2",
+			name:     "preformatted cap keys",
+			replace:  upperCaseKey,
+			preAttrs: preAttrs,
+			attrs:    attrs,
+			wantText: "TIME=2000-01-02T03:04:05.000Z LEVEL=INFO MSG=message PRE=3 X=y A=one B=2",
+			wantJSON: `{"TIME":"2000-01-02T03:04:05Z","LEVEL":"INFO","MSG":"message","PRE":3,"X":"y","A":"one","B":2}`,
 		},
 		{
-			name: "preformatted remove all",
-			h:    newHandler(removeAttr).with([]Attr{Int("pre", 3), String("x", "y")}),
-			want: "",
+			name:     "preformatted remove all",
+			replace:  removeAttr,
+			preAttrs: preAttrs,
+			attrs:    attrs,
+			wantText: "",
+			wantJSON: "{}",
 		},
 	} {
+		r := NewRecord(testTime, InfoLevel, "message", 1)
+		r.AddAttrs(test.attrs...)
+		var buf bytes.Buffer
+		opts := HandlerOptions{ReplaceAttr: test.replace}
 		t.Run(test.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			test.h.w = &buf
-			if err := test.h.handle(r); err != nil {
-				t.Fatal(err)
-			}
-			got := strings.TrimSuffix(buf.String(), "\n")
-			if got != test.want {
-				t.Errorf("\ngot  %#v\nwant %#v\n", got, test.want)
+			for _, handler := range []struct {
+				name string
+				h    Handler
+				want string
+			}{
+				{"text", opts.NewTextHandler(&buf), test.wantText},
+				{"json", opts.NewJSONHandler(&buf), test.wantJSON},
+			} {
+				t.Run(handler.name, func(t *testing.T) {
+					h := handler.h.With(test.preAttrs)
+					buf.Reset()
+					if err := h.Handle(r); err != nil {
+						t.Fatal(err)
+					}
+					got := strings.TrimSuffix(buf.String(), "\n")
+					if got != handler.want {
+						t.Errorf("\ngot  %#v\nwant %#v\n", got, handler.want)
+					}
+				})
 			}
 		})
 	}
