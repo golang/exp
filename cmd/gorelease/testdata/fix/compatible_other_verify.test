@@ -5,7 +5,7 @@ release=v1.1.0
 -- want --
 # example.com/fix/bad
 ## errors in base version:
-bad/bad.go:3:15: undeclared name: NOTYPE
+bad/bad.go:3:15: undefined: NOTYPE
 
 ## incompatible changes
 Broken: changed from func() invalid type to func() int
