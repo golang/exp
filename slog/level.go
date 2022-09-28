@@ -16,36 +16,36 @@ import (
 type Level int
 
 // The level numbers below don't really matter too much. Any system can map them
-// to another numbering scheme if it wishes. We picked them to satisfy two
+// to another numbering scheme if it wishes. We picked them to satisfy three
 // constraints.
 //
-// First, we wanted to make it easy to work with verbosities instead of levels.
-// Since higher verbosities are less important, higher levels are as well.
+// First, we wanted the default level to be Info, Since Levels are ints, Info is
+// the default value for int, zero.
 //
-// Second, we wanted some room between levels to accommodate schemes with named
+// Second, we wanted to make it easy to work with verbosities instead of levels.
+// Verbosities start at 0 corresponding to Info, and larger values are less severe
+// Negating a verbosity converts it into a Level.
+//
+// Third, we wanted some room between levels to accommodate schemes with named
 // levels between ours. For example, Google Cloud Logging defines a Notice level
 // between Info and Warn. Since there are only a few of these intermediate
-// levels, the gap between the numbers need not be large. We selected a gap of
-// 10, because the majority of humans have 10 fingers.
+// levels, the gap between the numbers need not be large. Our gap of 4 matches
+// OpenTelemetry's mapping. Subtracting 9 from an OpenTelemetry level in the
+// DEBUG, INFO, WARN and ERROR ranges converts it to the corresponding slog
+// Level range. OpenTelemetry also has the names TRACE and FATAL, which slog
+// does not. But those OpenTelemetry levels can still be represented as slog
+// Levels by using the appropriate integers.
 //
-// The missing gap between Info and Debug has to do with verbosities again. It
-// is natural to think of verbosity 0 as Info, and then verbosity 1 is the
-// lowest level one would call Debug. The simple formula
-//   level = InfoLevel + verbosity
-// then works well to map verbosities to levels. That is,
+// The lack of a gap between Debug and Info doesn't follow the pattern.
+// It makes sense, though, that the first negative number is the start
+// of the Debug range.
 //
-//   Level(InfoLevel+0).String() == "INFO"
-//   Level(InfoLevel+1).String() == "DEBUG"
-//   Level(InfoLevel+2).String() == "DEBUG+1"
-//
-// and so on.
-
 // Names for common levels.
 const (
-	ErrorLevel Level = 10
-	WarnLevel  Level = 20
-	InfoLevel  Level = 30
-	DebugLevel Level = 31
+	DebugLevel Level = -1
+	InfoLevel  Level = 0
+	WarnLevel  Level = 4
+	ErrorLevel Level = 8
 )
 
 // String returns a name for the level.
@@ -66,16 +66,14 @@ func (l Level) String() string {
 	}
 
 	switch {
-	case l <= 0:
-		return fmt.Sprintf("!BADLEVEL(%d)", l)
-	case l <= ErrorLevel:
-		return str("ERROR", l-ErrorLevel)
-	case l <= WarnLevel:
-		return str("WARN", l-WarnLevel)
-	case l <= InfoLevel:
-		return str("INFO", l-InfoLevel)
-	default:
+	case l <= DebugLevel:
 		return str("DEBUG", l-DebugLevel)
+	case l < WarnLevel:
+		return str("INFO", l)
+	case l < ErrorLevel:
+		return str("WARN", l-WarnLevel)
+	default:
+		return str("ERROR", l-ErrorLevel)
 	}
 }
 

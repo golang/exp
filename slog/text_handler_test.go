@@ -162,14 +162,14 @@ func TestTextHandlerPreformatted(t *testing.T) {
 	var buf bytes.Buffer
 	var h Handler = NewTextHandler(&buf)
 	h = h.With([]Attr{Duration("dur", time.Minute), Bool("b", true)})
-	// Also test omitting time and level.
-	r := NewRecord(time.Time{}, 0, "m", 0)
+	// Also test omitting time.
+	r := NewRecord(time.Time{}, 0 /* 0 Level is INFO */, "m", 0)
 	r.AddAttrs(Int("a", 1))
 	if err := h.Handle(r); err != nil {
 		t.Fatal(err)
 	}
 	got := strings.TrimSuffix(buf.String(), "\n")
-	want := `msg=m dur=1m0s b=true a=1`
+	want := `level=INFO msg=m dur=1m0s b=true a=1`
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}

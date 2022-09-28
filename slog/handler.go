@@ -32,7 +32,6 @@ type Handler interface {
 	// Handle handles the Record.
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time() is the zero time, ignore the time.
-	//   - If r.Level() is Level(0), ignore the level.
 	//   - If an Attr's key is the empty string, ignore the Attr.
 	Handle(r Record) error
 
@@ -53,10 +52,8 @@ func (*defaultHandler) Enabled(Level) bool { return true }
 // Let the log.Logger handle time and file/line.
 func (h *defaultHandler) Handle(r Record) error {
 	var b strings.Builder
-	if r.Level() > 0 {
-		b.WriteString(r.Level().String())
-		b.WriteByte(' ')
-	}
+	b.WriteString(r.Level().String())
+	b.WriteByte(' ')
 	r.Attrs(func(a Attr) {
 		fmt.Fprint(&b, a) // Attr.Format will print key=value
 		b.WriteByte(' ')
@@ -144,15 +141,13 @@ func (h *commonHandler) handle(r Record) error {
 		}
 	}
 	// level
-	if r.Level() != 0 {
-		key := "level"
-		val := r.Level()
-		if rep == nil {
-			state.appendKey(key)
-			state.appendString(val.String())
-		} else {
-			state.appendAttr(Any(key, val))
-		}
+	key := "level"
+	val := r.Level()
+	if rep == nil {
+		state.appendKey(key)
+		state.appendString(val.String())
+	} else {
+		state.appendAttr(Any(key, val))
 	}
 	// source
 	if h.opts.AddSource {
@@ -173,14 +168,13 @@ func (h *commonHandler) handle(r Record) error {
 			}
 		}
 	}
-	// message
-	key := "msg"
-	val := r.Message()
+	key = "msg"
+	msg := r.Message()
 	if rep == nil {
 		state.appendKey(key)
-		state.appendString(val)
+		state.appendString(msg)
 	} else {
-		state.appendAttr(String(key, val))
+		state.appendAttr(String(key, msg))
 	}
 	// preformatted Attrs
 	if len(h.preformattedAttrs) > 0 {

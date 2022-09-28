@@ -42,11 +42,11 @@ func TestLogTextHandler(t *testing.T) {
 	l.Error("bad", io.EOF, "a", 1)
 	check(`level=ERROR msg=bad a=1 err=EOF`)
 
-	l.Log(WarnLevel-1, "w", Int("a", 1), String("b", "two"))
-	check(`level=WARN-1 msg=w a=1 b=two`)
+	l.Log(WarnLevel+1, "w", Int("a", 1), String("b", "two"))
+	check(`level=WARN\+1 msg=w a=1 b=two`)
 
-	l.LogAttrs(InfoLevel-1, "a b c", Int("a", 1), String("b", "two"))
-	check(`level=INFO-1 msg="a b c" a=1 b=two`)
+	l.LogAttrs(InfoLevel+1, "a b c", Int("a", 1), String("b", "two"))
+	check(`level=INFO\+1 msg="a b c" a=1 b=two`)
 }
 
 func TestConnections(t *testing.T) {

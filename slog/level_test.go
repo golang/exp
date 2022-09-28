@@ -14,16 +14,16 @@ func TestLevelString(t *testing.T) {
 		in   Level
 		want string
 	}{
-		{0, "!BADLEVEL(0)"},
+		{0, "INFO"},
 		{ErrorLevel, "ERROR"},
-		{ErrorLevel - 2, "ERROR-2"},
+		{ErrorLevel + 2, "ERROR+2"},
+		{ErrorLevel - 2, "WARN+2"},
 		{WarnLevel, "WARN"},
-		{WarnLevel - 1, "WARN-1"},
+		{WarnLevel - 1, "INFO+3"},
 		{InfoLevel, "INFO"},
-		{InfoLevel - 3, "INFO-3"},
+		{InfoLevel - 3, "DEBUG-2"},
 		{DebugLevel, "DEBUG"},
-		{InfoLevel + 2, "DEBUG+1"},
-		{-1, "!BADLEVEL(-1)"},
+		{DebugLevel - 2, "DEBUG-2"},
 	} {
 		got := test.in.String()
 		if got != test.want {
