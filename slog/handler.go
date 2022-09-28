@@ -225,7 +225,7 @@ func (s *handleState) appendAttr(a Attr) {
 		return
 	}
 	s.appendKey(a.Key())
-	s.appendAttrValue(a)
+	s.appendValue(a.Value())
 }
 
 func (s *handleState) appendError(err error) {
@@ -279,12 +279,12 @@ func (s *handleState) appendString(str string) {
 	}
 }
 
-func (s *handleState) appendAttrValue(a Attr) {
+func (s *handleState) appendValue(v Value) {
 	var err error
 	if s.h.json {
-		err = appendJSONValue(s, a)
+		err = appendJSONValue(s, v)
 	} else {
-		err = appendTextValue(s, a)
+		err = appendTextValue(s, v)
 	}
 	if err != nil {
 		s.appendError(err)

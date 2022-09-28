@@ -88,16 +88,16 @@ func appendJSONTime(s *handleState, t time.Time) {
 	s.buf.WriteByte('"')
 }
 
-func appendJSONValue(s *handleState, a Attr) error {
-	switch a.Kind() {
+func appendJSONValue(s *handleState, v Value) error {
+	switch v.Kind() {
 	case StringKind:
-		s.appendString(a.str())
+		s.appendString(v.str())
 	case Int64Kind:
-		*s.buf = strconv.AppendInt(*s.buf, a.Int64(), 10)
+		*s.buf = strconv.AppendInt(*s.buf, v.Int64(), 10)
 	case Uint64Kind:
-		*s.buf = strconv.AppendUint(*s.buf, a.Uint64(), 10)
+		*s.buf = strconv.AppendUint(*s.buf, v.Uint64(), 10)
 	case Float64Kind:
-		f := a.Float64()
+		f := v.Float64()
 		// json.Marshal fails on special floats, so handle them here.
 		switch {
 		case math.IsInf(f, 1):
@@ -115,21 +115,21 @@ func appendJSONValue(s *handleState, a Attr) error {
 			}
 		}
 	case BoolKind:
-		*s.buf = strconv.AppendBool(*s.buf, a.Bool())
+		*s.buf = strconv.AppendBool(*s.buf, v.Bool())
 	case DurationKind:
 		// Do what json.Marshal does.
-		*s.buf = strconv.AppendInt(*s.buf, int64(a.Duration()), 10)
+		*s.buf = strconv.AppendInt(*s.buf, int64(v.Duration()), 10)
 	case TimeKind:
-		s.appendTime(a.Time())
+		s.appendTime(v.Time())
 	case AnyKind:
-		val := a.Value()
-		if err, ok := val.(error); ok {
+		a := v.Any()
+		if err, ok := a.(error); ok {
 			s.appendString(err.Error())
 		} else {
-			return appendJSONMarshal(s.buf, val)
+			return appendJSONMarshal(s.buf, a)
 		}
 	default:
-		panic(fmt.Sprintf("bad kind: %d", a.Kind()))
+		panic(fmt.Sprintf("bad kind: %d", v.Kind()))
 	}
 	return nil
 }

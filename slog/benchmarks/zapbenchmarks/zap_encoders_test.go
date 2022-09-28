@@ -39,19 +39,20 @@ func attrsToFields(attrs []slog.Attr) []zap.Field {
 	for _, a := range slogbench.TestAttrs {
 		var f zap.Field
 		k := a.Key()
-		switch a.Kind() {
+		v := a.Value()
+		switch v.Kind() {
 		case slog.StringKind:
-			f = zap.String(k, a.String())
+			f = zap.String(k, v.String())
 		case slog.Int64Kind:
-			f = zap.Int64(k, a.Int64())
+			f = zap.Int64(k, v.Int64())
 		case slog.DurationKind:
-			f = zap.Duration(k, a.Duration())
+			f = zap.Duration(k, v.Duration())
 		case slog.TimeKind:
-			f = zap.Time(k, a.Time())
+			f = zap.Time(k, v.Time())
 		case slog.AnyKind:
-			f = zap.Any(k, a.Value())
+			f = zap.Any(k, v)
 		default:
-			panic(fmt.Sprintf("unknown kind %d", a.Kind()))
+			panic(fmt.Sprintf("unknown kind %d", v.Kind()))
 		}
 		fields = append(fields, f)
 	}

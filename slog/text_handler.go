@@ -72,14 +72,14 @@ func (h *TextHandler) Handle(r Record) error {
 	return h.commonHandler.handle(r)
 }
 
-func appendTextValue(s *handleState, a Attr) error {
-	switch a.Kind() {
+func appendTextValue(s *handleState, v Value) error {
+	switch v.Kind() {
 	case StringKind:
-		s.appendString(a.str())
+		s.appendString(v.str())
 	case TimeKind:
-		s.appendTime(a.time())
+		s.appendTime(v.time())
 	case AnyKind:
-		if tm, ok := a.any.(encoding.TextMarshaler); ok {
+		if tm, ok := v.any.(encoding.TextMarshaler); ok {
 			data, err := tm.MarshalText()
 			if err != nil {
 				return err
@@ -88,9 +88,9 @@ func appendTextValue(s *handleState, a Attr) error {
 			s.appendString(string(data))
 			return nil
 		}
-		s.appendString(fmt.Sprint(a.Value()))
+		s.appendString(fmt.Sprint(v.Any()))
 	default:
-		*s.buf = a.appendValue(*s.buf)
+		*s.buf = v.append(*s.buf)
 	}
 	return nil
 }

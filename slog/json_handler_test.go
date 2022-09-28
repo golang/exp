@@ -82,8 +82,7 @@ func TestAppendJSONValue(t *testing.T) {
 		testTime,
 		jsonMarshaler{"xyz"},
 	} {
-		attr := Any("", value)
-		got := jsonValueString(t, attr)
+		got := jsonValueString(t, AnyValue(value))
 		b, err := json.Marshal(value)
 		if err != nil {
 			t.Fatal(err)
@@ -106,19 +105,18 @@ func TestJSONAppendAttrValueSpecial(t *testing.T) {
 		{math.Inf(-1), `"-Inf"`},
 		{WarnLevel, `"WARN"`},
 	} {
-		attr := Any("", test.value)
-		got := jsonValueString(t, attr)
+		got := jsonValueString(t, AnyValue(test.value))
 		if got != test.want {
 			t.Errorf("%v: got %s, want %s", test.value, got, test.want)
 		}
 	}
 }
 
-func jsonValueString(t *testing.T, a Attr) string {
+func jsonValueString(t *testing.T, v Value) string {
 	t.Helper()
 	var buf []byte
 	s := &handleState{h: &commonHandler{json: true}, buf: (*buffer.Buffer)(&buf)}
-	if err := appendJSONValue(s, a); err != nil {
+	if err := appendJSONValue(s, v); err != nil {
 		t.Fatal(err)
 	}
 	return string(buf)
@@ -132,8 +130,9 @@ func BenchmarkJSONHandler(b *testing.B) {
 		{"defaults", HandlerOptions{}},
 		{"time format", HandlerOptions{
 			ReplaceAttr: func(a Attr) Attr {
-				if a.Kind() == TimeKind {
-					return String(a.Key(), a.Time().Format(rfc3339Millis))
+				v := a.Value()
+				if v.Kind() == TimeKind {
+					return String(a.Key(), v.Time().Format(rfc3339Millis))
 				}
 				if a.Key() == "level" {
 					return a.WithKey("severity")
@@ -143,8 +142,9 @@ func BenchmarkJSONHandler(b *testing.B) {
 		}},
 		{"time unix", HandlerOptions{
 			ReplaceAttr: func(a Attr) Attr {
-				if a.Kind() == TimeKind {
-					return Int64(a.Key(), a.Time().UnixNano())
+				v := a.Value()
+				if v.Kind() == TimeKind {
+					return Int64(a.Key(), v.Time().UnixNano())
 				}
 				if a.Key() == "level" {
 					return a.WithKey("severity")

@@ -51,39 +51,39 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 		buf.WriteByte(' ')
 		buf.WriteString(a.Key())
 		buf.WriteByte('=')
-		h.appendValue(buf, a)
+		h.appendValue(buf, a.Value())
 	})
 	buf.WriteByte('\n')
 	_, err := h.w.Write(*buf)
 	return err
 }
 
-func (h *fastTextHandler) appendValue(buf *buffer.Buffer, a slog.Attr) {
-	switch a.Kind() {
+func (h *fastTextHandler) appendValue(buf *buffer.Buffer, v slog.Value) {
+	switch v.Kind() {
 	case slog.StringKind:
-		buf.WriteString(a.String())
+		buf.WriteString(v.String())
 	case slog.Int64Kind:
-		*buf = strconv.AppendInt(*buf, a.Int64(), 10)
+		*buf = strconv.AppendInt(*buf, v.Int64(), 10)
 	case slog.Uint64Kind:
-		*buf = strconv.AppendUint(*buf, a.Uint64(), 10)
+		*buf = strconv.AppendUint(*buf, v.Uint64(), 10)
 	case slog.Float64Kind:
-		*buf = strconv.AppendFloat(*buf, a.Float64(), 'g', -1, 64)
+		*buf = strconv.AppendFloat(*buf, v.Float64(), 'g', -1, 64)
 	case slog.BoolKind:
-		*buf = strconv.AppendBool(*buf, a.Bool())
+		*buf = strconv.AppendBool(*buf, v.Bool())
 	case slog.DurationKind:
-		*buf = strconv.AppendInt(*buf, a.Duration().Nanoseconds(), 10)
+		*buf = strconv.AppendInt(*buf, v.Duration().Nanoseconds(), 10)
 	case slog.TimeKind:
-		h.appendTime(buf, a.Time())
+		h.appendTime(buf, v.Time())
 	case slog.AnyKind:
-		v := a.Value()
-		switch v := v.(type) {
+		a := v.Any()
+		switch a := a.(type) {
 		case error:
-			buf.WriteString(v.Error())
+			buf.WriteString(a.Error())
 		default:
-			buf.WriteString(fmt.Sprint(v))
+			buf.WriteString(fmt.Sprint(a))
 		}
 	default:
-		panic(fmt.Sprintf("bad kind: %s", a.Kind()))
+		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
 	}
 }
 

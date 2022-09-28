@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !safe_attrs
+//go:build !safe_values
 
 package slog
 
-// This file defines the most compact representation of Attr.
+// This file defines the most compact representation of Value.
 
 import (
 	"reflect"
@@ -14,11 +14,10 @@ import (
 	"unsafe"
 )
 
-// An Attr is a key-value pair.
-// It can represent most small values without an allocation.
-// The zero Attr has a key of "" and a value of nil.
-type Attr struct {
-	key string
+// A Value can represent (almost) any Go value, but unlike type any,
+// it can represent most small values without an allocation.
+// The zero Value corresponds to nil.
+type Value struct {
 	// num holds the value for Kinds Int64, Uint64, Float64, Bool and Duration,
 	// the string length for StringKind, and nanoseconds since the epoch for TimeKind.
 	num uint64
@@ -37,9 +36,9 @@ type Attr struct {
 // stringptr is used in field `a` when the Value is a string.
 type stringptr unsafe.Pointer
 
-// Kind returns the Attr's Kind.
-func (a Attr) Kind() Kind {
-	switch x := a.any.(type) {
+// Kind returns the Value's Kind.
+func (v Value) Kind() Kind {
+	switch x := v.any.(type) {
 	case Kind:
 		return x
 	case stringptr:
@@ -51,32 +50,32 @@ func (a Attr) Kind() Kind {
 	}
 }
 
-// String returns a new Attr for a string.
-func String(key, value string) Attr {
+// String returns a new Value for a string.
+func StringValue(value string) Value {
 	hdr := (*reflect.StringHeader)(unsafe.Pointer(&value))
-	return Attr{key: key, num: uint64(hdr.Len), any: stringptr(hdr.Data)}
+	return Value{num: uint64(hdr.Len), any: stringptr(hdr.Data)}
 }
 
-func (a Attr) str() string {
+func (v Value) str() string {
 	var s string
 	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	hdr.Data = uintptr(a.any.(stringptr))
-	hdr.Len = int(a.num)
+	hdr.Data = uintptr(v.any.(stringptr))
+	hdr.Len = int(v.num)
 	return s
 }
 
-// String returns Attr's value as a string, formatted like fmt.Sprint. Unlike
-// the methods Int64, Float64, and so on, which panic if the Attr is of the
+// String returns Value's value as a string, formatted like fmt.Sprint. Unlike
+// the methods Int64, Float64, and so on, which panic if the Value is of the
 // wrong kind, String never panics.
-func (a Attr) String() string {
-	if sp, ok := a.any.(stringptr); ok {
+func (v Value) String() string {
+	if sp, ok := v.any.(stringptr); ok {
 		// Inlining this code makes a huge difference.
 		var s string
 		hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
 		hdr.Data = uintptr(sp)
-		hdr.Len = int(a.num)
+		hdr.Len = int(v.num)
 		return s
 	}
 	var buf []byte
-	return string(a.appendValue(buf))
+	return string(v.append(buf))
 }
