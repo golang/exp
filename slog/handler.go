@@ -58,7 +58,9 @@ func (h *defaultHandler) Handle(r Record) error {
 	b.WriteString(r.Level().String())
 	b.WriteByte(' ')
 	r.Attrs(func(a Attr) {
-		fmt.Fprint(&b, a) // Attr.Format will print key=value
+		b.WriteString(a.Key)
+		b.WriteByte('=')
+		b.WriteString(a.Value.Resolve().String())
 		b.WriteByte(' ')
 	})
 	b.WriteString(r.Message())
@@ -280,6 +282,7 @@ func (s *handleState) appendString(str string) {
 }
 
 func (s *handleState) appendValue(v Value) {
+	v = v.Resolve()
 	var err error
 	if s.h.json {
 		err = appendJSONValue(s, v)

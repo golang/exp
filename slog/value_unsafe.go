@@ -45,6 +45,8 @@ func (v Value) Kind() Kind {
 		return StringKind
 	case *time.Location:
 		return TimeKind
+	case LogValuer:
+		return LogValuerKind
 	default:
 		return AnyKind
 	}

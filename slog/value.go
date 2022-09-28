@@ -29,6 +29,7 @@ const (
 	StringKind
 	TimeKind
 	Uint64Kind
+	LogValuerKind
 )
 
 var kindStrings = []string{
@@ -40,6 +41,7 @@ var kindStrings = []string{
 	"String",
 	"Time",
 	"Uint64",
+	"LogValuer",
 }
 
 func (k Kind) String() string {
@@ -151,7 +153,7 @@ func AnyValue(v any) Value {
 // Any returns the Value's value as an any.
 func (v Value) Any() any {
 	switch v.Kind() {
-	case AnyKind:
+	case AnyKind, LogValuerKind:
 		return v.any
 	case Int64Kind:
 		return int64(v.num)
@@ -168,7 +170,7 @@ func (v Value) Any() any {
 	case TimeKind:
 		return v.time()
 	default:
-		panic("bad kind")
+		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
 	}
 }
 
@@ -244,6 +246,12 @@ func (v Value) time() time.Time {
 	return time.Unix(0, int64(v.num)).In(v.any.(*time.Location))
 }
 
+// LogValuer returns the Value's value as a LogValuer. It panics
+// if the value is not a LogValuer.
+func (v Value) LogValuer() LogValuer {
+	return v.any.(LogValuer)
+}
+
 //////////////// Other
 
 // Equal reports whether two Values have equal keys and values.
@@ -262,7 +270,7 @@ func (v1 Value) Equal(v2 Value) bool {
 		return v1.float() == v2.float()
 	case TimeKind:
 		return v1.time().Equal(v2.time())
-	case AnyKind:
+	case AnyKind, LogValuerKind:
 		return v1.any == v2.any // may panic if non-comparable
 	default:
 		panic(fmt.Sprintf("bad kind: %s", k1))
@@ -287,9 +295,34 @@ func (v Value) append(dst []byte) []byte {
 		return append(dst, v.duration().String()...)
 	case TimeKind:
 		return append(dst, v.time().String()...)
-	case AnyKind:
+	case AnyKind, LogValuerKind:
 		return append(dst, fmt.Sprint(v.any)...)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
 	}
+}
+
+// A LogValuer is a Value that transforms itself into a different Value (or,
+// using the Group feature, a group of Attrs) at the moment it is logged.
+//
+// This mechanism may be used to defer expensive operations until they are
+// needed, or to expand a single value into a sequence of components.
+type LogValuer interface {
+	LogValue() Value
+}
+
+const maxLogValues = 100
+
+// Resolve repeatedly calls LogValue on v while it implements LogValuer,
+// and returns the result.
+func (v Value) Resolve() Value {
+	orig := v
+	for i := 0; i < maxLogValues; i++ {
+		if v.Kind() != LogValuerKind {
+			return v
+		}
+		v = v.LogValuer().LogValue()
+	}
+	err := fmt.Errorf("LogValue called too many times on Value of type %T", orig.Any())
+	return AnyValue(err)
 }
