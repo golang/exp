@@ -132,7 +132,7 @@ func BenchmarkSourceLine(b *testing.B) {
 			buf.WriteString(file)
 			buf.WriteByte(':')
 			itoa((*[]byte)(buf), line, -1)
-			s := string(*buf)
+			s := buf.String()
 			buf.Free()
 			_ = s
 		}

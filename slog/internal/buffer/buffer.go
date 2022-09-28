@@ -44,3 +44,7 @@ func (b *Buffer) WriteString(s string) {
 func (b *Buffer) WriteByte(c byte) {
 	*b = append(*b, c)
 }
+
+func (b *Buffer) String() string {
+	return string(*b)
+}

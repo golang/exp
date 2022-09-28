@@ -12,7 +12,7 @@ func Test(t *testing.T) {
 	b.WriteString("hello")
 	b.WriteByte(',')
 	b.Write([]byte(" world"))
-	got := string(*b)
+	got := b.String()
 	want := "hello, world"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)

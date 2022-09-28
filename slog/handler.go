@@ -181,7 +181,7 @@ func (h *commonHandler) handle(r Record) error {
 				buf.WriteString(file)
 				buf.WriteByte(':')
 				itoa((*[]byte)(buf), line, -1)
-				s := string(*buf)
+				s := buf.String()
 				buf.Free()
 				replace(String(key, s))
 			}
