@@ -7,6 +7,8 @@ package slog
 import (
 	"runtime"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 const nAttrsInline = 5
@@ -95,10 +97,7 @@ func (r *Record) SourceLine() (file string, line int) {
 // without interfering with each other.
 func (r *Record) Clone() Record {
 	c := *r
-	if len(c.back) > 0 {
-		c.back = make([]Attr, len(c.back))
-		copy(c.back, r.back)
-	}
+	c.back = slices.Clip(c.back) // prevent append from mutating shared array
 	return c
 }
 
