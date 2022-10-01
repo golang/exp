@@ -15,13 +15,17 @@
 // from stdin and extract all of its files to corresponding locations relative
 // to the current, writing the archive's comment to stdout.
 //
+// The --list flag instructs txtar to instead read the archive file from stdin
+// and list all of its files to stdout. Note that shell variables in paths are
+// not expanded in this mode.
+//
 // Archive files are by default extracted only to the current directory or its
 // subdirectories. To allow extracting outside the current directory, use the
 // --unsafe flag.
 //
-// Shell variables in paths are expanded (using os.Expand) if the corresponding
-// variable is set in the process environment. When writing an archive, the
-// variables (before expansion) are preserved in the archived paths.
+// When extracting, shell variables in paths are expanded (using os.Expand) if
+// the corresponding variable is set in the process environment. When writing an
+// archive, the variables (before expansion) are preserved in the archived paths.
 //
 // Example usage:
 //
@@ -47,6 +51,7 @@ import (
 
 var (
 	extractFlag = flag.Bool("extract", false, "if true, extract files from the archive instead of writing to it")
+	listFlag    = flag.Bool("list", false, "if true, list files from the archive instead of writing to it")
 	unsafeFlag  = flag.Bool("unsafe", false, "allow extraction of files outside the current directory")
 )
 
@@ -58,13 +63,20 @@ func main() {
 	flag.Parse()
 
 	var err error
-	if *extractFlag {
+	switch {
+	case *extractFlag:
 		if len(flag.Args()) > 0 {
 			fmt.Fprintln(os.Stderr, "Usage: txtar --extract <archive.txt")
 			os.Exit(2)
 		}
 		err = extract()
-	} else {
+	case *listFlag:
+		if len(flag.Args()) > 0 {
+			fmt.Fprintln(os.Stderr, "Usage: txtar --list <archive.txt")
+			os.Exit(2)
+		}
+		err = list()
+	default:
 		paths := flag.Args()
 		if len(paths) == 0 {
 			paths = []string{"."}
@@ -121,6 +133,19 @@ func extract() (err error) {
 
 	if len(ar.Comment) > 0 {
 		os.Stdout.Write(ar.Comment)
+	}
+	return nil
+}
+
+func list() (err error) {
+	b, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return err
+	}
+
+	ar := txtar.Parse(b)
+	for _, f := range ar.Files {
+		fmt.Println(f.Name)
 	}
 	return nil
 }

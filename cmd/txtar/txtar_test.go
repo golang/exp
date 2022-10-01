@@ -26,6 +26,12 @@ two
 three
 `
 
+var filelist = `
+one.txt
+dir/two.txt
+$SPECIAL_LOCATION/three.txt
+`[1:]
+
 func TestMain(m *testing.M) {
 	code := m.Run()
 	txtarBin.once.Do(func() {})
@@ -49,6 +55,18 @@ func TestRoundTrip(t *testing.T) {
 	if err := os.Mkdir(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
+
+	if out, err := txtar(t, dir, testdata, "--list"); err != nil {
+		t.Fatal(err)
+	} else if out != filelist {
+		t.Fatalf("txtar --list: stdout:\n%s\nwant:\n%s", out, filelist)
+	}
+	if entries, err := os.ReadDir(dir); err != nil {
+		t.Fatal(err)
+	} else if len(entries) > 0 {
+		t.Fatalf("txtar --list: did not expect any extracted files")
+	}
+
 	if out, err := txtar(t, dir, testdata, "--extract"); err != nil {
 		t.Fatal(err)
 	} else if out != comment {
