@@ -6,10 +6,12 @@ package slog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"strconv"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/exp/slog/internal/buffer"
@@ -74,6 +76,18 @@ func (h *JSONHandler) Handle(r Record) error {
 	return h.commonHandler.handle(r)
 }
 
+// Adapted from time.Time.MarshalJSON to avoid allocation.
+func appendJSONTime(s *handleState, t time.Time) {
+	if y := t.Year(); y < 0 || y >= 10000 {
+		// RFC 3339 is clear that years are 4 digits exactly.
+		// See golang.org/issue/4556#c15 for more discussion.
+		s.appendError(errors.New("time.Time year outside of range [0,9999]"))
+	}
+	s.buf.WriteByte('"')
+	*s.buf = t.AppendFormat(*s.buf, time.RFC3339Nano)
+	s.buf.WriteByte('"')
+}
+
 func appendJSONValue(s *handleState, a Attr) error {
 	switch a.Kind() {
 	case StringKind:
@@ -108,7 +122,12 @@ func appendJSONValue(s *handleState, a Attr) error {
 	case TimeKind:
 		s.appendTime(a.Time())
 	case AnyKind:
-		return appendJSONMarshal(s.buf, a.Value())
+		val := a.Value()
+		if err, ok := val.(error); ok {
+			s.appendString(err.Error())
+		} else {
+			return appendJSONMarshal(s.buf, val)
+		}
 	default:
 		panic(fmt.Sprintf("bad kind: %d", a.Kind()))
 	}

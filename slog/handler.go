@@ -293,12 +293,7 @@ func (s *handleState) appendAttrValue(a Attr) {
 
 func (s *handleState) appendTime(t time.Time) {
 	if s.h.json {
-		b, err := t.MarshalJSON()
-		if err != nil {
-			s.appendError(err)
-			return
-		}
-		s.buf.Write(b)
+		appendJSONTime(s, t)
 	} else {
 		*s.buf = appendTimeRFC3339Millis(*s.buf, t)
 	}
