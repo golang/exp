@@ -52,16 +52,6 @@ func TestJSONHandler(t *testing.T) {
 	}
 }
 
-func TestJSONAppendSource(t *testing.T) {
-	var buf []byte
-	(jsonAppender{}).appendSource((*buffer.Buffer)(&buf), "file.go", 23)
-	got := string(buf)
-	want := `"file.go:23"`
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
 // for testing json.Marshaler
 type jsonMarshaler struct {
 	s string
@@ -76,7 +66,7 @@ func (j jsonMarshaler) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`[%q]`, j.s)), nil
 }
 
-func TestJSONAppendAttrValue(t *testing.T) {
+func TestAppendJSONValue(t *testing.T) {
 	// On most values, jsonAppendAttrValue should agree with json.Marshal.
 	for _, value := range []any{
 		"hello",
@@ -92,12 +82,8 @@ func TestJSONAppendAttrValue(t *testing.T) {
 		testTime,
 		jsonMarshaler{"xyz"},
 	} {
-		var buf []byte
 		attr := Any("", value)
-		if err := (jsonAppender{}).appendAttrValue((*buffer.Buffer)(&buf), attr); err != nil {
-			t.Fatal(err)
-		}
-		got := string(buf)
+		got := jsonValueString(t, attr)
 		b, err := json.Marshal(value)
 		if err != nil {
 			t.Fatal(err)
@@ -120,17 +106,22 @@ func TestJSONAppendAttrValueSpecial(t *testing.T) {
 		{math.Inf(-1), `"-Inf"`},
 		{WarnLevel, `"WARN"`},
 	} {
-		var buf []byte
-
 		attr := Any("", test.value)
-		if err := (jsonAppender{}).appendAttrValue((*buffer.Buffer)(&buf), attr); err != nil {
-			t.Fatal(err)
-		}
-		got := string(buf)
+		got := jsonValueString(t, attr)
 		if got != test.want {
 			t.Errorf("%v: got %s, want %s", test.value, got, test.want)
 		}
 	}
+}
+
+func jsonValueString(t *testing.T, a Attr) string {
+	t.Helper()
+	var buf []byte
+	s := &handleState{h: &commonHandler{json: true}, buf: (*buffer.Buffer)(&buf)}
+	if err := appendJSONValue(s, a); err != nil {
+		t.Fatal(err)
+	}
+	return string(buf)
 }
 
 func BenchmarkJSONHandler(b *testing.B) {

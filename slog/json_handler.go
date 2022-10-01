@@ -10,7 +10,6 @@ import (
 	"io"
 	"math"
 	"strconv"
-	"time"
 	"unicode/utf8"
 
 	"golang.org/x/exp/slog/internal/buffer"
@@ -32,10 +31,9 @@ func NewJSONHandler(w io.Writer) *JSONHandler {
 func (opts HandlerOptions) NewJSONHandler(w io.Writer) *JSONHandler {
 	return &JSONHandler{
 		&commonHandler{
-			app:     jsonAppender{},
-			attrSep: ',',
-			w:       w,
-			opts:    opts,
+			json: true,
+			w:    w,
+			opts: opts,
 		},
 	}
 }
@@ -76,76 +74,41 @@ func (h *JSONHandler) Handle(r Record) error {
 	return h.commonHandler.handle(r)
 }
 
-type jsonAppender struct{}
-
-func (jsonAppender) appendStart(buf *buffer.Buffer) { buf.WriteByte('{') }
-func (jsonAppender) appendEnd(buf *buffer.Buffer)   { buf.WriteByte('}') }
-
-func (a jsonAppender) appendKey(buf *buffer.Buffer, key string) {
-	a.appendString(buf, key)
-	buf.WriteByte(':')
-}
-
-func (jsonAppender) appendString(buf *buffer.Buffer, s string) {
-	*buf = appendQuotedJSONString(*buf, s)
-}
-
-func (jsonAppender) appendSource(buf *buffer.Buffer, file string, line int) {
-	buf.WriteByte('"')
-	*buf = appendJSONString(*buf, file)
-	buf.WriteByte(':')
-	itoa((*[]byte)(buf), line, -1)
-	buf.WriteByte('"')
-}
-
-func (jsonAppender) appendTime(buf *buffer.Buffer, t time.Time) error {
-	b, err := t.MarshalJSON()
-	if err != nil {
-		return err
-	}
-	buf.Write(b)
-	return nil
-}
-
-func (app jsonAppender) appendAttrValue(buf *buffer.Buffer, a Attr) error {
+func appendJSONValue(s *handleState, a Attr) error {
 	switch a.Kind() {
 	case StringKind:
-		app.appendString(buf, a.str())
+		s.appendString(a.str())
 	case Int64Kind:
-		*buf = strconv.AppendInt(*buf, a.Int64(), 10)
+		*s.buf = strconv.AppendInt(*s.buf, a.Int64(), 10)
 	case Uint64Kind:
-		*buf = strconv.AppendUint(*buf, a.Uint64(), 10)
+		*s.buf = strconv.AppendUint(*s.buf, a.Uint64(), 10)
 	case Float64Kind:
 		f := a.Float64()
 		// json.Marshal fails on special floats, so handle them here.
 		switch {
 		case math.IsInf(f, 1):
-			buf.WriteString(`"+Inf"`)
+			s.buf.WriteString(`"+Inf"`)
 		case math.IsInf(f, -1):
-			buf.WriteString(`"-Inf"`)
+			s.buf.WriteString(`"-Inf"`)
 		case math.IsNaN(f):
-			buf.WriteString(`"NaN"`)
+			s.buf.WriteString(`"NaN"`)
 		default:
 			// json.Marshal is funny about floats; it doesn't
 			// always match strconv.AppendFloat. So just call it.
 			// That's expensive, but floats are rare.
-			if err := appendJSONMarshal(buf, f); err != nil {
+			if err := appendJSONMarshal(s.buf, f); err != nil {
 				return err
 			}
 		}
 	case BoolKind:
-		*buf = strconv.AppendBool(*buf, a.Bool())
+		*s.buf = strconv.AppendBool(*s.buf, a.Bool())
 	case DurationKind:
 		// Do what json.Marshal does.
-		*buf = strconv.AppendInt(*buf, int64(a.Duration()), 10)
+		*s.buf = strconv.AppendInt(*s.buf, int64(a.Duration()), 10)
 	case TimeKind:
-		if err := app.appendTime(buf, a.Time()); err != nil {
-			return err
-		}
+		s.appendTime(a.Time())
 	case AnyKind:
-		if err := appendJSONMarshal(buf, a.Value()); err != nil {
-			return err
-		}
+		return appendJSONMarshal(s.buf, a.Value())
 	default:
 		panic(fmt.Sprintf("bad kind: %d", a.Kind()))
 	}
@@ -161,20 +124,14 @@ func appendJSONMarshal(buf *buffer.Buffer, v any) error {
 	return nil
 }
 
-func appendQuotedJSONString(buf []byte, s string) []byte {
-	buf = append(buf, '"')
-	buf = appendJSONString(buf, s)
-	return append(buf, '"')
-}
-
-// appendJSONString escapes s for JSON and appends it to buf.
+// appendEscapedJSONString escapes s for JSON and appends it to buf.
 // It does not surround the string in quotation marks.
 //
 // Modified from encoding/json/encode.go:encodeState.string,
 // with escapeHTML set to true.
 //
 // TODO: review whether HTML escaping is necessary.
-func appendJSONString(buf []byte, s string) []byte {
+func appendEscapedJSONString(buf []byte, s string) []byte {
 	char := func(b byte) { buf = append(buf, b) }
 	str := func(s string) { buf = append(buf, s...) }
 

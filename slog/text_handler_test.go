@@ -13,8 +13,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/exp/slog/internal/buffer"
 )
 
 var testTime = time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -111,25 +109,6 @@ func (t text) MarshalText() ([]byte, error) {
 		return nil, errors.New("text: empty string")
 	}
 	return []byte(fmt.Sprintf("text{%q}", t.s)), nil
-}
-
-func TestTextAppendSource(t *testing.T) {
-	for _, test := range []struct {
-		file string
-		want string
-	}{
-		{"a/b.go", "a/b.go:1"},
-		{"a b.go", `"a b.go:1"`},
-		{`C:\windows\b.go`, `C:\windows\b.go:1`},
-	} {
-		var buf []byte
-		(textAppender{}).appendSource((*buffer.Buffer)(&buf), test.file, 1)
-		got := string(buf)
-		if got != test.want {
-			t.Errorf("%s:\ngot  %s\nwant %s", test.file, got, test.want)
-		}
-
-	}
 }
 
 func TestTextHandlerSource(t *testing.T) {

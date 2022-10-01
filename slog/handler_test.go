@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/exp/slog/internal/buffer"
 )
 
 func TestDefaultWith(t *testing.T) {
@@ -145,6 +147,33 @@ func TestHandlerEnabled(t *testing.T) {
 		if got != test.want {
 			t.Errorf("%v: got %t, want %t", test.leveler, got, test.want)
 		}
+	}
+}
+
+func TestAppendSource(t *testing.T) {
+	for _, test := range []struct {
+		file               string
+		wantText, wantJSON string
+	}{
+		{"a/b.go", "a/b.go:1", `"a/b.go:1"`},
+		{"a b.go", `"a b.go:1"`, `"a b.go:1"`},
+		{`C:\windows\b.go`, `C:\windows\b.go:1`, `"C:\\windows\\b.go:1"`},
+	} {
+		check := func(json bool, want string) {
+			t.Helper()
+			var buf []byte
+			state := handleState{
+				h:   &commonHandler{json: json},
+				buf: (*buffer.Buffer)(&buf),
+			}
+			state.appendSource(test.file, 1)
+			got := string(buf)
+			if got != want {
+				t.Errorf("%s, json=%t:\ngot  %s\nwant %s", test.file, json, got, want)
+			}
+		}
+		check(false, test.wantText)
+		check(true, test.wantJSON)
 	}
 }
 

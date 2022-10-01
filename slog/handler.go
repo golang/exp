@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -92,9 +93,8 @@ type HandlerOptions struct {
 }
 
 type commonHandler struct {
+	json              bool // true => output JSON; false => output text
 	opts              HandlerOptions
-	app               appender
-	attrSep           byte // char separating attrs from each other
 	preformattedAttrs []byte
 	mu                sync.Mutex
 	w                 io.Writer
@@ -112,17 +112,16 @@ func (h *commonHandler) Enabled(l Level) bool {
 
 func (h *commonHandler) with(as []Attr) *commonHandler {
 	h2 := &commonHandler{
-		app:               h.app,
-		attrSep:           h.attrSep,
+		json:              h.json,
 		opts:              h.opts,
 		preformattedAttrs: h.preformattedAttrs,
 		w:                 h.w,
 	}
 	// Pre-format the attributes as an optimization.
 	state := handleState{
-		h2,
-		(*buffer.Buffer)(&h2.preformattedAttrs),
-		false,
+		h:   h2,
+		buf: (*buffer.Buffer)(&h2.preformattedAttrs),
+		sep: "",
 	}
 	for _, a := range as {
 		state.appendAttr(a)
@@ -132,9 +131,11 @@ func (h *commonHandler) with(as []Attr) *commonHandler {
 
 func (h *commonHandler) handle(r Record) error {
 	rep := h.opts.ReplaceAttr
-	state := handleState{h, buffer.New(), false}
+	state := handleState{h: h, buf: buffer.New(), sep: ""}
 	defer state.buf.Free()
-	h.app.appendStart(state.buf)
+	if h.json {
+		state.buf.WriteByte('{')
+	}
 	// time
 	if !r.Time().IsZero() {
 		key := "time"
@@ -162,7 +163,7 @@ func (h *commonHandler) handle(r Record) error {
 			key := "source"
 			if rep == nil {
 				state.appendKey(key)
-				h.app.appendSource(state.buf, file, line)
+				state.appendSource(file, line)
 			} else {
 				buf := buffer.New()
 				buf.WriteString(file) // TODO: escape?
@@ -184,14 +185,16 @@ func (h *commonHandler) handle(r Record) error {
 	}
 	// preformatted Attrs
 	if len(h.preformattedAttrs) > 0 {
-		state.appendSep()
+		state.buf.WriteString(state.sep)
 		state.buf.Write(h.preformattedAttrs)
 	}
 	// Attrs in Record
 	r.Attrs(func(a Attr) {
 		state.appendAttr(a)
 	})
-	h.app.appendEnd(state.buf)
+	if h.json {
+		state.buf.WriteByte('}')
+	}
 	state.buf.WriteByte('\n')
 
 	h.mu.Lock()
@@ -206,7 +209,7 @@ func (h *commonHandler) handle(r Record) error {
 type handleState struct {
 	h   *commonHandler
 	buf *buffer.Buffer
-	sep bool // Append separator before next Attr?
+	sep string // write between Attrs
 }
 
 // appendAttr appends the Attr's key and value using app.
@@ -229,41 +232,75 @@ func (s *handleState) appendError(err error) {
 	s.appendString(fmt.Sprintf("!ERROR:%v", err))
 }
 
-type appender interface {
-	appendStart(*buffer.Buffer)                 // start of output
-	appendEnd(*buffer.Buffer)                   // end of output
-	appendKey(*buffer.Buffer, string)           // append key and key-value separator
-	appendString(*buffer.Buffer, string)        // append a string
-	appendSource(*buffer.Buffer, string, int)   // append a filename and line
-	appendTime(*buffer.Buffer, time.Time) error // append a time
-	appendAttrValue(*buffer.Buffer, Attr) error // append Attr's value (but not key)
-}
-
-func (s *handleState) appendSep() {
-	if s.sep {
-		s.buf.WriteByte(s.h.attrSep)
+func (s *handleState) appendKey(key string) {
+	s.buf.WriteString(s.sep)
+	s.appendString(key)
+	if s.h.json {
+		s.buf.WriteByte(':')
+		s.sep = ","
+	} else {
+		s.buf.WriteByte('=')
+		s.sep = " "
 	}
 }
 
-func (s *handleState) appendKey(key string) {
-	s.appendSep()
-	s.h.app.appendKey(s.buf, key)
-	s.sep = true
+func (s *handleState) appendSource(file string, line int) {
+	if s.h.json {
+		s.buf.WriteByte('"')
+		*s.buf = appendEscapedJSONString(*s.buf, file)
+		s.buf.WriteByte(':')
+		itoa((*[]byte)(s.buf), line, -1)
+		s.buf.WriteByte('"')
+	} else {
+		// text
+		if needsQuoting(file) {
+			s.appendString(file + ":" + strconv.Itoa(line))
+		} else {
+			// common case: no quoting needed.
+			s.appendString(file)
+			s.buf.WriteByte(':')
+			itoa((*[]byte)(s.buf), line, -1)
+		}
+	}
 }
 
 func (s *handleState) appendString(str string) {
-	s.h.app.appendString(s.buf, str)
+	if s.h.json {
+		s.buf.WriteByte('"')
+		*s.buf = appendEscapedJSONString(*s.buf, str)
+		s.buf.WriteByte('"')
+	} else {
+		// text
+		if needsQuoting(str) {
+			*s.buf = strconv.AppendQuote(*s.buf, str)
+		} else {
+			s.buf.WriteString(str)
+		}
+	}
 }
 
 func (s *handleState) appendAttrValue(a Attr) {
-	if err := s.h.app.appendAttrValue(s.buf, a); err != nil {
+	var err error
+	if s.h.json {
+		err = appendJSONValue(s, a)
+	} else {
+		err = appendTextValue(s, a)
+	}
+	if err != nil {
 		s.appendError(err)
 	}
 }
 
 func (s *handleState) appendTime(t time.Time) {
-	if err := s.h.app.appendTime(s.buf, t); err != nil {
-		s.appendError(err)
+	if s.h.json {
+		b, err := t.MarshalJSON()
+		if err != nil {
+			s.appendError(err)
+			return
+		}
+		s.buf.Write(b)
+	} else {
+		*s.buf = appendTimeRFC3339Millis(*s.buf, t)
 	}
 }
 
