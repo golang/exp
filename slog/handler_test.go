@@ -15,20 +15,44 @@ import (
 	"golang.org/x/exp/slog/internal/buffer"
 )
 
-func TestDefaultWith(t *testing.T) {
-	d := &defaultHandler{}
-	if g := len(d.attrs); g != 0 {
-		t.Errorf("got %d, want 0", g)
-	}
-	a1 := []Attr{Int("a", 1)}
-	d2 := d.With(a1)
-	if g := d2.(*defaultHandler).attrs; !attrsEqual(g, a1) {
-		t.Errorf("got %v, want %v", g, a1)
-	}
-	d3 := d2.With([]Attr{String("b", "two")})
-	want := append(a1, String("b", "two"))
-	if g := d3.(*defaultHandler).attrs; !attrsEqual(g, want) {
-		t.Errorf("got %v, want %v", g, want)
+func TestDefaultHandle(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		withAttrs []Attr
+		attrs     []Attr
+		want      string
+	}{
+		{
+			name: "no attrs",
+			want: "INFO message",
+		},
+		{
+			name:  "attrs",
+			attrs: []Attr{Int("a", 1), String("b", "two")},
+			want:  "INFO a=1 b=two message",
+		},
+		{
+			name:      "pre attrs",
+			withAttrs: []Attr{Int("pre", 0)},
+			attrs:     []Attr{Int("a", 1)},
+			want:      "INFO pre=0 a=1 message",
+		},
+	} {
+		var got string
+		var d Handler = &defaultHandler{output: func(_ int, s string) error {
+			got = s
+			return nil
+		},
+		}
+		d = d.With(test.withAttrs)
+		r := NewRecord(time.Time{}, InfoLevel, "message", 0)
+		r.AddAttrs(test.attrs...)
+		if err := d.Handle(r); err != nil {
+			t.Fatal(err)
+		}
+		if got != test.want {
+			t.Errorf("\ngot  %s\nwant %s", got, test.want)
+		}
 	}
 }
 

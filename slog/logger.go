@@ -14,7 +14,7 @@ var defaultLogger atomic.Value
 
 func init() {
 	defaultLogger.Store(&Logger{
-		handler: &defaultHandler{},
+		handler: &defaultHandler{output: log.Output},
 	})
 }
 

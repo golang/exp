@@ -7,7 +7,6 @@ package slog
 import (
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,7 +42,8 @@ type Handler interface {
 }
 
 type defaultHandler struct {
-	attrs []Attr
+	attrs  []Attr
+	output func(int, string) error // log.Output, except for testing
 }
 
 func (*defaultHandler) Enabled(l Level) bool {
@@ -57,14 +57,21 @@ func (h *defaultHandler) Handle(r Record) error {
 	var b strings.Builder
 	b.WriteString(r.Level().String())
 	b.WriteByte(' ')
+	for _, a := range h.attrs {
+		h.writeAttr(&b, a)
+	}
 	r.Attrs(func(a Attr) {
-		b.WriteString(a.Key)
-		b.WriteByte('=')
-		b.WriteString(a.Value.Resolve().String())
-		b.WriteByte(' ')
+		h.writeAttr(&b, a)
 	})
 	b.WriteString(r.Message())
-	return log.Output(4, b.String())
+	return h.output(4, b.String())
+}
+
+func (h *defaultHandler) writeAttr(b *strings.Builder, a Attr) {
+	b.WriteString(a.Key)
+	b.WriteByte('=')
+	b.WriteString(a.Value.Resolve().String())
+	b.WriteByte(' ')
 }
 
 func (d *defaultHandler) With(as []Attr) Handler {
