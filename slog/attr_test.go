@@ -22,13 +22,13 @@ func TestAttrNoAlloc(t *testing.T) {
 		d time.Duration
 	)
 	a := int(testing.AllocsPerRun(5, func() {
-		i = Int64("key", 1).Value().Int64()
-		u = Uint64("key", 1).Value().Uint64()
-		f = Float64("key", 1).Value().Float64()
-		b = Bool("key", true).Value().Bool()
-		s = String("key", "foo").Value().String()
-		d = Duration("key", d).Value().Duration()
-		x = Any("key", p).Value().Any()
+		i = Int64("key", 1).Value.Int64()
+		u = Uint64("key", 1).Value.Uint64()
+		f = Float64("key", 1).Value.Float64()
+		b = Bool("key", true).Value.Bool()
+		s = String("key", "foo").Value.String()
+		d = Duration("key", d).Value.Duration()
+		x = Any("key", p).Value.Any()
 	}))
 	if a != 0 {
 		t.Errorf("got %d allocs, want zero", a)

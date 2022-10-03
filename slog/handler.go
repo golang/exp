@@ -221,11 +221,11 @@ func (s *handleState) appendAttr(a Attr) {
 	if rep := s.h.opts.ReplaceAttr; rep != nil {
 		a = rep(a)
 	}
-	if a.Key() == "" {
+	if a.Key == "" {
 		return
 	}
-	s.appendKey(a.Key())
-	s.appendValue(a.Value())
+	s.appendKey(a.Key)
+	s.appendValue(a.Value)
 }
 
 func (s *handleState) appendError(err error) {

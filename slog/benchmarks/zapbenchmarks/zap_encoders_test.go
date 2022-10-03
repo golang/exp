@@ -38,8 +38,8 @@ func attrsToFields(attrs []slog.Attr) []zap.Field {
 	var fields []zap.Field
 	for _, a := range slogbench.TestAttrs {
 		var f zap.Field
-		k := a.Key()
-		v := a.Value()
+		k := a.Key
+		v := a.Value
 		switch v.Kind() {
 		case slog.StringKind:
 			f = zap.String(k, v.String())

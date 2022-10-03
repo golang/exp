@@ -121,7 +121,8 @@ func TestJSONAndTextHandlers(t *testing.T) {
 }
 
 func upperCaseKey(a Attr) Attr {
-	return a.WithKey(strings.ToUpper(a.Key()))
+	a.Key = strings.ToUpper(a.Key)
+	return a
 }
 
 func TestHandlerEnabled(t *testing.T) {

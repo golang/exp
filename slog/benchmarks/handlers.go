@@ -49,9 +49,9 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 	buf.WriteString(r.Message())
 	r.Attrs(func(a slog.Attr) {
 		buf.WriteByte(' ')
-		buf.WriteString(a.Key())
+		buf.WriteString(a.Key)
 		buf.WriteByte('=')
-		h.appendValue(buf, a.Value())
+		h.appendValue(buf, a.Value)
 	})
 	buf.WriteByte('\n')
 	_, err := h.w.Write(*buf)

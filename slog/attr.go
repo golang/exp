@@ -10,18 +10,10 @@ import (
 )
 
 // An Attr is a key-value pair.
-// It can represent most small values without an allocation.
-// The zero Attr has a key of "" and a value of nil.
 type Attr struct {
-	key   string
-	value Value
+	Key   string
+	Value Value
 }
-
-// Key returns the Attr's key.
-func (a Attr) Key() string { return a.key }
-
-// Value returns the Attr's Value.
-func (a Attr) Value() Value { return a.value }
 
 // String returns an Attr for a string value.
 func String(key, value string) Attr {
@@ -71,17 +63,11 @@ func Any(key string, value any) Attr {
 	return Attr{key, AnyValue(value)}
 }
 
-// WithKey returns an attr with the given key and the receiver's value.
-func (a Attr) WithKey(key string) Attr {
-	a.key = key
-	return a
-}
-
 // Equal reports whether two Attrs have equal keys and values.
 func (a1 Attr) Equal(a2 Attr) bool {
-	return a1.key == a2.key && a1.value.Equal(a2.value)
+	return a1.Key == a2.Key && a1.Value.Equal(a2.Value)
 }
 
 func (a Attr) String() string {
-	return fmt.Sprintf("%s=%s", a.key, a.value)
+	return fmt.Sprintf("%s=%s", a.Key, a.Value)
 }

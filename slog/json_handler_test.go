@@ -130,24 +130,24 @@ func BenchmarkJSONHandler(b *testing.B) {
 		{"defaults", HandlerOptions{}},
 		{"time format", HandlerOptions{
 			ReplaceAttr: func(a Attr) Attr {
-				v := a.Value()
+				v := a.Value
 				if v.Kind() == TimeKind {
-					return String(a.Key(), v.Time().Format(rfc3339Millis))
+					return String(a.Key, v.Time().Format(rfc3339Millis))
 				}
-				if a.Key() == "level" {
-					return a.WithKey("severity")
+				if a.Key == "level" {
+					return Attr{"severity", a.Value}
 				}
 				return a
 			},
 		}},
 		{"time unix", HandlerOptions{
 			ReplaceAttr: func(a Attr) Attr {
-				v := a.Value()
+				v := a.Value
 				if v.Kind() == TimeKind {
-					return Int64(a.Key(), v.Time().UnixNano())
+					return Int64(a.Key, v.Time().UnixNano())
 				}
-				if a.Key() == "level" {
-					return a.WithKey("severity")
+				if a.Key == "level" {
+					return Attr{"severity", a.Value}
 				}
 				return a
 			},
