@@ -57,6 +57,17 @@ func Duration(key string, v time.Duration) Attr {
 	return Attr{key, DurationValue(v)}
 }
 
+// Group returns an Attr for a Group Value.
+// The caller must not subsequently mutate the
+// argument slice.
+//
+// Use Group to collect several Attrs under a single
+// key on a log line, or as the result of LogValue
+// in order to log a single value as multiple Attrs.
+func Group(key string, as ...Attr) Attr {
+	return Attr{key, GroupValue(as...)}
+}
+
 // Any returns an Attr for the supplied value.
 // See [Value.AnyValue] for how values are treated.
 func Any(key string, value any) Attr {

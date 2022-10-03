@@ -23,6 +23,7 @@ func TestValueEqual(t *testing.T) {
 		BoolValue(false),
 		AnyValue(&x),
 		AnyValue(&y),
+		GroupValue(Bool("b", true), Int("i", 3)),
 	}
 	for i, v1 := range vals {
 		for j, v2 := range vals {

@@ -9,6 +9,8 @@ import (
 	"math"
 	"strconv"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 // Definitions for Value.
@@ -29,6 +31,7 @@ const (
 	StringKind
 	TimeKind
 	Uint64Kind
+	GroupKind
 	LogValuerKind
 )
 
@@ -41,6 +44,7 @@ var kindStrings = []string{
 	"String",
 	"Time",
 	"Uint64",
+	"GroupKind",
 	"LogValuer",
 }
 
@@ -93,6 +97,12 @@ func DurationValue(v time.Duration) Value {
 	return Value{num: uint64(v.Nanoseconds()), any: DurationKind}
 }
 
+// GroupValue returns a new Value for a list of Attrs.
+// The caller must not subsequently mutate the argument slice.
+func GroupValue(as ...Attr) Value {
+	return groupValue(as)
+}
+
 // AnyValue returns a Value for the supplied value.
 //
 // Given a value of one of Go's predeclared string, bool, or
@@ -139,6 +149,8 @@ func AnyValue(v any) Value {
 		return Float64Value(v)
 	case float32:
 		return Float64Value(float64(v))
+	case []Attr:
+		return GroupValue(v...)
 	case Kind:
 		panic("cannot store a slog.Kind in a slog.Value")
 	case *time.Location:
@@ -153,7 +165,7 @@ func AnyValue(v any) Value {
 // Any returns the Value's value as an any.
 func (v Value) Any() any {
 	switch v.Kind() {
-	case AnyKind, LogValuerKind:
+	case AnyKind, GroupKind, LogValuerKind:
 		return v.any
 	case Int64Kind:
 		return int64(v.num)
@@ -252,6 +264,12 @@ func (v Value) LogValuer() LogValuer {
 	return v.any.(LogValuer)
 }
 
+// Group returns the Value's value as a []Attr.
+// It panics if the Value's Kind is not GroupKind.
+func (v Value) Group() []Attr {
+	return v.group()
+}
+
 //////////////// Other
 
 // Equal reports whether two Values have equal keys and values.
@@ -272,6 +290,8 @@ func (v1 Value) Equal(v2 Value) bool {
 		return v1.time().Equal(v2.time())
 	case AnyKind, LogValuerKind:
 		return v1.any == v2.any // may panic if non-comparable
+	case GroupKind:
+		return slices.EqualFunc(v1.uncheckedGroup(), v2.uncheckedGroup(), Attr.Equal)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", k1))
 	}
@@ -295,7 +315,7 @@ func (v Value) append(dst []byte) []byte {
 		return append(dst, v.duration().String()...)
 	case TimeKind:
 		return append(dst, v.time().String()...)
-	case AnyKind, LogValuerKind:
+	case AnyKind, GroupKind, LogValuerKind:
 		return append(dst, fmt.Sprint(v.any)...)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", v.Kind()))

@@ -35,6 +35,8 @@ func (v Value) Kind() Kind {
 		return k
 	case *time.Location:
 		return TimeKind
+	case []Attr:
+		return GroupKind
 	case LogValuer:
 		return LogValuerKind
 	default:
@@ -61,3 +63,13 @@ func (v Value) String() string {
 	var buf []byte
 	return string(v.append(buf))
 }
+
+func groupValue(as []Attr) Value {
+	return Value{any: as}
+}
+
+func (v Value) group() []Attr {
+	return v.any.([]Attr)
+}
+
+func (v Value) uncheckedGroup() []Attr { return v.group() }

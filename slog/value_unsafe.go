@@ -33,8 +33,10 @@ type Value struct {
 	any any
 }
 
-// stringptr is used in field `a` when the Value is a string.
-type stringptr unsafe.Pointer
+type (
+	stringptr unsafe.Pointer // used in Value.any when the Value is a string
+	groupptr  unsafe.Pointer // used in Value.any when the Value is a []Attr
+)
 
 // Kind returns the Value's Kind.
 func (v Value) Kind() Kind {
@@ -45,6 +47,8 @@ func (v Value) Kind() Kind {
 		return StringKind
 	case *time.Location:
 		return TimeKind
+	case groupptr:
+		return GroupKind
 	case LogValuer:
 		return LogValuerKind
 	default:
@@ -80,4 +84,22 @@ func (v Value) String() string {
 	}
 	var buf []byte
 	return string(v.append(buf))
+}
+
+func groupValue(as []Attr) Value {
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&as))
+	return Value{num: uint64(hdr.Len), any: groupptr(hdr.Data)}
+}
+
+// Group returns the Value's value as a []Attr.
+// It panics if the Value's Kind is not GroupKind.
+func (v Value) group() []Attr {
+	if sp, ok := v.any.(groupptr); ok {
+		return unsafe.Slice((*Attr)(sp), v.num)
+	}
+	panic("Group: bad kind")
+}
+
+func (v Value) uncheckedGroup() []Attr {
+	return unsafe.Slice((*Attr)(v.any.(groupptr)), v.num)
 }
