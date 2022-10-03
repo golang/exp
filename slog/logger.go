@@ -78,6 +78,15 @@ func (l *Logger) With(args ...any) *Logger {
 	return &Logger{handler: l.handler.With(attrs)}
 }
 
+// WithScope returns a new Logger with the named scope.
+// The keys of all attributes added to the Logger will be scoped
+// to the given name. Two loggers with different scope names
+// but identical Attr keys will result in output without
+// duplicate keys.
+func (l *Logger) WithScope(name string) *Logger {
+	return &Logger{handler: l.handler.WithScope(name)}
+}
+
 // New creates a new Logger with the given Handler.
 func New(h Handler) *Logger { return &Logger{handler: h} }
 

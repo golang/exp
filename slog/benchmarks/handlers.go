@@ -93,7 +93,11 @@ func (h *fastTextHandler) appendTime(buf *buffer.Buffer, t time.Time) {
 }
 
 func (h *fastTextHandler) With([]slog.Attr) slog.Handler {
-	panic("textHandler: With unimplemented")
+	panic("fastTextHandler: With unimplemented")
+}
+
+func (*fastTextHandler) WithScope(string) slog.Handler {
+	panic("fastTextHandler: WithScope unimplemented")
 }
 
 // An asyncHandler simulates a Handler that passes Records to a
@@ -120,6 +124,10 @@ func (h *asyncHandler) Handle(r slog.Record) error {
 	return nil
 }
 
-func (h *asyncHandler) With([]slog.Attr) slog.Handler {
+func (*asyncHandler) With([]slog.Attr) slog.Handler {
 	panic("asyncHandler: With unimplemented")
+}
+
+func (*asyncHandler) WithScope(string) slog.Handler {
+	panic("asyncHandler: WithScope unimplemented")
 }

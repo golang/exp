@@ -312,6 +312,10 @@ func (c *captureHandler) With(as []Attr) Handler {
 	return &c2
 }
 
+func (h *captureHandler) WithScope(name string) Handler {
+	panic("unimplemented")
+}
+
 type discardHandler struct {
 	disabled bool
 	attrs    []Attr
@@ -322,6 +326,9 @@ func (discardHandler) Handle(Record) error  { return nil }
 func (d discardHandler) With(as []Attr) Handler {
 	d.attrs = concat(d.attrs, as)
 	return d
+}
+func (h discardHandler) WithScope(name string) Handler {
+	return h
 }
 
 // This is a simple benchmark. See the benchmarks subdirectory for more extensive ones.

@@ -38,7 +38,11 @@ func (opts HandlerOptions) NewTextHandler(w io.Writer) *TextHandler {
 // With returns a new TextHandler whose attributes consists
 // of h's attributes followed by attrs.
 func (h *TextHandler) With(attrs []Attr) Handler {
-	return &TextHandler{commonHandler: h.commonHandler.with(attrs)}
+	return &TextHandler{commonHandler: h.commonHandler.withAttrs(attrs)}
+}
+
+func (h *TextHandler) WithScope(name string) Handler {
+	return &TextHandler{commonHandler: h.commonHandler.withScope(name)}
 }
 
 // Handle formats its argument Record as a single line of space-separated

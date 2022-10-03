@@ -43,7 +43,11 @@ func (opts HandlerOptions) NewJSONHandler(w io.Writer) *JSONHandler {
 // With returns a new JSONHandler whose attributes consists
 // of h's attributes followed by attrs.
 func (h *JSONHandler) With(attrs []Attr) Handler {
-	return &JSONHandler{commonHandler: h.commonHandler.with(attrs)}
+	return &JSONHandler{commonHandler: h.commonHandler.withAttrs(attrs)}
+}
+
+func (h *JSONHandler) WithScope(name string) Handler {
+	return &JSONHandler{commonHandler: h.commonHandler.withScope(name)}
 }
 
 // Handle formats its argument Record as a JSON object on a single line.

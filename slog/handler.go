@@ -39,6 +39,24 @@ type Handler interface {
 	// the receiver's attributes concatenated with the arguments.
 	// The Handler owns the slice: it may retain, modify or discard it.
 	With(attrs []Attr) Handler
+
+	// WithScope returns a new Handler with the given scope appended to
+	// the receiver's existing scopes.
+	// The keys of all subsequent attributes, whether added by With or in a
+	// Record, should be qualified by the sequence of scope names.
+	//
+	// How this qualification happens is up to the Handler, so long as
+	// this Handler's attribute keys differ from those of another Handler
+	// with a different sequence of scope names.
+	//
+	// A Handler should treat a scope as starting a Group of Attrs. That is,
+	//
+	//     logger.WithScope("s").LogAttrs(slog.Int("a", 1), slog.Int("b", 2))
+	//
+	// should behave like
+	//
+	//     logger.LogAttrs(slog.Group("s", slog.Int("a", 1), slog.Int("b", 2)))
+	WithScope(name string) Handler
 }
 
 type defaultHandler struct {
@@ -80,6 +98,10 @@ func (d *defaultHandler) With(as []Attr) Handler {
 	return &d2
 }
 
+func (h *defaultHandler) WithScope(name string) Handler {
+	panic("unimplemented")
+}
+
 // HandlerOptions are options for a TextHandler or JSONHandler.
 // A zero HandlerOptions consists entirely of default values.
 type HandlerOptions struct {
@@ -119,7 +141,7 @@ func (h *commonHandler) Enabled(l Level) bool {
 	return l >= minLevel
 }
 
-func (h *commonHandler) with(as []Attr) *commonHandler {
+func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 	h2 := &commonHandler{
 		json:              h.json,
 		opts:              h.opts,
@@ -136,6 +158,10 @@ func (h *commonHandler) with(as []Attr) *commonHandler {
 		state.appendAttr(a)
 	}
 	return h2
+}
+
+func (h *commonHandler) withScope(name string) *commonHandler {
+	panic("unimplemented")
 }
 
 func (h *commonHandler) handle(r Record) error {
