@@ -230,6 +230,7 @@ func (h *commonHandler) handle(r Record) error {
 	if len(h.preformattedAttrs) > 0 {
 		state.buf.WriteString(state.sep)
 		state.buf.Write(h.preformattedAttrs)
+		state.sep = h.attrSep()
 	}
 	// Attrs in Record
 	r.Attrs(func(a Attr) {
@@ -244,6 +245,14 @@ func (h *commonHandler) handle(r Record) error {
 	defer h.mu.Unlock()
 	_, err := h.w.Write(*state.buf)
 	return err
+}
+
+// attrSep returns the separator between attributes.
+func (h *commonHandler) attrSep() string {
+	if h.json {
+		return ","
+	}
+	return " "
 }
 
 // handleState holds state for a single call to commonHandler.handle.
@@ -280,11 +289,10 @@ func (s *handleState) appendKey(key string) {
 	s.appendString(key)
 	if s.h.json {
 		s.buf.WriteByte(':')
-		s.sep = ","
 	} else {
 		s.buf.WriteByte('=')
-		s.sep = " "
 	}
+	s.sep = s.h.attrSep()
 }
 
 func (s *handleState) appendSource(file string, line int) {

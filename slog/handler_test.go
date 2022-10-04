@@ -58,7 +58,23 @@ func TestDefaultHandle(t *testing.T) {
 
 // Verify the common parts of TextHandler and JSONHandler.
 func TestJSONAndTextHandlers(t *testing.T) {
-	removeAttr := func(a Attr) Attr { return Attr{} }
+
+	// ReplaceAttr functions
+
+	// remove all Attrs
+	removeAll := func(a Attr) Attr { return Attr{} }
+
+	// remove the given keys
+	removeKeys := func(keys ...string) func(a Attr) Attr {
+		return func(a Attr) Attr {
+			for _, k := range keys {
+				if a.Key == k {
+					return Attr{}
+				}
+			}
+			return a
+		}
+	}
 
 	attrs := []Attr{String("a", "one"), Int("b", 2), Any("", "ignore me")}
 	preAttrs := []Attr{Int("pre", 3), String("x", "y")}
@@ -66,6 +82,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 	for _, test := range []struct {
 		name     string
 		replace  func(Attr) Attr
+		with     func(Handler) Handler
 		preAttrs []Attr
 		attrs    []Attr
 		wantText string
@@ -86,13 +103,14 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:     "remove all",
-			replace:  removeAttr,
+			replace:  removeAll,
 			attrs:    attrs,
 			wantText: "",
 			wantJSON: `{}`,
 		},
 		{
 			name:     "preformatted",
+			with:     func(h Handler) Handler { return h.With(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
 			wantText: "time=2000-01-02T03:04:05.000Z level=INFO msg=message pre=3 x=y a=one b=2",
@@ -101,6 +119,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		{
 			name:     "preformatted cap keys",
 			replace:  upperCaseKey,
+			with:     func(h Handler) Handler { return h.With(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
 			wantText: "TIME=2000-01-02T03:04:05.000Z LEVEL=INFO MSG=message PRE=3 X=y A=one B=2",
@@ -108,11 +127,27 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:     "preformatted remove all",
-			replace:  removeAttr,
+			replace:  removeAll,
+			with:     func(h Handler) Handler { return h.With(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
 			wantText: "",
 			wantJSON: "{}",
+		},
+		{
+			name:     "remove built-in",
+			replace:  removeKeys(timeKey, levelKey, messageKey),
+			attrs:    attrs,
+			wantText: "a=one b=2",
+			wantJSON: `{"a":"one","b":2}`,
+		},
+		{
+			name:     "preformatted remove built-in",
+			replace:  removeKeys(timeKey, levelKey, messageKey),
+			with:     func(h Handler) Handler { return h.With(preAttrs) },
+			attrs:    attrs,
+			wantText: "pre=3 x=y a=one b=2",
+			wantJSON: `{"pre":3,"x":"y","a":"one","b":2}`,
 		},
 	} {
 		r := NewRecord(testTime, InfoLevel, "message", 1)
@@ -129,7 +164,10 @@ func TestJSONAndTextHandlers(t *testing.T) {
 				{"json", opts.NewJSONHandler(&buf), test.wantJSON},
 			} {
 				t.Run(handler.name, func(t *testing.T) {
-					h := handler.h.With(test.preAttrs)
+					h := handler.h
+					if test.with != nil {
+						h = test.with(h)
+					}
 					buf.Reset()
 					if err := h.Handle(r); err != nil {
 						t.Fatal(err)
