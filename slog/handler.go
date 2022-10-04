@@ -136,6 +136,7 @@ type commonHandler struct {
 	json              bool // true => output JSON; false => output text
 	opts              HandlerOptions
 	preformattedAttrs []byte
+	scopePrefix       string   // for text: prefix of scopes opened in preformatting
 	scopes            []string // all scopes
 	nOpenScopes       int      // the number of scopes opened in in preformattedAttrs
 	mu                sync.Mutex
@@ -148,6 +149,7 @@ func (h *commonHandler) clone() *commonHandler {
 		json:              h.json,
 		opts:              h.opts,
 		preformattedAttrs: h.preformattedAttrs,
+		scopePrefix:       h.scopePrefix,
 		scopes:            slices.Clip(h.scopes),
 		nOpenScopes:       h.nOpenScopes,
 		w:                 h.w,
@@ -167,10 +169,14 @@ func (h *commonHandler) Enabled(l Level) bool {
 func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 	h2 := h.clone()
 	// Pre-format the attributes as an optimization.
+	prefix := buffer.New()
+	defer prefix.Free()
+	prefix.WriteString(h.scopePrefix)
 	state := handleState{
-		h:   h2,
-		buf: (*buffer.Buffer)(&h2.preformattedAttrs),
-		sep: "",
+		h:      h2,
+		buf:    (*buffer.Buffer)(&h2.preformattedAttrs),
+		sep:    "",
+		prefix: prefix,
 	}
 	if len(h2.preformattedAttrs) > 0 {
 		state.sep = h.attrSep()
@@ -179,11 +185,11 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 	for _, a := range as {
 		state.appendAttr(a)
 	}
-	if h2.json {
-		// Remember how many open scopes are in preformattedAttrs,
-		// so we don't open them again when we handle a Record.
-		h2.nOpenScopes = len(h2.scopes)
-	}
+	// Remember the new prefix for later keys.
+	h2.scopePrefix = state.prefix.String()
+	// Remember how many opened scopes are in preformattedAttrs,
+	// so we don't open them again when we handle a Record.
+	h2.nOpenScopes = len(h2.scopes)
 	return h2
 }
 
@@ -200,6 +206,7 @@ func (h *commonHandler) handle(r Record) error {
 	if h.json {
 		state.buf.WriteByte('{')
 	}
+	// Built-in attributes. They are not scoped.
 	// time
 	if !r.Time().IsZero() {
 		key := timeKey
@@ -253,14 +260,20 @@ func (h *commonHandler) handle(r Record) error {
 		state.buf.Write(h.preformattedAttrs)
 		state.sep = h.attrSep()
 	}
-	// Attrs in Record -- unlike the "built-in" ones, they are scoped.
+	// Attrs in Record -- unlike the built-in ones, they are scoped.
+	state.prefix = buffer.New()
+	defer state.prefix.Free()
+	state.prefix.WriteString(h.scopePrefix)
 	state.openScopes()
 	r.Attrs(func(a Attr) {
 		state.appendAttr(a)
 	})
-	state.closeScopes()
 	if h.json {
-		// Close the top-level object
+		// Close all open scopes.
+		for range h.scopes {
+			state.buf.WriteByte('}')
+		}
+		// Close the top-level object.
 		state.buf.WriteByte('}')
 	}
 	state.buf.WriteByte('\n')
@@ -285,19 +298,13 @@ func (h *commonHandler) attrSep() string {
 type handleState struct {
 	h      *commonHandler
 	buf    *buffer.Buffer
-	sep    string // separator to write before next key
-	prefix string // for text: key prefix
+	sep    string         // separator to write before next key
+	prefix *buffer.Buffer // for text: key prefix
 }
 
 func (s *handleState) openScopes() {
 	for _, n := range s.h.scopes[s.h.nOpenScopes:] {
 		s.openGroup(n)
-	}
-}
-
-func (s *handleState) closeScopes() {
-	for i := len(s.h.scopes) - 1; i >= 0; i-- {
-		s.closeGroup(s.h.scopes[i])
 	}
 }
 
@@ -311,7 +318,8 @@ func (s *handleState) openGroup(name string) {
 		s.sep = ""
 	} else {
 		// TODO: fix escaping to make it easy to recover the original.
-		s.prefix += escapeDots(name) + "."
+		s.prefix.WriteString(escapeDots(name))
+		s.prefix.WriteByte('.')
 	}
 }
 
@@ -320,7 +328,7 @@ func (s *handleState) closeGroup(name string) {
 	if s.h.json {
 		s.buf.WriteByte('}')
 	} else {
-		s.prefix = s.prefix[:len(s.prefix)-len(name)-1]
+		(*s.prefix) = (*s.prefix)[:len(*s.prefix)-len(name)-1]
 	}
 	s.sep = s.h.attrSep()
 }
@@ -357,7 +365,9 @@ func (s *handleState) appendError(err error) {
 func (s *handleState) appendKey(key string) {
 	s.buf.WriteString(s.sep)
 	// TODO: make sure the entire prefix+key is quoted if any part of it needs to be.
-	s.buf.WriteString(s.prefix)
+	if s.prefix != nil {
+		s.buf.Write(*s.prefix)
+	}
 	s.appendString(key)
 	if s.h.json {
 		s.buf.WriteByte(':')
