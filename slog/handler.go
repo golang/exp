@@ -123,6 +123,14 @@ type HandlerOptions struct {
 	ReplaceAttr func(a Attr) Attr
 }
 
+// Keys for "built-in" attributes.
+const (
+	timeKey    = "time"   // time.Time: when log method is called
+	levelKey   = "level"  // Level: level of log method
+	messageKey = "msg"    // string: message of log method
+	sourceKey  = "source" // string: file:line of log call
+)
+
 type commonHandler struct {
 	json              bool // true => output JSON; false => output text
 	opts              HandlerOptions
@@ -173,7 +181,7 @@ func (h *commonHandler) handle(r Record) error {
 	}
 	// time
 	if !r.Time().IsZero() {
-		key := "time"
+		key := timeKey
 		val := r.Time().Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
 			state.appendKey(key)
@@ -183,7 +191,7 @@ func (h *commonHandler) handle(r Record) error {
 		}
 	}
 	// level
-	key := "level"
+	key := levelKey
 	val := r.Level()
 	if rep == nil {
 		state.appendKey(key)
@@ -195,7 +203,7 @@ func (h *commonHandler) handle(r Record) error {
 	if h.opts.AddSource {
 		file, line := r.SourceLine()
 		if file != "" {
-			key := "source"
+			key := sourceKey
 			if rep == nil {
 				state.appendKey(key)
 				state.appendSource(file, line)
@@ -210,7 +218,7 @@ func (h *commonHandler) handle(r Record) error {
 			}
 		}
 	}
-	key = "msg"
+	key = messageKey
 	msg := r.Message()
 	if rep == nil {
 		state.appendKey(key)
