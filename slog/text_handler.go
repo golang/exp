@@ -8,6 +8,7 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -97,6 +98,13 @@ func appendTextValue(s *handleState, v Value) error {
 		*s.buf = v.append(*s.buf)
 	}
 	return nil
+}
+
+// escapeDots replaces all '.' runes in s with the equivalent hex escape code.
+// This allows the scope/group structure to be retrieved from the dot-separated
+// components of a key.
+func escapeDots(s string) string {
+	return strings.ReplaceAll(s, ".", `\x2E`)
 }
 
 func needsQuoting(s string) bool {

@@ -179,9 +179,11 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 	for _, a := range as {
 		state.appendAttr(a)
 	}
-	// Remember how many open scopes are in preformattedAttrs,
-	// so we don't open them again when we handle a Record.
-	h2.nOpenScopes = len(h2.scopes)
+	if h2.json {
+		// Remember how many open scopes are in preformattedAttrs,
+		// so we don't open them again when we handle a Record.
+		h2.nOpenScopes = len(h2.scopes)
+	}
 	return h2
 }
 
@@ -281,9 +283,10 @@ func (h *commonHandler) attrSep() string {
 // The initial value of sep determines whether to emit a separator
 // before the next key, after which it stays true.
 type handleState struct {
-	h   *commonHandler
-	buf *buffer.Buffer
-	sep string // separator to write before next key
+	h      *commonHandler
+	buf    *buffer.Buffer
+	sep    string // separator to write before next key
+	prefix string // for text: key prefix
 }
 
 func (s *handleState) openScopes() {
@@ -307,7 +310,8 @@ func (s *handleState) openGroup(name string) {
 		s.buf.WriteByte('{')
 		s.sep = ""
 	} else {
-		panic("unimplemented")
+		// TODO: fix escaping to make it easy to recover the original.
+		s.prefix += escapeDots(name) + "."
 	}
 }
 
@@ -316,7 +320,7 @@ func (s *handleState) closeGroup(name string) {
 	if s.h.json {
 		s.buf.WriteByte('}')
 	} else {
-		panic("unimplemented -- but it will use name, I assure you")
+		s.prefix = s.prefix[:len(s.prefix)-len(name)-1]
 	}
 	s.sep = s.h.attrSep()
 }
@@ -352,6 +356,8 @@ func (s *handleState) appendError(err error) {
 
 func (s *handleState) appendKey(key string) {
 	s.buf.WriteString(s.sep)
+	// TODO: make sure the entire prefix+key is quoted if any part of it needs to be.
+	s.buf.WriteString(s.prefix)
 	s.appendString(key)
 	if s.h.json {
 		s.buf.WriteByte(':')
