@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog/internal/buffer"
 )
 
@@ -135,8 +136,22 @@ type commonHandler struct {
 	json              bool // true => output JSON; false => output text
 	opts              HandlerOptions
 	preformattedAttrs []byte
+	scopes            []string // all scopes
+	nOpenScopes       int      // the number of scopes opened in in preformattedAttrs
 	mu                sync.Mutex
 	w                 io.Writer
+}
+
+func (h *commonHandler) clone() *commonHandler {
+	// We can't use assignment because we can't copy the mutex.
+	return &commonHandler{
+		json:              h.json,
+		opts:              h.opts,
+		preformattedAttrs: h.preformattedAttrs,
+		scopes:            slices.Clip(h.scopes),
+		nOpenScopes:       h.nOpenScopes,
+		w:                 h.w,
+	}
 }
 
 // Enabled reports whether l is greater than or equal to the
@@ -150,26 +165,30 @@ func (h *commonHandler) Enabled(l Level) bool {
 }
 
 func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
-	h2 := &commonHandler{
-		json:              h.json,
-		opts:              h.opts,
-		preformattedAttrs: h.preformattedAttrs,
-		w:                 h.w,
-	}
+	h2 := h.clone()
 	// Pre-format the attributes as an optimization.
 	state := handleState{
 		h:   h2,
 		buf: (*buffer.Buffer)(&h2.preformattedAttrs),
 		sep: "",
 	}
+	if len(h2.preformattedAttrs) > 0 {
+		state.sep = h.attrSep()
+	}
+	state.openScopes()
 	for _, a := range as {
 		state.appendAttr(a)
 	}
+	// Remember how many open scopes are in preformattedAttrs,
+	// so we don't open them again when we handle a Record.
+	h2.nOpenScopes = len(h2.scopes)
 	return h2
 }
 
 func (h *commonHandler) withScope(name string) *commonHandler {
-	panic("unimplemented")
+	h2 := h.clone()
+	h2.scopes = append(h2.scopes, name)
+	return h2
 }
 
 func (h *commonHandler) handle(r Record) error {
@@ -232,11 +251,14 @@ func (h *commonHandler) handle(r Record) error {
 		state.buf.Write(h.preformattedAttrs)
 		state.sep = h.attrSep()
 	}
-	// Attrs in Record
+	// Attrs in Record -- unlike the "built-in" ones, they are scoped.
+	state.openScopes()
 	r.Attrs(func(a Attr) {
 		state.appendAttr(a)
 	})
+	state.closeScopes()
 	if h.json {
+		// Close the top-level object
 		state.buf.WriteByte('}')
 	}
 	state.buf.WriteByte('\n')
@@ -261,7 +283,42 @@ func (h *commonHandler) attrSep() string {
 type handleState struct {
 	h   *commonHandler
 	buf *buffer.Buffer
-	sep string // write between Attrs
+	sep string // separator to write before next key
+}
+
+func (s *handleState) openScopes() {
+	for _, n := range s.h.scopes[s.h.nOpenScopes:] {
+		s.openGroup(n)
+	}
+}
+
+func (s *handleState) closeScopes() {
+	for i := len(s.h.scopes) - 1; i >= 0; i-- {
+		s.closeGroup(s.h.scopes[i])
+	}
+}
+
+// openGroup starts a new group of attributes
+// with the given name.
+// A group can arise from a scope, or from an Attr with a GroupKind value.
+func (s *handleState) openGroup(name string) {
+	if s.h.json {
+		s.appendKey(name)
+		s.buf.WriteByte('{')
+		s.sep = ""
+	} else {
+		panic("unimplemented")
+	}
+}
+
+// closeGroup ends the group with the given name.
+func (s *handleState) closeGroup(name string) {
+	if s.h.json {
+		s.buf.WriteByte('}')
+	} else {
+		panic("unimplemented -- but it will use name, I assure you")
+	}
+	s.sep = s.h.attrSep()
 }
 
 // appendAttr appends the Attr's key and value using app.
@@ -276,8 +333,17 @@ func (s *handleState) appendAttr(a Attr) {
 	if a.Key == "" {
 		return
 	}
-	s.appendKey(a.Key)
-	s.appendValue(a.Value)
+	v := a.Value.Resolve()
+	if v.Kind() == GroupKind {
+		s.openGroup(a.Key)
+		for _, aa := range v.Group() {
+			s.appendAttr(aa)
+		}
+		s.closeGroup(a.Key)
+	} else {
+		s.appendKey(a.Key)
+		s.appendValue(v)
+	}
 }
 
 func (s *handleState) appendError(err error) {
@@ -331,7 +397,6 @@ func (s *handleState) appendString(str string) {
 }
 
 func (s *handleState) appendValue(v Value) {
-	v = v.Resolve()
 	var err error
 	if s.h.json {
 		err = appendJSONValue(s, v)

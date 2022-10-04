@@ -149,6 +149,71 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantText: "pre=3 x=y a=one b=2",
 			wantJSON: `{"pre":3,"x":"y","a":"one","b":2}`,
 		},
+		{
+			name:    "groups",
+			replace: removeKeys(timeKey, levelKey), // to simplify the result
+			attrs: []Attr{
+				Int("a", 1),
+				Group("g",
+					Int("b", 2),
+					Group("h", Int("c", 3)),
+					Int("d", 4)),
+				Int("e", 5),
+			},
+			wantText: "SKIP",
+			wantJSON: `{"msg":"message","a":1,"g":{"b":2,"h":{"c":3},"d":4},"e":5}`,
+		},
+		{
+			name:     "empty group",
+			replace:  removeKeys(timeKey, levelKey),
+			attrs:    []Attr{Group("g"), Group("h", Int("a", 1))},
+			wantText: "SKIP",
+			wantJSON: `{"msg":"message","g":{},"h":{"a":1}}`,
+		},
+		{
+			name:    "Marshaler",
+			replace: removeKeys(timeKey, levelKey),
+			attrs: []Attr{
+				Int("a", 1),
+				Any("name", marshalName{"Ren", "Hoek"}),
+				Int("b", 2),
+			},
+			wantText: "SKIP",
+			wantJSON: `{"msg":"message","a":1,"name":{"first":"Ren","last":"Hoek"},"b":2}`,
+		},
+		{
+			name:     "scope",
+			replace:  removeKeys(timeKey, levelKey),
+			with:     func(h Handler) Handler { return h.With(preAttrs).WithScope("s") },
+			attrs:    attrs,
+			wantText: "SKIP",
+			wantJSON: `{"msg":"message","pre":3,"x":"y","s":{"a":"one","b":2}}`,
+		},
+		{
+			name:    "preformatted scopes",
+			replace: removeKeys(timeKey, levelKey),
+			with: func(h Handler) Handler {
+				return h.With([]Attr{Int("p1", 1)}).
+					WithScope("s1").
+					With([]Attr{Int("p2", 2)}).
+					WithScope("s2")
+			},
+			attrs:    attrs,
+			wantText: "SKIP",
+			wantJSON: `{"msg":"message","p1":1,"s1":{"p2":2,"s2":{"a":"one","b":2}}}`,
+		},
+		{
+			name:    "two scopes",
+			replace: removeKeys(timeKey, levelKey),
+			with: func(h Handler) Handler {
+				return h.With([]Attr{Int("p1", 1)}).
+					WithScope("s1").
+					WithScope("s2")
+			},
+			attrs:    attrs,
+			wantText: "SKIP",
+			wantJSON: `{"msg":"message","p1":1,"s1":{"s2":{"a":"one","b":2}}}`,
+		},
 	} {
 		r := NewRecord(testTime, InfoLevel, "message", 1)
 		r.AddAttrs(test.attrs...)
@@ -164,6 +229,9 @@ func TestJSONAndTextHandlers(t *testing.T) {
 				{"json", opts.NewJSONHandler(&buf), test.wantJSON},
 			} {
 				t.Run(handler.name, func(t *testing.T) {
+					if handler.want == "SKIP" {
+						t.Skip("feature unimplemented")
+					}
 					h := handler.h
 					if test.with != nil {
 						h = test.with(h)
@@ -174,7 +242,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 					}
 					got := strings.TrimSuffix(buf.String(), "\n")
 					if got != handler.want {
-						t.Errorf("\ngot  %#v\nwant %#v\n", got, handler.want)
+						t.Errorf("\ngot  %s\nwant %s\n", got, handler.want)
 					}
 				})
 			}
@@ -185,6 +253,16 @@ func TestJSONAndTextHandlers(t *testing.T) {
 func upperCaseKey(a Attr) Attr {
 	a.Key = strings.ToUpper(a.Key)
 	return a
+}
+
+type marshalName struct {
+	first, last string
+}
+
+func (n marshalName) LogValue() Value {
+	return GroupValue(
+		String("first", n.first),
+		String("last", n.last))
 }
 
 func TestHandlerEnabled(t *testing.T) {

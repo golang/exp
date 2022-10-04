@@ -12,13 +12,13 @@ type Name struct {
 	First, Last string
 }
 
-func (n Name) MarshalLog() slog.Value {
+func (n Name) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("first", n.First),
 		slog.String("last", n.Last))
 }
 
-func ExampleMarshaler() {
+func ExampleLogValuer() {
 	n := Name{"Perry", "Platypus"}
 	slog.Info("mission accomplished", "agent", n)
 
