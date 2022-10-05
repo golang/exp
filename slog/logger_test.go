@@ -6,6 +6,7 @@ package slog
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"path/filepath"
@@ -352,4 +353,22 @@ func BenchmarkNopLog(b *testing.B) {
 			l.Log(InfoLevel, "msg", "a", 1, "b", "two", "c", true)
 		}
 	})
+}
+
+func TestSetDefault(t *testing.T) {
+	// Verify that setting the default to itself does not result in deadlock.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	defer func(w io.Writer) { log.SetOutput(w) }(log.Writer())
+	log.SetOutput(io.Discard)
+	go func() {
+		Info("A")
+		SetDefault(Default())
+		Info("B")
+		cancel()
+	}()
+	<-ctx.Done()
+	if err := ctx.Err(); err != context.Canceled {
+		t.Errorf("wanted canceled, got %v", err)
+	}
 }

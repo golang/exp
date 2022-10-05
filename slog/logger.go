@@ -26,8 +26,16 @@ func Default() *Logger { return defaultLogger.Load().(*Logger) }
 // (as with [log.Print], etc.) will be logged at InfoLevel using l's Handler.
 func SetDefault(l *Logger) {
 	defaultLogger.Store(l)
-	log.SetOutput(&handlerWriter{l.Handler(), log.Flags()})
-	log.SetFlags(0) // we want just the log message, no time or location
+	// If the default's handler is a defaultHandler, then don't use a handleWriter,
+	// or we'll deadlock as they both try to acquire the log default mutex.
+	// The defaultHandler will use whatever the log default writer is currently
+	// set to, which is correct.
+	// This can occur with SetDefault(Default()).
+	// See TestSetDefault.
+	if _, ok := l.Handler().(*defaultHandler); !ok {
+		log.SetOutput(&handlerWriter{l.Handler(), log.Flags()})
+		log.SetFlags(0) // we want just the log message, no time or location
+	}
 }
 
 // handlerWriter is an io.Writer that calls a Handler.
