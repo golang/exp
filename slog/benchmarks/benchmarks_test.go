@@ -20,6 +20,7 @@ func BenchmarkAttrs(b *testing.B) {
 		name string
 		h    slog.Handler
 	}{
+		{"disabled", disabledHandler{}},
 		{"async discard", newAsyncHandler()},
 		{"fastText discard", newFastTextHandler(io.Discard)},
 		{"Text discard", slog.NewTextHandler(io.Discard)},

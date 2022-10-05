@@ -131,3 +131,16 @@ func (*asyncHandler) With([]slog.Attr) slog.Handler {
 func (*asyncHandler) WithScope(string) slog.Handler {
 	panic("asyncHandler: WithScope unimplemented")
 }
+
+type disabledHandler struct{}
+
+func (disabledHandler) Enabled(slog.Level) bool  { return false }
+func (disabledHandler) Handle(slog.Record) error { panic("should not be called") }
+
+func (disabledHandler) With([]slog.Attr) slog.Handler {
+	panic("disabledHandler: With unimplemented")
+}
+
+func (disabledHandler) WithScope(string) slog.Handler {
+	panic("disabledHandler: WithScope unimplemented")
+}
