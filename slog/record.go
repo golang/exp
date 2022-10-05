@@ -68,18 +68,18 @@ func NewRecord(t time.Time, level Level, msg string, calldepth int) Record {
 }
 
 // Time returns the time of the log event.
-func (r *Record) Time() time.Time { return r.time }
+func (r Record) Time() time.Time { return r.time }
 
 // Message returns the log message.
-func (r *Record) Message() string { return r.message }
+func (r Record) Message() string { return r.message }
 
 // Level returns the level of the log event.
-func (r *Record) Level() Level { return r.level }
+func (r Record) Level() Level { return r.level }
 
 // SourceLine returns the file and line of the log event.
 // If the Record was created without the necessary information,
 // or if the location is unavailable, it returns ("", 0).
-func (r *Record) SourceLine() (file string, line int) {
+func (r Record) SourceLine() (file string, line int) {
 	fs := runtime.CallersFrames([]uintptr{r.pc})
 	// TODO: error-checking?
 	f, _ := fs.Next()
@@ -89,19 +89,18 @@ func (r *Record) SourceLine() (file string, line int) {
 // Clone returns a copy of the record with no shared state.
 // The original record and the clone can both be modified
 // without interfering with each other.
-func (r *Record) Clone() Record {
-	c := *r
-	c.back = slices.Clip(c.back) // prevent append from mutating shared array
-	return c
+func (r Record) Clone() Record {
+	r.back = slices.Clip(r.back) // prevent append from mutating shared array
+	return r
 }
 
 // NumAttrs returns the number of attributes in the Record.
-func (r *Record) NumAttrs() int {
+func (r Record) NumAttrs() int {
 	return r.nFront + len(r.back)
 }
 
 // Attrs calls f on each Attr in the Record.
-func (r *Record) Attrs(f func(Attr)) {
+func (r Record) Attrs(f func(Attr)) {
 	for i := 0; i < r.nFront; i++ {
 		f(r.front[i])
 	}
