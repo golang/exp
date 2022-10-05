@@ -60,11 +60,11 @@ func TestConnections(t *testing.T) {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	Info("msg", "a", 1)
 	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO a=1 msg`)
+		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO msg a=1`)
 	logbuf.Reset()
 	Warn("msg", "b", 2)
 	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: WARN b=2 msg`)
+		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: WARN msg b=2`)
 	// Levels below Info are not printed.
 	logbuf.Reset()
 	Debug("msg", "c", 3)

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -61,8 +60,16 @@ type Handler interface {
 }
 
 type defaultHandler struct {
-	attrs  []Attr
-	output func(int, string) error // log.Output, except for testing
+	ch *commonHandler
+	// log.Output, except for testing
+	output func(calldepth int, message string) error
+}
+
+func newDefaultHandler(output func(int, string) error) *defaultHandler {
+	return &defaultHandler{
+		ch:     &commonHandler{json: false},
+		output: output,
+	}
 }
 
 func (*defaultHandler) Enabled(l Level) bool {
@@ -73,34 +80,23 @@ func (*defaultHandler) Enabled(l Level) bool {
 // write it with the default log.Logger.
 // Let the log.Logger handle time and file/line.
 func (h *defaultHandler) Handle(r Record) error {
-	var b strings.Builder
-	b.WriteString(r.Level().String())
-	b.WriteByte(' ')
-	for _, a := range h.attrs {
-		h.writeAttr(&b, a)
-	}
-	r.Attrs(func(a Attr) {
-		h.writeAttr(&b, a)
-	})
-	b.WriteString(r.Message())
-	return h.output(4, b.String())
+	buf := buffer.New()
+	defer buf.Free()
+	buf.WriteString(r.Level().String())
+	buf.WriteByte(' ')
+	buf.WriteString(r.Message())
+	state := handleState{h: h.ch, buf: buf, sep: " "}
+	state.appendNonBuiltIns(r)
+	// 4 = log.Output depth + handlerWriter.Write + defaultHandler.Handle
+	return h.output(4, buf.String())
 }
 
-func (h *defaultHandler) writeAttr(b *strings.Builder, a Attr) {
-	b.WriteString(a.Key)
-	b.WriteByte('=')
-	b.WriteString(a.Value.Resolve().String())
-	b.WriteByte(' ')
-}
-
-func (d *defaultHandler) With(as []Attr) Handler {
-	d2 := *d
-	d2.attrs = concat(d2.attrs, as)
-	return &d2
+func (h *defaultHandler) With(as []Attr) Handler {
+	return &defaultHandler{h.ch.withAttrs(as), h.output}
 }
 
 func (h *defaultHandler) WithScope(name string) Handler {
-	panic("unimplemented")
+	return &defaultHandler{h.ch.withScope(name), h.output}
 }
 
 // HandlerOptions are options for a TextHandler or JSONHandler.
@@ -254,34 +250,38 @@ func (h *commonHandler) handle(r Record) error {
 	} else {
 		state.appendAttr(String(key, msg))
 	}
-	// preformatted Attrs
-	if len(h.preformattedAttrs) > 0 {
-		state.buf.WriteString(state.sep)
-		state.buf.Write(h.preformattedAttrs)
-		state.sep = h.attrSep()
-	}
-	// Attrs in Record -- unlike the built-in ones, they are scoped.
-	state.prefix = buffer.New()
-	defer state.prefix.Free()
-	state.prefix.WriteString(h.scopePrefix)
-	state.openScopes()
-	r.Attrs(func(a Attr) {
-		state.appendAttr(a)
-	})
-	if h.json {
-		// Close all open scopes.
-		for range h.scopes {
-			state.buf.WriteByte('}')
-		}
-		// Close the top-level object.
-		state.buf.WriteByte('}')
-	}
+	state.appendNonBuiltIns(r)
 	state.buf.WriteByte('\n')
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	_, err := h.w.Write(*state.buf)
 	return err
+}
+
+func (s *handleState) appendNonBuiltIns(r Record) {
+	// preformatted Attrs
+	if len(s.h.preformattedAttrs) > 0 {
+		s.buf.WriteString(s.sep)
+		s.buf.Write(s.h.preformattedAttrs)
+		s.sep = s.h.attrSep()
+	}
+	// Attrs in Record -- unlike the built-in ones, they are scoped.
+	s.prefix = buffer.New()
+	defer s.prefix.Free()
+	s.prefix.WriteString(s.h.scopePrefix)
+	s.openScopes()
+	r.Attrs(func(a Attr) {
+		s.appendAttr(a)
+	})
+	if s.h.json {
+		// Close all open scopes.
+		for range s.h.scopes {
+			s.buf.WriteByte('}')
+		}
+		// Close the top-level object.
+		s.buf.WriteByte('}')
+	}
 }
 
 // attrSep returns the separator between attributes.

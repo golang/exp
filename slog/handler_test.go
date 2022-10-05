@@ -16,11 +16,13 @@ import (
 )
 
 func TestDefaultHandle(t *testing.T) {
+	preAttrs := []Attr{Int("pre", 0)}
+	attrs := []Attr{Int("a", 1), String("b", "two")}
 	for _, test := range []struct {
-		name      string
-		withAttrs []Attr
-		attrs     []Attr
-		want      string
+		name  string
+		with  func(Handler) Handler
+		attrs []Attr
+		want  string
 	}{
 		{
 			name: "no attrs",
@@ -28,31 +30,73 @@ func TestDefaultHandle(t *testing.T) {
 		},
 		{
 			name:  "attrs",
-			attrs: []Attr{Int("a", 1), String("b", "two")},
-			want:  "INFO a=1 b=two message",
+			attrs: attrs,
+			want:  "INFO message a=1 b=two",
 		},
 		{
-			name:      "pre attrs",
-			withAttrs: []Attr{Int("pre", 0)},
-			attrs:     []Attr{Int("a", 1)},
-			want:      "INFO pre=0 a=1 message",
+			name:  "preformatted",
+			with:  func(h Handler) Handler { return h.With(preAttrs) },
+			attrs: attrs,
+			want:  "INFO message pre=0 a=1 b=two",
+		},
+		{
+			name: "groups",
+			attrs: []Attr{
+				Int("a", 1),
+				Group("g",
+					Int("b", 2),
+					Group("h", Int("c", 3)),
+					Int("d", 4)),
+				Int("e", 5),
+			},
+			want: "INFO message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
+		},
+		{
+			name:  "scope",
+			with:  func(h Handler) Handler { return h.With(preAttrs).WithScope("s") },
+			attrs: attrs,
+			want:  "INFO message pre=0 s.a=1 s.b=two",
+		},
+		{
+			name: "preformatted scopes",
+			with: func(h Handler) Handler {
+				return h.With([]Attr{Int("p1", 1)}).
+					WithScope("s1").
+					With([]Attr{Int("p2", 2)}).
+					WithScope("s2")
+			},
+			attrs: attrs,
+			want:  "INFO message p1=1 s1.p2=2 s1.s2.a=1 s1.s2.b=two",
+		},
+		{
+			name: "two scopes",
+			with: func(h Handler) Handler {
+				return h.With([]Attr{Int("p1", 1)}).
+					WithScope("s1").
+					WithScope("s2")
+			},
+			attrs: attrs,
+			want:  "INFO message p1=1 s1.s2.a=1 s1.s2.b=two",
 		},
 	} {
-		var got string
-		var d Handler = &defaultHandler{output: func(_ int, s string) error {
-			got = s
-			return nil
-		},
-		}
-		d = d.With(test.withAttrs)
-		r := NewRecord(time.Time{}, InfoLevel, "message", 0)
-		r.AddAttrs(test.attrs...)
-		if err := d.Handle(r); err != nil {
-			t.Fatal(err)
-		}
-		if got != test.want {
-			t.Errorf("\ngot  %s\nwant %s", got, test.want)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			var got string
+			var h Handler = newDefaultHandler(func(_ int, s string) error {
+				got = s
+				return nil
+			})
+			if test.with != nil {
+				h = test.with(h)
+			}
+			r := NewRecord(time.Time{}, InfoLevel, "message", 0)
+			r.AddAttrs(test.attrs...)
+			if err := h.Handle(r); err != nil {
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Errorf("\ngot  %s\nwant %s", got, test.want)
+			}
+		})
 	}
 }
 
