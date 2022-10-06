@@ -39,7 +39,7 @@ func TestJSONHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			h := test.opts.NewJSONHandler(&buf)
-			r := NewRecord(testTime, InfoLevel, "m", 0)
+			r := NewRecord(testTime, InfoLevel, "m", 0, nil)
 			r.AddAttrs(Int("a", 1), Any("m", map[string]int{"b": 2}))
 			if err := h.Handle(r); err != nil {
 				t.Fatal(err)

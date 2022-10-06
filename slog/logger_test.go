@@ -158,7 +158,7 @@ func TestCallDepth(t *testing.T) {
 
 func TestAlloc(t *testing.T) {
 	dl := New(discardHandler{})
-	defer func(d *Logger) { SetDefault(d) }(Default())
+	defer func(d Logger) { SetDefault(d) }(Default())
 	SetDefault(dl)
 
 	t.Run("Info", func(t *testing.T) {
@@ -265,7 +265,7 @@ func TestSetAttrs(t *testing.T) {
 		{[]any{"a", 1, "b"}, []Attr{Int("a", 1), String(badKey, "b")}},
 		{[]any{"a", 1, 2, 3}, []Attr{Int("a", 1), Int(badKey, 2), Int(badKey, 3)}},
 	} {
-		r := NewRecord(time.Time{}, 0, "", 0)
+		r := NewRecord(time.Time{}, 0, "", 0, nil)
 		r.setAttrsFromArgs(test.args)
 		got := attrsSlice(r)
 		if !attrsEqual(got, test.want) {

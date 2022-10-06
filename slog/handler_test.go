@@ -88,7 +88,7 @@ func TestDefaultHandle(t *testing.T) {
 			if test.with != nil {
 				h = test.with(h)
 			}
-			r := NewRecord(time.Time{}, InfoLevel, "message", 0)
+			r := NewRecord(time.Time{}, InfoLevel, "message", 0, nil)
 			r.AddAttrs(test.attrs...)
 			if err := h.Handle(r); err != nil {
 				t.Fatal(err)
@@ -271,7 +271,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantJSON: `{"msg":"message","p1":1,"s1":{"s2":{"a":"one","b":2}}}`,
 		},
 	} {
-		r := NewRecord(testTime, InfoLevel, "message", 1)
+		r := NewRecord(testTime, InfoLevel, "message", 1, nil)
 		r.AddAttrs(test.attrs...)
 		var buf bytes.Buffer
 		opts := HandlerOptions{ReplaceAttr: test.replace}
