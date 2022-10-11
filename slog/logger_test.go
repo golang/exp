@@ -334,7 +334,6 @@ func (h discardHandler) WithScope(name string) Handler {
 // This is a simple benchmark. See the benchmarks subdirectory for more extensive ones.
 func BenchmarkNopLog(b *testing.B) {
 	b.ReportAllocs()
-	disableSourceLine()
 	l := New(&captureHandler{})
 	b.Run("attrs", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

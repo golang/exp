@@ -126,16 +126,8 @@ func (l *Logger) LogDepth(calldepth int, level Level, msg string, args ...any) {
 	_ = l.Handler().Handle(r)
 }
 
-var useSourceLine = true
-
-// Temporary, for benchmarking.
-// Eventually, getting the pc should be fast.
-func disableSourceLine() { useSourceLine = false }
-
 func (l *Logger) makeRecord(msg string, level Level, depth int) Record {
-	if useSourceLine {
-		depth += 5
-	}
+	depth += 5
 	return NewRecord(time.Now(), level, msg, depth)
 }
 
