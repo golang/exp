@@ -17,6 +17,7 @@ import (
 )
 
 func TestChanges(t *testing.T) {
+	t.Skip("broken by go1.20-pre3 compiler: see https://go.dev/issue/56162")
 	dir, err := os.MkdirTemp("", "apidiff_test")
 	if err != nil {
 		t.Fatal(err)
