@@ -8,7 +8,6 @@ import (
 	"encoding"
 	"fmt"
 	"io"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -71,6 +70,12 @@ func (h *TextHandler) WithScope(name string) Handler {
 // Keys and values are quoted if they contain Unicode space characters,
 // non-printing characters, '"' or '='.
 //
+// Keys inside groups and scopes consist of components (keys or scope names)
+// separated by the Unicode middle dot character, '·'. No further escaping is
+// performed. If it is necessary to reconstruct the group structure of a key
+// even in the presence of middle dots inside components, use
+// [HandlerOptions.ReplaceAttr] to escape the keys.
+//
 // Each call to Handle results in a single serialized call to
 // io.Writer.Write.
 func (h *TextHandler) Handle(r Record) error {
@@ -98,13 +103,6 @@ func appendTextValue(s *handleState, v Value) error {
 		*s.buf = v.append(*s.buf)
 	}
 	return nil
-}
-
-// escapeDots replaces all '.' runes in s with the equivalent hex escape code.
-// This allows the scope/group structure to be retrieved from the dot-separated
-// components of a key.
-func escapeDots(s string) string {
-	return strings.ReplaceAll(s, ".", `\x2E`)
 }
 
 func needsQuoting(s string) bool {

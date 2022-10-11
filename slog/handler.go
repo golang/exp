@@ -308,6 +308,11 @@ func (s *handleState) openScopes() {
 	}
 }
 
+// Separator for group/scope names and keys.
+// We use the uncommon character middle-dot rather than an ordinary dot
+// to reduce the likelihood of ambiguous group structure.
+const keyComponentSep = "·" // Unicode middle dot
+
 // openGroup starts a new group of attributes
 // with the given name.
 // A group can arise from a scope, or from an Attr with a GroupKind value.
@@ -317,9 +322,8 @@ func (s *handleState) openGroup(name string) {
 		s.buf.WriteByte('{')
 		s.sep = ""
 	} else {
-		// TODO: fix escaping to make it easy to recover the original.
-		s.prefix.WriteString(escapeDots(name))
-		s.prefix.WriteByte('.')
+		s.prefix.WriteString(name)
+		s.prefix.WriteString(keyComponentSep)
 	}
 }
 
@@ -328,7 +332,7 @@ func (s *handleState) closeGroup(name string) {
 	if s.h.json {
 		s.buf.WriteByte('}')
 	} else {
-		(*s.prefix) = (*s.prefix)[:len(*s.prefix)-len(name)-1]
+		(*s.prefix) = (*s.prefix)[:len(*s.prefix)-len(name)-len(keyComponentSep)]
 	}
 	s.sep = s.h.attrSep()
 }
@@ -364,11 +368,12 @@ func (s *handleState) appendError(err error) {
 
 func (s *handleState) appendKey(key string) {
 	s.buf.WriteString(s.sep)
-	// TODO: make sure the entire prefix+key is quoted if any part of it needs to be.
 	if s.prefix != nil {
-		s.buf.Write(*s.prefix)
+		// TODO: optimize by avoiding allocation.
+		s.appendString(string(*s.prefix) + key)
+	} else {
+		s.appendString(key)
 	}
-	s.appendString(key)
 	if s.h.json {
 		s.buf.WriteByte(':')
 	} else {
