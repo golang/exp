@@ -85,6 +85,7 @@ func newConnection(ctx context.Context, rwc io.ReadWriteCloser, binder Binder) (
 		outgoingBox: make(chan map[ID]chan<- *Response, 1),
 		incomingBox: make(chan map[ID]*incoming, 1),
 	}
+	c.async.init()
 
 	options, err := binder.Bind(ctx, c)
 	if err != nil {
@@ -101,7 +102,6 @@ func newConnection(ctx context.Context, rwc io.ReadWriteCloser, binder Binder) (
 	}
 	c.outgoingBox <- make(map[ID]chan<- *Response)
 	c.incomingBox <- make(map[ID]*incoming)
-	c.async.init()
 	// the goroutines started here will continue until the underlying stream is closed
 	reader := options.Framer.Reader(rwc)
 	readToQueue := make(chan *incoming)
