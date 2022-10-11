@@ -40,6 +40,12 @@ func (opts HandlerOptions) NewJSONHandler(w io.Writer) *JSONHandler {
 	}
 }
 
+// Enabled reports whether the handler handles records at the given level.
+// The handler ignores records whose level is lower.
+func (h *JSONHandler) Enabled(level Level) bool {
+	return h.commonHandler.enabled(level)
+}
+
 // With returns a new JSONHandler whose attributes consists
 // of h's attributes followed by attrs.
 func (h *JSONHandler) With(attrs []Attr) Handler {

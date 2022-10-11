@@ -35,6 +35,12 @@ func (opts HandlerOptions) NewTextHandler(w io.Writer) *TextHandler {
 	}
 }
 
+// Enabled reports whether the handler handles records at the given level.
+// The handler ignores records whose level is lower.
+func (h *TextHandler) Enabled(level Level) bool {
+	return h.commonHandler.enabled(level)
+}
+
 // With returns a new TextHandler whose attributes consists
 // of h's attributes followed by attrs.
 func (h *TextHandler) With(attrs []Attr) Handler {

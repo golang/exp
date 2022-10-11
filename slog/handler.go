@@ -154,7 +154,7 @@ func (h *commonHandler) clone() *commonHandler {
 
 // Enabled reports whether l is greater than or equal to the
 // minimum level.
-func (h *commonHandler) Enabled(l Level) bool {
+func (h *commonHandler) enabled(l Level) bool {
 	minLevel := InfoLevel
 	if h.opts.Level != nil {
 		minLevel = h.opts.Level.Level()

@@ -337,7 +337,7 @@ func TestHandlerEnabled(t *testing.T) {
 		{atomicLevel(DebugLevel), true},
 	} {
 		h := &commonHandler{opts: HandlerOptions{Level: test.leveler}}
-		got := h.Enabled(InfoLevel)
+		got := h.enabled(InfoLevel)
 		if got != test.want {
 			t.Errorf("%v: got %t, want %t", test.leveler, got, test.want)
 		}
