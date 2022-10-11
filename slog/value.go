@@ -19,6 +19,10 @@ import (
 // Kind is the kind of a Value.
 type Kind int
 
+// Unexported version of Kind, just so we can store Kinds in Values.
+// (No user-provided value has this type.)
+type kind Kind
+
 // The following list is sorted alphabetically, but it's also important that
 // AnyKind is 0 so that a zero Value represents nil.
 
@@ -86,10 +90,14 @@ func BoolValue(v bool) Value {
 	return Value{num: u, any: BoolKind}
 }
 
+// Unexported version of *time.Location, just so we can store *time.Locations in
+// Values. (No user-provided value has this type.)
+type timeLocation *time.Location
+
 // TimeValue returns a Value for a time.Time.
 // It discards the monotonic portion.
 func TimeValue(v time.Time) Value {
-	return Value{num: uint64(v.UnixNano()), any: v.Location()}
+	return Value{num: uint64(v.UnixNano()), any: timeLocation(v.Location())}
 }
 
 // DurationValue returns a Value for a time.Duration.
@@ -152,9 +160,7 @@ func AnyValue(v any) Value {
 	case []Attr:
 		return GroupValue(v...)
 	case Kind:
-		panic("cannot store a slog.Kind in a slog.Value")
-	case *time.Location:
-		panic("cannot store a *time.Location in a slog.Value")
+		return Value{any: kind(v)}
 	default:
 		return Value{any: v}
 	}
@@ -166,6 +172,9 @@ func AnyValue(v any) Value {
 func (v Value) Any() any {
 	switch v.Kind() {
 	case AnyKind, GroupKind, LogValuerKind:
+		if k, ok := v.any.(kind); ok {
+			return Kind(k)
+		}
 		return v.any
 	case Int64Kind:
 		return int64(v.num)
@@ -255,7 +264,7 @@ func (v Value) Time() time.Time {
 }
 
 func (v Value) time() time.Time {
-	return time.Unix(0, int64(v.num)).In(v.any.(*time.Location))
+	return time.Unix(0, int64(v.num)).In(v.any.(timeLocation))
 }
 
 // LogValuer returns the Value's value as a LogValuer. It panics

@@ -10,7 +10,6 @@ package slog
 
 import (
 	"reflect"
-	"time"
 	"unsafe"
 )
 
@@ -45,12 +44,14 @@ func (v Value) Kind() Kind {
 		return x
 	case stringptr:
 		return StringKind
-	case *time.Location:
+	case timeLocation:
 		return TimeKind
 	case groupptr:
 		return GroupKind
 	case LogValuer:
 		return LogValuerKind
+	case kind: // a kind is just a wrapper for a Kind
+		return AnyKind
 	default:
 		return AnyKind
 	}

@@ -6,8 +6,6 @@
 
 package slog
 
-import "time"
-
 // This file defines the most portable representation of Value.
 
 // A Value can represent (almost) any Go value, but unlike type any,
@@ -33,12 +31,14 @@ func (v Value) Kind() Kind {
 	switch k := v.any.(type) {
 	case Kind:
 		return k
-	case *time.Location:
+	case timeLocation:
 		return TimeKind
 	case []Attr:
 		return GroupKind
 	case LogValuer:
 		return LogValuerKind
+	case kind: // a kind is just a wrapper for a Kind
+		return AnyKind
 	default:
 		return AnyKind
 	}

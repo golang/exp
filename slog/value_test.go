@@ -21,6 +21,7 @@ func TestValueEqual(t *testing.T) {
 		Float64Value(3.7),
 		BoolValue(true),
 		BoolValue(false),
+		TimeValue(testTime),
 		AnyValue(&x),
 		AnyValue(&y),
 		GroupValue(Bool("b", true), Int("i", 3)),
@@ -62,10 +63,11 @@ func TestValueString(t *testing.T) {
 		{Float64Value(.15), "0.15"},
 		{BoolValue(true), "true"},
 		{StringValue("foo"), "foo"},
+		{TimeValue(testTime), "2000-01-02 03:04:05 +0000 UTC"},
 		{AnyValue(time.Duration(3 * time.Second)), "3s"},
 	} {
 		if got := test.v.String(); got != test.want {
-			t.Errorf("%#v: got %q, want %q", test.v, got, test.want)
+			t.Errorf("%#v:\ngot  %q\nwant %q", test.v, got, test.want)
 		}
 	}
 }
@@ -73,14 +75,15 @@ func TestValueString(t *testing.T) {
 func TestValueNoAlloc(t *testing.T) {
 	// Assign values just to make sure the compiler doesn't optimize away the statements.
 	var (
-		i int64
-		u uint64
-		f float64
-		b bool
-		s string
-		x any
-		p = &i
-		d time.Duration
+		i  int64
+		u  uint64
+		f  float64
+		b  bool
+		s  string
+		x  any
+		p  = &i
+		d  time.Duration
+		tm time.Time
 	)
 	a := int(testing.AllocsPerRun(5, func() {
 		i = Int64Value(1).Int64()
@@ -89,6 +92,7 @@ func TestValueNoAlloc(t *testing.T) {
 		b = BoolValue(true).Bool()
 		s = StringValue("foo").String()
 		d = DurationValue(d).Duration()
+		tm = TimeValue(testTime).Time()
 		x = AnyValue(p).Any()
 	}))
 	if a != 0 {
@@ -99,6 +103,7 @@ func TestValueNoAlloc(t *testing.T) {
 	_ = b
 	_ = s
 	_ = x
+	_ = tm
 }
 
 func TestAnyLevelAlloc(t *testing.T) {
@@ -119,6 +124,22 @@ func TestAnyLevel(t *testing.T) {
 	}
 }
 
+func TestSpecialValueTypes(t *testing.T) {
+	t.Run("time.Location", func(t *testing.T) {
+		want := time.UTC
+		got := AnyValue(want).Any()
+		if got != want {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+	t.Run("Kind", func(t *testing.T) {
+		want := BoolKind
+		got := AnyValue(want).Any()
+		if got != want {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+}
 func TestLogValue(t *testing.T) {
 	want := "replaced"
 	r := &replace{StringValue(want)}
