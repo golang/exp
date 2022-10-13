@@ -35,13 +35,9 @@ type Level int
 // does not. But those OpenTelemetry levels can still be represented as slog
 // Levels by using the appropriate integers.
 //
-// The lack of a gap between Debug and Info doesn't follow the pattern.
-// It makes sense, though, that the first negative number is the start
-// of the Debug range.
-//
 // Names for common levels.
 const (
-	DebugLevel Level = -1
+	DebugLevel Level = -4
 	InfoLevel  Level = 0
 	WarnLevel  Level = 4
 	ErrorLevel Level = 8
@@ -65,7 +61,7 @@ func (l Level) String() string {
 	}
 
 	switch {
-	case l <= DebugLevel:
+	case l < InfoLevel:
 		return str("DEBUG", l-DebugLevel)
 	case l < WarnLevel:
 		return str("INFO", l)

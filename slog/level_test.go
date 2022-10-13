@@ -20,7 +20,8 @@ func TestLevelString(t *testing.T) {
 		{WarnLevel, "WARN"},
 		{WarnLevel - 1, "INFO+3"},
 		{InfoLevel, "INFO"},
-		{InfoLevel - 3, "DEBUG-2"},
+		{InfoLevel + 1, "INFO+1"},
+		{InfoLevel - 3, "DEBUG+1"},
 		{DebugLevel, "DEBUG"},
 		{DebugLevel - 2, "DEBUG-2"},
 	} {
