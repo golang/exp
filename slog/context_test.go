@@ -30,7 +30,7 @@ func TestContext(t *testing.T) {
 	// FromContext preserves the context of the Logger that was stored
 	// with NewContext, in this case nil.
 	gotl.Info("")
-	if g := h.r.Context(); g != nil {
+	if g := h.r.Context; g != nil {
 		t.Errorf("got %v, want nil", g)
 	}
 	gotl = Ctx(ctx)
@@ -39,7 +39,7 @@ func TestContext(t *testing.T) {
 	}
 	// Ctx adds the argument context to the Logger.
 	gotl.Info("")
-	c := h.r.Context()
+	c := h.r.Context
 	if c == nil {
 		t.Fatal("got nil Context")
 	}

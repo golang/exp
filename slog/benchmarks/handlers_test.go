@@ -28,7 +28,7 @@ func TestHandlers(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := h.ringBuffer[0]
-		if !got.Time().Equal(r.Time()) || !slices.EqualFunc(attrSlice(got), attrSlice(r), slog.Attr.Equal) {
+		if !got.Time.Equal(r.Time) || !slices.EqualFunc(attrSlice(got), attrSlice(r), slog.Attr.Equal) {
 			t.Errorf("got %+v, want %+v", got, r)
 		}
 	})

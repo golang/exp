@@ -37,16 +37,16 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 	buf := buffer.New()
 	defer buf.Free()
 
-	if !r.Time().IsZero() {
+	if !r.Time.IsZero() {
 		buf.WriteString("time=")
-		h.appendTime(buf, r.Time())
+		h.appendTime(buf, r.Time)
 		buf.WriteByte(' ')
 	}
 	buf.WriteString("level=")
-	*buf = strconv.AppendInt(*buf, int64(r.Level()), 10)
+	*buf = strconv.AppendInt(*buf, int64(r.Level), 10)
 	buf.WriteByte(' ')
 	buf.WriteString("msg=")
-	buf.WriteString(r.Message())
+	buf.WriteString(r.Message)
 	r.Attrs(func(a slog.Attr) {
 		buf.WriteByte(' ')
 		buf.WriteString(a.Key)

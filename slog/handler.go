@@ -31,7 +31,7 @@ type Handler interface {
 
 	// Handle handles the Record.
 	// Handle methods that produce output should observe the following rules:
-	//   - If r.Time() is the zero time, ignore the time.
+	//   - If r.Time is the zero time, ignore the time.
 	//   - If an Attr's key is the empty string, ignore the Attr.
 	Handle(r Record) error
 
@@ -82,9 +82,9 @@ func (*defaultHandler) Enabled(l Level) bool {
 func (h *defaultHandler) Handle(r Record) error {
 	buf := buffer.New()
 	defer buf.Free()
-	buf.WriteString(r.Level().String())
+	buf.WriteString(r.Level.String())
 	buf.WriteByte(' ')
-	buf.WriteString(r.Message())
+	buf.WriteString(r.Message)
 	state := handleState{h: h.ch, buf: buf, sep: " "}
 	state.appendNonBuiltIns(r)
 	// 4 = log.Output depth + handlerWriter.Write + defaultHandler.Handle
@@ -212,9 +212,9 @@ func (h *commonHandler) handle(r Record) error {
 	}
 	// Built-in attributes. They are not scoped.
 	// time
-	if !r.Time().IsZero() {
+	if !r.Time.IsZero() {
 		key := TimeKey
-		val := r.Time().Round(0) // strip monotonic to match Attr behavior
+		val := r.Time.Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
 			state.appendKey(key)
 			state.appendTime(val)
@@ -224,7 +224,7 @@ func (h *commonHandler) handle(r Record) error {
 	}
 	// level
 	key := LevelKey
-	val := r.Level()
+	val := r.Level
 	if rep == nil {
 		state.appendKey(key)
 		state.appendString(val.String())
@@ -251,7 +251,7 @@ func (h *commonHandler) handle(r Record) error {
 		}
 	}
 	key = MessageKey
-	msg := r.Message()
+	msg := r.Message
 	if rep == nil {
 		state.appendKey(key)
 		state.appendString(msg)

@@ -20,16 +20,18 @@ const nAttrsInline = 5
 // Use [Record.Clone] to create a copy with no shared state.
 type Record struct {
 	// The time at which the output method (Log, Info, etc.) was called.
-	time time.Time
+	Time time.Time
 
 	// The log message.
-	message string
+	Message string
 
 	// The level of the event.
-	level Level
+	Level Level
 
-	// The Logger's context.
-	ctx context.Context
+	// The context of the Logger that created the Record. Present
+	// solely to provide Handlers access to the context's values.
+	// Canceling the context should not affect record processing.
+	Context context.Context
 
 	// The pc at the time the record was constructed, as determined
 	// by runtime.Callers using the calldepth argument to NewRecord.
@@ -56,9 +58,6 @@ type Record struct {
 // return the file and line number at that depth,
 // where 1 means the caller of NewRecord.
 //
-// A Record stores a context solely to provide Handlers access to the context's
-// values. Cancellation of the context does not affect record processing.
-//
 // NewRecord is intended for logging APIs that want to support a [Handler] as
 // a backend.
 func NewRecord(t time.Time, level Level, msg string, calldepth int, ctx context.Context) Record {
@@ -67,27 +66,17 @@ func NewRecord(t time.Time, level Level, msg string, calldepth int, ctx context.
 		p = pc(calldepth + 1)
 	}
 	return Record{
-		time:    t,
-		message: msg,
-		level:   level,
-		ctx:     ctx,
+		Time:    t,
+		Message: msg,
+		Level:   level,
+		Context: ctx,
 		pc:      p,
 	}
 }
 
-// Time returns the time of the log event.
-func (r Record) Time() time.Time { return r.time }
-
-// Message returns the log message.
-func (r Record) Message() string { return r.message }
-
-// Level returns the level of the log event.
-func (r Record) Level() Level { return r.level }
-
 // Context returns the context in the Record.
 // If the Record was created from a Logger,
 // this will be the Logger's context.
-func (r Record) Context() context.Context { return r.ctx }
 
 // SourceLine returns the file and line of the log event.
 // If the Record was created without the necessary information,
