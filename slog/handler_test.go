@@ -180,14 +180,14 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:     "remove built-in",
-			replace:  removeKeys(timeKey, levelKey, messageKey),
+			replace:  removeKeys(TimeKey, LevelKey, MessageKey),
 			attrs:    attrs,
 			wantText: "a=one b=2",
 			wantJSON: `{"a":"one","b":2}`,
 		},
 		{
 			name:     "preformatted remove built-in",
-			replace:  removeKeys(timeKey, levelKey, messageKey),
+			replace:  removeKeys(TimeKey, LevelKey, MessageKey),
 			with:     func(h Handler) Handler { return h.With(preAttrs) },
 			attrs:    attrs,
 			wantText: "pre=3 x=y a=one b=2",
@@ -195,7 +195,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:    "groups",
-			replace: removeKeys(timeKey, levelKey), // to simplify the result
+			replace: removeKeys(TimeKey, LevelKey), // to simplify the result
 			attrs: []Attr{
 				Int("a", 1),
 				Group("g",
@@ -209,14 +209,14 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:     "empty group",
-			replace:  removeKeys(timeKey, levelKey),
+			replace:  removeKeys(TimeKey, LevelKey),
 			attrs:    []Attr{Group("g"), Group("h", Int("a", 1))},
 			wantText: "msg=message h·a=1",
 			wantJSON: `{"msg":"message","g":{},"h":{"a":1}}`,
 		},
 		{
 			name:    "escapes",
-			replace: removeKeys(timeKey, levelKey),
+			replace: removeKeys(TimeKey, LevelKey),
 			attrs: []Attr{
 				String("a b", "x\t\n\000y"),
 				Group(" b.c=\"\\x2E\t",
@@ -228,7 +228,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:    "LogValuer",
-			replace: removeKeys(timeKey, levelKey),
+			replace: removeKeys(TimeKey, LevelKey),
 			attrs: []Attr{
 				Int("a", 1),
 				Any("name", logValueName{"Ren", "Hoek"}),
@@ -239,7 +239,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:     "scope",
-			replace:  removeKeys(timeKey, levelKey),
+			replace:  removeKeys(TimeKey, LevelKey),
 			with:     func(h Handler) Handler { return h.With(preAttrs).WithScope("s") },
 			attrs:    attrs,
 			wantText: "msg=message pre=3 x=y s·a=one s·b=2",
@@ -247,7 +247,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:    "preformatted scopes",
-			replace: removeKeys(timeKey, levelKey),
+			replace: removeKeys(TimeKey, LevelKey),
 			with: func(h Handler) Handler {
 				return h.With([]Attr{Int("p1", 1)}).
 					WithScope("s1").
@@ -260,7 +260,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:    "two scopes",
-			replace: removeKeys(timeKey, levelKey),
+			replace: removeKeys(TimeKey, LevelKey),
 			with: func(h Handler) Handler {
 				return h.With([]Attr{Int("p1", 1)}).
 					WithScope("s1").

@@ -122,10 +122,18 @@ type HandlerOptions struct {
 
 // Keys for "built-in" attributes.
 const (
-	timeKey    = "time"   // time.Time: when log method is called
-	levelKey   = "level"  // Level: level of log method
-	messageKey = "msg"    // string: message of log method
-	sourceKey  = "source" // string: file:line of log call
+	// TimeKey is the key used by the built-in handlers for the time
+	// when the log method is called. The associated Value is a [time.Time].
+	TimeKey = "time"
+	// LevelKey is the key used by the built-in handlers for the level
+	// of the log call. The associated value is a [Level].
+	LevelKey = "level"
+	// MessageKey is the key used by the built-in handlers for the
+	// message of the log call. The associated value is a string.
+	MessageKey = "msg"
+	// SourceKey is the key used by the built-in handlers for the source file
+	// and line of the log call. The associated value is a string.
+	SourceKey = "source"
 )
 
 type commonHandler struct {
@@ -205,7 +213,7 @@ func (h *commonHandler) handle(r Record) error {
 	// Built-in attributes. They are not scoped.
 	// time
 	if !r.Time().IsZero() {
-		key := timeKey
+		key := TimeKey
 		val := r.Time().Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
 			state.appendKey(key)
@@ -215,7 +223,7 @@ func (h *commonHandler) handle(r Record) error {
 		}
 	}
 	// level
-	key := levelKey
+	key := LevelKey
 	val := r.Level()
 	if rep == nil {
 		state.appendKey(key)
@@ -227,7 +235,7 @@ func (h *commonHandler) handle(r Record) error {
 	if h.opts.AddSource {
 		file, line := r.SourceLine()
 		if file != "" {
-			key := sourceKey
+			key := SourceKey
 			if rep == nil {
 				state.appendKey(key)
 				state.appendSource(file, line)
@@ -242,7 +250,7 @@ func (h *commonHandler) handle(r Record) error {
 			}
 		}
 	}
-	key = messageKey
+	key = MessageKey
 	msg := r.Message()
 	if rep == nil {
 		state.appendKey(key)
