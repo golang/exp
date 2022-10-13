@@ -93,13 +93,10 @@ func (l Logger) With(args ...any) Logger {
 	return l
 }
 
-// WithScope returns a new Logger with the named scope.
-// The keys of all attributes added to the Logger will be scoped
-// to the given name. Two loggers with different scope names
-// but identical Attr keys will result in output without
-// duplicate keys.
-func (l Logger) WithScope(name string) Logger {
-	l.handler = l.handler.WithScope(name)
+// WithGroup returns a new Logger that starts a group. The keys of all
+// attributes added to the Logger will be qualified by the given name.
+func (l Logger) WithGroup(name string) Logger {
+	l.handler = l.handler.WithGroup(name)
 	return l
 }
 

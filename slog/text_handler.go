@@ -47,8 +47,8 @@ func (h *TextHandler) With(attrs []Attr) Handler {
 	return &TextHandler{commonHandler: h.commonHandler.withAttrs(attrs)}
 }
 
-func (h *TextHandler) WithScope(name string) Handler {
-	return &TextHandler{commonHandler: h.commonHandler.withScope(name)}
+func (h *TextHandler) WithGroup(name string) Handler {
+	return &TextHandler{commonHandler: h.commonHandler.withGroup(name)}
 }
 
 // Handle formats its argument Record as a single line of space-separated
@@ -76,7 +76,7 @@ func (h *TextHandler) WithScope(name string) Handler {
 // Keys and values are quoted if they contain Unicode space characters,
 // non-printing characters, '"' or '='.
 //
-// Keys inside groups and scopes consist of components (keys or scope names)
+// Keys inside groups consist of components (keys or group names)
 // separated by the Unicode middle dot character, '·'. No further escaping is
 // performed. If it is necessary to reconstruct the group structure of a key
 // even in the presence of middle dots inside components, use

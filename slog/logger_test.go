@@ -313,7 +313,7 @@ func (c *captureHandler) With(as []Attr) Handler {
 	return &c2
 }
 
-func (h *captureHandler) WithScope(name string) Handler {
+func (h *captureHandler) WithGroup(name string) Handler {
 	panic("unimplemented")
 }
 
@@ -328,7 +328,7 @@ func (d discardHandler) With(as []Attr) Handler {
 	d.attrs = concat(d.attrs, as)
 	return d
 }
-func (h discardHandler) WithScope(name string) Handler {
+func (h discardHandler) WithGroup(name string) Handler {
 	return h
 }
 

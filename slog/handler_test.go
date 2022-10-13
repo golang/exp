@@ -52,28 +52,28 @@ func TestDefaultHandle(t *testing.T) {
 			want: "INFO message a=1 g·b=2 g·h·c=3 g·d=4 e=5",
 		},
 		{
-			name:  "scope",
-			with:  func(h Handler) Handler { return h.With(preAttrs).WithScope("s") },
+			name:  "group",
+			with:  func(h Handler) Handler { return h.With(preAttrs).WithGroup("s") },
 			attrs: attrs,
 			want:  "INFO message pre=0 s·a=1 s·b=two",
 		},
 		{
-			name: "preformatted scopes",
+			name: "preformatted groups",
 			with: func(h Handler) Handler {
 				return h.With([]Attr{Int("p1", 1)}).
-					WithScope("s1").
+					WithGroup("s1").
 					With([]Attr{Int("p2", 2)}).
-					WithScope("s2")
+					WithGroup("s2")
 			},
 			attrs: attrs,
 			want:  "INFO message p1=1 s1·p2=2 s1·s2·a=1 s1·s2·b=two",
 		},
 		{
-			name: "two scopes",
+			name: "two with-groups",
 			with: func(h Handler) Handler {
 				return h.With([]Attr{Int("p1", 1)}).
-					WithScope("s1").
-					WithScope("s2")
+					WithGroup("s1").
+					WithGroup("s2")
 			},
 			attrs: attrs,
 			want:  "INFO message p1=1 s1·s2·a=1 s1·s2·b=two",
@@ -238,33 +238,33 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantJSON: `{"msg":"message","a":1,"name":{"first":"Ren","last":"Hoek"},"b":2}`,
 		},
 		{
-			name:     "scope",
+			name:     "with-group",
 			replace:  removeKeys(TimeKey, LevelKey),
-			with:     func(h Handler) Handler { return h.With(preAttrs).WithScope("s") },
+			with:     func(h Handler) Handler { return h.With(preAttrs).WithGroup("s") },
 			attrs:    attrs,
 			wantText: "msg=message pre=3 x=y s·a=one s·b=2",
 			wantJSON: `{"msg":"message","pre":3,"x":"y","s":{"a":"one","b":2}}`,
 		},
 		{
-			name:    "preformatted scopes",
+			name:    "preformatted with-groups",
 			replace: removeKeys(TimeKey, LevelKey),
 			with: func(h Handler) Handler {
 				return h.With([]Attr{Int("p1", 1)}).
-					WithScope("s1").
+					WithGroup("s1").
 					With([]Attr{Int("p2", 2)}).
-					WithScope("s2")
+					WithGroup("s2")
 			},
 			attrs:    attrs,
 			wantText: "msg=message p1=1 s1·p2=2 s1·s2·a=one s1·s2·b=2",
 			wantJSON: `{"msg":"message","p1":1,"s1":{"p2":2,"s2":{"a":"one","b":2}}}`,
 		},
 		{
-			name:    "two scopes",
+			name:    "two with-groups",
 			replace: removeKeys(TimeKey, LevelKey),
 			with: func(h Handler) Handler {
 				return h.With([]Attr{Int("p1", 1)}).
-					WithScope("s1").
-					WithScope("s2")
+					WithGroup("s1").
+					WithGroup("s2")
 			},
 			attrs:    attrs,
 			wantText: "msg=message p1=1 s1·s2·a=one s1·s2·b=2",

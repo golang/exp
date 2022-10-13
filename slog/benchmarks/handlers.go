@@ -96,8 +96,8 @@ func (h *fastTextHandler) With([]slog.Attr) slog.Handler {
 	panic("fastTextHandler: With unimplemented")
 }
 
-func (*fastTextHandler) WithScope(string) slog.Handler {
-	panic("fastTextHandler: WithScope unimplemented")
+func (*fastTextHandler) WithGroup(string) slog.Handler {
+	panic("fastTextHandler: WithGroup unimplemented")
 }
 
 // An asyncHandler simulates a Handler that passes Records to a
@@ -128,8 +128,8 @@ func (*asyncHandler) With([]slog.Attr) slog.Handler {
 	panic("asyncHandler: With unimplemented")
 }
 
-func (*asyncHandler) WithScope(string) slog.Handler {
-	panic("asyncHandler: WithScope unimplemented")
+func (*asyncHandler) WithGroup(string) slog.Handler {
+	panic("asyncHandler: WithGroup unimplemented")
 }
 
 type disabledHandler struct{}
@@ -141,6 +141,6 @@ func (disabledHandler) With([]slog.Attr) slog.Handler {
 	panic("disabledHandler: With unimplemented")
 }
 
-func (disabledHandler) WithScope(string) slog.Handler {
-	panic("disabledHandler: WithScope unimplemented")
+func (disabledHandler) WithGroup(string) slog.Handler {
+	panic("disabledHandler: WithGroup unimplemented")
 }

@@ -40,23 +40,24 @@ type Handler interface {
 	// The Handler owns the slice: it may retain, modify or discard it.
 	With(attrs []Attr) Handler
 
-	// WithScope returns a new Handler with the given scope appended to
-	// the receiver's existing scopes.
+	// WithGroup returns a new Handler with the given group appended to
+	// the receiver's existing groups.
 	// The keys of all subsequent attributes, whether added by With or in a
-	// Record, should be qualified by the sequence of scope names.
+	// Record, should be qualified by the sequence of group names.
 	//
 	// How this qualification happens is up to the Handler, so long as
 	// this Handler's attribute keys differ from those of another Handler
-	// with a different sequence of scope names.
+	// with a different sequence of group names.
 	//
-	// A Handler should treat a scope as starting a Group of Attrs. That is,
+	// A Handler should treat WithGroup as starting a Group of Attrs that ends
+	// at the end of the log event. That is,
 	//
-	//     logger.WithScope("s").LogAttrs(slog.Int("a", 1), slog.Int("b", 2))
+	//     logger.WithGroup("s").LogAttrs(slog.Int("a", 1), slog.Int("b", 2))
 	//
 	// should behave like
 	//
 	//     logger.LogAttrs(slog.Group("s", slog.Int("a", 1), slog.Int("b", 2)))
-	WithScope(name string) Handler
+	WithGroup(name string) Handler
 }
 
 type defaultHandler struct {
@@ -95,8 +96,8 @@ func (h *defaultHandler) With(as []Attr) Handler {
 	return &defaultHandler{h.ch.withAttrs(as), h.output}
 }
 
-func (h *defaultHandler) WithScope(name string) Handler {
-	return &defaultHandler{h.ch.withScope(name), h.output}
+func (h *defaultHandler) WithGroup(name string) Handler {
+	return &defaultHandler{h.ch.withGroup(name), h.output}
 }
 
 // HandlerOptions are options for a TextHandler or JSONHandler.
@@ -140,9 +141,9 @@ type commonHandler struct {
 	json              bool // true => output JSON; false => output text
 	opts              HandlerOptions
 	preformattedAttrs []byte
-	scopePrefix       string   // for text: prefix of scopes opened in preformatting
-	scopes            []string // all scopes
-	nOpenScopes       int      // the number of scopes opened in in preformattedAttrs
+	groupPrefix       string   // for text: prefix of groups opened in preformatting
+	groups            []string // all groups started from WithGroup
+	nOpenGroups       int      // the number of groups opened in preformattedAttrs
 	mu                sync.Mutex
 	w                 io.Writer
 }
@@ -153,9 +154,9 @@ func (h *commonHandler) clone() *commonHandler {
 		json:              h.json,
 		opts:              h.opts,
 		preformattedAttrs: h.preformattedAttrs,
-		scopePrefix:       h.scopePrefix,
-		scopes:            slices.Clip(h.scopes),
-		nOpenScopes:       h.nOpenScopes,
+		groupPrefix:       h.groupPrefix,
+		groups:            slices.Clip(h.groups),
+		nOpenGroups:       h.nOpenGroups,
 		w:                 h.w,
 	}
 }
@@ -175,7 +176,7 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 	// Pre-format the attributes as an optimization.
 	prefix := buffer.New()
 	defer prefix.Free()
-	prefix.WriteString(h.scopePrefix)
+	prefix.WriteString(h.groupPrefix)
 	state := handleState{
 		h:      h2,
 		buf:    (*buffer.Buffer)(&h2.preformattedAttrs),
@@ -190,16 +191,16 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 		state.appendAttr(a)
 	}
 	// Remember the new prefix for later keys.
-	h2.scopePrefix = state.prefix.String()
-	// Remember how many opened scopes are in preformattedAttrs,
+	h2.groupPrefix = state.prefix.String()
+	// Remember how many opened groups are in preformattedAttrs,
 	// so we don't open them again when we handle a Record.
-	h2.nOpenScopes = len(h2.scopes)
+	h2.nOpenGroups = len(h2.groups)
 	return h2
 }
 
-func (h *commonHandler) withScope(name string) *commonHandler {
+func (h *commonHandler) withGroup(name string) *commonHandler {
 	h2 := h.clone()
-	h2.scopes = append(h2.scopes, name)
+	h2.groups = append(h2.groups, name)
 	return h2
 }
 
@@ -210,7 +211,7 @@ func (h *commonHandler) handle(r Record) error {
 	if h.json {
 		state.buf.WriteByte('{')
 	}
-	// Built-in attributes. They are not scoped.
+	// Built-in attributes. They are not in a group.
 	// time
 	if !r.Time.IsZero() {
 		key := TimeKey
@@ -274,17 +275,18 @@ func (s *handleState) appendNonBuiltIns(r Record) {
 		s.buf.Write(s.h.preformattedAttrs)
 		s.sep = s.h.attrSep()
 	}
-	// Attrs in Record -- unlike the built-in ones, they are scoped.
+	// Attrs in Record -- unlike the built-in ones, they are in groups started
+	// from WithGroup.
 	s.prefix = buffer.New()
 	defer s.prefix.Free()
-	s.prefix.WriteString(s.h.scopePrefix)
+	s.prefix.WriteString(s.h.groupPrefix)
 	s.openScopes()
 	r.Attrs(func(a Attr) {
 		s.appendAttr(a)
 	})
 	if s.h.json {
-		// Close all open scopes.
-		for range s.h.scopes {
+		// Close all open groups.
+		for range s.h.groups {
 			s.buf.WriteByte('}')
 		}
 		// Close the top-level object.
@@ -311,19 +313,18 @@ type handleState struct {
 }
 
 func (s *handleState) openScopes() {
-	for _, n := range s.h.scopes[s.h.nOpenScopes:] {
+	for _, n := range s.h.groups[s.h.nOpenGroups:] {
 		s.openGroup(n)
 	}
 }
 
-// Separator for group/scope names and keys.
+// Separator for group names and keys.
 // We use the uncommon character middle-dot rather than an ordinary dot
 // to reduce the likelihood of ambiguous group structure.
 const keyComponentSep = "·" // Unicode middle dot
 
 // openGroup starts a new group of attributes
 // with the given name.
-// A group can arise from a scope, or from an Attr with a GroupKind value.
 func (s *handleState) openGroup(name string) {
 	if s.h.json {
 		s.appendKey(name)

@@ -162,7 +162,7 @@ func TestTextHandlerAlloc(t *testing.T) {
 	var h Handler = NewTextHandler(io.Discard)
 	wantAllocs(t, 0, func() { h.Handle(r) })
 
-	h = h.WithScope("s")
+	h = h.WithGroup("s")
 	r.AddAttrs(Group("g", Int("a", 1)))
 	wantAllocs(t, 0, func() { h.Handle(r) })
 }

@@ -52,8 +52,8 @@ func (h *JSONHandler) With(attrs []Attr) Handler {
 	return &JSONHandler{commonHandler: h.commonHandler.withAttrs(attrs)}
 }
 
-func (h *JSONHandler) WithScope(name string) Handler {
-	return &JSONHandler{commonHandler: h.commonHandler.withScope(name)}
+func (h *JSONHandler) WithGroup(name string) Handler {
+	return &JSONHandler{commonHandler: h.commonHandler.withGroup(name)}
 }
 
 // Handle formats its argument Record as a JSON object on a single line.
