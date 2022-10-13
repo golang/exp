@@ -307,7 +307,7 @@ func (h *captureHandler) Handle(r Record) error {
 
 func (*captureHandler) Enabled(Level) bool { return true }
 
-func (c *captureHandler) With(as []Attr) Handler {
+func (c *captureHandler) WithAttrs(as []Attr) Handler {
 	c2 := *c
 	c2.attrs = concat(c2.attrs, as)
 	return &c2
@@ -324,7 +324,7 @@ type discardHandler struct {
 
 func (d discardHandler) Enabled(Level) bool { return !d.disabled }
 func (discardHandler) Handle(Record) error  { return nil }
-func (d discardHandler) With(as []Attr) Handler {
+func (d discardHandler) WithAttrs(as []Attr) Handler {
 	d.attrs = concat(d.attrs, as)
 	return d
 }

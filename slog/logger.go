@@ -89,7 +89,7 @@ func (l Logger) With(args ...any) Logger {
 		attr, args = argsToAttr(args)
 		attrs = append(attrs, attr)
 	}
-	l.handler = l.handler.With(attrs)
+	l.handler = l.handler.WithAttrs(attrs)
 	return l
 }
 

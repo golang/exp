@@ -48,7 +48,7 @@ func (h *JSONHandler) Enabled(level Level) bool {
 
 // With returns a new JSONHandler whose attributes consists
 // of h's attributes followed by attrs.
-func (h *JSONHandler) With(attrs []Attr) Handler {
+func (h *JSONHandler) WithAttrs(attrs []Attr) Handler {
 	return &JSONHandler{commonHandler: h.commonHandler.withAttrs(attrs)}
 }
 

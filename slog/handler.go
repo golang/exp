@@ -35,10 +35,10 @@ type Handler interface {
 	//   - If an Attr's key is the empty string, ignore the Attr.
 	Handle(r Record) error
 
-	// With returns a new Handler whose attributes consist of
+	// WithAttrs returns a new Handler whose attributes consist of
 	// the receiver's attributes concatenated with the arguments.
 	// The Handler owns the slice: it may retain, modify or discard it.
-	With(attrs []Attr) Handler
+	WithAttrs(attrs []Attr) Handler
 
 	// WithGroup returns a new Handler with the given group appended to
 	// the receiver's existing groups.
@@ -92,7 +92,7 @@ func (h *defaultHandler) Handle(r Record) error {
 	return h.output(4, buf.String())
 }
 
-func (h *defaultHandler) With(as []Attr) Handler {
+func (h *defaultHandler) WithAttrs(as []Attr) Handler {
 	return &defaultHandler{h.ch.withAttrs(as), h.output}
 }
 

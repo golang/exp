@@ -43,7 +43,7 @@ func (h *TextHandler) Enabled(level Level) bool {
 
 // With returns a new TextHandler whose attributes consists
 // of h's attributes followed by attrs.
-func (h *TextHandler) With(attrs []Attr) Handler {
+func (h *TextHandler) WithAttrs(attrs []Attr) Handler {
 	return &TextHandler{commonHandler: h.commonHandler.withAttrs(attrs)}
 }
 

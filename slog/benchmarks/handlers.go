@@ -92,7 +92,7 @@ func (h *fastTextHandler) appendTime(buf *buffer.Buffer, t time.Time) {
 	*buf = strconv.AppendInt(*buf, t.Unix(), 10)
 }
 
-func (h *fastTextHandler) With([]slog.Attr) slog.Handler {
+func (h *fastTextHandler) WithAttrs([]slog.Attr) slog.Handler {
 	panic("fastTextHandler: With unimplemented")
 }
 
@@ -124,7 +124,7 @@ func (h *asyncHandler) Handle(r slog.Record) error {
 	return nil
 }
 
-func (*asyncHandler) With([]slog.Attr) slog.Handler {
+func (*asyncHandler) WithAttrs([]slog.Attr) slog.Handler {
 	panic("asyncHandler: With unimplemented")
 }
 
@@ -137,7 +137,7 @@ type disabledHandler struct{}
 func (disabledHandler) Enabled(slog.Level) bool  { return false }
 func (disabledHandler) Handle(slog.Record) error { panic("should not be called") }
 
-func (disabledHandler) With([]slog.Attr) slog.Handler {
+func (disabledHandler) WithAttrs([]slog.Attr) slog.Handler {
 	panic("disabledHandler: With unimplemented")
 }
 

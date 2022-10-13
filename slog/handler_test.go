@@ -35,7 +35,7 @@ func TestDefaultHandle(t *testing.T) {
 		},
 		{
 			name:  "preformatted",
-			with:  func(h Handler) Handler { return h.With(preAttrs) },
+			with:  func(h Handler) Handler { return h.WithAttrs(preAttrs) },
 			attrs: attrs,
 			want:  "INFO message pre=0 a=1 b=two",
 		},
@@ -53,16 +53,16 @@ func TestDefaultHandle(t *testing.T) {
 		},
 		{
 			name:  "group",
-			with:  func(h Handler) Handler { return h.With(preAttrs).WithGroup("s") },
+			with:  func(h Handler) Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
 			attrs: attrs,
 			want:  "INFO message pre=0 s·a=1 s·b=two",
 		},
 		{
 			name: "preformatted groups",
 			with: func(h Handler) Handler {
-				return h.With([]Attr{Int("p1", 1)}).
+				return h.WithAttrs([]Attr{Int("p1", 1)}).
 					WithGroup("s1").
-					With([]Attr{Int("p2", 2)}).
+					WithAttrs([]Attr{Int("p2", 2)}).
 					WithGroup("s2")
 			},
 			attrs: attrs,
@@ -71,7 +71,7 @@ func TestDefaultHandle(t *testing.T) {
 		{
 			name: "two with-groups",
 			with: func(h Handler) Handler {
-				return h.With([]Attr{Int("p1", 1)}).
+				return h.WithAttrs([]Attr{Int("p1", 1)}).
 					WithGroup("s1").
 					WithGroup("s2")
 			},
@@ -154,7 +154,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		},
 		{
 			name:     "preformatted",
-			with:     func(h Handler) Handler { return h.With(preAttrs) },
+			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
 			wantText: "time=2000-01-02T03:04:05.000Z level=INFO msg=message pre=3 x=y a=one b=2",
@@ -163,7 +163,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		{
 			name:     "preformatted cap keys",
 			replace:  upperCaseKey,
-			with:     func(h Handler) Handler { return h.With(preAttrs) },
+			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
 			wantText: "TIME=2000-01-02T03:04:05.000Z LEVEL=INFO MSG=message PRE=3 X=y A=one B=2",
@@ -172,7 +172,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		{
 			name:     "preformatted remove all",
 			replace:  removeAll,
-			with:     func(h Handler) Handler { return h.With(preAttrs) },
+			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
 			wantText: "",
@@ -188,7 +188,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		{
 			name:     "preformatted remove built-in",
 			replace:  removeKeys(TimeKey, LevelKey, MessageKey),
-			with:     func(h Handler) Handler { return h.With(preAttrs) },
+			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs) },
 			attrs:    attrs,
 			wantText: "pre=3 x=y a=one b=2",
 			wantJSON: `{"pre":3,"x":"y","a":"one","b":2}`,
@@ -240,7 +240,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 		{
 			name:     "with-group",
 			replace:  removeKeys(TimeKey, LevelKey),
-			with:     func(h Handler) Handler { return h.With(preAttrs).WithGroup("s") },
+			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
 			attrs:    attrs,
 			wantText: "msg=message pre=3 x=y s·a=one s·b=2",
 			wantJSON: `{"msg":"message","pre":3,"x":"y","s":{"a":"one","b":2}}`,
@@ -249,9 +249,9 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			name:    "preformatted with-groups",
 			replace: removeKeys(TimeKey, LevelKey),
 			with: func(h Handler) Handler {
-				return h.With([]Attr{Int("p1", 1)}).
+				return h.WithAttrs([]Attr{Int("p1", 1)}).
 					WithGroup("s1").
-					With([]Attr{Int("p2", 2)}).
+					WithAttrs([]Attr{Int("p2", 2)}).
 					WithGroup("s2")
 			},
 			attrs:    attrs,
@@ -262,7 +262,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			name:    "two with-groups",
 			replace: removeKeys(TimeKey, LevelKey),
 			with: func(h Handler) Handler {
-				return h.With([]Attr{Int("p1", 1)}).
+				return h.WithAttrs([]Attr{Int("p1", 1)}).
 					WithGroup("s1").
 					WithGroup("s2")
 			},
