@@ -186,7 +186,7 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 	if len(h2.preformattedAttrs) > 0 {
 		state.sep = h.attrSep()
 	}
-	state.openScopes()
+	state.openGroups()
 	for _, a := range as {
 		state.appendAttr(a)
 	}
@@ -280,7 +280,7 @@ func (s *handleState) appendNonBuiltIns(r Record) {
 	s.prefix = buffer.New()
 	defer s.prefix.Free()
 	s.prefix.WriteString(s.h.groupPrefix)
-	s.openScopes()
+	s.openGroups()
 	r.Attrs(func(a Attr) {
 		s.appendAttr(a)
 	})
@@ -312,7 +312,7 @@ type handleState struct {
 	prefix *buffer.Buffer // for text: key prefix
 }
 
-func (s *handleState) openScopes() {
+func (s *handleState) openGroups() {
 	for _, n := range s.h.groups[s.h.nOpenGroups:] {
 		s.openGroup(n)
 	}
