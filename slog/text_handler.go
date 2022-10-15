@@ -73,8 +73,8 @@ func (h *TextHandler) WithGroup(name string) Handler {
 // If a value implements [encoding.TextMarshaler], the result of MarshalText is
 // written. Otherwise, the result of fmt.Sprint is written.
 //
-// Keys and values are quoted if they contain Unicode space characters,
-// non-printing characters, '"' or '='.
+// Keys and values are quoted with [strconv.Quote] if they contain Unicode space
+// characters, non-printing characters, '"' or '='.
 //
 // Keys inside groups consist of components (keys or group names)
 // separated by the Unicode middle dot character, '·'. No further escaping is
