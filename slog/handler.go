@@ -244,7 +244,7 @@ func (h *commonHandler) handle(r Record) error {
 				buf := buffer.New()
 				buf.WriteString(file) // TODO: escape?
 				buf.WriteByte(':')
-				itoa((*[]byte)(buf), line, -1)
+				buf.WritePosInt(line)
 				s := buf.String()
 				buf.Free()
 				state.appendAttr(String(key, s))
@@ -321,7 +321,7 @@ func (s *handleState) openGroups() {
 // Separator for group names and keys.
 // We use the uncommon character middle-dot rather than an ordinary dot
 // to reduce the likelihood of ambiguous group structure.
-const keyComponentSep = "·" // Unicode middle dot
+const keyComponentSep = "·"
 
 // openGroup starts a new group of attributes
 // with the given name.
@@ -396,7 +396,7 @@ func (s *handleState) appendSource(file string, line int) {
 		s.buf.WriteByte('"')
 		*s.buf = appendEscapedJSONString(*s.buf, file)
 		s.buf.WriteByte(':')
-		itoa((*[]byte)(s.buf), line, -1)
+		s.buf.WritePosInt(line)
 		s.buf.WriteByte('"')
 	} else {
 		// text
@@ -406,7 +406,7 @@ func (s *handleState) appendSource(file string, line int) {
 			// common case: no quoting needed.
 			s.appendString(file)
 			s.buf.WriteByte(':')
-			itoa((*[]byte)(s.buf), line, -1)
+			s.buf.WritePosInt(line)
 		}
 	}
 }
@@ -442,47 +442,41 @@ func (s *handleState) appendTime(t time.Time) {
 	if s.h.json {
 		appendJSONTime(s, t)
 	} else {
-		*s.buf = appendTimeRFC3339Millis(*s.buf, t)
+		writeTimeRFC3339Millis(s.buf, t)
 	}
 }
 
 // This takes half the time of Time.AppendFormat.
-func appendTimeRFC3339Millis(buf []byte, t time.Time) []byte {
-	// TODO: try to speed up by indexing the buffer.
-	char := func(b byte) {
-		buf = append(buf, b)
-	}
-
+func writeTimeRFC3339Millis(buf *buffer.Buffer, t time.Time) {
 	year, month, day := t.Date()
-	itoa(&buf, year, 4)
-	char('-')
-	itoa(&buf, int(month), 2)
-	char('-')
-	itoa(&buf, day, 2)
-	char('T')
+	buf.WritePosIntWidth(year, 4)
+	buf.WriteByte('-')
+	buf.WritePosIntWidth(int(month), 2)
+	buf.WriteByte('-')
+	buf.WritePosIntWidth(day, 2)
+	buf.WriteByte('T')
 	hour, min, sec := t.Clock()
-	itoa(&buf, hour, 2)
-	char(':')
-	itoa(&buf, min, 2)
-	char(':')
-	itoa(&buf, sec, 2)
+	buf.WritePosIntWidth(hour, 2)
+	buf.WriteByte(':')
+	buf.WritePosIntWidth(min, 2)
+	buf.WriteByte(':')
+	buf.WritePosIntWidth(sec, 2)
 	ns := t.Nanosecond()
-	char('.')
-	itoa(&buf, ns/1e6, 3)
+	buf.WriteByte('.')
+	buf.WritePosIntWidth(ns/1e6, 3)
 	_, offsetSeconds := t.Zone()
 	if offsetSeconds == 0 {
-		char('Z')
+		buf.WriteByte('Z')
 	} else {
 		offsetMinutes := offsetSeconds / 60
 		if offsetMinutes < 0 {
-			char('-')
+			buf.WriteByte('-')
 			offsetMinutes = -offsetMinutes
 		} else {
-			char('+')
+			buf.WriteByte('+')
 		}
-		itoa(&buf, offsetMinutes/60, 2)
-		char(':')
-		itoa(&buf, offsetMinutes%60, 2)
+		buf.WritePosIntWidth(offsetMinutes/60, 2)
+		buf.WriteByte(':')
+		buf.WritePosIntWidth(offsetMinutes%60, 2)
 	}
-	return buf
 }

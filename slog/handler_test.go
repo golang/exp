@@ -373,28 +373,30 @@ func TestAppendSource(t *testing.T) {
 
 const rfc3339Millis = "2006-01-02T15:04:05.000Z07:00"
 
-func TestAppendTimeRFC3339(t *testing.T) {
+func TestWriteTimeRFC3339(t *testing.T) {
 	for _, tm := range []time.Time{
 		time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC),
 		time.Date(2000, 1, 2, 3, 4, 5, 400, time.Local),
 		time.Date(2000, 11, 12, 3, 4, 500, 5e7, time.UTC),
 	} {
 		want := tm.Format(rfc3339Millis)
-		var buf []byte
-		buf = appendTimeRFC3339Millis(buf, tm)
-		got := string(buf)
+		buf := buffer.New()
+		defer buf.Free()
+		writeTimeRFC3339Millis(buf, tm)
+		got := buf.String()
 		if got != want {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	}
 }
 
-func BenchmarkAppendTime(b *testing.B) {
-	buf := make([]byte, 0, 100)
+func BenchmarkWriteTime(b *testing.B) {
+	buf := buffer.New()
+	defer buf.Free()
 	tm := time.Date(2022, 3, 4, 5, 6, 7, 823456789, time.Local)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		buf = appendTimeRFC3339Millis(buf, tm)
-		buf = buf[:0]
+		writeTimeRFC3339Millis(buf, tm)
+		buf.Reset()
 	}
 }
