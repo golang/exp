@@ -30,13 +30,14 @@ type Handler interface {
 	Enabled(Level) bool
 
 	// Handle handles the Record.
+	// It will only be called if Enabled returns true.
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time is the zero time, ignore the time.
 	//   - If an Attr's key is the empty string, ignore the Attr.
 	Handle(r Record) error
 
 	// WithAttrs returns a new Handler whose attributes consist of
-	// the receiver's attributes concatenated with the arguments.
+	// both the receiver's attributes and the arguments.
 	// The Handler owns the slice: it may retain, modify or discard it.
 	WithAttrs(attrs []Attr) Handler
 
