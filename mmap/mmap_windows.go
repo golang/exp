@@ -36,6 +36,9 @@ type ReaderAt struct {
 func (r *ReaderAt) Close() error {
 	if r.data == nil {
 		return nil
+	} else if len(r.data) == 0 {
+		r.data = nil
+		return nil
 	}
 	data := r.data
 	r.data = nil
@@ -89,7 +92,14 @@ func Open(filename string) (*ReaderAt, error) {
 
 	size := fi.Size()
 	if size == 0 {
-		return &ReaderAt{}, nil
+		// Treat (size == 0) as a special case, avoiding the syscall, to be
+		// consistent with mmap_unix.go.
+		//
+		// As we do not call syscall.MapViewOfFile, there is no need to call
+		// runtime.SetFinalizer to enforce a balancing syscall.UnmapViewOfFile.
+		return &ReaderAt{
+			data: make([]byte, 0),
+		}, nil
 	}
 	if size < 0 {
 		return nil, fmt.Errorf("mmap: file %q has negative size", filename)
