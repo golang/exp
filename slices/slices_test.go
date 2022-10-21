@@ -614,3 +614,99 @@ func TestClip(t *testing.T) {
 		t.Errorf("cap(Clip(%v)) = %d, want 3", orig, cap(s2))
 	}
 }
+
+// naiveReplace is a baseline implementation to the Replace function.
+func naiveReplace[S ~[]E, E any](s S, i, j int, v ...E) S {
+	s = Delete(s, i, j)
+	s = Insert(s, i, v...)
+	return s
+}
+
+func TestReplace(t *testing.T) {
+	for _, test := range []struct {
+		s, v []int
+		i, j int
+	}{
+		{}, // all zero value
+		{
+			s: []int{1, 2, 3, 4},
+			v: []int{5},
+			i: 1,
+			j: 2,
+		},
+		{
+			s: []int{1, 2, 3, 4},
+			v: []int{5, 6, 7, 8},
+			i: 1,
+			j: 2,
+		},
+		{
+			s: func() []int {
+				s := make([]int, 3, 20)
+				s[0] = 0
+				s[1] = 1
+				s[2] = 2
+				return s
+			}(),
+			v: []int{3, 4, 5, 6, 7},
+			i: 0,
+			j: 1,
+		},
+	} {
+		ss, vv := Clone(test.s), Clone(test.v)
+		want := naiveReplace(ss, test.i, test.j, vv...)
+		got := Replace(test.s, test.i, test.j, test.v...)
+		if !Equal(got, want) {
+			t.Errorf("Replace(%v, %v, %v, %v) = %v, want %v", test.s, test.i, test.j, test.v, got, want)
+		}
+	}
+}
+
+func BenchmarkReplace(b *testing.B) {
+	cases := []struct {
+		name string
+		s, v func() []int
+		i, j int
+	}{
+		{
+			name: "fast",
+			s: func() []int {
+				return make([]int, 100)
+			},
+			v: func() []int {
+				return make([]int, 20)
+			},
+			i: 10,
+			j: 40,
+		},
+		{
+			name: "slow",
+			s: func() []int {
+				return make([]int, 100)
+			},
+			v: func() []int {
+				return make([]int, 20)
+			},
+			i: 0,
+			j: 2,
+		},
+	}
+
+	for _, c := range cases {
+		b.Run("naive-"+c.name, func(b *testing.B) {
+			for k := 0; k < b.N; k++ {
+				s := c.s()
+				v := c.v()
+				_ = naiveReplace(s, c.i, c.j, v...)
+			}
+		})
+		b.Run("optimized-"+c.name, func(b *testing.B) {
+			for k := 0; k < b.N; k++ {
+				s := c.s()
+				v := c.v()
+				_ = Replace(s, c.i, c.j, v...)
+			}
+		})
+	}
+
+}
