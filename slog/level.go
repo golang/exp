@@ -14,16 +14,19 @@ import (
 // The higher the level, the more important or severe the event.
 type Level int
 
-// The level numbers below don't really matter too much. Any system can map them
-// to another numbering scheme if it wishes. We picked them to satisfy three
-// constraints.
+// Level numbers are inherently arbitrary,
+// but we picked them to satisfy three constraints.
+// Any system can map them to another numbering scheme if it wishes.
 //
 // First, we wanted the default level to be Info, Since Levels are ints, Info is
 // the default value for int, zero.
 //
-// Second, we wanted to make it easy to work with verbosities instead of levels.
-// Verbosities start at 0 corresponding to Info, and larger values are less severe
-// Negating a verbosity converts it into a Level.
+
+// Second, we wanted to make it easy to use levels to specify logger verbosity.
+// Since a larger level means a more severe event, a logger that accepts events
+// with smaller (or more negative) level means a more verbose logger. Logger
+// verbosity is thus the negation of event severity, and the default verbosity
+// of 0 accepts all events at least as severe as INFO.
 //
 // Third, we wanted some room between levels to accommodate schemes with named
 // levels between ours. For example, Google Cloud Logging defines a Notice level
