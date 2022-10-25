@@ -49,13 +49,13 @@ func TestDefaultHandle(t *testing.T) {
 					Int("d", 4)),
 				Int("e", 5),
 			},
-			want: "INFO message a=1 g·b=2 g·h·c=3 g·d=4 e=5",
+			want: "INFO message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
 		},
 		{
 			name:  "group",
 			with:  func(h Handler) Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
 			attrs: attrs,
-			want:  "INFO message pre=0 s·a=1 s·b=two",
+			want:  "INFO message pre=0 s.a=1 s.b=two",
 		},
 		{
 			name: "preformatted groups",
@@ -66,7 +66,7 @@ func TestDefaultHandle(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs: attrs,
-			want:  "INFO message p1=1 s1·p2=2 s1·s2·a=1 s1·s2·b=two",
+			want:  "INFO message p1=1 s1.p2=2 s1.s2.a=1 s1.s2.b=two",
 		},
 		{
 			name: "two with-groups",
@@ -76,7 +76,7 @@ func TestDefaultHandle(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs: attrs,
-			want:  "INFO message p1=1 s1·s2·a=1 s1·s2·b=two",
+			want:  "INFO message p1=1 s1.s2.a=1 s1.s2.b=two",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -204,14 +204,14 @@ func TestJSONAndTextHandlers(t *testing.T) {
 					Int("d", 4)),
 				Int("e", 5),
 			},
-			wantText: "msg=message a=1 g·b=2 g·h·c=3 g·d=4 e=5",
+			wantText: "msg=message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
 			wantJSON: `{"msg":"message","a":1,"g":{"b":2,"h":{"c":3},"d":4},"e":5}`,
 		},
 		{
 			name:     "empty group",
 			replace:  removeKeys(TimeKey, LevelKey),
 			attrs:    []Attr{Group("g"), Group("h", Int("a", 1))},
-			wantText: "msg=message h·a=1",
+			wantText: "msg=message h.a=1",
 			wantJSON: `{"msg":"message","g":{},"h":{"a":1}}`,
 		},
 		{
@@ -221,10 +221,10 @@ func TestJSONAndTextHandlers(t *testing.T) {
 				String("a b", "x\t\n\000y"),
 				Group(" b.c=\"\\x2E\t",
 					String("d=e", "f.g\""),
-					Int("m·d", 1)), // middle dot is not escaped
+					Int("m.d", 1)), // dot is not escaped
 			},
-			wantText: `msg=message "a b"="x\t\n\x00y" " b.c=\"\\x2E\t·d=e"="f.g\"" " b.c=\"\\x2E\t·m·d"=1`,
-			wantJSON: `{"msg":"message","a b":"x\t\n\u0000y"," b.c=\"\\x2E\t":{"d=e":"f.g\"","m·d":1}}`,
+			wantText: `msg=message "a b"="x\t\n\x00y" " b.c=\"\\x2E\t.d=e"="f.g\"" " b.c=\"\\x2E\t.m.d"=1`,
+			wantJSON: `{"msg":"message","a b":"x\t\n\u0000y"," b.c=\"\\x2E\t":{"d=e":"f.g\"","m.d":1}}`,
 		},
 		{
 			name:    "LogValuer",
@@ -234,7 +234,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 				Any("name", logValueName{"Ren", "Hoek"}),
 				Int("b", 2),
 			},
-			wantText: "msg=message a=1 name·first=Ren name·last=Hoek b=2",
+			wantText: "msg=message a=1 name.first=Ren name.last=Hoek b=2",
 			wantJSON: `{"msg":"message","a":1,"name":{"first":"Ren","last":"Hoek"},"b":2}`,
 		},
 		{
@@ -242,7 +242,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			replace:  removeKeys(TimeKey, LevelKey),
 			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
 			attrs:    attrs,
-			wantText: "msg=message pre=3 x=y s·a=one s·b=2",
+			wantText: "msg=message pre=3 x=y s.a=one s.b=2",
 			wantJSON: `{"msg":"message","pre":3,"x":"y","s":{"a":"one","b":2}}`,
 		},
 		{
@@ -255,7 +255,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs:    attrs,
-			wantText: "msg=message p1=1 s1·p2=2 s1·s2·a=one s1·s2·b=2",
+			wantText: "msg=message p1=1 s1.p2=2 s1.s2.a=one s1.s2.b=2",
 			wantJSON: `{"msg":"message","p1":1,"s1":{"p2":2,"s2":{"a":"one","b":2}}}`,
 		},
 		{
@@ -267,7 +267,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs:    attrs,
-			wantText: "msg=message p1=1 s1·s2·a=one s1·s2·b=2",
+			wantText: "msg=message p1=1 s1.s2.a=one s1.s2.b=2",
 			wantJSON: `{"msg":"message","p1":1,"s1":{"s2":{"a":"one","b":2}}}`,
 		},
 	} {

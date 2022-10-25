@@ -320,9 +320,7 @@ func (s *handleState) openGroups() {
 }
 
 // Separator for group names and keys.
-// We use the uncommon character middle-dot rather than an ordinary dot
-// to reduce the likelihood of ambiguous group structure.
-const keyComponentSep = "·"
+const keyComponentSep = '.'
 
 // openGroup starts a new group of attributes
 // with the given name.
@@ -333,7 +331,7 @@ func (s *handleState) openGroup(name string) {
 		s.sep = ""
 	} else {
 		s.prefix.WriteString(name)
-		s.prefix.WriteString(keyComponentSep)
+		s.prefix.WriteByte(keyComponentSep)
 	}
 }
 
@@ -342,7 +340,7 @@ func (s *handleState) closeGroup(name string) {
 	if s.h.json {
 		s.buf.WriteByte('}')
 	} else {
-		(*s.prefix) = (*s.prefix)[:len(*s.prefix)-len(name)-len(keyComponentSep)]
+		(*s.prefix) = (*s.prefix)[:len(*s.prefix)-len(name)-1 /* forkeyComponentSep */]
 	}
 	s.sep = s.h.attrSep()
 }

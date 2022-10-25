@@ -76,10 +76,9 @@ func (h *TextHandler) WithGroup(name string) Handler {
 // Keys and values are quoted with [strconv.Quote] if they contain Unicode space
 // characters, non-printing characters, '"' or '='.
 //
-// Keys inside groups consist of components (keys or group names)
-// separated by the Unicode middle dot character, '·'. No further escaping is
-// performed. If it is necessary to reconstruct the group structure of a key
-// even in the presence of middle dots inside components, use
+// Keys inside groups consist of components (keys or group names) separated by
+// dots. No further escaping is performed. If it is necessary to reconstruct the
+// group structure of a key even in the presence of dots inside components, use
 // [HandlerOptions.ReplaceAttr] to escape the keys.
 //
 // Each call to Handle results in a single serialized call to
