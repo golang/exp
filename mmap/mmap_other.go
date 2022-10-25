@@ -9,6 +9,7 @@ package mmap
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -44,6 +45,21 @@ func (r *ReaderAt) At(i int) byte {
 // ReadAt implements the io.ReaderAt interface.
 func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	return r.f.ReadAt(p, off)
+}
+
+// WriteTo implements the io.WriterTo interface.
+func (r *ReaderAt) WriteTo(w io.Writer) (int64, error) {
+	return r.f.WriterTo(w)
+}
+
+// Read implements the io.ReadSeeker interface.
+func (r *ReaderAt) Read(p []byte) (n int, err error) {
+	return r.f.Read(p)
+}
+
+// Seek implements the io.ReadSeeker interface.
+func (r *ReaderAt) Seek(offset int64, whence int) (int64, error) {
+	return r.f.Seek(offset, whence)
 }
 
 // Open memory-maps the named file for reading.
