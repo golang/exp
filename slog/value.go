@@ -344,6 +344,9 @@ const maxLogValues = 100
 
 // Resolve repeatedly calls LogValue on v while it implements LogValuer,
 // and returns the result.
+// If the number of LogValue calls exceeds a threshold, a Value containing an
+// error is returned.
+// Resolve's return value is guaranteed not to be of Kind LogValuerKind.
 func (v Value) Resolve() Value {
 	orig := v
 	for i := 0; i < maxLogValues; i++ {

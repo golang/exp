@@ -27,6 +27,8 @@ import (
 type Handler interface {
 	// Enabled reports whether the handler handles records at the given level.
 	// The handler ignores records whose level is lower.
+	// Enabled is called early, before any arguments are processed,
+	// to save effort if the log event should be discarded.
 	Enabled(Level) bool
 
 	// Handle handles the Record.
@@ -106,6 +108,8 @@ func (h *defaultHandler) WithGroup(name string) Handler {
 type HandlerOptions struct {
 	// Add a "source" attribute to the output whose value is of the form
 	// "file:line".
+	// This is false by default, because there is a cost to extracting this
+	// information.
 	AddSource bool
 
 	// Ignore records with levels below Level.Level().
@@ -119,6 +123,11 @@ type HandlerOptions struct {
 	// The built-in attributes with keys "time", "level", "source", and "msg"
 	// are passed to this function first, except that time and level are omitted
 	// if zero, and source is omitted if AddSourceLine is false.
+	//
+	// ReplaceAttr can be used to change the default keys of the built-in
+	// attributes, convert types (for example, to replace a `time.Time` with the
+	// integer seconds since the Unix epoch), sanitize personal information, or
+	// remove attributes from the output.
 	ReplaceAttr func(a Attr) Attr
 }
 

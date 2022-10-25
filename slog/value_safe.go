@@ -8,7 +8,7 @@ package slog
 
 // This file defines the most portable representation of Value.
 
-// A Value can represent (almost) any Go value, but unlike type any,
+// A Value can represent any Go value, but unlike type any,
 // it can represent most small values without an allocation.
 // The zero Value corresponds to nil.
 type Value struct {
