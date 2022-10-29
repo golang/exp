@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const timeRE = `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|-\d{2}:\d{2})`
+const timeRE = `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:\d{2})`
 
 func TestLogTextHandler(t *testing.T) {
 	var buf bytes.Buffer
