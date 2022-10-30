@@ -74,9 +74,9 @@ func Any(key string, value any) Attr {
 	return Attr{key, AnyValue(value)}
 }
 
-// Equal reports whether two Attrs have equal keys and values.
-func (a1 Attr) Equal(a2 Attr) bool {
-	return a1.Key == a2.Key && a1.Value.Equal(a2.Value)
+// Equal reports whether a and b have equal keys and values.
+func (a Attr) Equal(b Attr) bool {
+	return a.Key == b.Key && a.Value.Equal(b.Value)
 }
 
 func (a Attr) String() string {

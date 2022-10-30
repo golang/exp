@@ -26,7 +26,7 @@ type Value struct {
 	any any
 }
 
-// Kind returns the Value's Kind.
+// Kind returns v's Kind.
 func (v Value) Kind() Kind {
 	switch k := v.any.(type) {
 	case Kind:
@@ -54,7 +54,7 @@ func StringValue(value string) Value {
 }
 
 // String returns Value's value as a string, formatted like fmt.Sprint. Unlike
-// the methods Int64, Float64, and so on, which panic if the Value is of the
+// the methods Int64, Float64, and so on, which panic if v is of the
 // wrong kind, String never panics.
 func (v Value) String() string {
 	if v.Kind() == StringKind {

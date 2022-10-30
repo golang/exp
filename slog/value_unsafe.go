@@ -37,7 +37,7 @@ type (
 	groupptr  unsafe.Pointer // used in Value.any when the Value is a []Attr
 )
 
-// Kind returns the Value's Kind.
+// Kind returns v's Kind.
 func (v Value) Kind() Kind {
 	switch x := v.any.(type) {
 	case Kind:
@@ -72,7 +72,7 @@ func (v Value) str() string {
 }
 
 // String returns Value's value as a string, formatted like fmt.Sprint. Unlike
-// the methods Int64, Float64, and so on, which panic if the Value is of the
+// the methods Int64, Float64, and so on, which panic if v is of the
 // wrong kind, String never panics.
 func (v Value) String() string {
 	if sp, ok := v.any.(stringptr); ok {

@@ -83,25 +83,27 @@ func (l Level) MarshalJSON() ([]byte, error) {
 // It implements Leveler.
 func (l Level) Level() Level { return l }
 
-// An AtomicLevel is a Level that can be read and written safely by multiple
-// goroutines.
-// The default value of AtomicLevel is InfoLevel.
-type AtomicLevel struct {
+// A LevelVar is a Level variable, to allow a Handler level to change
+// dynamically.
+// It implements Leveler as well as a Set method,
+// and it is safe for use by multiple goroutines.
+// The zero LevelVar corresponds to InfoLevel.
+type LevelVar struct {
 	val atomic.Int64
 }
 
-// Level returns r's level.
-func (a *AtomicLevel) Level() Level {
-	return Level(int(a.val.Load()))
+// Level returns v's level.
+func (v *LevelVar) Level() Level {
+	return Level(int(v.val.Load()))
 }
 
-// Set sets the receiver's level to l.
-func (a *AtomicLevel) Set(l Level) {
-	a.val.Store(int64(l))
+// Set sets v's level to l.
+func (v *LevelVar) Set(l Level) {
+	v.val.Store(int64(l))
 }
 
-func (a *AtomicLevel) String() string {
-	return fmt.Sprintf("AtomicLevel(%s)", a.Level())
+func (v *LevelVar) String() string {
+	return fmt.Sprintf("LevelVar(%s)", v.Level())
 }
 
 // A Leveler provides a Level value.
@@ -109,7 +111,7 @@ func (a *AtomicLevel) String() string {
 // As Level itself implements Leveler, clients typically supply
 // a Level value wherever a Leveler is needed, such as in HandlerOptions.
 // Clients who need to vary the level dynamically can provide a more complex
-// Leveler implementation such as *AtomicLevel.
+// Leveler implementation such as *LevelVar.
 type Leveler interface {
 	Level() Level
 }

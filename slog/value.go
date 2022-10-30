@@ -168,7 +168,7 @@ func AnyValue(v any) Value {
 
 //////////////// Accessors
 
-// Any returns the Value's value as an any.
+// Any returns v's value as an any.
 func (v Value) Any() any {
 	switch v.Kind() {
 	case AnyKind, GroupKind, LogValuerKind:
@@ -195,8 +195,8 @@ func (v Value) Any() any {
 	}
 }
 
-// Int64 returns the Value's value as an int64. It panics
-// if the value is not a signed integer.
+// Int64 returns v's value as an int64. It panics
+// if v is not a signed integer.
 func (v Value) Int64() int64 {
 	if g, w := v.Kind(), Int64Kind; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
@@ -204,8 +204,8 @@ func (v Value) Int64() int64 {
 	return int64(v.num)
 }
 
-// Uint64 returns the Value's value as a uint64. It panics
-// if the value is not an unsigned integer.
+// Uint64 returns v's value as a uint64. It panics
+// if v is not an unsigned integer.
 func (v Value) Uint64() uint64 {
 	if g, w := v.Kind(), Uint64Kind; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
@@ -213,8 +213,8 @@ func (v Value) Uint64() uint64 {
 	return v.num
 }
 
-// Bool returns the Value's value as a bool. It panics
-// if the value is not a bool.
+// Bool returns v's value as a bool. It panics
+// if v is not a bool.
 func (v Value) Bool() bool {
 	if g, w := v.Kind(), BoolKind; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
@@ -226,8 +226,8 @@ func (a Value) bool() bool {
 	return a.num == 1
 }
 
-// Duration returns the Value's value as a time.Duration. It panics
-// if the value is not a time.Duration.
+// Duration returns v's value as a time.Duration. It panics
+// if v is not a time.Duration.
 func (a Value) Duration() time.Duration {
 	if g, w := a.Kind(), DurationKind; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
@@ -240,8 +240,8 @@ func (a Value) duration() time.Duration {
 	return time.Duration(int64(a.num))
 }
 
-// Float64 returns the Value's value as a float64. It panics
-// if the value is not a float64.
+// Float64 returns v's value as a float64. It panics
+// if v is not a float64.
 func (v Value) Float64() float64 {
 	if g, w := v.Kind(), Float64Kind; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
@@ -254,8 +254,8 @@ func (a Value) float() float64 {
 	return math.Float64frombits(a.num)
 }
 
-// Time returns the Value's value as a time.Time. It panics
-// if the value is not a time.Time.
+// Time returns v's value as a time.Time. It panics
+// if v is not a time.Time.
 func (v Value) Time() time.Time {
 	if g, w := v.Kind(), TimeKind; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
@@ -267,47 +267,47 @@ func (v Value) time() time.Time {
 	return time.Unix(0, int64(v.num)).In(v.any.(timeLocation))
 }
 
-// LogValuer returns the Value's value as a LogValuer. It panics
-// if the value is not a LogValuer.
+// LogValuer returns v's value as a LogValuer. It panics
+// if v is not a LogValuer.
 func (v Value) LogValuer() LogValuer {
 	return v.any.(LogValuer)
 }
 
-// Group returns the Value's value as a []Attr.
-// It panics if the Value's Kind is not GroupKind.
+// Group returns v's value as a []Attr.
+// It panics if v's Kind is not GroupKind.
 func (v Value) Group() []Attr {
 	return v.group()
 }
 
 //////////////// Other
 
-// Equal reports whether two Values have equal keys and values.
-func (v1 Value) Equal(v2 Value) bool {
-	k1 := v1.Kind()
-	k2 := v2.Kind()
+// Equal reports whether v and w have equal keys and values.
+func (v Value) Equal(w Value) bool {
+	k1 := v.Kind()
+	k2 := w.Kind()
 	if k1 != k2 {
 		return false
 	}
 	switch k1 {
 	case Int64Kind, Uint64Kind, BoolKind, DurationKind:
-		return v1.num == v2.num
+		return v.num == w.num
 	case StringKind:
-		return v1.str() == v2.str()
+		return v.str() == w.str()
 	case Float64Kind:
-		return v1.float() == v2.float()
+		return v.float() == w.float()
 	case TimeKind:
-		return v1.time().Equal(v2.time())
+		return v.time().Equal(w.time())
 	case AnyKind, LogValuerKind:
-		return v1.any == v2.any // may panic if non-comparable
+		return v.any == w.any // may panic if non-comparable
 	case GroupKind:
-		return slices.EqualFunc(v1.uncheckedGroup(), v2.uncheckedGroup(), Attr.Equal)
+		return slices.EqualFunc(v.uncheckedGroup(), w.uncheckedGroup(), Attr.Equal)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", k1))
 	}
 }
 
-// append appends a text representation of the Value to dst.
-// The value is formatted as with fmt.Sprint.
+// append appends a text representation of v to dst.
+// v is formatted as with fmt.Sprint.
 func (v Value) append(dst []byte) []byte {
 	switch v.Kind() {
 	case StringKind:
@@ -331,8 +331,7 @@ func (v Value) append(dst []byte) []byte {
 	}
 }
 
-// A LogValuer is a Value that transforms itself into a different Value (or,
-// using the Group feature, a group of Attrs) at the moment it is logged.
+// A LogValuer is any Go value that can convert itself into a Value for logging.
 //
 // This mechanism may be used to defer expensive operations until they are
 // needed, or to expand a single value into a sequence of components.

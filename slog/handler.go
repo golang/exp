@@ -106,19 +106,21 @@ func (h *defaultHandler) WithGroup(name string) Handler {
 // HandlerOptions are options for a TextHandler or JSONHandler.
 // A zero HandlerOptions consists entirely of default values.
 type HandlerOptions struct {
-	// Add a "source" attribute to the output whose value is of the form
-	// "file:line".
-	// This is false by default, because there is a cost to extracting this
-	// information.
+	// When AddSource is true, the handler adds a ("source", "file:line")
+	// attribute to the output indicating the source code position of the log
+	// statement. AddSource is false by default to skip the cost of computing
+	// this information.
 	AddSource bool
 
-	// Ignore records with levels below Level.Level().
-	// The default is InfoLevel.
+	// Level reports the minimum record level that will be logged.
+	// The handler discards records with lower levels.
+	// If Level is nil, the handler assumes InfoLevel.
+	// The handler calls Level.Level for each record processed;
+	// to adjust the minimum level dynamically, use a LevelVar.
 	Level Leveler
 
-	// If set, ReplaceAttr is called on each attribute of the message,
-	// and the returned value is used instead of the original. If the returned
-	// key is empty, the attribute is omitted from the output.
+	// ReplaceAttr is called to rewrite each attribute before it is logged.
+	// If ReplaceAttr returns an Attr with Key == "", the attribute is discarded.
 	//
 	// The built-in attributes with keys "time", "level", "source", and "msg"
 	// are passed to this function first, except that time and level are omitted

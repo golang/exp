@@ -32,8 +32,8 @@ func TestLevelString(t *testing.T) {
 	}
 }
 
-func TestAtomicLevel(t *testing.T) {
-	var al AtomicLevel
+func TestLevelVar(t *testing.T) {
+	var al LevelVar
 	if got, want := al.Level(), InfoLevel; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}

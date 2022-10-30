@@ -319,8 +319,8 @@ func (n logValueName) LogValue() Value {
 }
 
 func TestHandlerEnabled(t *testing.T) {
-	atomicLevel := func(l Level) *AtomicLevel {
-		var al AtomicLevel
+	levelVar := func(l Level) *LevelVar {
+		var al LevelVar
 		al.Set(l)
 		return &al
 	}
@@ -331,10 +331,10 @@ func TestHandlerEnabled(t *testing.T) {
 	}{
 		{nil, true},
 		{WarnLevel, false},
-		{&AtomicLevel{}, true}, // defaults to Info
-		{atomicLevel(WarnLevel), false},
+		{&LevelVar{}, true}, // defaults to Info
+		{levelVar(WarnLevel), false},
 		{DebugLevel, true},
-		{atomicLevel(DebugLevel), true},
+		{levelVar(DebugLevel), true},
 	} {
 		h := &commonHandler{opts: HandlerOptions{Level: test.leveler}}
 		got := h.enabled(InfoLevel)
