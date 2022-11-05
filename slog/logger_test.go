@@ -274,6 +274,24 @@ func TestSetAttrs(t *testing.T) {
 	}
 }
 
+func TestSetDefault(t *testing.T) {
+	// Verify that setting the default to itself does not result in deadlock.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	defer func(w io.Writer) { log.SetOutput(w) }(log.Writer())
+	log.SetOutput(io.Discard)
+	go func() {
+		Info("A")
+		SetDefault(Default())
+		Info("B")
+		cancel()
+	}()
+	<-ctx.Done()
+	if err := ctx.Err(); err != context.Canceled {
+		t.Errorf("wanted canceled, got %v", err)
+	}
+}
+
 func checkLogOutput(t *testing.T, got, wantRegexp string) {
 	t.Helper()
 	got = clean(got)
@@ -332,6 +350,15 @@ func (h discardHandler) WithGroup(name string) Handler {
 	return h
 }
 
+// concat returns a new slice with the elements of s1 followed
+// by those of s2. The slice has no additional capacity.
+func concat[T any](s1, s2 []T) []T {
+	s := make([]T, len(s1)+len(s2))
+	copy(s, s1)
+	copy(s[len(s1):], s2)
+	return s
+}
+
 // This is a simple benchmark. See the benchmarks subdirectory for more extensive ones.
 func BenchmarkNopLog(b *testing.B) {
 	b.ReportAllocs()
@@ -353,31 +380,4 @@ func BenchmarkNopLog(b *testing.B) {
 			l.Log(InfoLevel, "msg", "a", 1, "b", "two", "c", true)
 		}
 	})
-}
-
-func TestSetDefault(t *testing.T) {
-	// Verify that setting the default to itself does not result in deadlock.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	defer func(w io.Writer) { log.SetOutput(w) }(log.Writer())
-	log.SetOutput(io.Discard)
-	go func() {
-		Info("A")
-		SetDefault(Default())
-		Info("B")
-		cancel()
-	}()
-	<-ctx.Done()
-	if err := ctx.Err(); err != context.Canceled {
-		t.Errorf("wanted canceled, got %v", err)
-	}
-}
-
-// concat returns a new slice with the elements of s1 followed
-// by those of s2. The slice has no additional capacity.
-func concat[T any](s1, s2 []T) []T {
-	s := make([]T, len(s1)+len(s2))
-	copy(s, s1)
-	copy(s[len(s1):], s2)
-	return s
 }
