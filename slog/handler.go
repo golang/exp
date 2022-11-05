@@ -55,11 +55,11 @@ type Handler interface {
 	// A Handler should treat WithGroup as starting a Group of Attrs that ends
 	// at the end of the log event. That is,
 	//
-	//     logger.WithGroup("s").LogAttrs(slog.Int("a", 1), slog.Int("b", 2))
+	//     logger.WithGroup("s").LogAttrs(level, msg, slog.Int("a", 1), slog.Int("b", 2))
 	//
 	// should behave like
 	//
-	//     logger.LogAttrs(slog.Group("s", slog.Int("a", 1), slog.Int("b", 2)))
+	//     logger.LogAttrs(level, msg, slog.Group("s", slog.Int("a", 1), slog.Int("b", 2)))
 	WithGroup(name string) Handler
 }
 
