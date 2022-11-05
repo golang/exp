@@ -91,8 +91,10 @@ func (h *defaultHandler) Handle(r Record) error {
 	buf.WriteString(r.Message)
 	state := handleState{h: h.ch, buf: buf, sep: " "}
 	state.appendNonBuiltIns(r)
-	// 4 = log.Output depth + handlerWriter.Write + defaultHandler.Handle
-	return h.output(4, buf.String())
+
+	// 5 = log.Output depth + handlerWriter.Write + defaultHandler.Handle
+	//
+	return h.output(5, buf.String())
 }
 
 func (h *defaultHandler) WithAttrs(as []Attr) Handler {

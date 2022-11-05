@@ -141,11 +141,28 @@ func (l *Logger) Log(level Level, msg string, args ...any) {
 // file and line number in the log record. 0 refers to the caller
 // of LogDepth; 1 refers to the caller's caller; and so on.
 func (l *Logger) LogDepth(calldepth int, level Level, msg string, args ...any) {
+	l.logDepth(nil, calldepth+1, level, msg, args...)
+}
+
+// logDepthErr is a trivial wrapper around logDepth, just to make the call
+// depths on all paths the same. This is important only for the defaultHandler,
+// which passes a fixed call depth to log.Output. When slog moves to the
+// standard library, we can replace that fixed call depth with logic based on
+// the Record's pc, and remove this function. See the comment on
+// TestConnections/wrap_default_handler.
+func (l *Logger) logDepthErr(err error, calldepth int, level Level, msg string, args ...any) {
+	l.logDepth(err, calldepth+1, level, msg, args...)
+}
+
+func (l *Logger) logDepth(err error, calldepth int, level Level, msg string, args ...any) {
 	if !l.Enabled(level) {
 		return
 	}
 	r := l.makeRecord(msg, level, calldepth)
 	r.setAttrsFromArgs(args)
+	if err != nil {
+		r.AddAttrs(Any("err", err))
+	}
 	_ = l.Handler().Handle(r)
 }
 
@@ -188,11 +205,7 @@ func (l *Logger) Warn(msg string, args ...any) {
 // If err is non-nil, Error appends Any(ErrorKey, err)
 // to the list of attributes.
 func (l *Logger) Error(msg string, err error, args ...any) {
-	if err != nil {
-		// TODO: avoid the copy.
-		args = append(args[:len(args):len(args)], Any(ErrorKey, err))
-	}
-	l.LogDepth(0, ErrorLevel, msg, args...)
+	l.logDepthErr(err, 0, ErrorLevel, msg, args...)
 }
 
 // Debug calls Logger.Debug on the default logger.
@@ -212,11 +225,7 @@ func Warn(msg string, args ...any) {
 
 // Error calls Logger.Error on the default logger.
 func Error(msg string, err error, args ...any) {
-	if err != nil {
-		// TODO: avoid the copy.
-		args = append(args[:len(args):len(args)], Any(ErrorKey, err))
-	}
-	Default().LogDepth(0, ErrorLevel, msg, args...)
+	Default().logDepthErr(err, 0, ErrorLevel, msg, args...)
 }
 
 // Log calls Logger.Log on the default logger.

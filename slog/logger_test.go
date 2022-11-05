@@ -72,10 +72,33 @@ func TestConnections(t *testing.T) {
 	Warn("msg", "b", 2)
 	checkLogOutput(t, logbuf.String(),
 		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: WARN msg b=2`)
+	logbuf.Reset()
+	Error("msg", io.EOF, "c", 3)
+	checkLogOutput(t, logbuf.String(),
+		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: ERROR msg c=3 err=EOF`)
+
 	// Levels below Info are not printed.
 	logbuf.Reset()
 	Debug("msg", "c", 3)
 	checkLogOutput(t, logbuf.String(), "")
+
+	t.Run("wrap default handler", func(t *testing.T) {
+		// It should be possible to wrap the default handler and get the right output.
+		// But because the call depth to log.Output is hard-coded, the source line is wrong.
+		// We want to use the pc inside the Record, but there is no way to give that to
+		// the log package.
+		//
+		// TODO(jba): when slog lives under log in the standard library, we can
+		// move the bulk of log.Logger.Output to a function in an internal
+		// package, so both log and slog can call it.
+		//
+		// While slog lives in exp, we punt.
+		t.Skip("skip until this package is in the standard library")
+		logger := New(wrappingHandler{Default().Handler()})
+		logger.Info("msg", "d", 4)
+		checkLogOutput(t, logbuf.String(),
+			`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO msg d=4`)
+	})
 
 	// Once slog.SetDefault is called, the direction is reversed: the default
 	// log.Logger's output goes through the handler.
@@ -95,6 +118,15 @@ func TestConnections(t *testing.T) {
 		t.Errorf("got %q, want empty", got)
 	}
 }
+
+type wrappingHandler struct {
+	h Handler
+}
+
+func (h wrappingHandler) Enabled(level Level) bool      { return h.h.Enabled(level) }
+func (h wrappingHandler) WithGroup(name string) Handler { return h.h.WithGroup(name) }
+func (h wrappingHandler) WithAttrs(as []Attr) Handler   { return h.h.WithAttrs(as) }
+func (h wrappingHandler) Handle(r Record) error         { return h.h.Handle(r) }
 
 func TestAttrs(t *testing.T) {
 	check := func(got []Attr, want ...Attr) {
@@ -170,9 +202,9 @@ func TestAlloc(t *testing.T) {
 	t.Run("Info", func(t *testing.T) {
 		wantAllocs(t, 0, func() { Info("hello") })
 	})
-	// t.Run("Error", func(t *testing.T) {
-	// 	wantAllocs(t, 0, func() { Error("hello", io.EOF) })
-	// })
+	t.Run("Error", func(t *testing.T) {
+		wantAllocs(t, 0, func() { Error("hello", io.EOF) })
+	})
 	t.Run("logger.Info", func(t *testing.T) {
 		wantAllocs(t, 0, func() { dl.Info("hello") })
 	})
@@ -296,6 +328,23 @@ func TestSetDefault(t *testing.T) {
 	if err := ctx.Err(); err != context.Canceled {
 		t.Errorf("wanted canceled, got %v", err)
 	}
+}
+
+func TestLoggerError(t *testing.T) {
+	var buf bytes.Buffer
+
+	removeTime := func(a Attr) Attr {
+		if a.Key == TimeKey {
+			return Attr{}
+		}
+		return a
+	}
+	l := New(HandlerOptions{ReplaceAttr: removeTime}.NewTextHandler(&buf))
+	l.Error("msg", io.EOF, "a", 1)
+	checkLogOutput(t, buf.String(), `level=ERROR msg=msg a=1 err=EOF`)
+	buf.Reset()
+	l.Error("msg", io.EOF, "a")
+	checkLogOutput(t, buf.String(), `level=ERROR msg=msg !BADKEY=a err=EOF`)
 }
 
 func checkLogOutput(t *testing.T, got, wantRegexp string) {
