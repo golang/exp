@@ -1,0 +1,31 @@
+goos: linux
+goarch: amd64
+pkg: golang.org/x/exp/slog
+cpu: Intel(R) Xeon(R) CPU @ 2.20GHz
+BenchmarkNopLog/attrs-8         	 1000000	      1120 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-8         	 1000000	      1087 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-8         	 1000000	      1125 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-8         	 1000000	      1112 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-8         	 1000000	      1116 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-parallel-8         	 3975526	       297.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-parallel-8         	 4036947	       308.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-parallel-8         	 4063410	       297.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-parallel-8         	 4042863	       293.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/attrs-parallel-8         	 4067066	       295.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/keys-values-8            	 1000000	      1051 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/keys-values-8            	 1000000	      1050 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/keys-values-8            	 1000000	      1044 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/keys-values-8            	 1000000	      1057 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/keys-values-8            	 1000000	      1064 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-8            	 1000000	      1103 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-8            	 1000000	      1103 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-8            	 1000000	      1112 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-8            	 1000000	      1081 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-8            	 1000000	      1112 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-parallel-8   	 4040090	       297.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-parallel-8   	 4025874	       297.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-parallel-8   	 4039935	       296.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-parallel-8   	 4054540	       299.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNopLog/WithContext-parallel-8   	 4045884	       295.9 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	golang.org/x/exp/slog	31.654s

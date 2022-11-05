@@ -5,6 +5,7 @@
 package benchmarks
 
 import (
+	"context"
 	"io"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 // reduces measured allocations.
 
 func BenchmarkAttrs(b *testing.B) {
+	ctx := context.Background()
 	for _, handler := range []struct {
 		name string
 		h    slog.Handler
@@ -40,6 +42,18 @@ func BenchmarkAttrs(b *testing.B) {
 					"5 args",
 					func() {
 						logger.LogAttrs(slog.InfoLevel, TestMessage,
+							slog.String("string", TestString),
+							slog.Int("status", TestInt),
+							slog.Duration("duration", TestDuration),
+							slog.Time("time", TestTime),
+							slog.Any("error", TestError),
+						)
+					},
+				},
+				{
+					"5 args ctx",
+					func() {
+						logger.WithContext(ctx).LogAttrs(slog.InfoLevel, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),

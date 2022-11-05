@@ -361,14 +361,16 @@ func concat[T any](s1, s2 []T) []T {
 
 // This is a simple benchmark. See the benchmarks subdirectory for more extensive ones.
 func BenchmarkNopLog(b *testing.B) {
-	b.ReportAllocs()
+	ctx := context.Background()
 	l := New(&captureHandler{})
 	b.Run("attrs", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			l.LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
 		}
 	})
 	b.Run("attrs-parallel", func(b *testing.B) {
+		b.ReportAllocs()
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
 				l.LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
@@ -376,8 +378,24 @@ func BenchmarkNopLog(b *testing.B) {
 		})
 	})
 	b.Run("keys-values", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			l.Log(InfoLevel, "msg", "a", 1, "b", "two", "c", true)
 		}
 	})
+	b.Run("WithContext", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			l.WithContext(ctx).LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+		}
+	})
+	b.Run("WithContext-parallel", func(b *testing.B) {
+		b.ReportAllocs()
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				l.WithContext(ctx).LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+			}
+		})
+	})
+
 }
