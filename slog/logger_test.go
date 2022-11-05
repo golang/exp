@@ -158,7 +158,7 @@ func TestCallDepth(t *testing.T) {
 
 func TestAlloc(t *testing.T) {
 	dl := New(discardHandler{})
-	defer func(d Logger) { SetDefault(d) }(Default())
+	defer func(d *Logger) { SetDefault(d) }(Default())
 	SetDefault(dl)
 
 	t.Run("Info", func(t *testing.T) {
@@ -386,7 +386,7 @@ func BenchmarkNopLog(b *testing.B) {
 	b.Run("WithContext", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			l.WithContext(ctx).LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+			l.WithContext(ctx).LogAttrs(InfoLevel, "msg2", Int("a", 1), String("b", "two"), Bool("c", true))
 		}
 	})
 	b.Run("WithContext-parallel", func(b *testing.B) {
@@ -397,5 +397,13 @@ func BenchmarkNopLog(b *testing.B) {
 			}
 		})
 	})
-
+	b.Run("Ctx", func(b *testing.B) {
+		dl := Default()
+		SetDefault(l)
+		defer SetDefault(dl)
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			Ctx(ctx).LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+		}
+	})
 }
