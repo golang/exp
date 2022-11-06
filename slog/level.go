@@ -67,7 +67,7 @@ func (l Level) String() string {
 	case l < InfoLevel:
 		return str("DEBUG", l-DebugLevel)
 	case l < WarnLevel:
-		return str("INFO", l)
+		return str("INFO", l-InfoLevel)
 	case l < ErrorLevel:
 		return str("WARN", l-WarnLevel)
 	default:
