@@ -193,7 +193,7 @@ func Clone[S ~[]E, E any](s S) S {
 // This is like the uniq command found on Unix.
 // Compact modifies the contents of the slice s; it does not create a new slice.
 func Compact[S ~[]E, E comparable](s S) S {
-	if len(s) == 0 {
+	if len(s) < 2 {
 		return s
 	}
 	i := 1
@@ -210,7 +210,7 @@ func Compact[S ~[]E, E comparable](s S) S {
 
 // CompactFunc is like Compact but uses a comparison function.
 func CompactFunc[S ~[]E, E any](s S, eq func(E, E) bool) S {
-	if len(s) == 0 {
+	if len(s) < 2 {
 		return s
 	}
 	i := 1

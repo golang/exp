@@ -497,30 +497,37 @@ func TestClone(t *testing.T) {
 }
 
 var compactTests = []struct {
+	name string
 	s    []int
 	want []int
 }{
 	{
+		"nil",
 		nil,
 		nil,
 	},
 	{
+		"one",
 		[]int{1},
 		[]int{1},
 	},
 	{
+		"sorted",
 		[]int{1, 2, 3},
 		[]int{1, 2, 3},
 	},
 	{
+		"1 item",
 		[]int{1, 1, 2},
 		[]int{1, 2},
 	},
 	{
+		"unsorted",
 		[]int{1, 2, 1},
 		[]int{1, 2, 1},
 	},
 	{
+		"many",
 		[]int{1, 2, 2, 3, 3, 4},
 		[]int{1, 2, 3, 4},
 	},
@@ -533,6 +540,20 @@ func TestCompact(t *testing.T) {
 			t.Errorf("Compact(%v) = %v, want %v", test.s, got, test.want)
 		}
 	}
+}
+
+func BenchmarkCompact(b *testing.B) {
+	for _, c := range compactTests {
+		b.Run(c.name, func(b *testing.B) {
+			ss := make([]int, 0, 64)
+			for k := 0; k < b.N; k++ {
+				ss = ss[:0]
+				ss = append(ss, c.s...)
+				_ = Compact(ss)
+			}
+		})
+	}
+
 }
 
 func TestCompactFunc(t *testing.T) {
