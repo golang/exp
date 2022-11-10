@@ -545,8 +545,11 @@ func TestCompact(t *testing.T) {
 func BenchmarkCompact(b *testing.B) {
 	for _, c := range compactTests {
 		b.Run(c.name, func(b *testing.B) {
+			ss := make([]int, 0, 64)
 			for k := 0; k < b.N; k++ {
-				_ = Compact(c.s)
+				ss = ss[:0]
+				ss = append(ss, c.s...)
+				_ = Compact(ss)
 			}
 		})
 	}
