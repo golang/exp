@@ -683,6 +683,23 @@ func TestReplace(t *testing.T) {
 	}
 }
 
+func TestReplacePanics(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		s, v []int
+		i, j int
+	}{
+		{"indexes out of order", []int{1, 2}, []int{3}, 2, 1},
+		{"large index", []int{1, 2}, []int{3}, 1, 10},
+		{"negative index", []int{1, 2}, []int{3}, -1, 2},
+	} {
+		ss, vv := Clone(test.s), Clone(test.v)
+		if !panics(func() { Replace(ss, test.i, test.j, vv...) }) {
+			t.Errorf("Replace %s: should have panicked", test.name)
+		}
+	}
+}
+
 func BenchmarkReplace(b *testing.B) {
 	cases := []struct {
 		name string
