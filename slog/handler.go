@@ -165,7 +165,7 @@ func (h *commonHandler) clone() *commonHandler {
 	return &commonHandler{
 		json:              h.json,
 		opts:              h.opts,
-		preformattedAttrs: h.preformattedAttrs,
+		preformattedAttrs: slices.Clip(h.preformattedAttrs),
 		groupPrefix:       h.groupPrefix,
 		groups:            slices.Clip(h.groups),
 		nOpenGroups:       h.nOpenGroups,

@@ -108,18 +108,6 @@ func TestJSONAndTextHandlers(t *testing.T) {
 	// remove all Attrs
 	removeAll := func(a Attr) Attr { return Attr{} }
 
-	// remove the given keys
-	removeKeys := func(keys ...string) func(a Attr) Attr {
-		return func(a Attr) Attr {
-			for _, k := range keys {
-				if a.Key == k {
-					return Attr{}
-				}
-			}
-			return a
-		}
-	}
-
 	attrs := []Attr{String("a", "one"), Int("b", 2), Any("", "ignore me")}
 	preAttrs := []Attr{Int("pre", 3), String("x", "y")}
 
@@ -303,6 +291,19 @@ func TestJSONAndTextHandlers(t *testing.T) {
 	}
 }
 
+// removeKeys returns a function suitable for HandlerOptions.ReplaceAttr
+// that removes all Attrs with the given keys.
+func removeKeys(keys ...string) func(a Attr) Attr {
+	return func(a Attr) Attr {
+		for _, k := range keys {
+			if a.Key == k {
+				return Attr{}
+			}
+		}
+		return a
+	}
+}
+
 func upperCaseKey(a Attr) Attr {
 	a.Key = strings.ToUpper(a.Key)
 	return a
@@ -368,6 +369,26 @@ func TestAppendSource(t *testing.T) {
 		}
 		check(false, test.wantText)
 		check(true, test.wantJSON)
+	}
+}
+
+func TestSecondWith(t *testing.T) {
+	// Verify that a second call to Logger.With does not corrupt
+	// the original.
+	var buf bytes.Buffer
+	h := HandlerOptions{ReplaceAttr: removeKeys(TimeKey)}.NewTextHandler(&buf)
+	logger := New(h).With(
+		String("app", "playground"),
+		String("role", "tester"),
+		Int("data_version", 2),
+	)
+	appLogger := logger.With("type", "log") // this becomes type=met
+	_ = logger.With("type", "metric")
+	appLogger.Info("foo")
+	got := strings.TrimSpace(buf.String())
+	want := `level=INFO msg=foo app=playground role=tester data_version=2 type=log`
+	if got != want {
+		t.Errorf("\ngot  %s\nwant %s", got, want)
 	}
 }
 
