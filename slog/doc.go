@@ -78,11 +78,74 @@ will send log records to the logger's handler without needing to be rewritten.
 
 # Attrs and Values
 
+An [Attr] is a key-value pair. The Logger output methods accept Attrs as well as
+alternating keys and values. The statement
+
+    slog.Info("hello", slog.Int("count", 3))
+
+behaves the same as
+
+    slog.Info("hello", "count", 3)
+
+There are convenience constructors for [Attr] such as [Int], [String], and [Bool]
+for common types, as well as the function [Any] for constructing Attrs of any
+type.
+
+The value part of an Attr is a type called [Value].
+Like an [any], a Value can hold any Go value,
+but it can represent typical values, including all numbers and strings,
+without an allocation.
+
+For the most efficient log output, use [Logger.LogAttrs].
+It is similar to [Logger.Log] but accepts only Attrs, not alternating
+keys and values; this allows it, too, to avoid allocation.
+
+The call
+
+    logger.LogAttrs(slog.InfoLevel, "hello", slog.Int("count", 3))
+
+is the most efficient way to achieve the same output as
+
+    slog.Info("hello", "count", 3)
+
+
 # Levels
+
+A [Level] is an integer representing the importance or severity of a log event.
+The higher the level, the more severe the event.
+This package defines four constants for the most common levels,
+but any int can be used as a level.
+
+In an application, you may wish to log messages only at a certain level or greater.
+One common configuration is to log messages at Info or higher levels,
+suppressing debug logging until it is needed.
+The built-in handlers can be configured with the minimum level to output by
+setting [HandlerOptions.Level].
+The program's `main` function typically does this.
+
+Setting the [HandlerOptions.Level] field to a [Level] value
+fixes the handler's minimum level throughout its lifetime.
+Setting it to a [LevelVar] allows the level to be varied dynamically.
+A LevelVar holds a Level and is safe to read or write from multiple
+goroutines.
+To vary the level dynamically for an entire program, first initialize
+a global LevelVar:
+
+    var programLevel = new(slog.LevelVar) // Info by default
+
+Then use the LevelVar to construct a handler, and make it the default:
+
+    h := slog.HandlerOptions{Level: programLevel}.NewJSONHandler(os.Stderr)
+    slog.SetDefault(slog.New(h))
+
+Now the program can change its logging level with a single statement:
+
+    programLevel.Set(slog.DebugLevel)
+
 
 # Configuring the built-in handlers
 
-TODO: cover HandlerOptions, Leveler, LevelVar
+TODO: cover HandlerOptions
 
 # Groups
 
@@ -98,7 +161,7 @@ TODO: discuss LogValuer
 
 TODO: discuss LogDepth, LogAttrDepth
 
-## Interoperating with other logging packabes
+## Interoperating with other logging packages
 
 TODO: discuss NewRecord, Record.AddAttrs
 
