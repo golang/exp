@@ -140,6 +140,30 @@ func TestSpecialValueTypes(t *testing.T) {
 		}
 	})
 }
+
+func TestAnyValue(t *testing.T) {
+	for _, test := range []struct {
+		in   any
+		want Value
+	}{
+		{1, IntValue(1)},
+		{1.5, Float64Value(1.5)},
+		{"s", StringValue("s")},
+		{uint(2), Uint64Value(2)},
+		{true, BoolValue(true)},
+		{testTime, TimeValue(testTime)},
+		{time.Hour, DurationValue(time.Hour)},
+		{[]Attr{Int("i", 3)}, GroupValue(Int("i", 3))},
+		{IntValue(4), IntValue(4)},
+	} {
+		got := AnyValue(test.in)
+		if !got.Equal(test.want) {
+			t.Errorf("%v (%[1]T): got %v (kind %s), want %v (kind %s)",
+				test.in, got, got.Kind(), test.want, test.want.Kind())
+		}
+	}
+}
+
 func TestLogValue(t *testing.T) {
 	want := "replaced"
 	r := &replace{StringValue(want)}

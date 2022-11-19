@@ -113,6 +113,9 @@ func GroupValue(as ...Attr) Value {
 
 // AnyValue returns a Value for the supplied value.
 //
+// If the supplied value is of type Value, it is returned
+// unmodified.
+//
 // Given a value of one of Go's predeclared string, bool, or
 // (non-complex) numeric types, AnyValue returns a Value of kind
 // String, Bool, Uint64, Int64, or Float64. The width of the
@@ -129,6 +132,8 @@ func AnyValue(v any) Value {
 		return StringValue(v)
 	case int:
 		return Int64Value(int64(v))
+	case uint:
+		return Uint64Value(uint64(v))
 	case int64:
 		return Int64Value(v)
 	case uint64:
@@ -161,6 +166,8 @@ func AnyValue(v any) Value {
 		return GroupValue(v...)
 	case Kind:
 		return Value{any: kind(v)}
+	case Value:
+		return v
 	default:
 		return Value{any: v}
 	}

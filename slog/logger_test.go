@@ -51,6 +51,12 @@ func TestLogTextHandler(t *testing.T) {
 
 	l.LogAttrs(InfoLevel+1, "a b c", Int("a", 1), String("b", "two"))
 	check(`level=INFO\+1 msg="a b c" a=1 b=two`)
+
+	l.Info("info", "a", []Attr{Int("i", 1)})
+	check(`level=INFO msg=info a.i=1`)
+
+	l.Info("info", "a", GroupValue(Int("i", 1)))
+	check(`level=INFO msg=info a.i=1`)
 }
 
 func TestConnections(t *testing.T) {

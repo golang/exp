@@ -258,6 +258,13 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantText: "msg=message p1=1 s1.s2.a=one s1.s2.b=2",
 			wantJSON: `{"msg":"message","p1":1,"s1":{"s2":{"a":"one","b":2}}}`,
 		},
+		{
+			name:     "GroupValue as Attr value",
+			replace:  removeKeys(TimeKey, LevelKey),
+			attrs:    []Attr{{"v", AnyValue(IntValue(3))}},
+			wantText: "msg=message v=3",
+			wantJSON: `{"msg":"message","v":3}`,
+		},
 	} {
 		r := NewRecord(testTime, InfoLevel, "message", 1, nil)
 		r.AddAttrs(test.attrs...)
