@@ -185,12 +185,12 @@ func (l *Logger) Warn(msg string, args ...any) {
 }
 
 // Error logs at ErrorLevel.
-// If err is non-nil, Error appends Any("err", err)
+// If err is non-nil, Error appends Any(ErrorKey, err)
 // to the list of attributes.
 func (l *Logger) Error(msg string, err error, args ...any) {
 	if err != nil {
 		// TODO: avoid the copy.
-		args = append(args[:len(args):len(args)], Any("err", err))
+		args = append(args[:len(args):len(args)], Any(ErrorKey, err))
 	}
 	l.LogDepth(0, ErrorLevel, msg, args...)
 }
@@ -214,7 +214,7 @@ func Warn(msg string, args ...any) {
 func Error(msg string, err error, args ...any) {
 	if err != nil {
 		// TODO: avoid the copy.
-		args = append(args[:len(args):len(args)], Any("err", err))
+		args = append(args[:len(args):len(args)], Any(ErrorKey, err))
 	}
 	Default().LogDepth(0, ErrorLevel, msg, args...)
 }
