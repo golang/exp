@@ -8,6 +8,8 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"reflect"
+	"strconv"
 	"unicode"
 	"unicode/utf8"
 )
@@ -103,11 +105,31 @@ func appendTextValue(s *handleState, v Value) error {
 			s.appendString(string(data))
 			return nil
 		}
+		if bs, ok := byteSlice(v.any); ok {
+			// As of Go 1.19, this only allocates for strings longer than 32 bytes.
+			s.buf.WriteString(strconv.Quote(string(bs)))
+			return nil
+		}
 		s.appendString(fmt.Sprint(v.Any()))
 	default:
 		*s.buf = v.append(*s.buf)
 	}
 	return nil
+}
+
+// byteSlice returns its argument as a []byte if the argument's
+// underlying type is []byte, along with a second return value of true.
+// Otherwise it returns nil, false.
+func byteSlice(a any) ([]byte, bool) {
+	if bs, ok := a.([]byte); ok {
+		return bs, true
+	}
+	// Like Printf's %s, we allow both the slice type and the byte element type to be named.
+	t := reflect.TypeOf(a)
+	if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
+		return reflect.ValueOf(a).Bytes(), true
+	}
+	return nil, false
 }
 
 func needsQuoting(s string) bool {

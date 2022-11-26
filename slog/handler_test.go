@@ -8,6 +8,7 @@ package slog
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -266,6 +267,20 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			attrs:    []Attr{{"v", AnyValue(IntValue(3))}},
 			wantText: "msg=message v=3",
 			wantJSON: `{"msg":"message","v":3}`,
+		},
+		{
+			name:     "byte slice",
+			replace:  removeKeys(TimeKey, LevelKey),
+			attrs:    []Attr{Any("bs", []byte{1, 2, 3, 4})},
+			wantText: `msg=message bs="\x01\x02\x03\x04"`,
+			wantJSON: `{"msg":"message","bs":"AQIDBA=="}`,
+		},
+		{
+			name:     "json.RawMessage",
+			replace:  removeKeys(TimeKey, LevelKey),
+			attrs:    []Attr{Any("bs", json.RawMessage([]byte("1234")))},
+			wantText: `msg=message bs="1234"`,
+			wantJSON: `{"msg":"message","bs":1234}`,
 		},
 	} {
 		r := NewRecord(testTime, InfoLevel, "message", 1, nil)
