@@ -358,6 +358,25 @@ func TestContains(t *testing.T) {
 	}
 }
 
+func TestContainsFunc(t *testing.T) {
+	for _, test := range indexTests {
+		if got := ContainsFunc(test.s, equalToIndex(equal[int], test.v)); got != (test.want != -1) {
+			t.Errorf("ContainsFunc(%v, equalToIndex(equal[int], %v)) = %t, want %t", test.s, test.v, got, test.want != -1)
+		}
+	}
+
+	s1 := []string{"hi", "HI"}
+	if got := ContainsFunc(s1, equalToIndex(equal[string], "HI")); got != true {
+		t.Errorf("ContainsFunc(%v, equalToContains(equal[string], %q)) = %t, want %t", s1, "HI", got, true)
+	}
+	if got := ContainsFunc(s1, equalToIndex(equal[string], "hI")); got != false {
+		t.Errorf("ContainsFunc(%v, equalToContains(strings.EqualFold, %q)) = %t, want %t", s1, "hI", got, false)
+	}
+	if got := ContainsFunc(s1, equalToIndex(strings.EqualFold, "hI")); got != true {
+		t.Errorf("ContainsFunc(%v, equalToContains(strings.EqualFold, %q)) = %t, want %t", s1, "hI", got, true)
+	}
+}
+
 var insertTests = []struct {
 	s    []int
 	i    int
