@@ -8,10 +8,12 @@ package slog
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
+	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog/internal/buffer"
 )
 
@@ -106,14 +108,14 @@ func TestJSONAndTextHandlers(t *testing.T) {
 	// ReplaceAttr functions
 
 	// remove all Attrs
-	removeAll := func(a Attr) Attr { return Attr{} }
+	removeAll := func(_ []string, a Attr) Attr { return Attr{} }
 
 	attrs := []Attr{String("a", "one"), Int("b", 2), Any("", "ignore me")}
 	preAttrs := []Attr{Int("pre", 3), String("x", "y")}
 
 	for _, test := range []struct {
 		name     string
-		replace  func(Attr) Attr
+		replace  func([]string, Attr) Attr
 		with     func(Handler) Handler
 		preAttrs []Attr
 		attrs    []Attr
@@ -300,8 +302,8 @@ func TestJSONAndTextHandlers(t *testing.T) {
 
 // removeKeys returns a function suitable for HandlerOptions.ReplaceAttr
 // that removes all Attrs with the given keys.
-func removeKeys(keys ...string) func(a Attr) Attr {
-	return func(a Attr) Attr {
+func removeKeys(keys ...string) func([]string, Attr) Attr {
+	return func(_ []string, a Attr) Attr {
 		for _, k := range keys {
 			if a.Key == k {
 				return Attr{}
@@ -311,7 +313,7 @@ func removeKeys(keys ...string) func(a Attr) Attr {
 	}
 }
 
-func upperCaseKey(a Attr) Attr {
+func upperCaseKey(_ []string, a Attr) Attr {
 	a.Key = strings.ToUpper(a.Key)
 	return a
 }
@@ -396,6 +398,56 @@ func TestSecondWith(t *testing.T) {
 	want := `level=INFO msg=foo app=playground role=tester data_version=2 type=log`
 	if got != want {
 		t.Errorf("\ngot  %s\nwant %s", got, want)
+	}
+}
+
+func TestReplaceAttrGroups(t *testing.T) {
+	// Verify that ReplaceAttr is called with the correct groups.
+	type ga struct {
+		groups string
+		key    string
+		val    string
+	}
+
+	var got []ga
+
+	h := HandlerOptions{ReplaceAttr: func(gs []string, a Attr) Attr {
+		v := a.Value.String()
+		if a.Key == TimeKey {
+			v = "<now>"
+		}
+		got = append(got, ga{strings.Join(gs, ","), a.Key, v})
+		return a
+	}}.NewTextHandler(io.Discard)
+	New(h).
+		With(Int("a", 1)).
+		WithGroup("g1").
+		With(Int("b", 2)).
+		WithGroup("g2").
+		With(
+			Int("c", 3),
+			Group("g3", Int("d", 4)),
+			Int("e", 5)).
+		Info("m",
+			Int("f", 6),
+			Group("g4", Int("h", 7)),
+			Int("i", 8))
+
+	want := []ga{
+		{"", "a", "1"},
+		{"g1", "b", "2"},
+		{"g1,g2", "c", "3"},
+		{"g1,g2,g3", "d", "4"},
+		{"g1,g2", "e", "5"},
+		{"", "time", "<now>"},
+		{"", "level", "INFO"},
+		{"", "msg", "m"},
+		{"g1,g2", "f", "6"},
+		{"g1,g2,g4", "h", "7"},
+		{"g1,g2", "i", "8"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("\ngot  %v\nwant %v", got, want)
 	}
 }
 

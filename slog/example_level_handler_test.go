@@ -56,7 +56,7 @@ func (h *LevelHandler) Handler() slog.Handler {
 func ExampleHandler_levelHandler() {
 	th := slog.HandlerOptions{
 		// Remove time from the output.
-		ReplaceAttr: func(a slog.Attr) slog.Attr {
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.TimeKey {
 				return slog.Attr{}
 			}
