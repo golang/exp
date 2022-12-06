@@ -92,12 +92,16 @@ func (l Level) Level() Level { return l }
 // and it is safe for use by multiple goroutines.
 // The zero LevelVar corresponds to InfoLevel.
 type LevelVar struct {
-	val atomic.Int64
+	val atomic.Value
 }
 
 // Level returns v's level.
 func (v *LevelVar) Level() Level {
-	return Level(int(v.val.Load()))
+	val := v.val.Load()
+	if val == nil {
+		return DebugLevel
+	}
+	return Level((val).(int))
 }
 
 // Set sets v's level to l.
