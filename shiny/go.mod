@@ -3,7 +3,7 @@ module golang.org/x/exp/shiny
 go 1.18
 
 require (
-	dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
+	dmitri.shuralyov.com/gpu/mtl v0.0.0-20221207185020-b78c9fe623cc
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 	github.com/jezek/xgb v1.0.0
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
