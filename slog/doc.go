@@ -102,7 +102,7 @@ keys and values; this allows it, too, to avoid allocation.
 
 The call
 
-    logger.LogAttrs(slog.InfoLevel, "hello", slog.Int("count", 3))
+    logger.LogAttrs(slog.LevelInfo, "hello", slog.Int("count", 3))
 
 is the most efficient way to achieve the same output as
 
@@ -140,7 +140,7 @@ Then use the LevelVar to construct a handler, and make it the default:
 
 Now the program can change its logging level with a single statement:
 
-    programLevel.Set(slog.DebugLevel)
+    programLevel.Set(slog.LevelDebug)
 
 
 # Configuring the built-in handlers

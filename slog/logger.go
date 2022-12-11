@@ -22,7 +22,7 @@ func Default() *Logger { return defaultLogger.Load().(*Logger) }
 
 // SetDefault makes l the default Logger.
 // After this call, output from the log package's default Logger
-// (as with [log.Print], etc.) will be logged at InfoLevel using l's Handler.
+// (as with [log.Print], etc.) will be logged at LevelInfo using l's Handler.
 func SetDefault(l *Logger) {
 	defaultLogger.Store(l)
 	// If the default's handler is a defaultHandler, then don't use a handleWriter,
@@ -54,7 +54,7 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 	if len(buf) > 0 && buf[len(buf)-1] == '\n' {
 		buf = buf[:len(buf)-1]
 	}
-	r := NewRecord(time.Now(), InfoLevel, string(buf), depth, nil)
+	r := NewRecord(time.Now(), LevelInfo, string(buf), depth, nil)
 	return origLen, w.h.Handle(r)
 }
 
@@ -186,46 +186,46 @@ func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...
 	_ = l.Handler().Handle(r)
 }
 
-// Debug logs at DebugLevel.
+// Debug logs at LevelDebug.
 func (l *Logger) Debug(msg string, args ...any) {
-	l.LogDepth(0, DebugLevel, msg, args...)
+	l.LogDepth(0, LevelDebug, msg, args...)
 }
 
-// Info logs at InfoLevel.
+// Info logs at LevelInfo.
 func (l *Logger) Info(msg string, args ...any) {
-	l.LogDepth(0, InfoLevel, msg, args...)
+	l.LogDepth(0, LevelInfo, msg, args...)
 }
 
-// Warn logs at WarnLevel.
+// Warn logs at LevelWarn.
 func (l *Logger) Warn(msg string, args ...any) {
-	l.LogDepth(0, WarnLevel, msg, args...)
+	l.LogDepth(0, LevelWarn, msg, args...)
 }
 
-// Error logs at ErrorLevel.
+// Error logs at LevelError.
 // If err is non-nil, Error appends Any(ErrorKey, err)
 // to the list of attributes.
 func (l *Logger) Error(msg string, err error, args ...any) {
-	l.logDepthErr(err, 0, ErrorLevel, msg, args...)
+	l.logDepthErr(err, 0, LevelError, msg, args...)
 }
 
 // Debug calls Logger.Debug on the default logger.
 func Debug(msg string, args ...any) {
-	Default().LogDepth(0, DebugLevel, msg, args...)
+	Default().LogDepth(0, LevelDebug, msg, args...)
 }
 
 // Info calls Logger.Info on the default logger.
 func Info(msg string, args ...any) {
-	Default().LogDepth(0, InfoLevel, msg, args...)
+	Default().LogDepth(0, LevelInfo, msg, args...)
 }
 
 // Warn calls Logger.Warn on the default logger.
 func Warn(msg string, args ...any) {
-	Default().LogDepth(0, WarnLevel, msg, args...)
+	Default().LogDepth(0, LevelWarn, msg, args...)
 }
 
 // Error calls Logger.Error on the default logger.
 func Error(msg string, err error, args ...any) {
-	Default().logDepthErr(err, 0, ErrorLevel, msg, args...)
+	Default().logDepthErr(err, 0, LevelError, msg, args...)
 }
 
 // Log calls Logger.Log on the default logger.

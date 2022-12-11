@@ -64,7 +64,7 @@ func ExampleHandler_levelHandler() {
 		},
 	}.NewTextHandler(os.Stdout)
 
-	logger := slog.New(NewLevelHandler(slog.WarnLevel, th))
+	logger := slog.New(NewLevelHandler(slog.LevelWarn, th))
 	logger.Info("not printed")
 	logger.Warn("printed")
 

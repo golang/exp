@@ -14,16 +14,16 @@ func TestLevelString(t *testing.T) {
 		want string
 	}{
 		{0, "INFO"},
-		{ErrorLevel, "ERROR"},
-		{ErrorLevel + 2, "ERROR+2"},
-		{ErrorLevel - 2, "WARN+2"},
-		{WarnLevel, "WARN"},
-		{WarnLevel - 1, "INFO+3"},
-		{InfoLevel, "INFO"},
-		{InfoLevel + 1, "INFO+1"},
-		{InfoLevel - 3, "DEBUG+1"},
-		{DebugLevel, "DEBUG"},
-		{DebugLevel - 2, "DEBUG-2"},
+		{LevelError, "ERROR"},
+		{LevelError + 2, "ERROR+2"},
+		{LevelError - 2, "WARN+2"},
+		{LevelWarn, "WARN"},
+		{LevelWarn - 1, "INFO+3"},
+		{LevelInfo, "INFO"},
+		{LevelInfo + 1, "INFO+1"},
+		{LevelInfo - 3, "DEBUG+1"},
+		{LevelDebug, "DEBUG"},
+		{LevelDebug - 2, "DEBUG-2"},
 	} {
 		got := test.in.String()
 		if got != test.want {
@@ -34,15 +34,15 @@ func TestLevelString(t *testing.T) {
 
 func TestLevelVar(t *testing.T) {
 	var al LevelVar
-	if got, want := al.Level(), InfoLevel; got != want {
+	if got, want := al.Level(), LevelInfo; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	al.Set(WarnLevel)
-	if got, want := al.Level(), WarnLevel; got != want {
+	al.Set(LevelWarn)
+	if got, want := al.Level(), LevelWarn; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	al.Set(InfoLevel)
-	if got, want := al.Level(), InfoLevel; got != want {
+	al.Set(LevelInfo)
+	if got, want := al.Level(), LevelInfo; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 

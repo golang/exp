@@ -91,7 +91,7 @@ func TestDefaultHandle(t *testing.T) {
 			if test.with != nil {
 				h = test.with(h)
 			}
-			r := NewRecord(time.Time{}, InfoLevel, "message", 0, nil)
+			r := NewRecord(time.Time{}, LevelInfo, "message", 0, nil)
 			r.AddAttrs(test.attrs...)
 			if err := h.Handle(r); err != nil {
 				t.Fatal(err)
@@ -283,7 +283,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantJSON: `{"msg":"message","bs":1234}`,
 		},
 	} {
-		r := NewRecord(testTime, InfoLevel, "message", 1, nil)
+		r := NewRecord(testTime, LevelInfo, "message", 1, nil)
 		r.AddAttrs(test.attrs...)
 		var buf bytes.Buffer
 		opts := HandlerOptions{ReplaceAttr: test.replace}
@@ -355,14 +355,14 @@ func TestHandlerEnabled(t *testing.T) {
 		want    bool
 	}{
 		{nil, true},
-		{WarnLevel, false},
+		{LevelWarn, false},
 		{&LevelVar{}, true}, // defaults to Info
-		{levelVar(WarnLevel), false},
-		{DebugLevel, true},
-		{levelVar(DebugLevel), true},
+		{levelVar(LevelWarn), false},
+		{LevelDebug, true},
+		{levelVar(LevelDebug), true},
 	} {
 		h := &commonHandler{opts: HandlerOptions{Level: test.leveler}}
-		got := h.enabled(InfoLevel)
+		got := h.enabled(LevelInfo)
 		if got != test.want {
 			t.Errorf("%v: got %t, want %t", test.leveler, got, test.want)
 		}

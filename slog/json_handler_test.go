@@ -39,7 +39,7 @@ func TestJSONHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			h := test.opts.NewJSONHandler(&buf)
-			r := NewRecord(testTime, InfoLevel, "m", 0, nil)
+			r := NewRecord(testTime, LevelInfo, "m", 0, nil)
 			r.AddAttrs(Int("a", 1), Any("m", map[string]int{"b": 2}))
 			if err := h.Handle(r); err != nil {
 				t.Fatal(err)
@@ -103,7 +103,7 @@ func TestJSONAppendAttrValueSpecial(t *testing.T) {
 		{math.NaN(), `"NaN"`},
 		{math.Inf(+1), `"+Inf"`},
 		{math.Inf(-1), `"-Inf"`},
-		{WarnLevel, `"WARN"`},
+		{LevelWarn, `"WARN"`},
 	} {
 		got := jsonValueString(t, AnyValue(test.value))
 		if got != test.want {
@@ -162,7 +162,7 @@ func BenchmarkJSONHandler(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				l.LogAttrs(InfoLevel, "this is a typical log message",
+				l.LogAttrs(LevelInfo, "this is a typical log message",
 					String("module", "github.com/google/go-cmp"),
 					String("version", "v1.23.4"),
 					Int("count", 23),
@@ -223,7 +223,7 @@ func BenchmarkPreformatting(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				l.LogAttrs(InfoLevel, "this is a typical log message",
+				l.LogAttrs(LevelInfo, "this is a typical log message",
 					String("module", "github.com/google/go-cmp"),
 					String("version", "v1.23.4"),
 					Int("count", 23),

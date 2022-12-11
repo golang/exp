@@ -77,7 +77,7 @@ func newDefaultHandler(output func(int, string) error) *defaultHandler {
 }
 
 func (*defaultHandler) Enabled(l Level) bool {
-	return l >= InfoLevel
+	return l >= LevelInfo
 }
 
 // Collect the level, attributes and message in a string and
@@ -116,7 +116,7 @@ type HandlerOptions struct {
 
 	// Level reports the minimum record level that will be logged.
 	// The handler discards records with lower levels.
-	// If Level is nil, the handler assumes InfoLevel.
+	// If Level is nil, the handler assumes LevelInfo.
 	// The handler calls Level.Level for each record processed;
 	// to adjust the minimum level dynamically, use a LevelVar.
 	Level Leveler
@@ -195,7 +195,7 @@ func (h *commonHandler) clone() *commonHandler {
 // Enabled reports whether l is greater than or equal to the
 // minimum level.
 func (h *commonHandler) enabled(l Level) bool {
-	minLevel := InfoLevel
+	minLevel := LevelInfo
 	if h.opts.Level != nil {
 		minLevel = h.opts.Level.Level()
 	}

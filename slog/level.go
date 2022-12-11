@@ -40,10 +40,10 @@ type Level int
 //
 // Names for common levels.
 const (
-	DebugLevel Level = -4
-	InfoLevel  Level = 0
-	WarnLevel  Level = 4
-	ErrorLevel Level = 8
+	LevelDebug Level = -4
+	LevelInfo  Level = 0
+	LevelWarn  Level = 4
+	LevelError Level = 8
 )
 
 // String returns a name for the level.
@@ -53,8 +53,8 @@ const (
 // an integer is appended to the uppercased name.
 // Examples:
 //
-//	WarnLevel.String() => "WARN"
-//	(WarnLevel-2).String() => "WARN-2"
+//	LevelWarn.String() => "WARN"
+//	(LevelWarn-2).String() => "WARN-2"
 func (l Level) String() string {
 	str := func(base string, val Level) string {
 		if val == 0 {
@@ -64,14 +64,14 @@ func (l Level) String() string {
 	}
 
 	switch {
-	case l < InfoLevel:
-		return str("DEBUG", l-DebugLevel)
-	case l < WarnLevel:
-		return str("INFO", l-InfoLevel)
-	case l < ErrorLevel:
-		return str("WARN", l-WarnLevel)
+	case l < LevelInfo:
+		return str("DEBUG", l-LevelDebug)
+	case l < LevelWarn:
+		return str("INFO", l-LevelInfo)
+	case l < LevelError:
+		return str("WARN", l-LevelWarn)
 	default:
-		return str("ERROR", l-ErrorLevel)
+		return str("ERROR", l-LevelError)
 	}
 }
 
@@ -90,7 +90,7 @@ func (l Level) Level() Level { return l }
 // dynamically.
 // It implements Leveler as well as a Set method,
 // and it is safe for use by multiple goroutines.
-// The zero LevelVar corresponds to InfoLevel.
+// The zero LevelVar corresponds to LevelInfo.
 type LevelVar struct {
 	val atomic.Int64
 }

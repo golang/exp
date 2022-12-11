@@ -46,10 +46,10 @@ func TestLogTextHandler(t *testing.T) {
 	l.Error("bad", io.EOF, "a", 1)
 	check(`level=ERROR msg=bad a=1 err=EOF`)
 
-	l.Log(WarnLevel+1, "w", Int("a", 1), String("b", "two"))
+	l.Log(LevelWarn+1, "w", Int("a", 1), String("b", "two"))
 	check(`level=WARN\+1 msg=w a=1 b=two`)
 
-	l.LogAttrs(InfoLevel+1, "a b c", Int("a", 1), String("b", "two"))
+	l.LogAttrs(LevelInfo+1, "a b c", Int("a", 1), String("b", "two"))
 	check(`level=INFO\+1 msg="a b c" a=1 b=two`)
 
 	l.Info("info", "a", []Attr{Int("i", 1)})
@@ -168,9 +168,9 @@ func TestCallDepth(t *testing.T) {
 	startLine = f.Line + 4
 	// Do not change the number of lines between here and the call to check(0).
 
-	logger.Log(InfoLevel, "")
+	logger.Log(LevelInfo, "")
 	check(0)
-	logger.LogAttrs(InfoLevel, "")
+	logger.LogAttrs(LevelInfo, "")
 	check(1)
 	logger.Debug("")
 	check(2)
@@ -188,9 +188,9 @@ func TestCallDepth(t *testing.T) {
 	check(8)
 	Error("", nil)
 	check(9)
-	Log(InfoLevel, "")
+	Log(LevelInfo, "")
 	check(10)
-	LogAttrs(InfoLevel, "")
+	LogAttrs(LevelInfo, "")
 	check(11)
 }
 
@@ -209,7 +209,7 @@ func TestAlloc(t *testing.T) {
 		wantAllocs(t, 0, func() { dl.Info("hello") })
 	})
 	t.Run("logger.Log", func(t *testing.T) {
-		wantAllocs(t, 0, func() { dl.Log(DebugLevel, "hello") })
+		wantAllocs(t, 0, func() { dl.Log(LevelDebug, "hello") })
 	})
 	t.Run("2 pairs", func(t *testing.T) {
 		s := "abc"
@@ -226,7 +226,7 @@ func TestAlloc(t *testing.T) {
 		s := "abc"
 		i := 2000
 		wantAllocs(t, 2, func() {
-			l.Log(InfoLevel, "hello",
+			l.Log(LevelInfo, "hello",
 				"n", i,
 				"s", s,
 			)
@@ -237,8 +237,8 @@ func TestAlloc(t *testing.T) {
 		s := "abc"
 		i := 2000
 		wantAllocs(t, 0, func() {
-			if l.Enabled(InfoLevel) {
-				l.Log(InfoLevel, "hello",
+			if l.Enabled(LevelInfo) {
+				l.Log(LevelInfo, "hello",
 					"n", i,
 					"s", s,
 				)
@@ -260,30 +260,30 @@ func TestAlloc(t *testing.T) {
 		wantAllocs(t, 0, func() { dl.Info("", "error", io.EOF) })
 	})
 	t.Run("attrs1", func(t *testing.T) {
-		wantAllocs(t, 0, func() { dl.LogAttrs(InfoLevel, "", Int("a", 1)) })
-		wantAllocs(t, 0, func() { dl.LogAttrs(InfoLevel, "", Any("error", io.EOF)) })
+		wantAllocs(t, 0, func() { dl.LogAttrs(LevelInfo, "", Int("a", 1)) })
+		wantAllocs(t, 0, func() { dl.LogAttrs(LevelInfo, "", Any("error", io.EOF)) })
 	})
 	t.Run("attrs3", func(t *testing.T) {
 		wantAllocs(t, 0, func() {
-			dl.LogAttrs(InfoLevel, "hello", Int("a", 1), String("b", "two"), Duration("c", time.Second))
+			dl.LogAttrs(LevelInfo, "hello", Int("a", 1), String("b", "two"), Duration("c", time.Second))
 		})
 	})
 	t.Run("attrs3 disabled", func(t *testing.T) {
 		logger := New(discardHandler{disabled: true})
 		wantAllocs(t, 0, func() {
-			logger.LogAttrs(InfoLevel, "hello", Int("a", 1), String("b", "two"), Duration("c", time.Second))
+			logger.LogAttrs(LevelInfo, "hello", Int("a", 1), String("b", "two"), Duration("c", time.Second))
 		})
 	})
 	t.Run("attrs6", func(t *testing.T) {
 		wantAllocs(t, 1, func() {
-			dl.LogAttrs(InfoLevel, "hello",
+			dl.LogAttrs(LevelInfo, "hello",
 				Int("a", 1), String("b", "two"), Duration("c", time.Second),
 				Int("d", 1), String("e", "two"), Duration("f", time.Second))
 		})
 	})
 	t.Run("attrs9", func(t *testing.T) {
 		wantAllocs(t, 1, func() {
-			dl.LogAttrs(InfoLevel, "hello",
+			dl.LogAttrs(LevelInfo, "hello",
 				Int("a", 1), String("b", "two"), Duration("c", time.Second),
 				Int("d", 1), String("e", "two"), Duration("f", time.Second),
 				Int("d", 1), String("e", "two"), Duration("f", time.Second))
@@ -421,34 +421,34 @@ func BenchmarkNopLog(b *testing.B) {
 	b.Run("attrs", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			l.LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+			l.LogAttrs(LevelInfo, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
 		}
 	})
 	b.Run("attrs-parallel", func(b *testing.B) {
 		b.ReportAllocs()
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
-				l.LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+				l.LogAttrs(LevelInfo, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
 			}
 		})
 	})
 	b.Run("keys-values", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			l.Log(InfoLevel, "msg", "a", 1, "b", "two", "c", true)
+			l.Log(LevelInfo, "msg", "a", 1, "b", "two", "c", true)
 		}
 	})
 	b.Run("WithContext", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			l.WithContext(ctx).LogAttrs(InfoLevel, "msg2", Int("a", 1), String("b", "two"), Bool("c", true))
+			l.WithContext(ctx).LogAttrs(LevelInfo, "msg2", Int("a", 1), String("b", "two"), Bool("c", true))
 		}
 	})
 	b.Run("WithContext-parallel", func(b *testing.B) {
 		b.ReportAllocs()
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
-				l.WithContext(ctx).LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+				l.WithContext(ctx).LogAttrs(LevelInfo, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
 			}
 		})
 	})
@@ -458,7 +458,7 @@ func BenchmarkNopLog(b *testing.B) {
 		defer SetDefault(dl)
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			Ctx(ctx).LogAttrs(InfoLevel, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
+			Ctx(ctx).LogAttrs(LevelInfo, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
 		}
 	})
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func TestHandlers(t *testing.T) {
-	r := slog.NewRecord(TestTime, slog.InfoLevel, TestMessage, 0, nil)
+	r := slog.NewRecord(TestTime, slog.LevelInfo, TestMessage, 0, nil)
 	r.AddAttrs(TestAttrs...)
 	t.Run("text", func(t *testing.T) {
 		var b bytes.Buffer
