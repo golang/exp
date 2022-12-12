@@ -203,6 +203,22 @@ so even if it uses the common key "id", the log line will have distinct keys.
 
 # Contexts
 
+This package works with [context.Context] in two ways.
+
+Storing a Logger in a Context is a convenient way to pass it around,
+since many functions already take a Context as an argument.
+Create a Context that contains a Logger with [NewContext],
+and retrieve the Logger with [FromContext].
+
+Sometimes a Context holds information that a Handler would like to use.
+For example, tracing systems usually store span identifiers in Contexts.
+To provide a Context to a Handler, associate it with a Logger using [Logger.WithContext]:
+
+    logger.WithContext(ctx).Info("hello")
+
+That sets [Record.Context] to ctx so the Handler can access it.
+
+
 # Advanced topics
 
 
