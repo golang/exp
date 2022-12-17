@@ -222,10 +222,17 @@ That sets [Record.Context] to ctx so the Handler can access it.
 # Advanced topics
 
 
-
 ## Customizing a type's logging behavior
 
-TODO: discuss LogValuer
+If a type implements the [LogValuer] interface, the [Value] returned from its LogValue
+method is used for logging. You can use this to control how values of the type
+appear in logs. For example, you can redact secret information like passwords,
+or gather a struct's fields in a Group. See the examples under [LogValuer] for
+details.
+
+A LogValue method may return a Value that itself implements [LogValuer]. The [Value.Resolve]
+method handles these cases carefully, avoiding infinite loops and unbounded recursion.
+Handler authors and others may wish to use Value.Resolve instead of calling LogValue directly.
 
 ## Wrapping output methods
 
