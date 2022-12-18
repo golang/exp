@@ -418,6 +418,12 @@ func concat[T any](s1, s2 []T) []T {
 func BenchmarkNopLog(b *testing.B) {
 	ctx := context.Background()
 	l := New(&captureHandler{})
+	b.Run("no attrs", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			l.LogAttrs(LevelInfo, "msg")
+		}
+	})
 	b.Run("attrs", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {

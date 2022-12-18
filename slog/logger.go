@@ -137,28 +137,11 @@ func (l *Logger) Log(level Level, msg string, args ...any) {
 	l.LogDepth(0, level, msg, args...)
 }
 
-// LogDepth is like [Logger.Log], but accepts a call depth to adjust the
-// file and line number in the log record. 0 refers to the caller
-// of LogDepth; 1 refers to the caller's caller; and so on.
-func (l *Logger) LogDepth(calldepth int, level Level, msg string, args ...any) {
-	l.logDepth(nil, calldepth+1, level, msg, args...)
-}
-
-// logDepthErr is a trivial wrapper around logDepth, just to make the call
-// depths on all paths the same. This is important only for the defaultHandler,
-// which passes a fixed call depth to log.Output. When slog moves to the
-// standard library, we can replace that fixed call depth with logic based on
-// the Record's pc, and remove this function. See the comment on
-// TestConnections/wrap_default_handler.
-func (l *Logger) logDepthErr(err error, calldepth int, level Level, msg string, args ...any) {
-	l.logDepth(err, calldepth+1, level, msg, args...)
-}
-
-func (l *Logger) logDepth(err error, calldepth int, level Level, msg string, args ...any) {
+func (l *Logger) logPC(err error, pc uintptr, level Level, msg string, args ...any) {
 	if !l.Enabled(level) {
 		return
 	}
-	r := l.makeRecord(msg, level, calldepth)
+	r := l.makeRecord(msg, level, pc)
 	r.setAttrsFromArgs(args)
 	if err != nil {
 		r.AddAttrs(Any("err", err))
@@ -166,24 +149,19 @@ func (l *Logger) logDepth(err error, calldepth int, level Level, msg string, arg
 	_ = l.Handler().Handle(r)
 }
 
-func (l *Logger) makeRecord(msg string, level Level, depth int) Record {
-	return NewRecord(time.Now(), level, msg, depth+5, l.ctx)
+func (l *Logger) makeRecord(msg string, level Level, pc uintptr) Record {
+	return Record{
+		Time:    time.Now(),
+		Message: msg,
+		Level:   level,
+		Context: l.ctx,
+		pc:      pc,
+	}
 }
 
 // LogAttrs is a more efficient version of [Logger.Log] that accepts only Attrs.
 func (l *Logger) LogAttrs(level Level, msg string, attrs ...Attr) {
 	l.LogAttrsDepth(0, level, msg, attrs...)
-}
-
-// LogAttrsDepth is like [Logger.LogAttrs], but accepts a call depth argument
-// which it interprets like [Logger.LogDepth].
-func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...Attr) {
-	if !l.Enabled(level) {
-		return
-	}
-	r := l.makeRecord(msg, level, calldepth)
-	r.AddAttrs(attrs...)
-	_ = l.Handler().Handle(r)
 }
 
 // Debug logs at LevelDebug.
