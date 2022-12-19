@@ -256,3 +256,15 @@ func Grow[S ~[]E, E any](s S, n int) S {
 func Clip[S ~[]E, E any](s S) S {
 	return s[:len(s):len(s)]
 }
+
+// Intersection finds elements that are present in both slices, returning new slice without duplicates
+func Intersection[E comparable](s1, s2 []E) []E {
+	var result []E
+	for i := 0; i < len(s1); i++ {
+		element := s1[i]
+		if Contains(s2, element) && !Contains(result, element) {
+			result = append(result, element)
+		}
+	}
+	return result
+}
