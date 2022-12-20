@@ -798,6 +798,18 @@ func TestIntersection(t *testing.T) {
 			v:    []int{3, 4, 5},
 			want: []int{3},
 		},
+		{
+			name: "nil value",
+			s:    nil,
+			v:    nil,
+			want: nil,
+		},
+		{
+			name: "different size",
+			s:    []int{1, 5},
+			v:    []int{5, 10, 25},
+			want: []int{5},
+		},
 	}
 	strTypeCases := []struct {
 		name string

@@ -260,9 +260,19 @@ func Clip[S ~[]E, E any](s S) S {
 // Intersection finds elements that are present in both slices, returning new slice without duplicates
 func Intersection[E comparable](s1, s2 []E) []E {
 	var result []E
-	for i := 0; i < len(s1); i++ {
+	s2len := len(s2)
+	s1len := len(s1)
+	if s1len == 0 || s2len == 0 {
+		return result
+	}
+	s2Map := make(map[E]bool, s2len)
+	for i := 0; i < s2len; i++ {
+		el := s2[i]
+		s2Map[el] = true
+	}
+	for i := 0; i < s1len; i++ {
 		element := s1[i]
-		if Contains(s2, element) && !Contains(result, element) {
+		if _, ok := s2Map[element]; ok {
 			result = append(result, element)
 		}
 	}
