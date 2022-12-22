@@ -85,29 +85,20 @@ func BinarySearch[E constraints.Ordered](x []E, target E) (int, bool) {
 // parameters: 0 if a == b, a negative number if a < b and a positive number if
 // a > b.
 func BinarySearchFunc[E any](x []E, target E, cmp func(E, E) int) (int, bool) {
-	pos := search(len(x), func(i int) bool { return cmp(x[i], target) >= 0 })
-	if pos >= len(x) || cmp(x[pos], target) != 0 {
-		return pos, false
-	} else {
-		return pos, true
-	}
-}
-
-func search(n int, f func(int) bool) int {
 	// Define f(-1) == false and f(n) == true.
 	// Invariant: f(i-1) == false, f(j) == true.
-	i, j := 0, n
+	i, j := 0, len(x)
 	for i < j {
 		h := int(uint(i+j) >> 1) // avoid overflow when computing h
 		// i ≤ h < j
-		if !f(h) {
+		if cmp(x[h], target) < 0 {
 			i = h + 1 // preserves f(i-1) == false
 		} else {
 			j = h // preserves f(j) == true
 		}
 	}
 	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
-	return i
+	return i, i < len(x) && cmp(x[i], target) == 0
 }
 
 type sortedHint int // hint for pdqsort when choosing the pivot
