@@ -62,15 +62,21 @@ func IsSortedFunc[E any](x []E, less func(a, b E) bool) bool {
 // sort order; it also returns a bool saying whether the target is really found
 // in the slice. The slice must be sorted in increasing order.
 func BinarySearch[E constraints.Ordered](x []E, target E) (int, bool) {
-	// search returns the leftmost position where f returns true, or len(x) if f
-	// returns false for all x. This is the insertion position for target in x,
-	// and could point to an element that's either == target or not.
-	pos := search(len(x), func(i int) bool { return x[i] >= target })
-	if pos >= len(x) || x[pos] != target {
-		return pos, false
-	} else {
-		return pos, true
+	// Inlining is faster than calling BinarySearchFunc with a lambda.
+	// Define f(-1) == false and f(n) == true.
+	// Invariant: f(i-1) == false, f(j) == true.
+	i, j := 0, len(x)
+	for i < j {
+		h := int(uint(i+j) >> 1) // avoid overflow when computing h
+		// i ≤ h < j
+		if x[h] < target {
+			i = h + 1 // preserves f(i-1) == false
+		} else {
+			j = h // preserves f(j) == true
+		}
 	}
+	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
+	return i, i < len(x) && x[i] == target
 }
 
 // BinarySearchFunc works like BinarySearch, but uses a custom comparison
