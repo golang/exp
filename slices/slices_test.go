@@ -6,6 +6,7 @@ package slices
 
 import (
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -766,4 +767,153 @@ func BenchmarkReplace(b *testing.B) {
 		})
 	}
 
+}
+
+func TestChunkBy(t *testing.T) {
+
+	type args struct {
+		s []string
+		n int
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantChunks [][]string
+	}{
+		{
+			name: "0 len slice 0 n",
+			args: args{
+				s: []string{},
+				n: 0,
+			},
+			wantChunks: [][]string{},
+		},
+		{
+			name: "1 len slice 0 n",
+			args: args{
+				s: []string{},
+				n: 0,
+			},
+			wantChunks: [][]string{},
+		},
+		{
+			name: "2 len slice 0 n",
+			args: args{
+				s: []string{"", ""},
+				n: 0,
+			},
+			wantChunks: [][]string{{""}, {""}},
+		},
+		{
+			name: "3 len slice 0 n",
+			args: args{
+				s: []string{"", "", ""},
+				n: 0,
+			},
+			wantChunks: [][]string{{""}, {""}, {""}},
+		},
+		{
+			name: "0 len slice 1 n",
+			args: args{
+				s: []string{},
+				n: 1,
+			},
+			wantChunks: [][]string{},
+		},
+		{
+			name: "1 len slice 1 n",
+			args: args{
+				s: []string{""},
+				n: 1,
+			},
+			wantChunks: [][]string{{""}},
+		},
+		{
+			name: "2 len slice 1 n",
+			args: args{
+				s: []string{"", ""},
+				n: 1,
+			},
+			wantChunks: [][]string{{""}, {""}},
+		},
+		{
+			name: "3 len slice 1 n",
+			args: args{
+				s: []string{"", "", ""},
+				n: 1,
+			},
+			wantChunks: [][]string{{""}, {""}, {""}},
+		},
+		{
+			name: "0 len slice 2 n",
+			args: args{
+				s: []string{},
+				n: 2,
+			},
+			wantChunks: [][]string{},
+		},
+		{
+			name: "1 len slice 2 n",
+			args: args{
+				s: []string{""},
+				n: 2,
+			},
+			wantChunks: [][]string{{""}},
+		},
+		{
+			name: "2 len slice 2 n",
+			args: args{
+				s: []string{"", ""},
+				n: 2,
+			},
+			wantChunks: [][]string{{"", ""}},
+		},
+		{
+			name: "3 len slice 2 n",
+			args: args{
+				s: []string{"", "", ""},
+				n: 2,
+			},
+			wantChunks: [][]string{{"", ""}, {""}},
+		},
+		{
+			name: "0 len slice 3 n",
+			args: args{
+				s: []string{},
+				n: 3,
+			},
+			wantChunks: [][]string{},
+		},
+		{
+			name: "1 len slice 3 n",
+			args: args{
+				s: []string{""},
+				n: 3,
+			},
+			wantChunks: [][]string{{""}},
+		},
+		{
+			name: "2 len slice 3 n",
+			args: args{
+				s: []string{"", ""},
+				n: 3,
+			},
+			wantChunks: [][]string{{"", ""}},
+		},
+		{
+			name: "3 len slice 3 n",
+			args: args{
+				s: []string{"", "", ""},
+				n: 3,
+			},
+			wantChunks: [][]string{{"", "", ""}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotChunks := ChunkBy(tt.args.s, tt.args.n); !reflect.DeepEqual(gotChunks, tt.wantChunks) {
+				t.Errorf("ChunkBy() = %v, want %v", gotChunks, tt.wantChunks)
+			}
+		})
+	}
 }
