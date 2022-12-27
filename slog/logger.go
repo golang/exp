@@ -69,15 +69,20 @@ type Logger struct {
 	ctx     context.Context
 }
 
+func (l *Logger) clone() *Logger {
+	c := *l
+	return &c
+}
+
 // Handler returns l's Handler.
 func (l *Logger) Handler() Handler { return l.handler }
 
-// Context returns l's context.
+// Context returns l's context, which may be nil.
 func (l *Logger) Context() context.Context { return l.ctx }
 
 // With returns a new Logger that includes the given arguments, converted to
 // Attrs as in [Logger.Log]. The Attrs will be added to each output from the
-// Logger.
+// Logger. The new Logger shares the old Logger's context.
 //
 // The new Logger's handler is the result of calling WithAttrs on the receiver's
 // handler.
@@ -90,28 +95,40 @@ func (l *Logger) With(args ...any) *Logger {
 		attr, args = argsToAttr(args)
 		attrs = append(attrs, attr)
 	}
-	return New(l.handler.WithAttrs(attrs))
+	c := l.clone()
+	c.handler = l.handler.WithAttrs(attrs)
+	return c
 }
 
 // WithGroup returns a new Logger that starts a group. The keys of all
 // attributes added to the Logger will be qualified by the given name.
+// The new Logger shares the old Logger's context.
 //
 // The new Logger's handler is the result of calling WithGroup on the receiver's
 // handler.
 func (l *Logger) WithGroup(name string) *Logger {
-	return New(l.handler.WithGroup(name))
+	c := l.clone()
+	c.handler = l.handler.WithGroup(name)
+	return c
+
 }
 
 // WithContext returns a new Logger with the same handler
 // as the receiver and the given context.
+// It uses the same handler as the original.
 func (l *Logger) WithContext(ctx context.Context) *Logger {
-	l2 := *l
-	l2.ctx = ctx
-	return &l2
+	c := l.clone()
+	c.ctx = ctx
+	return c
 }
 
-// New creates a new Logger with the given Handler.
-func New(h Handler) *Logger { return &Logger{handler: h} }
+// New creates a new Logger with the given non-nil Handler and a nil context.
+func New(h Handler) *Logger {
+	if h == nil {
+		panic("nil Handler")
+	}
+	return &Logger{handler: h}
+}
 
 // With calls Logger.With on the default logger.
 func With(args ...any) *Logger {

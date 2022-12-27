@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 const timeRE = `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:\d{2})`
@@ -347,6 +349,46 @@ func TestLoggerError(t *testing.T) {
 	checkLogOutput(t, buf.String(), `level=ERROR msg=msg !BADKEY=a err=EOF`)
 }
 
+func TestLogCopying(t *testing.T) {
+	// Verify that Logger methods that purport to set one field of a new Logger
+	// actually do so while preserving the other field.
+
+	h := &captureHandler{} // Use a captureHandler for convenience.
+	l := New(h)
+	ctx := context.WithValue(context.Background(), "v", 0)
+
+	checkContext := func(l *Logger) {
+		t.Helper()
+		ctx := l.Context()
+		if ctx == nil {
+			t.Error("nil context")
+		} else if got, want := ctx.Value("v"), 0; got != want {
+			t.Errorf("for got %v, want %v", got, want)
+		}
+	}
+
+	// WithContext returns a Logger with the given context and the same handler.
+	l2 := l.WithContext(ctx)
+	checkContext(l2)
+	if l2.Handler() != h {
+		t.Error("WithContext changed handler")
+	}
+
+	// With returns a Logger with a different handler but the same context.
+	l3 := l2.With("a", 1)
+	if l3.Handler() == l2.Handler() {
+		t.Error("With did not change handler")
+	}
+	checkContext(l3)
+
+	// WithGroup also returns a Logger with a different handler but the same context.
+	l4 := l3.WithGroup("g")
+	if l4.Handler() == l3.Handler() {
+		t.Error("With did not change handler")
+	}
+	checkContext(l4)
+}
+
 func checkLogOutput(t *testing.T, got, wantRegexp string) {
 	t.Helper()
 	got = clean(got)
@@ -369,8 +411,9 @@ func clean(s string) string {
 }
 
 type captureHandler struct {
-	r     Record
-	attrs []Attr
+	r      Record
+	attrs  []Attr
+	groups []string
 }
 
 func (h *captureHandler) Handle(r Record) error {
@@ -386,8 +429,10 @@ func (c *captureHandler) WithAttrs(as []Attr) Handler {
 	return &c2
 }
 
-func (h *captureHandler) WithGroup(name string) Handler {
-	panic("unimplemented")
+func (c *captureHandler) WithGroup(name string) Handler {
+	c2 := *c
+	c2.groups = append(slices.Clip(c2.groups), name)
+	return &c2
 }
 
 type discardHandler struct {
