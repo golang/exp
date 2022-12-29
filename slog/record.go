@@ -63,7 +63,7 @@ type Record struct {
 func NewRecord(t time.Time, level Level, msg string, calldepth int, ctx context.Context) Record {
 	var p uintptr
 	if calldepth > 0 {
-		p = pc(calldepth + 1)
+		p = pc(calldepth + 2)
 	}
 	return Record{
 		Time:    t,

@@ -35,7 +35,8 @@ func TestRecordSourceLine(t *testing.T) {
 	}{
 		{0, "", false},
 		{-16, "", false},
-		{1, "record.go", true},
+		{1, "record_test.go", true}, // 1: caller of NewRecord
+		{2, "testing.go", true},
 	} {
 		r := NewRecord(time.Time{}, 0, "", test.depth, nil)
 		gotFile, gotLine := r.SourceLine()
