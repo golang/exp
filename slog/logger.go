@@ -45,6 +45,9 @@ type handlerWriter struct {
 }
 
 func (w *handlerWriter) Write(buf []byte) (int, error) {
+	if !w.h.Enabled(LevelInfo) {
+		return 0, nil
+	}
 	var depth int
 	if w.flags&(log.Lshortfile|log.Llongfile) != 0 {
 		depth = 2
@@ -155,9 +158,6 @@ func (l *Logger) Log(level Level, msg string, args ...any) {
 }
 
 func (l *Logger) logPC(err error, pc uintptr, level Level, msg string, args ...any) {
-	if !l.Enabled(level) {
-		return
-	}
 	r := l.makeRecord(msg, level, pc)
 	r.setAttrsFromArgs(args)
 	if err != nil {

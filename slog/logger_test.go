@@ -108,6 +108,14 @@ func TestConnections(t *testing.T) {
 	log.Print("msg2")
 	checkLogOutput(t, slogbuf.String(), "time="+timeRE+` level=INFO msg=msg2`)
 
+	// The default log.Logger always outputs at Info level.
+	slogbuf.Reset()
+	SetDefault(New(HandlerOptions{Level: LevelWarn}.NewTextHandler(&slogbuf)))
+	log.Print("should not appear")
+	if got := slogbuf.String(); got != "" {
+		t.Errorf("got %q, want empty", got)
+	}
+
 	// Setting log's output again breaks the connection.
 	logbuf.Reset()
 	slogbuf.Reset()
@@ -119,6 +127,7 @@ func TestConnections(t *testing.T) {
 	if got := slogbuf.String(); got != "" {
 		t.Errorf("got %q, want empty", got)
 	}
+
 }
 
 type wrappingHandler struct {
