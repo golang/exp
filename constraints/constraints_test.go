@@ -5,11 +5,11 @@
 package constraints
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
 )
@@ -148,9 +148,8 @@ replace golang.org/x/exp => %s
 				t.Error("build succeeded, but expected to fail")
 			} else if len(out) > 0 {
 				t.Logf("%s", out)
-				const want = "does not implement"
-				if !bytes.Contains(out, []byte(want)) {
-					t.Errorf("output does not include %q", want)
+				if !wantRx.Match(out) {
+					t.Errorf("output does not match %q", wantRx)
 				}
 			} else {
 				t.Error("no error output, expected something")
@@ -158,3 +157,5 @@ replace golang.org/x/exp => %s
 		})
 	}
 }
+
+var wantRx = regexp.MustCompile("does not (implement|satisfy)")
