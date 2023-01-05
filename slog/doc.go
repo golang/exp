@@ -329,7 +329,4 @@ Then use a value of that type in log calls:
     slog.Debug("frobbing", "value", expensive{arg})
 
 Now computeExpensiveValue will only be called when the line is enabled.
-
-## Writing a handler
-
 */
