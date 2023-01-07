@@ -19,7 +19,7 @@ var float64sWithNaNs = [...]float64{74.3, 59.0, math.Inf(1), 238.2, -784.0, 2.3,
 var strs = [...]string{"", "Hello", "foo", "bar", "foo", "f00", "%*&^*&^&", "***"}
 
 func TestSortIntSlice(t *testing.T) {
-	data := ints[:]
+	data := Clone(ints[:])
 	Sort(data)
 	if !IsSorted(data) {
 		t.Errorf("sorted %v", ints)
@@ -28,7 +28,7 @@ func TestSortIntSlice(t *testing.T) {
 }
 
 func TestSortFuncIntSlice(t *testing.T) {
-	data := ints[:]
+	data := Clone(ints[:])
 	SortFunc(data, func(a, b int) bool { return a < b })
 	if !IsSorted(data) {
 		t.Errorf("sorted %v", ints)
@@ -37,7 +37,7 @@ func TestSortFuncIntSlice(t *testing.T) {
 }
 
 func TestSortFloat64Slice(t *testing.T) {
-	data := float64s[:]
+	data := Clone(float64s[:])
 	Sort(data)
 	if !IsSorted(data) {
 		t.Errorf("sorted %v", float64s)
@@ -47,10 +47,8 @@ func TestSortFloat64Slice(t *testing.T) {
 
 func TestSortFloat64SliceWithNaNs(t *testing.T) {
 	data := float64sWithNaNs[:]
-	input := make([]float64, len(float64sWithNaNs))
-	for i := range input {
-		input[i] = float64sWithNaNs[i]
-	}
+	input := Clone(data)
+
 	// Make sure Sort doesn't panic when the slice contains NaNs.
 	Sort(data)
 	// Check whether the result is a permutation of the input.
@@ -64,7 +62,7 @@ func TestSortFloat64SliceWithNaNs(t *testing.T) {
 }
 
 func TestSortStringSlice(t *testing.T) {
-	data := strs[:]
+	data := Clone(strs[:])
 	Sort(data)
 	if !IsSorted(data) {
 		t.Errorf("sorted %v", strs)
