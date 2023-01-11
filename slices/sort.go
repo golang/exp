@@ -63,20 +63,21 @@ func IsSortedFunc[E any](x []E, less func(a, b E) bool) bool {
 // in the slice. The slice must be sorted in increasing order.
 func BinarySearch[E constraints.Ordered](x []E, target E) (int, bool) {
 	// Inlining is faster than calling BinarySearchFunc with a lambda.
-	// Define f(-1) == false and f(n) == true.
-	// Invariant: f(i-1) == false, f(j) == true.
-	i, j := 0, len(x)
+	n := len(x)
+	// Define x[-1] < target and x[n] >= target.
+	// Invariant: x[i-1] < target, x[j] >= target.
+	i, j := 0, n
 	for i < j {
 		h := int(uint(i+j) >> 1) // avoid overflow when computing h
 		// i ≤ h < j
 		if x[h] < target {
-			i = h + 1 // preserves f(i-1) == false
+			i = h + 1 // preserves x[i-1] < target
 		} else {
-			j = h // preserves f(j) == true
+			j = h // preserves x[j] >= target
 		}
 	}
-	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
-	return i, i < len(x) && x[i] == target
+	// i == j, x[i-1] < target, and x[j] (= x[i]) >= target  =>  answer is i.
+	return i, i < n && x[i] == target
 }
 
 // BinarySearchFunc works like BinarySearch, but uses a custom comparison
@@ -85,20 +86,21 @@ func BinarySearch[E constraints.Ordered](x []E, target E) (int, bool) {
 // parameters: 0 if a == b, a negative number if a < b and a positive number if
 // a > b.
 func BinarySearchFunc[E any](x []E, target E, cmp func(E, E) int) (int, bool) {
-	// Define f(-1) == false and f(n) == true.
-	// Invariant: f(i-1) == false, f(j) == true.
-	i, j := 0, len(x)
+	n := len(x)
+	// Define cmp(x[-1], target) < 0 and cmp(x[n], target) >= 0 .
+	// Invariant: cmp(x[i - 1], target) < 0, cmp(x[j], target) >= 0.
+	i, j := 0, n
 	for i < j {
 		h := int(uint(i+j) >> 1) // avoid overflow when computing h
 		// i ≤ h < j
 		if cmp(x[h], target) < 0 {
-			i = h + 1 // preserves f(i-1) == false
+			i = h + 1 // preserves cmp(x[i - 1], target) < 0
 		} else {
-			j = h // preserves f(j) == true
+			j = h // preserves cmp(x[j], target) >= 0
 		}
 	}
-	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
-	return i, i < len(x) && cmp(x[i], target) == 0
+	// i == j, cmp(x[i-1], target) < 0, and cmp(x[j], target) (= cmp(x[i], target)) >= 0  =>  answer is i.
+	return i, i < n && cmp(x[i], target) == 0
 }
 
 type sortedHint int // hint for pdqsort when choosing the pivot
