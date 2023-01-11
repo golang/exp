@@ -512,13 +512,4 @@ func BenchmarkNopLog(b *testing.B) {
 			}
 		})
 	})
-	b.Run("Ctx", func(b *testing.B) {
-		dl := Default()
-		SetDefault(l)
-		defer SetDefault(dl)
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			Ctx(ctx).LogAttrs(LevelInfo, "msg", Int("a", 1), String("b", "two"), Bool("c", true))
-		}
-	})
 }
