@@ -5,6 +5,7 @@
 package slices
 
 import (
+	"fmt"
 	"math/rand"
 	"sort"
 	"strings"
@@ -198,5 +199,40 @@ func BenchmarkSortFuncStructs(b *testing.B) {
 		ss := makeRandomStructs(N)
 		b.StartTimer()
 		SortFunc(ss, lessFunc)
+	}
+}
+
+func BenchmarkBinarySearchFloats(b *testing.B) {
+	for _, size := range []int{16, 32, 64, 128, 512, 1024} {
+		b.Run(fmt.Sprintf("Size%d", size), func(b *testing.B) {
+			floats := make([]float64, size)
+			for i := range floats {
+				floats[i] = float64(i)
+			}
+			midpoint := len(floats) / 2
+			needle := (floats[midpoint] + floats[midpoint+1]) / 2
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				BinarySearch(floats, needle)
+			}
+		})
+	}
+}
+
+func BenchmarkBinarySearchFuncStruct(b *testing.B) {
+	for _, size := range []int{16, 32, 64, 128, 512, 1024} {
+		b.Run(fmt.Sprintf("Size%d", size), func(b *testing.B) {
+			structs := make([]*myStruct, size)
+			for i := range structs {
+				structs[i] = &myStruct{n: i}
+			}
+			midpoint := len(structs) / 2
+			needle := &myStruct{n: (structs[midpoint].n + structs[midpoint+1].n) / 2}
+			lessFunc := func(a, b *myStruct) int { return a.n - b.n }
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				BinarySearchFunc(structs, needle, lessFunc)
+			}
+		})
 	}
 }
