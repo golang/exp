@@ -54,7 +54,7 @@ const (
 // Examples:
 //
 //	LevelWarn.String() => "WARN"
-//	(LevelWarn-2).String() => "WARN-2"
+//	(LevelInfo+2).String() => "INFO+2"
 func (l Level) String() string {
 	str := func(base string, val Level) string {
 		if val == 0 {

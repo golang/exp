@@ -1,9 +1,13 @@
-#!/bin/bash -ex
+#!/bin/bash -e
+
+go=${1:-go}
 
 cd $(dirname $0)
 
+set -x
+
 # Run all benchmarks a few times and capture to a file.
-go test -bench . -count 5 > zap.bench
+$go test -bench . -count 5 > zap.bench
 
 # Rename the package in the output to fool benchstat into comparing
 # these benchmarks with the ones in the parent directory.

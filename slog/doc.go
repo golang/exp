@@ -126,7 +126,6 @@ The result is a new Logger with the same handler as the original, but additional
 attributes that will appear in the output of every call.
 
 
-
 # Levels
 
 A [Level] is an integer representing the importance or severity of a log event.
@@ -203,27 +202,131 @@ so even if it uses the common key "id", the log line will have distinct keys.
 
 # Contexts
 
-# Advanced topics
+This package works with [context.Context] in two ways.
 
+Storing a Logger in a Context is a convenient way to pass it around,
+since many functions already take a Context as an argument.
+Create a Context that contains a Logger with [NewContext],
+and retrieve the Logger with [FromContext].
+
+Sometimes a Context holds information that a Handler would like to use.
+For example, tracing systems usually store span identifiers in Contexts.
+To provide a Context to a Handler, associate it with a Logger using [Logger.WithContext]:
+
+    logger.WithContext(ctx).Info("hello")
+
+That sets [Record.Context] to ctx so the Handler can access it.
+
+
+# Advanced topics
 
 
 ## Customizing a type's logging behavior
 
-TODO: discuss LogValuer
+If a type implements the [LogValuer] interface, the [Value] returned from its LogValue
+method is used for logging. You can use this to control how values of the type
+appear in logs. For example, you can redact secret information like passwords,
+or gather a struct's fields in a Group. See the examples under [LogValuer] for
+details.
+
+A LogValue method may return a Value that itself implements [LogValuer]. The [Value.Resolve]
+method handles these cases carefully, avoiding infinite loops and unbounded recursion.
+Handler authors and others may wish to use Value.Resolve instead of calling LogValue directly.
+
 
 ## Wrapping output methods
 
-TODO: discuss LogDepth, LogAttrDepth
+The logger functions use reflection over the call stack to find the
+file name and line number of the logging call within the application.
+To distinguish logger functions from application functions, the logger
+ignores the topmost few functions on the call stack.
+The number of frames to ignore is called the "depth."
 
-## Interoperating with other logging packages
+If your own packages define logging functions that wrap those provided by slog,
+you will want to adjust the depth so that source line
+information points to your wrapper, not the underlying slog function. For instance, if you define
+this function in file mylog.go:
 
-TODO: discuss NewRecord, Record.AddAttrs
+    func Infof(format string, args ...any) {
+        slog.Default().Info(fmt.Sprintf(format, args...))
+    }
+
+and you call it like this in main.go:
+
+    Infof(slog.Default(), "hello, %s", "world")
+
+then slog will use source file mylog.go, not main.go.
+
+The [LogDepth] and [LogAttrDepth] functions are designed for this case.
+Their first argument is the number of calls between your wrapper
+function and the LogDepth or LogAttrDepth call.
+The proper definition of Infof is
+
+    func Infof(format string, args ...any) {
+        slog.Default().LogDepth(1, slog.LevelInfo, fmt.Sprintf(format, args...))
+    }
+
+
+## Working with Records
+
+Sometimes a Handler will need to modify a Record
+before passing it on to another Handler or backend.
+A Record contains a mixture of simple public fields (e.g. Time, Level, Message)
+and hidden fields that refer to state (such as attributes) indirectly. This
+means that modifying a simple copy of a Record (e.g. by calling [Record.AddAttrs] to add attributes)
+may have unexpected effects on the original.
+Before modifying a Record, use [Clone] to
+create a copy that shares no state with the original,
+or create a new Record with [NewRecord]
+and build up its Attrs by traversing the old ones with [Record.Attrs].
+
 
 ## Performance considerations
 
-TODO: mention to avoid unnecessary work (like calling URL.String()) in log args in case
-the log statement is disabled.
+If profiling your application demonstrates that logging is taking significant time,
+the following suggestions may help.
 
-## Writing a handler
+If many log lines have a common attribute, use [Logger.With] to create a Logger with
+that attribute. The built-in handlers will format that attribute only once, at the
+call to [Logger.With]. The [Handler] interface is designed to allow that optimization,
+and a well-written Handler should take advantage of it.
 
+The arguments to a log call are always evaluated, even if the log event is discarded.
+If possible, defer computation so that it happens only if the value is actually logged.
+For example, consider the call
+
+    slog.Info("starting request", "url", r.URL.String())  // may compute String unnecessarily
+
+The URL.String method will be called even if the logger discards Info-level events.
+Instead, pass the URL directly:
+
+    slog.Info("starting request", "url", &r.URL) // calls URL.String only if needed
+
+The built-in [TextHandler] will call its String method, but only
+if the log event is enabled.
+Avoiding the call to String also preserves the structure of the underlying value.
+For example [JSONHandler] emits the components of the parsed URL as a JSON object.
+If you want to avoid eagerly paying the cost of the String call
+without causing the handler to potentially inspect the structure of the value,
+wrap the value in a fmt.Stringer implementation that hides its Marshal methods.
+
+You can also use the [LogValuer] interface to avoid unnecessary work in disabled log
+calls. Say you need to log some expensive value:
+
+    slog.Debug("frobbing", "value", computeExpensiveValue(arg))
+
+Even if this line is disabled, computeExpensiveValue will be called.
+To avoid that, define a type implementing LogValuer:
+
+    type expensive struct { arg int }
+
+    func (e expensive) LogValue() slog.Value {
+        return slog.AnyValue(computeExpensiveValue(e.arg))
+    }
+
+Then use a value of that type in log calls:
+
+    slog.Debug("frobbing", "value", expensive{arg})
+
+Now computeExpensiveValue will only be called when the line is enabled.
 */

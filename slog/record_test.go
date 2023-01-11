@@ -5,6 +5,7 @@
 package slog
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -34,7 +35,8 @@ func TestRecordSourceLine(t *testing.T) {
 	}{
 		{0, "", false},
 		{-16, "", false},
-		{1, "record.go", true},
+		{1, "record_test.go", true}, // 1: caller of NewRecord
+		{2, "testing.go", true},
 	} {
 		r := NewRecord(time.Time{}, 0, "", test.depth, nil)
 		gotFile, gotLine := r.SourceLine()
@@ -108,12 +110,16 @@ func attrsEqual(as1, as2 []Attr) bool {
 // Currently, pc(2) takes over 400ns, which is too expensive
 // to call it for every log message.
 func BenchmarkPC(b *testing.B) {
-	b.ReportAllocs()
-	var x uintptr
-	for i := 0; i < b.N; i++ {
-		x = pc(3)
+	for depth := 0; depth < 5; depth++ {
+		b.Run(strconv.Itoa(depth), func(b *testing.B) {
+			b.ReportAllocs()
+			var x uintptr
+			for i := 0; i < b.N; i++ {
+				x = pc(depth)
+			}
+			_ = x
+		})
 	}
-	_ = x
 }
 
 func BenchmarkSourceLine(b *testing.B) {
@@ -151,4 +157,16 @@ func BenchmarkRecord(b *testing.B) {
 		r.Attrs(func(b Attr) { a = b })
 	}
 	_ = a
+}
+
+func BenchmarkNewRecordCallDepth(b *testing.B) {
+	for d := 0; d < 5; d++ {
+		b.Run(strconv.Itoa(d), func(b *testing.B) {
+			var x Record
+			for i := 0; i < b.N; i++ {
+				x = NewRecord(time.Time{}, LevelInfo, "", d, nil)
+			}
+			_ = x
+		})
+	}
 }

@@ -114,7 +114,7 @@ func (t text) MarshalText() ([]byte, error) {
 func TestTextHandlerSource(t *testing.T) {
 	var buf bytes.Buffer
 	h := HandlerOptions{AddSource: true}.NewTextHandler(&buf)
-	r := NewRecord(testTime, LevelInfo, "m", 2, nil)
+	r := NewRecord(testTime, LevelInfo, "m", 1, nil)
 	if err := h.Handle(r); err != nil {
 		t.Fatal(err)
 	}
