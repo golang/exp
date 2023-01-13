@@ -16,7 +16,7 @@ func (l *Logger) LogDepth(calldepth int, level Level, msg string, args ...any) {
 	if !l.Enabled(level) {
 		return
 	}
-	l.logDepth(nil, 0, level, msg, args...)
+	l.logPC(nil, 0, level, msg, args...)
 }
 
 // LogAttrsDepth is like [Logger.LogAttrs], but accepts a call depth argument
@@ -37,7 +37,10 @@ func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...
 // the Record's pc, and remove this function. See the comment on
 // TestConnections/wrap_default_handler.
 func (l *Logger) logDepthErr(err error, calldepth int, level Level, msg string, args ...any) {
-	l.logDepth(err, 0, level, msg, args...)
+	if !l.Enabled(level) {
+		return
+	}
+	l.logPC(err, 0, level, msg, args...)
 }
 
 // pc returns 0 to avoid incurring the cost of runtime.Callers.
