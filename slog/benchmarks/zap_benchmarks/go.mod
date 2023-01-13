@@ -1,4 +1,4 @@
-module golang.org/x/exp/slog/benchmarks/zapbenchmarks
+module golang.org/x/exp/slog/benchmarks/zap_benchmarks
 
 go 1.19
 
