@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package slog
-
 /*
 Package slog provides structured logging,
 in which log records include a message,
@@ -334,3 +332,4 @@ The built-in handlers acquire a lock before calling [io.Writer.Write]
 to ensure that each record is written in one piece. User-defined
 handlers are responsible for their own locking.
 */
+package slog
