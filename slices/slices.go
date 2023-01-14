@@ -134,6 +134,17 @@ func ContainsFunc[E any](s []E, f func(E) bool) bool {
 	return IndexFunc(s, f) >= 0
 }
 
+// Count reports the number of items in s that are equal to v.
+func Count[E comparable](s []E, v E) int {
+	count := 0
+	for _, vs := range s {
+		if v == vs {
+			count += 1
+		}
+	}
+	return count
+}
+
 // Insert inserts the values v... into s at index i,
 // returning the modified slice.
 // In the returned slice r, r[i] == v[0].

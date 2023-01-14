@@ -377,6 +377,51 @@ func TestContainsFunc(t *testing.T) {
 	}
 }
 
+var countTests = []struct {
+	s    []int
+	v    int
+	want int
+}{
+	{
+		nil,
+		0,
+		0,
+	},
+	{
+		[]int{},
+		0,
+		0,
+	},
+	{
+		[]int{1, 2, 3},
+		4,
+		0,
+	},
+	{
+		[]int{1, 2, 3},
+		2,
+		1,
+	},
+	{
+		[]int{1, 2, 2, 3},
+		2,
+		2,
+	},
+	{
+		[]int{1, 2, 3, 2},
+		2,
+		2,
+	},
+}
+
+func TestCount(t *testing.T) {
+	for _, test := range countTests {
+		if got := Count(test.s, test.v); got != test.want {
+			t.Errorf("Count(%v, %v) = %v, want %v", test.s, test.v, got, test.want)
+		}
+	}
+}
+
 var insertTests = []struct {
 	s    []int
 	i    int
