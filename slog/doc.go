@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package slog
-
 /*
 Package slog provides structured logging,
 in which log records include a message,
@@ -330,3 +328,4 @@ Then use a value of that type in log calls:
 
 Now computeExpensiveValue will only be called when the line is enabled.
 */
+package slog
