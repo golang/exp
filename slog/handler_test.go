@@ -29,18 +29,18 @@ func TestDefaultHandle(t *testing.T) {
 	}{
 		{
 			name: "no attrs",
-			want: "INFO message",
+			want: "NOTICE message",
 		},
 		{
 			name:  "attrs",
 			attrs: attrs,
-			want:  "INFO message a=1 b=two",
+			want:  "NOTICE message a=1 b=two",
 		},
 		{
 			name:  "preformatted",
 			with:  func(h Handler) Handler { return h.WithAttrs(preAttrs) },
 			attrs: attrs,
-			want:  "INFO message pre=0 a=1 b=two",
+			want:  "NOTICE message pre=0 a=1 b=two",
 		},
 		{
 			name: "groups",
@@ -52,13 +52,13 @@ func TestDefaultHandle(t *testing.T) {
 					Int("d", 4)),
 				Int("e", 5),
 			},
-			want: "INFO message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
+			want: "NOTICE message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
 		},
 		{
 			name:  "group",
 			with:  func(h Handler) Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
 			attrs: attrs,
-			want:  "INFO message pre=0 s.a=1 s.b=two",
+			want:  "NOTICE message pre=0 s.a=1 s.b=two",
 		},
 		{
 			name: "preformatted groups",
@@ -69,7 +69,7 @@ func TestDefaultHandle(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs: attrs,
-			want:  "INFO message p1=1 s1.p2=2 s1.s2.a=1 s1.s2.b=two",
+			want:  "NOTICE message p1=1 s1.p2=2 s1.s2.a=1 s1.s2.b=two",
 		},
 		{
 			name: "two with-groups",
@@ -79,7 +79,7 @@ func TestDefaultHandle(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs: attrs,
-			want:  "INFO message p1=1 s1.s2.a=1 s1.s2.b=two",
+			want:  "NOTICE message p1=1 s1.s2.a=1 s1.s2.b=two",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -91,7 +91,7 @@ func TestDefaultHandle(t *testing.T) {
 			if test.with != nil {
 				h = test.with(h)
 			}
-			r := NewRecord(time.Time{}, LevelInfo, "message", 0, nil)
+			r := NewRecord(time.Time{}, LevelNotice, "message", 0, nil)
 			r.AddAttrs(test.attrs...)
 			if err := h.Handle(r); err != nil {
 				t.Fatal(err)
@@ -356,13 +356,13 @@ func TestHandlerEnabled(t *testing.T) {
 	}{
 		{nil, true},
 		{LevelWarn, false},
-		{&LevelVar{}, true}, // defaults to Info
+		{&LevelVar{}, true}, // defaults to notice 0 info is 42
 		{levelVar(LevelWarn), false},
 		{LevelDebug, true},
 		{levelVar(LevelDebug), true},
 	} {
 		h := &commonHandler{opts: HandlerOptions{Level: test.leveler}}
-		got := h.enabled(LevelInfo)
+		got := h.enabled(LevelNotice)
 		if got != test.want {
 			t.Errorf("%v: got %t, want %t", test.leveler, got, test.want)
 		}
@@ -408,9 +408,9 @@ func TestSecondWith(t *testing.T) {
 	)
 	appLogger := logger.With("type", "log") // this becomes type=met
 	_ = logger.With("type", "metric")
-	appLogger.Info("foo")
+	appLogger.Notice("foo")
 	got := strings.TrimSpace(buf.String())
-	want := `level=INFO msg=foo app=playground role=tester data_version=2 type=log`
+	want := `level=NOTICE msg=foo app=playground role=tester data_version=2 type=log`
 	if got != want {
 		t.Errorf("\ngot  %s\nwant %s", got, want)
 	}
@@ -443,7 +443,7 @@ func TestReplaceAttrGroups(t *testing.T) {
 			Int("c", 3),
 			Group("g3", Int("d", 4)),
 			Int("e", 5)).
-		Info("m",
+		Notice("m",
 			Int("f", 6),
 			Group("g4", Int("h", 7)),
 			Int("i", 8))
@@ -455,7 +455,7 @@ func TestReplaceAttrGroups(t *testing.T) {
 		{"g1,g2,g3", "d", "4"},
 		{"g1,g2", "e", "5"},
 		{"", "time", "<now>"},
-		{"", "level", "INFO"},
+		{"", "level", "NOTICE"},
 		{"", "msg", "m"},
 		{"g1,g2", "f", "6"},
 		{"g1,g2,g4", "h", "7"},

@@ -31,8 +31,8 @@ func ExampleLogValuer_secret() {
 		return a
 	}
 	logger := slog.New(slog.HandlerOptions{ReplaceAttr: removeTime}.NewTextHandler(os.Stdout))
-	logger.Info("permission granted", "user", "Perry", "token", t)
+	logger.Notice("permission granted", "user", "Perry", "token", t)
 
 	// Output:
-	// level=INFO msg="permission granted" user=Perry token=REDACTED_TOKEN
+	// level=NOTICE msg="permission granted" user=Perry token=REDACTED_TOKEN
 }

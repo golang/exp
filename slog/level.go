@@ -12,7 +12,7 @@ import (
 
 // A Level is the importance or severity of a log event.
 // The higher the level, the more important or severe the event.
-type Level int
+type Level int8
 
 // Level numbers are inherently arbitrary,
 // but we picked them to satisfy three constraints.
@@ -40,10 +40,17 @@ type Level int
 //
 // Names for common levels.
 const (
-	LevelDebug Level = -4
-	LevelInfo  Level = 0
-	LevelWarn  Level = 4
-	LevelError Level = 8
+	LevelQuiet  Level = -128 // never log anything
+	LevelError  Level = -86
+	LevelWarn   Level = -44
+	LevelNotice Level = 0 // default when level is
+	LevelInfo   Level = 42
+	LevelDebug  Level = 84
+	LevelAlways Level = 127 // log always regardless of the level
+)
+
+const (
+	CustoLevel = -87
 )
 
 // String returns a name for the level.
@@ -64,14 +71,20 @@ func (l Level) String() string {
 	}
 
 	switch {
-	case l < LevelInfo:
-		return str("DEBUG", l-LevelDebug)
-	case l < LevelWarn:
-		return str("INFO", l-LevelInfo)
-	case l < LevelError:
+	case l == LevelQuiet:
+		return "QUIET"
+	case l < LevelWarn: // -127
+		return str("ERROR", l-LevelError) // can be negative up to LevelQuiet+1
+	case l < LevelNotice:
 		return str("WARN", l-LevelWarn)
+	case l < LevelInfo:
+		return str("NOTICE", l)
+	case l < LevelDebug:
+		return str("INFO", l-LevelInfo)
+	case l < LevelAlways:
+		return str("DEBUG", l-LevelDebug)
 	default:
-		return str("ERROR", l-LevelError)
+		return "LOG"
 	}
 }
 

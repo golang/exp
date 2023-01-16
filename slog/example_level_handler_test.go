@@ -30,7 +30,7 @@ func NewLevelHandler(level slog.Leveler, h slog.Handler) *LevelHandler {
 // Enabled implements Handler.Enabled by reporting whether
 // level is at least as large as h's level.
 func (h *LevelHandler) Enabled(level slog.Level) bool {
-	return level >= h.level.Level()
+	return level <= h.level.Level()
 }
 
 // Handle implements Handler.Handle.

@@ -148,7 +148,7 @@ func TestTextHandlerPreformatted(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.TrimSuffix(buf.String(), "\n")
-	want := `level=INFO msg=m dur=1m0s b=true a=1`
+	want := `level=NOTICE msg=m dur=1m0s b=true a=1`
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}

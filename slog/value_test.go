@@ -110,13 +110,13 @@ func TestAnyLevelAlloc(t *testing.T) {
 	// Because typical Levels are small integers,
 	// they are zero-alloc.
 	var a Value
-	x := LevelDebug + 100
+	x := LevelDebug + 10
 	wantAllocs(t, 0, func() { a = AnyValue(x) })
 	_ = a
 }
 
 func TestAnyLevel(t *testing.T) {
-	x := LevelDebug + 100
+	x := LevelDebug + 10
 	v := AnyValue(x)
 	vv := v.Any()
 	if _, ok := vv.(Level); !ok {

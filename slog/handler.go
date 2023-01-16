@@ -77,7 +77,7 @@ func newDefaultHandler(output func(int, string) error) *defaultHandler {
 }
 
 func (*defaultHandler) Enabled(l Level) bool {
-	return l >= LevelInfo
+	return l <= LevelNotice
 }
 
 // Collect the level, attributes and message in a string and
@@ -195,11 +195,12 @@ func (h *commonHandler) clone() *commonHandler {
 // Enabled reports whether l is greater than or equal to the
 // minimum level.
 func (h *commonHandler) enabled(l Level) bool {
-	minLevel := LevelInfo
+	minLevel := LevelNotice
 	if h.opts.Level != nil {
 		minLevel = h.opts.Level.Level()
 	}
-	return l >= minLevel
+
+	return l <= minLevel
 }
 
 func (h *commonHandler) withAttrs(as []Attr) *commonHandler {

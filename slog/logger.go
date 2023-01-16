@@ -45,7 +45,7 @@ type handlerWriter struct {
 }
 
 func (w *handlerWriter) Write(buf []byte) (int, error) {
-	if !w.h.Enabled(LevelInfo) {
+	if !w.h.Enabled(LevelNotice) {
 		return 0, nil
 	}
 	var depth int
@@ -57,7 +57,7 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 	if len(buf) > 0 && buf[len(buf)-1] == '\n' {
 		buf = buf[:len(buf)-1]
 	}
-	r := NewRecord(time.Now(), LevelInfo, string(buf), depth, nil)
+	r := NewRecord(time.Now(), LevelNotice, string(buf), depth, nil)
 	return origLen, w.h.Handle(r)
 }
 
@@ -191,6 +191,11 @@ func (l *Logger) Info(msg string, args ...any) {
 	l.LogDepth(1, LevelInfo, msg, args...)
 }
 
+// Notice logs at LevelNotice.
+func (l *Logger) Notice(msg string, args ...any) {
+	l.LogDepth(1, LevelNotice, msg, args...)
+}
+
 // Warn logs at LevelWarn.
 func (l *Logger) Warn(msg string, args ...any) {
 	l.LogDepth(1, LevelWarn, msg, args...)
@@ -206,6 +211,11 @@ func (l *Logger) Error(msg string, err error, args ...any) {
 // Debug calls Logger.Debug on the default logger.
 func Debug(msg string, args ...any) {
 	Default().LogDepth(1, LevelDebug, msg, args...)
+}
+
+// Notice calls Logger.Notice on the default logger.
+func Notice(msg string, args ...any) {
+	Default().LogDepth(1, LevelNotice, msg, args...)
 }
 
 // Info calls Logger.Info on the default logger.

@@ -12,10 +12,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-func Infof(format string, args ...any) {
-	// Use LogDepth to adjust source line information to point to the caller of Infof.
+func Noticef(format string, args ...any) {
+	// Use LogDepth to adjust source line information to point to the caller of Noticef.
 	// The 1 passed to LogDepth refers to the caller of LogDepth, namely this function.
-	slog.Default().LogDepth(1, slog.LevelInfo, fmt.Sprintf(format, args...))
+	slog.Default().LogDepth(1, slog.LevelNotice, fmt.Sprintf(format, args...))
 }
 
 func ExampleLogger_LogDepth() {
@@ -34,8 +34,8 @@ func ExampleLogger_LogDepth() {
 	}
 	logger := slog.New(slog.HandlerOptions{AddSource: true, ReplaceAttr: replace}.NewTextHandler(os.Stdout))
 	slog.SetDefault(logger)
-	Infof("message, %s", "formatted")
+	Noticef("message, %s", "formatted")
 
 	// Output:
-	// level=INFO source=example_depth_test.go:37 msg="message, formatted"
+	// level=NOTICE source=example_depth_test.go:37 msg="message, formatted"
 }

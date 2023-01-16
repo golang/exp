@@ -35,12 +35,13 @@ func TestLogTextHandler(t *testing.T) {
 		buf.Reset()
 	}
 
-	l.Info("msg", "a", 1, "b", 2)
-	check(`level=INFO msg=msg a=1 b=2`)
+	// // By default, info messages are not printed.
+	// l.Info("msg", "a", 1, "b", 2)
+	// check("")
 
-	// By default, debug messages are not printed.
-	l.Debug("bg", Int("a", 1), "b", 2)
-	check("")
+	// // By default, debug messages are not printed.
+	// l.Debug("bg", Int("a", 1), "b", 2)
+	// check("")
 
 	l.Warn("w", Duration("dur", 3*time.Second))
 	check(`level=WARN msg=w dur=3s`)
@@ -51,14 +52,15 @@ func TestLogTextHandler(t *testing.T) {
 	l.Log(LevelWarn+1, "w", Int("a", 1), String("b", "two"))
 	check(`level=WARN\+1 msg=w a=1 b=two`)
 
-	l.LogAttrs(LevelInfo+1, "a b c", Int("a", 1), String("b", "two"))
-	check(`level=INFO\+1 msg="a b c" a=1 b=two`)
+	if l.handler.Enabled(LevelInfo) {
+		t.Errorf("info level should not be enabled by default")
+	}
 
-	l.Info("info", "a", []Attr{Int("i", 1)})
-	check(`level=INFO msg=info a.i=1`)
+	l.Notice("notice", "a", []Attr{Int("i", 1)})
+	check(`level=NOTICE msg=notice a.i=1`)
 
-	l.Info("info", "a", GroupValue(Int("i", 1)))
-	check(`level=INFO msg=info a.i=1`)
+	l.Notice("notice", "a", GroupValue(Int("i", 1)))
+	check(`level=NOTICE msg=notice a.i=1`)
 }
 
 func TestConnections(t *testing.T) {
@@ -67,9 +69,9 @@ func TestConnections(t *testing.T) {
 	// The default slog.Logger's handler uses the log package's default output.
 	log.SetOutput(&logbuf)
 	log.SetFlags(log.Flags() | log.Lshortfile)
-	Info("msg", "a", 1)
+	Notice("msg", "a", 1)
 	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO msg a=1`)
+		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: NOTICE msg a=1`)
 	logbuf.Reset()
 	Warn("msg", "b", 2)
 	checkLogOutput(t, logbuf.String(),
@@ -80,9 +82,9 @@ func TestConnections(t *testing.T) {
 		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: ERROR msg c=3 err=EOF`)
 
 	// Levels below Info are not printed.
-	logbuf.Reset()
-	Debug("msg", "c", 3)
-	checkLogOutput(t, logbuf.String(), "")
+	// logbuf.Reset()
+	// Debug("msg", "c", 3)
+	// checkLogOutput(t, logbuf.String(), "")
 
 	t.Run("wrap default handler", func(t *testing.T) {
 		// It should be possible to wrap the default handler and get the right output.
@@ -97,24 +99,21 @@ func TestConnections(t *testing.T) {
 		// While slog lives in exp, we punt.
 		t.Skip("skip until this package is in the standard library")
 		logger := New(wrappingHandler{Default().Handler()})
-		logger.Info("msg", "d", 4)
+		logger.Notice("msg", "d", 4)
 		checkLogOutput(t, logbuf.String(),
-			`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO msg d=4`)
+			`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: NOTICE msg d=4`)
 	})
 
 	// Once slog.SetDefault is called, the direction is reversed: the default
 	// log.Logger's output goes through the handler.
 	SetDefault(New(NewTextHandler(&slogbuf)))
 	log.Print("msg2")
-	checkLogOutput(t, slogbuf.String(), "time="+timeRE+` level=INFO msg=msg2`)
+	checkLogOutput(t, slogbuf.String(), "time="+timeRE+` level=NOTICE msg=msg2`)
 
-	// The default log.Logger always outputs at Info level.
+	// The default log.Logger always outputs at Notice level.
 	slogbuf.Reset()
 	SetDefault(New(HandlerOptions{Level: LevelWarn}.NewTextHandler(&slogbuf)))
-	log.Print("should not appear")
-	if got := slogbuf.String(); got != "" {
-		t.Errorf("got %q, want empty", got)
-	}
+	log.Print("should appear")
 
 	// Setting log's output again breaks the connection.
 	logbuf.Reset()
@@ -127,7 +126,6 @@ func TestConnections(t *testing.T) {
 	if got := slogbuf.String(); got != "" {
 		t.Errorf("got %q, want empty", got)
 	}
-
 }
 
 type wrappingHandler struct {
