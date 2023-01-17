@@ -64,20 +64,26 @@ func TestLogTextHandler(t *testing.T) {
 func TestConnections(t *testing.T) {
 	var logbuf, slogbuf bytes.Buffer
 
+	// Revert any changes to the default logger. This is important because other
+	// tests might change the default logger using SetDefault. Also ensure we
+	// restore the default logger at the end of the test.
+	currentLogger := Default()
+	SetDefault(New(newDefaultHandler(log.Output)))
+	t.Cleanup(func() {
+		SetDefault(currentLogger)
+	})
+
 	// The default slog.Logger's handler uses the log package's default output.
 	log.SetOutput(&logbuf)
-	log.SetFlags(log.Flags() | log.Lshortfile)
+	log.SetFlags(log.Lshortfile &^ log.LstdFlags)
 	Info("msg", "a", 1)
-	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO msg a=1`)
+	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: INFO msg a=1`)
 	logbuf.Reset()
 	Warn("msg", "b", 2)
-	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: WARN msg b=2`)
+	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: WARN msg b=2`)
 	logbuf.Reset()
 	Error("msg", io.EOF, "c", 3)
-	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: ERROR msg c=3 err=EOF`)
+	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: ERROR msg c=3 err=EOF`)
 
 	// Levels below Info are not printed.
 	logbuf.Reset()
@@ -98,8 +104,7 @@ func TestConnections(t *testing.T) {
 		t.Skip("skip until this package is in the standard library")
 		logger := New(wrappingHandler{Default().Handler()})
 		logger.Info("msg", "d", 4)
-		checkLogOutput(t, logbuf.String(),
-			`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} logger_test.go:\d\d: INFO msg d=4`)
+		checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: INFO msg d=4`)
 	})
 
 	// Once slog.SetDefault is called, the direction is reversed: the default
@@ -120,14 +125,12 @@ func TestConnections(t *testing.T) {
 	logbuf.Reset()
 	slogbuf.Reset()
 	log.SetOutput(&logbuf)
-	log.SetFlags(log.LstdFlags)
+	log.SetFlags(log.Lshortfile &^ log.LstdFlags)
 	log.Print("msg3")
-	checkLogOutput(t, logbuf.String(),
-		`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} msg3`)
+	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: msg3`)
 	if got := slogbuf.String(); got != "" {
 		t.Errorf("got %q, want empty", got)
 	}
-
 }
 
 type wrappingHandler struct {
