@@ -133,7 +133,7 @@ func TestSpecialValueTypes(t *testing.T) {
 		}
 	})
 	t.Run("Kind", func(t *testing.T) {
-		want := BoolKind
+		want := KindBool
 		got := AnyValue(want).Any()
 		if got != want {
 			t.Errorf("got %v, want %v", got, want)
@@ -168,7 +168,7 @@ func TestLogValue(t *testing.T) {
 	want := "replaced"
 	r := &replace{StringValue(want)}
 	v := AnyValue(r)
-	if g, w := v.Kind(), LogValuerKind; g != w {
+	if g, w := v.Kind(), KindLogValuer; g != w {
 		t.Errorf("got %s, want %s", g, w)
 	}
 	got := v.LogValuer().LogValue().Any()

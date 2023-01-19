@@ -100,13 +100,13 @@ func appendJSONTime(s *handleState, t time.Time) {
 
 func appendJSONValue(s *handleState, v Value) error {
 	switch v.Kind() {
-	case StringKind:
+	case KindString:
 		s.appendString(v.str())
-	case Int64Kind:
+	case KindInt64:
 		*s.buf = strconv.AppendInt(*s.buf, v.Int64(), 10)
-	case Uint64Kind:
+	case KindUint64:
 		*s.buf = strconv.AppendUint(*s.buf, v.Uint64(), 10)
-	case Float64Kind:
+	case KindFloat64:
 		f := v.Float64()
 		// json.Marshal fails on special floats, so handle them here.
 		switch {
@@ -124,14 +124,14 @@ func appendJSONValue(s *handleState, v Value) error {
 				return err
 			}
 		}
-	case BoolKind:
+	case KindBool:
 		*s.buf = strconv.AppendBool(*s.buf, v.Bool())
-	case DurationKind:
+	case KindDuration:
 		// Do what json.Marshal does.
 		*s.buf = strconv.AppendInt(*s.buf, int64(v.Duration()), 10)
-	case TimeKind:
+	case KindTime:
 		s.appendTime(v.Time())
-	case AnyKind:
+	case KindAny:
 		a := v.Any()
 		if err, ok := a.(error); ok {
 			s.appendString(err.Error())

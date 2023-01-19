@@ -131,7 +131,7 @@ func BenchmarkJSONHandler(b *testing.B) {
 		{"time format", HandlerOptions{
 			ReplaceAttr: func(_ []string, a Attr) Attr {
 				v := a.Value
-				if v.Kind() == TimeKind {
+				if v.Kind() == KindTime {
 					return String(a.Key, v.Time().Format(rfc3339Millis))
 				}
 				if a.Key == "level" {
@@ -143,7 +143,7 @@ func BenchmarkJSONHandler(b *testing.B) {
 		{"time unix", HandlerOptions{
 			ReplaceAttr: func(_ []string, a Attr) Attr {
 				v := a.Value
-				if v.Kind() == TimeKind {
+				if v.Kind() == KindTime {
 					return Int64(a.Key, v.Time().UnixNano())
 				}
 				if a.Key == "level" {

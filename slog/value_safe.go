@@ -13,9 +13,9 @@ package slog
 // The zero Value corresponds to nil.
 type Value struct {
 	// num holds the value for Kinds Int64, Uint64, Float64, Bool and Duration,
-	// and nanoseconds since the epoch for TimeKind.
+	// and nanoseconds since the epoch for KindTime.
 	num uint64
-	// s holds the value for StringKind.
+	// s holds the value for KindString.
 	s string
 	// If any is of type Kind, then the value is in num or s as described above.
 	// If any is of type *time.Location, then the Kind is Time and time.Time
@@ -32,15 +32,15 @@ func (v Value) Kind() Kind {
 	case Kind:
 		return k
 	case timeLocation:
-		return TimeKind
+		return KindTime
 	case []Attr:
-		return GroupKind
+		return KindGroup
 	case LogValuer:
-		return LogValuerKind
+		return KindLogValuer
 	case kind: // a kind is just a wrapper for a Kind
-		return AnyKind
+		return KindAny
 	default:
-		return AnyKind
+		return KindAny
 	}
 }
 
@@ -50,14 +50,14 @@ func (v Value) str() string {
 
 // String returns a new Value for a string.
 func StringValue(value string) Value {
-	return Value{s: value, any: StringKind}
+	return Value{s: value, any: KindString}
 }
 
 // String returns Value's value as a string, formatted like fmt.Sprint. Unlike
 // the methods Int64, Float64, and so on, which panic if v is of the
 // wrong kind, String never panics.
 func (v Value) String() string {
-	if v.Kind() == StringKind {
+	if v.Kind() == KindString {
 		return v.str()
 	}
 	var buf []byte

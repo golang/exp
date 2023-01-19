@@ -91,11 +91,11 @@ func (h *TextHandler) Handle(r Record) error {
 
 func appendTextValue(s *handleState, v Value) error {
 	switch v.Kind() {
-	case StringKind:
+	case KindString:
 		s.appendString(v.str())
-	case TimeKind:
+	case KindTime:
 		s.appendTime(v.time())
-	case AnyKind:
+	case KindAny:
 		if tm, ok := v.any.(encoding.TextMarshaler); ok {
 			data, err := tm.MarshalText()
 			if err != nil {

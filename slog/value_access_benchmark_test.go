@@ -39,19 +39,19 @@ func BenchmarkDispatch(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			for _, v := range vs {
 				switch v.Kind() {
-				case StringKind:
+				case KindString:
 					s = v.String()
-				case Int64Kind:
+				case KindInt64:
 					ii = v.Int64()
-				case Uint64Kind:
+				case KindUint64:
 					u = v.Uint64()
-				case Float64Kind:
+				case KindFloat64:
 					f = v.Float64()
-				case BoolKind:
+				case KindBool:
 					bb = v.Bool()
-				case DurationKind:
+				case KindDuration:
 					d = v.Duration()
-				case AnyKind:
+				case KindAny:
 					a = v.Any()
 				default:
 					panic("bad kind")
@@ -132,49 +132,49 @@ func (v *setVisitor) Any(x any)                { v.a = x }
 // the kind again. See BenchmarkDispatch above.
 
 func (a Value) AsString() (string, bool) {
-	if a.Kind() == StringKind {
+	if a.Kind() == KindString {
 		return a.str(), true
 	}
 	return "", false
 }
 
 func (a Value) AsInt64() (int64, bool) {
-	if a.Kind() == Int64Kind {
+	if a.Kind() == KindInt64 {
 		return int64(a.num), true
 	}
 	return 0, false
 }
 
 func (a Value) AsUint64() (uint64, bool) {
-	if a.Kind() == Uint64Kind {
+	if a.Kind() == KindUint64 {
 		return a.num, true
 	}
 	return 0, false
 }
 
 func (a Value) AsFloat64() (float64, bool) {
-	if a.Kind() == Float64Kind {
+	if a.Kind() == KindFloat64 {
 		return a.float(), true
 	}
 	return 0, false
 }
 
 func (a Value) AsBool() (bool, bool) {
-	if a.Kind() == BoolKind {
+	if a.Kind() == KindBool {
 		return a.bool(), true
 	}
 	return false, false
 }
 
 func (a Value) AsDuration() (time.Duration, bool) {
-	if a.Kind() == DurationKind {
+	if a.Kind() == KindDuration {
 		return a.duration(), true
 	}
 	return 0, false
 }
 
 func (a Value) AsAny() (any, bool) {
-	if a.Kind() == AnyKind {
+	if a.Kind() == KindAny {
 		return a.any, true
 	}
 	return nil, false
@@ -195,19 +195,19 @@ type Visitor interface {
 
 func (a Value) Visit(v Visitor) {
 	switch a.Kind() {
-	case StringKind:
+	case KindString:
 		v.String(a.str())
-	case Int64Kind:
+	case KindInt64:
 		v.Int64(int64(a.num))
-	case Uint64Kind:
+	case KindUint64:
 		v.Uint64(a.num)
-	case BoolKind:
+	case KindBool:
 		v.Bool(a.bool())
-	case Float64Kind:
+	case KindFloat64:
 		v.Float64(a.float())
-	case DurationKind:
+	case KindDuration:
 		v.Duration(a.duration())
-	case AnyKind:
+	case KindAny:
 		v.Any(a.any)
 	default:
 		panic("bad kind")

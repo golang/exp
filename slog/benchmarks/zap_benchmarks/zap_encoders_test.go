@@ -41,15 +41,15 @@ func attrsToFields(attrs []slog.Attr) []zap.Field {
 		k := a.Key
 		v := a.Value
 		switch v.Kind() {
-		case slog.StringKind:
+		case slog.KindString:
 			f = zap.String(k, v.String())
-		case slog.Int64Kind:
+		case slog.KindInt64:
 			f = zap.Int64(k, v.Int64())
-		case slog.DurationKind:
+		case slog.KindDuration:
 			f = zap.Duration(k, v.Duration())
-		case slog.TimeKind:
+		case slog.KindTime:
 			f = zap.Time(k, v.Time())
-		case slog.AnyKind:
+		case slog.KindAny:
 			f = zap.Any(k, v)
 		default:
 			panic(fmt.Sprintf("unknown kind %d", v.Kind()))

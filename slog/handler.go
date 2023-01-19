@@ -424,7 +424,7 @@ func (s *handleState) appendAttr(a Attr) {
 		return
 	}
 	v := a.Value.Resolve()
-	if rep := s.h.opts.ReplaceAttr; rep != nil && v.Kind() != GroupKind {
+	if rep := s.h.opts.ReplaceAttr; rep != nil && v.Kind() != KindGroup {
 		var gs []string
 		if s.groups != nil {
 			gs = *s.groups
@@ -435,7 +435,7 @@ func (s *handleState) appendAttr(a Attr) {
 		}
 		v = a.Value.Resolve()
 	}
-	if v.Kind() == GroupKind {
+	if v.Kind() == KindGroup {
 		s.openGroup(a.Key)
 		for _, aa := range v.Group() {
 			s.appendAttr(aa)

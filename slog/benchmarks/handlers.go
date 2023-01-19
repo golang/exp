@@ -61,21 +61,21 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 func (h *fastTextHandler) appendValue(buf *buffer.Buffer, v slog.Value) {
 	v = v.Resolve()
 	switch v.Kind() {
-	case slog.StringKind:
+	case slog.KindString:
 		buf.WriteString(v.String())
-	case slog.Int64Kind:
+	case slog.KindInt64:
 		*buf = strconv.AppendInt(*buf, v.Int64(), 10)
-	case slog.Uint64Kind:
+	case slog.KindUint64:
 		*buf = strconv.AppendUint(*buf, v.Uint64(), 10)
-	case slog.Float64Kind:
+	case slog.KindFloat64:
 		*buf = strconv.AppendFloat(*buf, v.Float64(), 'g', -1, 64)
-	case slog.BoolKind:
+	case slog.KindBool:
 		*buf = strconv.AppendBool(*buf, v.Bool())
-	case slog.DurationKind:
+	case slog.KindDuration:
 		*buf = strconv.AppendInt(*buf, v.Duration().Nanoseconds(), 10)
-	case slog.TimeKind:
+	case slog.KindTime:
 		h.appendTime(buf, v.Time())
-	case slog.AnyKind:
+	case slog.KindAny:
 		a := v.Any()
 		switch a := a.(type) {
 		case error:

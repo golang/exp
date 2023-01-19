@@ -19,24 +19,20 @@ import (
 // Kind is the kind of a Value.
 type Kind int
 
-// Unexported version of Kind, just so we can store Kinds in Values.
-// (No user-provided value has this type.)
-type kind Kind
-
 // The following list is sorted alphabetically, but it's also important that
-// AnyKind is 0 so that a zero Value represents nil.
+// KindAny is 0 so that a zero Value represents nil.
 
 const (
-	AnyKind Kind = iota
-	BoolKind
-	DurationKind
-	Float64Kind
-	Int64Kind
-	StringKind
-	TimeKind
-	Uint64Kind
-	GroupKind
-	LogValuerKind
+	KindAny Kind = iota
+	KindBool
+	KindDuration
+	KindFloat64
+	KindInt64
+	KindString
+	KindTime
+	KindUint64
+	KindGroup
+	KindLogValuer
 )
 
 var kindStrings = []string{
@@ -48,7 +44,7 @@ var kindStrings = []string{
 	"String",
 	"Time",
 	"Uint64",
-	"GroupKind",
+	"Group",
 	"LogValuer",
 }
 
@@ -59,6 +55,10 @@ func (k Kind) String() string {
 	return "<unknown slog.Kind>"
 }
 
+// Unexported version of Kind, just so we can store Kinds in Values.
+// (No user-provided value has this type.)
+type kind Kind
+
 //////////////// Constructors
 
 // IntValue returns a Value for an int.
@@ -68,17 +68,17 @@ func IntValue(v int) Value {
 
 // Int64Value returns a Value for an int64.
 func Int64Value(v int64) Value {
-	return Value{num: uint64(v), any: Int64Kind}
+	return Value{num: uint64(v), any: KindInt64}
 }
 
 // Uint64Value returns a Value for a uint64.
 func Uint64Value(v uint64) Value {
-	return Value{num: v, any: Uint64Kind}
+	return Value{num: v, any: KindUint64}
 }
 
 // Float64Value returns a Value for a floating-point number.
 func Float64Value(v float64) Value {
-	return Value{num: math.Float64bits(v), any: Float64Kind}
+	return Value{num: math.Float64bits(v), any: KindFloat64}
 }
 
 // BoolValue returns a Value for a bool.
@@ -87,7 +87,7 @@ func BoolValue(v bool) Value {
 	if v {
 		u = 1
 	}
-	return Value{num: u, any: BoolKind}
+	return Value{num: u, any: KindBool}
 }
 
 // Unexported version of *time.Location, just so we can store *time.Locations in
@@ -102,7 +102,7 @@ func TimeValue(v time.Time) Value {
 
 // DurationValue returns a Value for a time.Duration.
 func DurationValue(v time.Duration) Value {
-	return Value{num: uint64(v.Nanoseconds()), any: DurationKind}
+	return Value{num: uint64(v.Nanoseconds()), any: KindDuration}
 }
 
 // GroupValue returns a new Value for a list of Attrs.
@@ -122,10 +122,10 @@ func GroupValue(as ...Attr) Value {
 // original numeric type is not preserved.
 //
 // Given a time.Time or time.Duration value, AnyValue returns a Value of kind
-// TimeKind or DurationKind. The monotonic time is not preserved.
+// KindTime or KindDuration. The monotonic time is not preserved.
 //
 // For nil, or values of all other types, including named types whose
-// underlying type is numeric, AnyValue returns a value of kind AnyKind.
+// underlying type is numeric, AnyValue returns a value of kind KindAny.
 func AnyValue(v any) Value {
 	switch v := v.(type) {
 	case string:
@@ -178,24 +178,24 @@ func AnyValue(v any) Value {
 // Any returns v's value as an any.
 func (v Value) Any() any {
 	switch v.Kind() {
-	case AnyKind, GroupKind, LogValuerKind:
+	case KindAny, KindGroup, KindLogValuer:
 		if k, ok := v.any.(kind); ok {
 			return Kind(k)
 		}
 		return v.any
-	case Int64Kind:
+	case KindInt64:
 		return int64(v.num)
-	case Uint64Kind:
+	case KindUint64:
 		return v.num
-	case Float64Kind:
+	case KindFloat64:
 		return v.float()
-	case StringKind:
+	case KindString:
 		return v.str()
-	case BoolKind:
+	case KindBool:
 		return v.bool()
-	case DurationKind:
+	case KindDuration:
 		return v.duration()
-	case TimeKind:
+	case KindTime:
 		return v.time()
 	default:
 		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
@@ -205,7 +205,7 @@ func (v Value) Any() any {
 // Int64 returns v's value as an int64. It panics
 // if v is not a signed integer.
 func (v Value) Int64() int64 {
-	if g, w := v.Kind(), Int64Kind; g != w {
+	if g, w := v.Kind(), KindInt64; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return int64(v.num)
@@ -214,7 +214,7 @@ func (v Value) Int64() int64 {
 // Uint64 returns v's value as a uint64. It panics
 // if v is not an unsigned integer.
 func (v Value) Uint64() uint64 {
-	if g, w := v.Kind(), Uint64Kind; g != w {
+	if g, w := v.Kind(), KindUint64; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return v.num
@@ -223,7 +223,7 @@ func (v Value) Uint64() uint64 {
 // Bool returns v's value as a bool. It panics
 // if v is not a bool.
 func (v Value) Bool() bool {
-	if g, w := v.Kind(), BoolKind; g != w {
+	if g, w := v.Kind(), KindBool; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return v.bool()
@@ -236,7 +236,7 @@ func (a Value) bool() bool {
 // Duration returns v's value as a time.Duration. It panics
 // if v is not a time.Duration.
 func (a Value) Duration() time.Duration {
-	if g, w := a.Kind(), DurationKind; g != w {
+	if g, w := a.Kind(), KindDuration; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 
@@ -250,7 +250,7 @@ func (a Value) duration() time.Duration {
 // Float64 returns v's value as a float64. It panics
 // if v is not a float64.
 func (v Value) Float64() float64 {
-	if g, w := v.Kind(), Float64Kind; g != w {
+	if g, w := v.Kind(), KindFloat64; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 
@@ -264,7 +264,7 @@ func (a Value) float() float64 {
 // Time returns v's value as a time.Time. It panics
 // if v is not a time.Time.
 func (v Value) Time() time.Time {
-	if g, w := v.Kind(), TimeKind; g != w {
+	if g, w := v.Kind(), KindTime; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return v.time()
@@ -281,7 +281,7 @@ func (v Value) LogValuer() LogValuer {
 }
 
 // Group returns v's value as a []Attr.
-// It panics if v's Kind is not GroupKind.
+// It panics if v's Kind is not KindGroup.
 func (v Value) Group() []Attr {
 	return v.group()
 }
@@ -296,17 +296,17 @@ func (v Value) Equal(w Value) bool {
 		return false
 	}
 	switch k1 {
-	case Int64Kind, Uint64Kind, BoolKind, DurationKind:
+	case KindInt64, KindUint64, KindBool, KindDuration:
 		return v.num == w.num
-	case StringKind:
+	case KindString:
 		return v.str() == w.str()
-	case Float64Kind:
+	case KindFloat64:
 		return v.float() == w.float()
-	case TimeKind:
+	case KindTime:
 		return v.time().Equal(w.time())
-	case AnyKind, LogValuerKind:
+	case KindAny, KindLogValuer:
 		return v.any == w.any // may panic if non-comparable
-	case GroupKind:
+	case KindGroup:
 		return slices.EqualFunc(v.uncheckedGroup(), w.uncheckedGroup(), Attr.Equal)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", k1))
@@ -317,21 +317,21 @@ func (v Value) Equal(w Value) bool {
 // v is formatted as with fmt.Sprint.
 func (v Value) append(dst []byte) []byte {
 	switch v.Kind() {
-	case StringKind:
+	case KindString:
 		return append(dst, v.str()...)
-	case Int64Kind:
+	case KindInt64:
 		return strconv.AppendInt(dst, int64(v.num), 10)
-	case Uint64Kind:
+	case KindUint64:
 		return strconv.AppendUint(dst, v.num, 10)
-	case Float64Kind:
+	case KindFloat64:
 		return strconv.AppendFloat(dst, v.float(), 'g', -1, 64)
-	case BoolKind:
+	case KindBool:
 		return strconv.AppendBool(dst, v.bool())
-	case DurationKind:
+	case KindDuration:
 		return append(dst, v.duration().String()...)
-	case TimeKind:
+	case KindTime:
 		return append(dst, v.time().String()...)
-	case AnyKind, GroupKind, LogValuerKind:
+	case KindAny, KindGroup, KindLogValuer:
 		return append(dst, fmt.Sprint(v.any)...)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
@@ -352,11 +352,11 @@ const maxLogValues = 100
 // and returns the result.
 // If the number of LogValue calls exceeds a threshold, a Value containing an
 // error is returned.
-// Resolve's return value is guaranteed not to be of Kind LogValuerKind.
+// Resolve's return value is guaranteed not to be of Kind KindLogValuer.
 func (v Value) Resolve() Value {
 	orig := v
 	for i := 0; i < maxLogValues; i++ {
-		if v.Kind() != LogValuerKind {
+		if v.Kind() != KindLogValuer {
 			return v
 		}
 		v = v.LogValuer().LogValue()
