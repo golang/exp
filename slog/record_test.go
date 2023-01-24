@@ -38,8 +38,12 @@ func TestRecordSourceLine(t *testing.T) {
 		{1, "record_test.go", true}, // 1: caller of NewRecord
 		{2, "testing.go", true},
 	} {
-		r := NewRecord(time.Time{}, 0, "", test.depth, nil)
-		gotFile, gotLine := r.SourceLine()
+		var pc uintptr
+		if test.depth > 0 {
+			pc = callerPC(test.depth + 1)
+		}
+		r := NewRecord(time.Time{}, 0, "", pc, nil)
+		gotFile, gotLine := sourceLine(r)
 		if i := strings.LastIndexByte(gotFile, '/'); i >= 0 {
 			gotFile = gotFile[i+1:]
 		}
@@ -115,7 +119,7 @@ func BenchmarkPC(b *testing.B) {
 			b.ReportAllocs()
 			var x uintptr
 			for i := 0; i < b.N; i++ {
-				x = pc(depth)
+				x = callerPC(depth)
 			}
 			_ = x
 		})
@@ -126,14 +130,14 @@ func BenchmarkSourceLine(b *testing.B) {
 	r := NewRecord(time.Now(), LevelInfo, "", 5, nil)
 	b.Run("alone", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			file, line := r.SourceLine()
+			file, line := sourceLine(r)
 			_ = file
 			_ = line
 		}
 	})
 	b.Run("stringifying", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			file, line := r.SourceLine()
+			file, line := sourceLine(r)
 			buf := buffer.New()
 			buf.WriteString(file)
 			buf.WriteByte(':')
@@ -157,16 +161,4 @@ func BenchmarkRecord(b *testing.B) {
 		r.Attrs(func(b Attr) { a = b })
 	}
 	_ = a
-}
-
-func BenchmarkNewRecordCallDepth(b *testing.B) {
-	for d := 0; d < 5; d++ {
-		b.Run(strconv.Itoa(d), func(b *testing.B) {
-			var x Record
-			for i := 0; i < b.N; i++ {
-				x = NewRecord(time.Time{}, LevelInfo, "", d, nil)
-			}
-			_ = x
-		})
-	}
 }

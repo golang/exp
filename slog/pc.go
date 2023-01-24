@@ -53,8 +53,8 @@ func (l *Logger) logDepthErr(err error, calldepth int, level Level, msg string, 
 	l.logPC(err, pcs[0], level, msg, args...)
 }
 
-// pc returns the program counter at the given stack depth.
-func pc(depth int) uintptr {
+// callerPC returns the program counter at the given stack depth.
+func callerPC(depth int) uintptr {
 	var pcs [1]uintptr
 	runtime.Callers(depth, pcs[:])
 	return pcs[0]

@@ -48,16 +48,17 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 	if !w.h.Enabled(LevelInfo) {
 		return 0, nil
 	}
-	var depth int
+	var pc uintptr
 	if w.flags&(log.Lshortfile|log.Llongfile) != 0 {
-		depth = 2
+		pc = callerPC(5)
 	}
+
 	// Remove final newline.
 	origLen := len(buf) // Report that the entire buf was written.
 	if len(buf) > 0 && buf[len(buf)-1] == '\n' {
 		buf = buf[:len(buf)-1]
 	}
-	r := NewRecord(time.Now(), LevelInfo, string(buf), depth, nil)
+	r := NewRecord(time.Now(), LevelInfo, string(buf), pc, nil)
 	return origLen, w.h.Handle(r)
 }
 
@@ -172,7 +173,7 @@ func (l *Logger) makeRecord(msg string, level Level, pc uintptr) Record {
 		Message: msg,
 		Level:   level,
 		Context: l.ctx,
-		pc:      pc,
+		PC:      pc,
 	}
 }
 

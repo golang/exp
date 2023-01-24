@@ -104,9 +104,9 @@ func TestConnections(t *testing.T) {
 
 	// Once slog.SetDefault is called, the direction is reversed: the default
 	// log.Logger's output goes through the handler.
-	SetDefault(New(NewTextHandler(&slogbuf)))
+	SetDefault(New(HandlerOptions{AddSource: true}.NewTextHandler(&slogbuf)))
 	log.Print("msg2")
-	checkLogOutput(t, slogbuf.String(), "time="+timeRE+` level=INFO msg=msg2`)
+	checkLogOutput(t, slogbuf.String(), "time="+timeRE+` level=INFO source=.*logger_test.go:\d{3} msg=msg2`)
 
 	// The default log.Logger always outputs at Info level.
 	slogbuf.Reset()
@@ -155,6 +155,11 @@ func TestAttrs(t *testing.T) {
 	check(attrsSlice(h.r), Int("c", 3))
 }
 
+func sourceLine(r Record) (string, int) {
+	f := r.frame()
+	return f.File, f.Line
+}
+
 func TestCallDepth(t *testing.T) {
 	h := &captureHandler{}
 	var startLine int
@@ -163,7 +168,7 @@ func TestCallDepth(t *testing.T) {
 		t.Helper()
 		const wantFile = "logger_test.go"
 		wantLine := startLine + count*2
-		gotFile, gotLine := h.r.SourceLine()
+		gotFile, gotLine := sourceLine(h.r)
 		gotFile = filepath.Base(gotFile)
 		if gotFile != wantFile || gotLine != wantLine {
 			t.Errorf("got (%s, %d), want (%s, %d)", gotFile, gotLine, wantFile, wantLine)
@@ -175,7 +180,7 @@ func TestCallDepth(t *testing.T) {
 
 	// Calls to check must be one line apart.
 	// Determine line where calls start.
-	f, _ := runtime.CallersFrames([]uintptr{pc(2)}).Next()
+	f, _ := runtime.CallersFrames([]uintptr{callerPC(2)}).Next()
 	startLine = f.Line + 4
 	// Do not change the number of lines between here and the call to check(0).
 

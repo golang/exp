@@ -43,5 +43,5 @@ func (l *Logger) logDepthErr(err error, calldepth int, level Level, msg string, 
 	l.logPC(err, 0, level, msg, args...)
 }
 
-// pc returns 0 to avoid incurring the cost of runtime.Callers.
-func pc(depth int) uintptr { return 0 }
+// callerPC returns 0 to avoid incurring the cost of runtime.Callers.
+func callerPC(depth int) uintptr { return 0 }

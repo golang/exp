@@ -33,9 +33,13 @@ type Record struct {
 	// Canceling the context should not affect record processing.
 	Context context.Context
 
-	// The pc at the time the record was constructed, as determined
-	// by runtime.Callers using the calldepth argument to NewRecord.
-	pc uintptr
+	// The program counter at the time the record was constructed, as determined
+	// by runtime.Callers. If zero, no program counter is available.
+	//
+	// The only valid use for this value is as an argument to
+	// [runtime.CallersFrames]. In particular, it must not be passed to
+	// [runtime.FuncForPC].
+	PC uintptr
 
 	// Allocation optimization: an inline array sized to hold
 	// the majority of log calls (based on examination of open-source
@@ -54,38 +58,26 @@ type Record struct {
 
 // NewRecord creates a Record from the given arguments.
 // Use [Record.AddAttrs] to add attributes to the Record.
-// If calldepth is greater than zero, [Record.SourceLine] will
-// return the file and line number at that depth,
-// where 1 means the caller of NewRecord.
 //
 // NewRecord is intended for logging APIs that want to support a [Handler] as
 // a backend.
-func NewRecord(t time.Time, level Level, msg string, calldepth int, ctx context.Context) Record {
-	var p uintptr
-	if calldepth > 0 {
-		p = pc(calldepth + 2)
-	}
+func NewRecord(t time.Time, level Level, msg string, pc uintptr, ctx context.Context) Record {
 	return Record{
 		Time:    t,
 		Message: msg,
 		Level:   level,
+		PC:      pc,
 		Context: ctx,
-		pc:      p,
 	}
 }
 
-// Context returns the context in the Record.
-// If the Record was created from a Logger,
-// this will be the Logger's context.
-
-// SourceLine returns the file and line of the log event.
+// frame returns the runtime.Frame of the log event.
 // If the Record was created without the necessary information,
-// or if the location is unavailable, it returns ("", 0).
-func (r Record) SourceLine() (file string, line int) {
-	fs := runtime.CallersFrames([]uintptr{r.pc})
-	// TODO: error-checking?
+// or if the location is unavailable, it returns a zero Frame.
+func (r Record) frame() runtime.Frame {
+	fs := runtime.CallersFrames([]uintptr{r.PC})
 	f, _ := fs.Next()
-	return f.File, f.Line
+	return f
 }
 
 // Clone returns a copy of the record with no shared state.

@@ -263,17 +263,17 @@ func (h *commonHandler) handle(r Record) error {
 	}
 	// source
 	if h.opts.AddSource {
-		file, line := r.SourceLine()
-		if file != "" {
+		frame := r.frame()
+		if frame.File != "" {
 			key := SourceKey
 			if rep == nil {
 				state.appendKey(key)
-				state.appendSource(file, line)
+				state.appendSource(frame.File, frame.Line)
 			} else {
 				buf := buffer.New()
-				buf.WriteString(file) // TODO: escape?
+				buf.WriteString(frame.File) // TODO: escape?
 				buf.WriteByte(':')
-				buf.WritePosInt(line)
+				buf.WritePosInt(frame.Line)
 				s := buf.String()
 				buf.Free()
 				state.appendAttr(String(key, s))
