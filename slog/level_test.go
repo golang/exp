@@ -5,6 +5,8 @@
 package slog
 
 import (
+	"flag"
+	"strings"
 	"testing"
 )
 
@@ -46,4 +48,91 @@ func TestLevelVar(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
+}
+
+func TestMarshalJSON(t *testing.T) {
+	want := LevelWarn - 3
+	data, err := want.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Level
+	if err := got.UnmarshalJSON(data); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestMarshalText(t *testing.T) {
+	want := LevelWarn - 3
+	data, err := want.MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Level
+	if err := got.UnmarshalText(data); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestLevelParse(t *testing.T) {
+	for _, test := range []struct {
+		in   string
+		want Level
+	}{
+		{"DEBUG", LevelDebug},
+		{"INFO", LevelInfo},
+		{"WARN", LevelWarn},
+		{"ERROR", LevelError},
+		{"debug", LevelDebug},
+		{"iNfo", LevelInfo},
+		{"INFO+87", LevelInfo + 87},
+		{"Error-18", LevelError - 18},
+		{"Error-8", LevelInfo},
+	} {
+		var got Level
+		if err := got.parse(test.in); err != nil {
+			t.Fatalf("%q: %v", test.in, err)
+		}
+		if got != test.want {
+			t.Errorf("%q: got %s, want %s", test.in, got, test.want)
+		}
+	}
+}
+
+func TestLevelParseError(t *testing.T) {
+	for _, test := range []struct {
+		in   string
+		want string // error string should contain this
+	}{
+		{"", "unknown name"},
+		{"dbg", "unknown name"},
+		{"INFO+", "invalid syntax"},
+		{"INFO-", "invalid syntax"},
+		{"ERROR+23x", "invalid syntax"},
+	} {
+		var l Level
+		err := l.parse(test.in)
+		if err == nil || !strings.Contains(err.Error(), test.want) {
+			t.Errorf("%q: got %v, want string containing %q", test.in, err, test.want)
+		}
+	}
+}
+
+func TestLevelFlag(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	lf := LevelInfo
+	fs.TextVar(&lf, "level", lf, "set level")
+	err := fs.Parse([]string{"-level", "WARN+3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, w := lf, LevelWarn+3; g != w {
+		t.Errorf("got %v, want %v", g, w)
+	}
 }
