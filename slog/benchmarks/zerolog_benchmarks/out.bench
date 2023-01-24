@@ -1,0 +1,26 @@
+goos: linux
+goarch: amd64
+pkg: golang.org/x/exp/slog/benchmarks/zerolog_benchmarks
+cpu: Intel(R) Xeon(R) CPU @ 2.20GHz
+BenchmarkAttrs/fastText_discard/5_args-8  	 6418659	       189.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6533284	       195.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 5889310	       198.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6604699	       186.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6355650	       179.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6616807	       179.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6906835	       183.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6206449	       184.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6946840	       180.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/5_args-8  	 6482282	       193.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4138516	       282.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4230062	       278.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4168550	       287.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4263456	       278.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4329322	       280.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4063077	       288.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4137674	       293.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4281580	       285.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4209427	       300.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/fastText_discard/10_args-8 	 4304002	       282.7 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	golang.org/x/exp/slog/benchmarks/zerolog_benchmarks	29.079s
