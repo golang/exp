@@ -129,8 +129,8 @@ type HandlerOptions struct {
 	// If ReplaceAttr returns an Attr with Key == "", the attribute is discarded.
 	//
 	// The built-in attributes with keys "time", "level", "source", and "msg"
-	// are passed to this function, except that time and level are omitted
-	// if zero, and source is omitted if AddSourceLine is false.
+	// are passed to this function, except that time is omitted
+	// if zero, and source is omitted if AddSource is false.
 	//
 	// The first argument is a list of currently open groups that contain the
 	// Attr. It must not be retained or modified. ReplaceAttr is never called
