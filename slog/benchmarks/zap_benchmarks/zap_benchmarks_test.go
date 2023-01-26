@@ -6,6 +6,7 @@ package zap_benchmarks
 
 import (
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -31,7 +32,18 @@ func BenchmarkAttrs(b *testing.B) {
 				&discarder{},
 				zap.DebugLevel)),
 		},
-	} {
+		{
+			"JSON discard",
+			zap.New(zapcore.NewCore(
+				zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+					MessageKey: "msg",
+					LevelKey:   "level",
+					TimeKey:    "time",
+					EncodeTime: zapcore.TimeEncoderOfLayout(time.RFC3339Nano),
+				}),
+				&discarder{},
+				zap.DebugLevel)),
+		}} {
 		l := logger.l
 		b.Run(logger.name, func(b *testing.B) {
 			for _, call := range []struct {
