@@ -5,6 +5,7 @@
 package slog
 
 import (
+	"context"
 	"encoding"
 	"fmt"
 	"io"
@@ -39,7 +40,7 @@ func (opts HandlerOptions) NewTextHandler(w io.Writer) *TextHandler {
 
 // Enabled reports whether the handler handles records at the given level.
 // The handler ignores records whose level is lower.
-func (h *TextHandler) Enabled(level Level) bool {
+func (h *TextHandler) Enabled(_ context.Context, level Level) bool {
 	return h.commonHandler.enabled(level)
 }
 

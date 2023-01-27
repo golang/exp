@@ -45,7 +45,7 @@ type handlerWriter struct {
 }
 
 func (w *handlerWriter) Write(buf []byte) (int, error) {
-	if !w.h.Enabled(LevelInfo) {
+	if !w.h.Enabled(nil, LevelInfo) {
 		return 0, nil
 	}
 	var pc uintptr
@@ -141,7 +141,7 @@ func With(args ...any) *Logger {
 
 // Enabled reports whether l emits log records at the given level.
 func (l *Logger) Enabled(level Level) bool {
-	return l.Handler().Enabled(level)
+	return l.Handler().Enabled(l.ctx, level)
 }
 
 // Log emits a log record with the current time and the given level and message.

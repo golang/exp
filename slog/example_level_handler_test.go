@@ -5,6 +5,7 @@
 package slog_test
 
 import (
+	"context"
 	"os"
 
 	"golang.org/x/exp/slog"
@@ -29,7 +30,7 @@ func NewLevelHandler(level slog.Leveler, h slog.Handler) *LevelHandler {
 
 // Enabled implements Handler.Enabled by reporting whether
 // level is at least as large as h's level.
-func (h *LevelHandler) Enabled(level slog.Level) bool {
+func (h *LevelHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level.Level()
 }
 

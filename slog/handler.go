@@ -5,6 +5,7 @@
 package slog
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -27,9 +28,11 @@ import (
 type Handler interface {
 	// Enabled reports whether the handler handles records at the given level.
 	// The handler ignores records whose level is lower.
-	// Enabled is called early, before any arguments are processed,
+	// It is called early, before any arguments are processed,
 	// to save effort if the log event should be discarded.
-	Enabled(Level) bool
+	// The Logger's context is passed so Enabled can use its values
+	// to make a decision. The context may be nil.
+	Enabled(context.Context, Level) bool
 
 	// Handle handles the Record.
 	// It will only be called if Enabled returns true.
@@ -76,7 +79,7 @@ func newDefaultHandler(output func(int, string) error) *defaultHandler {
 	}
 }
 
-func (*defaultHandler) Enabled(l Level) bool {
+func (*defaultHandler) Enabled(_ context.Context, l Level) bool {
 	return l >= LevelInfo
 }
 

@@ -7,6 +7,7 @@ package benchmarks
 // Handlers for benchmarking.
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -31,7 +32,7 @@ func newFastTextHandler(w io.Writer) slog.Handler {
 	return &fastTextHandler{w: w}
 }
 
-func (h *fastTextHandler) Enabled(slog.Level) bool { return true }
+func (h *fastTextHandler) Enabled(context.Context, slog.Level) bool { return true }
 
 func (h *fastTextHandler) Handle(r slog.Record) error {
 	buf := buffer.New()
@@ -116,7 +117,7 @@ func newAsyncHandler() *asyncHandler {
 	return &asyncHandler{}
 }
 
-func (*asyncHandler) Enabled(slog.Level) bool { return true }
+func (*asyncHandler) Enabled(context.Context, slog.Level) bool { return true }
 
 func (h *asyncHandler) Handle(r slog.Record) error {
 	h.ringBuffer[h.next] = r.Clone()
@@ -134,8 +135,8 @@ func (*asyncHandler) WithGroup(string) slog.Handler {
 
 type disabledHandler struct{}
 
-func (disabledHandler) Enabled(slog.Level) bool  { return false }
-func (disabledHandler) Handle(slog.Record) error { panic("should not be called") }
+func (disabledHandler) Enabled(context.Context, slog.Level) bool { return false }
+func (disabledHandler) Handle(slog.Record) error                 { panic("should not be called") }
 
 func (disabledHandler) WithAttrs([]slog.Attr) slog.Handler {
 	panic("disabledHandler: With unimplemented")

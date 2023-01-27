@@ -137,7 +137,9 @@ type wrappingHandler struct {
 	h Handler
 }
 
-func (h wrappingHandler) Enabled(level Level) bool      { return h.h.Enabled(level) }
+func (h wrappingHandler) Enabled(ctx context.Context, level Level) bool {
+	return h.h.Enabled(ctx, level)
+}
 func (h wrappingHandler) WithGroup(name string) Handler { return h.h.WithGroup(name) }
 func (h wrappingHandler) WithAttrs(as []Attr) Handler   { return h.h.WithAttrs(as) }
 func (h wrappingHandler) Handle(r Record) error         { return h.h.Handle(r) }
@@ -438,7 +440,7 @@ func (h *captureHandler) Handle(r Record) error {
 	return nil
 }
 
-func (*captureHandler) Enabled(Level) bool { return true }
+func (*captureHandler) Enabled(context.Context, Level) bool { return true }
 
 func (c *captureHandler) WithAttrs(as []Attr) Handler {
 	c2 := *c
@@ -457,8 +459,8 @@ type discardHandler struct {
 	attrs    []Attr
 }
 
-func (d discardHandler) Enabled(Level) bool { return !d.disabled }
-func (discardHandler) Handle(Record) error  { return nil }
+func (d discardHandler) Enabled(context.Context, Level) bool { return !d.disabled }
+func (discardHandler) Handle(Record) error                   { return nil }
 func (d discardHandler) WithAttrs(as []Attr) Handler {
 	d.attrs = concat(d.attrs, as)
 	return d

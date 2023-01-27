@@ -5,6 +5,7 @@
 package slog
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,7 +43,7 @@ func (opts HandlerOptions) NewJSONHandler(w io.Writer) *JSONHandler {
 
 // Enabled reports whether the handler handles records at the given level.
 // The handler ignores records whose level is lower.
-func (h *JSONHandler) Enabled(level Level) bool {
+func (h *JSONHandler) Enabled(_ context.Context, level Level) bool {
 	return h.commonHandler.enabled(level)
 }
 
