@@ -190,6 +190,14 @@ func TestLogValue(t *testing.T) {
 	}
 }
 
+func TestZeroTime(t *testing.T) {
+	z := time.Time{}
+	got := TimeValue(z).Time()
+	if !got.IsZero() {
+		t.Errorf("got %s (%#[1]v), not zero time (%#v)", got, z)
+	}
+}
+
 type replace struct {
 	v Value
 }

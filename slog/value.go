@@ -97,6 +97,13 @@ type timeLocation *time.Location
 // TimeValue returns a Value for a time.Time.
 // It discards the monotonic portion.
 func TimeValue(v time.Time) Value {
+	if v.IsZero() {
+		// UnixNano on the zero time is undefined, so represent the zero time
+		// with a nil *time.Location instead. time.Time.Location method never
+		// returns nil, so a Value with any == timeLocation(nil) cannot be
+		// mistaken for any other Value, time.Time or otherwise.
+		return Value{any: timeLocation(nil)}
+	}
 	return Value{num: uint64(v.UnixNano()), any: timeLocation(v.Location())}
 }
 
@@ -271,7 +278,11 @@ func (v Value) Time() time.Time {
 }
 
 func (v Value) time() time.Time {
-	return time.Unix(0, int64(v.num)).In(v.any.(timeLocation))
+	loc := v.any.(timeLocation)
+	if loc == nil {
+		return time.Time{}
+	}
+	return time.Unix(0, int64(v.num)).In(loc)
 }
 
 // LogValuer returns v's value as a LogValuer. It panics
