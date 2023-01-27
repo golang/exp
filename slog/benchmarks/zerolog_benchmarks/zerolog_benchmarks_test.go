@@ -16,8 +16,8 @@ import (
 // benchmarks in the parent directory.
 
 func BenchmarkAttrs(b *testing.B) {
-	logger := zerolog.New(io.Discard).With().Timestamp().Logger()
-	b.Run("fastText discard", func(b *testing.B) {
+	logger := zerolog.New(zerolog.SyncWriter(io.Discard)).With().Timestamp().Logger()
+	b.Run("JSON discard", func(b *testing.B) {
 		b.Run("5 args", func(b *testing.B) {
 			b.ReportAllocs()
 			b.RunParallel(func(pb *testing.PB) {
