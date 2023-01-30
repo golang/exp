@@ -185,11 +185,15 @@ func AnyValue(v any) Value {
 // Any returns v's value as an any.
 func (v Value) Any() any {
 	switch v.Kind() {
-	case KindAny, KindGroup, KindLogValuer:
+	case KindAny:
 		if k, ok := v.any.(kind); ok {
 			return Kind(k)
 		}
 		return v.any
+	case KindLogValuer:
+		return v.any
+	case KindGroup:
+		return v.uncheckedGroup()
 	case KindInt64:
 		return int64(v.num)
 	case KindUint64:

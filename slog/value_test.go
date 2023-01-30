@@ -6,6 +6,7 @@ package slog
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 	"unsafe"
@@ -34,13 +35,6 @@ func TestValueEqual(t *testing.T) {
 				t.Errorf("%v.Equal(%v): got %t, want %t", v1, v2, got, want)
 			}
 		}
-	}
-}
-
-func TestNilValue(t *testing.T) {
-	n := AnyValue(nil)
-	if g := n.Any(); g != nil {
-		t.Errorf("got %#v, want nil", g)
 	}
 }
 
@@ -115,32 +109,6 @@ func TestAnyLevelAlloc(t *testing.T) {
 	_ = a
 }
 
-func TestAnyLevel(t *testing.T) {
-	x := LevelDebug + 100
-	v := AnyValue(x)
-	vv := v.Any()
-	if _, ok := vv.(Level); !ok {
-		t.Errorf("wanted Level, got %T", vv)
-	}
-}
-
-func TestSpecialValueTypes(t *testing.T) {
-	t.Run("time.Location", func(t *testing.T) {
-		want := time.UTC
-		got := AnyValue(want).Any()
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
-	})
-	t.Run("Kind", func(t *testing.T) {
-		want := KindBool
-		got := AnyValue(want).Any()
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
-	})
-}
-
 func TestAnyValue(t *testing.T) {
 	for _, test := range []struct {
 		in   any
@@ -160,6 +128,22 @@ func TestAnyValue(t *testing.T) {
 		if !got.Equal(test.want) {
 			t.Errorf("%v (%[1]T): got %v (kind %s), want %v (kind %s)",
 				test.in, got, got.Kind(), test.want, test.want.Kind())
+		}
+	}
+}
+
+func TestValueAny(t *testing.T) {
+	for _, want := range []any{
+		nil,
+		LevelDebug + 100,
+		time.UTC, // time.Locations treated specially...
+		KindBool, // ...as are Kinds
+		[]Attr{Int("a", 1)},
+	} {
+		v := AnyValue(want)
+		got := v.Any()
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
 		}
 	}
 }
