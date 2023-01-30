@@ -60,7 +60,6 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 }
 
 func (h *fastTextHandler) appendValue(buf *buffer.Buffer, v slog.Value) {
-	v = v.Resolve()
 	switch v.Kind() {
 	case slog.KindString:
 		buf.WriteString(v.String())

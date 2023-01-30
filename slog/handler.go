@@ -426,7 +426,7 @@ func (s *handleState) appendAttr(a Attr) {
 	if a.Key == "" {
 		return
 	}
-	v := a.Value.Resolve()
+	v := a.Value
 	if rep := s.h.opts.ReplaceAttr; rep != nil && v.Kind() != KindGroup {
 		var gs []string
 		if s.groups != nil {
@@ -436,6 +436,8 @@ func (s *handleState) appendAttr(a Attr) {
 		if a.Key == "" {
 			return
 		}
+		// Although all attributes in the Record are already resolved,
+		// This one came from the user, so it may not have been.
 		v = a.Value.Resolve()
 	}
 	if v.Kind() == KindGroup {

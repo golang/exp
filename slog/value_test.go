@@ -172,6 +172,19 @@ func TestLogValue(t *testing.T) {
 	if _, ok := got.(error); !ok {
 		t.Errorf("expected error, got %T", got)
 	}
+
+	// Test Resolve group.
+	r = &replace{GroupValue(
+		Int("a", 1),
+		Group("b", Any("c", &replace{StringValue("d")})),
+	)}
+	v = AnyValue(r)
+	got2 := v.Resolve().Any().([]Attr)
+	want2 := []Attr{Int("a", 1), Group("b", String("c", "d"))}
+	if !attrsEqual(got2, want2) {
+		t.Errorf("got %v, want %v", got2, want2)
+	}
+
 }
 
 func TestZeroTime(t *testing.T) {
