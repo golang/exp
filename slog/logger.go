@@ -85,9 +85,9 @@ func (l *Logger) Handler() Handler { return l.handler }
 func (l *Logger) Context() context.Context { return l.ctx }
 
 // With returns a new Logger that includes the given arguments, converted to
-// Attrs as in [Logger.Log]. The Attrs will be added to each output from the
-// Logger. The new Logger shares the old Logger's context.
-//
+// Attrs as in [Logger.Log] and resolved.
+// The Attrs will be added to each output from the Logger.
+// The new Logger shares the old Logger's context.
 // The new Logger's handler is the result of calling WithAttrs on the receiver's
 // handler.
 func (l *Logger) With(args ...any) *Logger {
@@ -160,10 +160,11 @@ func (l *Logger) Log(level Level, msg string, args ...any) {
 
 func (l *Logger) logPC(err error, pc uintptr, level Level, msg string, args ...any) {
 	r := l.makeRecord(msg, level, pc)
-	r.setAttrsFromArgs(args)
 	if err != nil {
-		r.AddAttrs(Any("err", err))
+		r.front[0] = Any(ErrorKey, err)
+		r.nFront++
 	}
+	r.setAttrsFromArgs(args)
 	_ = l.Handler().Handle(r)
 }
 

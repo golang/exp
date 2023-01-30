@@ -46,7 +46,7 @@ func TestLogTextHandler(t *testing.T) {
 	check(`level=WARN msg=w dur=3s`)
 
 	l.Error("bad", io.EOF, "a", 1)
-	check(`level=ERROR msg=bad a=1 err=EOF`)
+	check(`level=ERROR msg=bad err=EOF a=1`)
 
 	l.Log(LevelWarn+1, "w", Int("a", 1), String("b", "two"))
 	check(`level=WARN\+1 msg=w a=1 b=two`)
@@ -83,7 +83,7 @@ func TestConnections(t *testing.T) {
 	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: WARN msg b=2`)
 	logbuf.Reset()
 	Error("msg", io.EOF, "c", 3)
-	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: ERROR msg c=3 err=EOF`)
+	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: ERROR msg err=EOF c=3`)
 
 	// Levels below Info are not printed.
 	logbuf.Reset()
@@ -362,10 +362,10 @@ func TestLoggerError(t *testing.T) {
 	}
 	l := New(HandlerOptions{ReplaceAttr: removeTime}.NewTextHandler(&buf))
 	l.Error("msg", io.EOF, "a", 1)
-	checkLogOutput(t, buf.String(), `level=ERROR msg=msg a=1 err=EOF`)
+	checkLogOutput(t, buf.String(), `level=ERROR msg=msg err=EOF a=1`)
 	buf.Reset()
 	l.Error("msg", io.EOF, "a")
-	checkLogOutput(t, buf.String(), `level=ERROR msg=msg !BADKEY=a err=EOF`)
+	checkLogOutput(t, buf.String(), `level=ERROR msg=msg err=EOF !BADKEY=a`)
 }
 
 func TestLogCopying(t *testing.T) {
