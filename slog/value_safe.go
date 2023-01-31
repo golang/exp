@@ -48,7 +48,7 @@ func (v Value) str() string {
 	return v.s
 }
 
-// String returns a new Value for a string.
+// StringValue returns a new Value for a string.
 func StringValue(value string) Value {
 	return Value{s: value, any: KindString}
 }

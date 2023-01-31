@@ -1470,7 +1470,7 @@ func loadRetractions(ctx context.Context, modRoot string) ([]string, error) {
 	return retracted, nil
 }
 
-// ShortRetractionRationale returns a retraction rationale string that is safe
+// shortRetractionRationale returns a retraction rationale string that is safe
 // to print in a terminal. It returns hard-coded strings if the rationale
 // is empty, too long, or contains non-printable characters.
 //

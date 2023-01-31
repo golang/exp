@@ -57,7 +57,7 @@ func (v Value) Kind() Kind {
 	}
 }
 
-// String returns a new Value for a string.
+// StringValue returns a new Value for a string.
 func StringValue(value string) Value {
 	hdr := (*reflect.StringHeader)(unsafe.Pointer(&value))
 	return Value{num: uint64(hdr.Len), any: stringptr(hdr.Data)}
@@ -92,7 +92,7 @@ func groupValue(as []Attr) Value {
 	return Value{num: uint64(hdr.Len), any: groupptr(hdr.Data)}
 }
 
-// Group returns the Value's value as a []Attr.
+// group returns the Value's value as a []Attr.
 // It panics if the Value's Kind is not KindGroup.
 func (v Value) group() []Attr {
 	if sp, ok := v.any.(groupptr); ok {
