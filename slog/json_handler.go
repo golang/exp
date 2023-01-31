@@ -5,6 +5,7 @@
 package slog
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -81,6 +82,7 @@ func (h *JSONHandler) WithGroup(name string) Handler {
 //   - Floating-point NaNs and infinities are formatted as one of the strings
 //     "NaN", "+Inf" or "-Inf".
 //   - Levels are formatted as with Level.String.
+//   - HTML characters are not escaped.
 //
 // Each call to Handle results in a single serialized call to io.Writer.Write.
 func (h *JSONHandler) Handle(r Record) error {
@@ -146,11 +148,15 @@ func appendJSONValue(s *handleState, v Value) error {
 }
 
 func appendJSONMarshal(buf *buffer.Buffer, v any) error {
-	b, err := json.Marshal(v)
-	if err != nil {
+	// Use a json.Encoder to avoid escaping HTML.
+	var bb bytes.Buffer
+	enc := json.NewEncoder(&bb)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
 		return err
 	}
-	buf.Write(b)
+	bs := bb.Bytes()
+	buf.Write(bs[:len(bs)-1]) // remove final newline
 	return nil
 }
 
@@ -168,7 +174,7 @@ func appendEscapedJSONString(buf []byte, s string) []byte {
 	start := 0
 	for i := 0; i < len(s); {
 		if b := s[i]; b < utf8.RuneSelf {
-			if htmlSafeSet[b] {
+			if safeSet[b] {
 				i++
 				continue
 			}
@@ -187,10 +193,6 @@ func appendEscapedJSONString(buf []byte, s string) []byte {
 				char('t')
 			default:
 				// This encodes bytes < 0x20 except for \t, \n and \r.
-				// It also escapes <, >, and &
-				// because they can lead to security holes when
-				// user-controlled strings are rendered into JSON
-				// and served to some browsers.
 				str(`u00`)
 				char(hex[b>>4])
 				char(hex[b&0xF])
@@ -236,23 +238,22 @@ func appendEscapedJSONString(buf []byte, s string) []byte {
 
 var hex = "0123456789abcdef"
 
-// Copied from encoding/json/encode.go:encodeState.string.
+// Copied from encoding/json/tables.go.
 //
-// htmlSafeSet holds the value true if the ASCII character with the given
-// array position can be safely represented inside a JSON string, embedded
-// inside of HTML <script> tags, without any additional escaping.
+// safeSet holds the value true if the ASCII character with the given array
+// position can be represented inside a JSON string without any further
+// escaping.
 //
 // All values are true except for the ASCII control characters (0-31), the
-// double quote ("), the backslash character ("\"), HTML opening and closing
-// tags ("<" and ">"), and the ampersand ("&").
-var htmlSafeSet = [utf8.RuneSelf]bool{
+// double quote ("), and the backslash character ("\").
+var safeSet = [utf8.RuneSelf]bool{
 	' ':      true,
 	'!':      true,
 	'"':      false,
 	'#':      true,
 	'$':      true,
 	'%':      true,
-	'&':      false,
+	'&':      true,
 	'\'':     true,
 	'(':      true,
 	')':      true,
@@ -274,9 +275,9 @@ var htmlSafeSet = [utf8.RuneSelf]bool{
 	'9':      true,
 	':':      true,
 	';':      true,
-	'<':      false,
+	'<':      true,
 	'=':      true,
-	'>':      false,
+	'>':      true,
 	'?':      true,
 	'@':      true,
 	'A':      true,

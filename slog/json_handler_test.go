@@ -83,15 +83,24 @@ func TestAppendJSONValue(t *testing.T) {
 		jsonMarshaler{"xyz"},
 	} {
 		got := jsonValueString(t, AnyValue(value))
-		b, err := json.Marshal(value)
+		want, err := marshalJSON(value)
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := string(b)
 		if got != want {
 			t.Errorf("%v: got %s, want %s", value, got, want)
 		}
 	}
+}
+
+func marshalJSON(x any) (string, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(x); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(buf.String()), nil
 }
 
 func TestJSONAppendAttrValueSpecial(t *testing.T) {
