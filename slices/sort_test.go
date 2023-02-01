@@ -281,3 +281,14 @@ func TestBinarySearchInts(t *testing.T) {
 		})
 	}
 }
+
+func TestBinarySearchFunc(t *testing.T) {
+	data := []int{1, 10, 11, 2} // sorted lexicographically
+	cmp := func(a int, b string) int {
+		return strings.Compare(strconv.Itoa(a), b)
+	}
+	pos, found := BinarySearchFunc(data, "2", cmp)
+	if pos != 3 || !found {
+		t.Errorf("BinarySearchFunc(%v, %q, cmp) = %v, %v, want %v, %v", data, "2", pos, found, 3, true)
+	}
+}
