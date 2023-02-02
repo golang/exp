@@ -9,6 +9,8 @@
 
 package slog
 
+import "time"
+
 // LogDepth is like [Logger.Log], but accepts a call depth to adjust the
 // file and line number in the log record. 0 refers to the caller
 // of LogDepth; 1 refers to the caller's caller; and so on.
@@ -25,7 +27,7 @@ func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...
 	if !l.Enabled(level) {
 		return
 	}
-	r := l.makeRecord(msg, level, 0)
+	r := NewRecord(time.Now(), level, msg, 0, l.ctx)
 	r.AddAttrs(attrs...)
 	_ = l.Handler().Handle(r)
 }

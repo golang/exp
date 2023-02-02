@@ -8,6 +8,7 @@ package slog
 
 import (
 	"runtime"
+	"time"
 )
 
 // These functions compute the pc early and pass it down the call chain,
@@ -33,7 +34,7 @@ func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...
 	}
 	var pcs [1]uintptr
 	runtime.Callers(calldepth+2, pcs[:])
-	r := l.makeRecord(msg, level, pcs[0])
+	r := NewRecord(time.Now(), level, msg, pcs[0], l.ctx)
 	r.AddAttrs(attrs...)
 	_ = l.Handler().Handle(r)
 }

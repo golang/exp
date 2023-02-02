@@ -159,23 +159,13 @@ func (l *Logger) Log(level Level, msg string, args ...any) {
 }
 
 func (l *Logger) logPC(err error, pc uintptr, level Level, msg string, args ...any) {
-	r := l.makeRecord(msg, level, pc)
+	r := NewRecord(time.Now(), level, msg, pc, l.ctx)
 	if err != nil {
 		r.front[0] = Any(ErrorKey, err)
 		r.nFront++
 	}
 	r.setAttrsFromArgs(args)
 	_ = l.Handler().Handle(r)
-}
-
-func (l *Logger) makeRecord(msg string, level Level, pc uintptr) Record {
-	return Record{
-		Time:    time.Now(),
-		Message: msg,
-		Level:   level,
-		Context: l.ctx,
-		PC:      pc,
-	}
 }
 
 // LogAttrs is a more efficient version of [Logger.Log] that accepts only Attrs.
