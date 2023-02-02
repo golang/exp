@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"golang.org/x/exp/slog"
+	"golang.org/x/exp/slog/internal/testutil"
 )
 
 // A LevelHandler wraps a Handler with an Enabled method
@@ -63,16 +64,7 @@ func (h *LevelHandler) Handler() slog.Handler {
 // Another typical use would be to decrease the log level (to LevelDebug, say)
 // during a part of the program that was suspected of containing a bug.
 func ExampleHandler_levelHandler() {
-	th := slog.HandlerOptions{
-		// Remove time from the output.
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				return slog.Attr{}
-			}
-			return a
-		},
-	}.NewTextHandler(os.Stdout)
-
+	th := slog.HandlerOptions{ReplaceAttr: testutil.RemoveTime}.NewTextHandler(os.Stdout)
 	logger := slog.New(NewLevelHandler(slog.LevelWarn, th))
 	logger.Info("not printed")
 	logger.Warn("printed")

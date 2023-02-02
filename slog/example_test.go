@@ -10,20 +10,14 @@ import (
 	"time"
 
 	"golang.org/x/exp/slog"
+	"golang.org/x/exp/slog/internal/testutil"
 )
 
 func ExampleGroup() {
 	r, _ := http.NewRequest("GET", "localhost", nil)
 	// ...
 
-	// Remove the time attribute to make Output deterministic.
-	removeTime := func(groups []string, a slog.Attr) slog.Attr {
-		if a.Key == slog.TimeKey && len(groups) == 0 {
-			a.Key = ""
-		}
-		return a
-	}
-	logger := slog.New(slog.HandlerOptions{ReplaceAttr: removeTime}.NewTextHandler(os.Stdout))
+	logger := slog.New(slog.HandlerOptions{ReplaceAttr: testutil.RemoveTime}.NewTextHandler(os.Stdout))
 	slog.SetDefault(logger)
 
 	slog.Info("finished",
