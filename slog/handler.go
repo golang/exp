@@ -64,6 +64,8 @@ type Handler interface {
 	// should behave like
 	//
 	//     logger.LogAttrs(level, msg, slog.Group("s", slog.Int("a", 1), slog.Int("b", 2)))
+	//
+	// If the name is empty, WithGroup returns the receiver.
 	WithGroup(name string) Handler
 }
 
@@ -230,6 +232,9 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 }
 
 func (h *commonHandler) withGroup(name string) *commonHandler {
+	if name == "" {
+		return h
+	}
 	h2 := h.clone()
 	h2.groups = append(h2.groups, name)
 	return h2
