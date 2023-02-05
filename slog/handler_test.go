@@ -282,6 +282,17 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantText: `msg=message bs="1234"`,
 			wantJSON: `{"msg":"message","bs":1234}`,
 		},
+		{
+			name:    "inline group",
+			replace: removeKeys(TimeKey, LevelKey),
+			attrs: []Attr{
+				Int("a", 1),
+				Group("", Int("b", 2), Int("c", 3)),
+				Int("d", 4),
+			},
+			wantText: `msg=message a=1 b=2 c=3 d=4`,
+			wantJSON: `{"msg":"message","a":1,"b":2,"c":3,"d":4}`,
+		},
 	} {
 		r := NewRecord(testTime, LevelInfo, "message", 1, nil)
 		r.AddAttrs(test.attrs...)

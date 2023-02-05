@@ -38,8 +38,11 @@ type Handler interface {
 	// It will only be called if Enabled returns true.
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time is the zero time, ignore the time.
-	//   - If an Attr's key is the empty string, ignore the Attr.
-	//   - If a group has no Attrs, ignore it.
+	//   - If an Attr's key is the empty string and the value is not a group,
+	//     ignore the Attr.
+	//   - If a group's key is empty, inline the group's Attrs.
+	//   - If a group has no Attrs (even if it has a non-empty key),
+	//     ignore it.
 	Handle(r Record) error
 
 	// WithAttrs returns a new Handler whose attributes consist of
@@ -427,10 +430,11 @@ func (s *handleState) closeGroup(name string) {
 // It handles replacement and checking for an empty key.
 // after replacement).
 func (s *handleState) appendAttr(a Attr) {
-	if a.Key == "" {
+	v := a.Value
+	// Elide a non-group with an empty key.
+	if a.Key == "" && v.Kind() != KindGroup {
 		return
 	}
-	v := a.Value
 	if rep := s.h.opts.ReplaceAttr; rep != nil && v.Kind() != KindGroup {
 		var gs []string
 		if s.groups != nil {
@@ -448,11 +452,16 @@ func (s *handleState) appendAttr(a Attr) {
 		attrs := v.Group()
 		// Output only non-empty groups.
 		if len(attrs) > 0 {
-			s.openGroup(a.Key)
+			// Inline a group with an empty key.
+			if a.Key != "" {
+				s.openGroup(a.Key)
+			}
 			for _, aa := range attrs {
 				s.appendAttr(aa)
 			}
-			s.closeGroup(a.Key)
+			if a.Key != "" {
+				s.closeGroup(a.Key)
+			}
 		}
 	} else {
 		s.appendKey(a.Key)
