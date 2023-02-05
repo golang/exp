@@ -39,6 +39,7 @@ type Handler interface {
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time is the zero time, ignore the time.
 	//   - If an Attr's key is the empty string, ignore the Attr.
+	//   - If a group has no Attrs, ignore it.
 	Handle(r Record) error
 
 	// WithAttrs returns a new Handler whose attributes consist of
@@ -418,9 +419,7 @@ func (s *handleState) closeGroup(name string) {
 }
 
 // appendAttr appends the Attr's key and value using app.
-// If sep is true, it also prepends a separator.
 // It handles replacement and checking for an empty key.
-// It sets sep to true if it actually did the append (if the key was non-empty
 // after replacement).
 func (s *handleState) appendAttr(a Attr) {
 	if a.Key == "" {
@@ -441,11 +440,15 @@ func (s *handleState) appendAttr(a Attr) {
 		v = a.Value.Resolve()
 	}
 	if v.Kind() == KindGroup {
-		s.openGroup(a.Key)
-		for _, aa := range v.Group() {
-			s.appendAttr(aa)
+		attrs := v.Group()
+		// Output only non-empty groups.
+		if len(attrs) > 0 {
+			s.openGroup(a.Key)
+			for _, aa := range attrs {
+				s.appendAttr(aa)
+			}
+			s.closeGroup(a.Key)
 		}
-		s.closeGroup(a.Key)
 	} else {
 		s.appendKey(a.Key)
 		s.appendValue(v)

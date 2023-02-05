@@ -203,7 +203,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			replace:  removeKeys(TimeKey, LevelKey),
 			attrs:    []Attr{Group("g"), Group("h", Int("a", 1))},
 			wantText: "msg=message h.a=1",
-			wantJSON: `{"msg":"message","g":{},"h":{"a":1}}`,
+			wantJSON: `{"msg":"message","h":{"a":1}}`,
 		},
 		{
 			name:    "escapes",
