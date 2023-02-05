@@ -173,6 +173,23 @@ func (v *LevelVar) String() string {
 	return fmt.Sprintf("LevelVar(%s)", v.Level())
 }
 
+// MarshalText implements [encoding.TextMarshaler]
+// by calling [Level.MarshalText].
+func (v *LevelVar) MarshalText() ([]byte, error) {
+	return v.Level().MarshalText()
+}
+
+// UnmarshalText implements [encoding.TextUnmarshaler]
+// by calling [Level.UnmarshalText].
+func (v *LevelVar) UnmarshalText(data []byte) error {
+	var l Level
+	if err := l.UnmarshalText(data); err != nil {
+		return err
+	}
+	v.Set(l)
+	return nil
+}
+
 // A Leveler provides a Level value.
 //
 // As Level itself implements Leveler, clients typically supply

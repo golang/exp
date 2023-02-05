@@ -65,7 +65,7 @@ func TestMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestMarshalText(t *testing.T) {
+func TestLevelMarshalText(t *testing.T) {
 	want := LevelWarn - 3
 	data, err := want.MarshalText()
 	if err != nil {
@@ -133,6 +133,36 @@ func TestLevelFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 	if g, w := lf, LevelWarn+3; g != w {
+		t.Errorf("got %v, want %v", g, w)
+	}
+}
+
+func TestLevelVarMarshalText(t *testing.T) {
+	var v LevelVar
+	v.Set(LevelWarn)
+	data, err := v.MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v2 LevelVar
+	if err := v2.UnmarshalText(data); err != nil {
+		t.Fatal(err)
+	}
+	if g, w := v2.Level(), LevelWarn; g != w {
+		t.Errorf("got %s, want %s", g, w)
+	}
+}
+
+func TestLevelVarFlag(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	v := &LevelVar{}
+	v.Set(LevelWarn + 3)
+	fs.TextVar(v, "level", v, "set level")
+	err := fs.Parse([]string{"-level", "WARN+3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, w := v.Level(), LevelWarn+3; g != w {
 		t.Errorf("got %v, want %v", g, w)
 	}
 }
