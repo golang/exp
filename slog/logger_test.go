@@ -408,6 +408,14 @@ func TestLogCopying(t *testing.T) {
 	checkContext(l4)
 }
 
+func TestNewLogLogger(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTextHandler(&buf)
+	ll := NewLogLogger(h, LevelWarn)
+	ll.Print("hello")
+	checkLogOutput(t, buf.String(), "time="+timeRE+` level=WARN msg=hello`)
+}
+
 func checkLogOutput(t *testing.T, got, wantRegexp string) {
 	t.Helper()
 	got = clean(got)
