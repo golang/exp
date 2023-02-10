@@ -54,6 +54,14 @@ func (h *LevelHandler) Handler() slog.Handler {
 	return h.handler
 }
 
+// This example shows how to Use a LevelHandler to change the level of an
+// existing Handler while preserving its other behavior.
+//
+// This example demonstrates increasing the log level to reduce a logger's
+// output.
+//
+// Another typical use would be to decrease the log level (to LevelDebug, say)
+// during a part of the program that was suspected of containing a bug.
 func ExampleHandler_levelHandler() {
 	th := slog.HandlerOptions{
 		// Remove time from the output.
