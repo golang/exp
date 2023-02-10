@@ -199,8 +199,8 @@ func (l *Logger) Warn(msg string, args ...any) {
 }
 
 // Error logs at LevelError.
-// If err is non-nil, Error appends Any(ErrorKey, err)
-// to the list of attributes.
+// If err is non-nil, Error adds Any(ErrorKey, err)
+// before the list of attributes.
 func (l *Logger) Error(msg string, err error, args ...any) {
 	l.logDepthErr(err, 1, LevelError, msg, args...)
 }
