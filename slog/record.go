@@ -5,7 +5,6 @@
 package slog
 
 import (
-	"context"
 	"runtime"
 	"time"
 
@@ -27,11 +26,6 @@ type Record struct {
 
 	// The level of the event.
 	Level Level
-
-	// The context of the Logger that created the Record. Present
-	// solely to provide Handlers access to the context's values.
-	// Canceling the context should not affect record processing.
-	Context context.Context
 
 	// The program counter at the time the record was constructed, as determined
 	// by runtime.Callers. If zero, no program counter is available.
@@ -61,13 +55,12 @@ type Record struct {
 //
 // NewRecord is intended for logging APIs that want to support a [Handler] as
 // a backend.
-func NewRecord(t time.Time, level Level, msg string, pc uintptr, ctx context.Context) Record {
+func NewRecord(t time.Time, level Level, msg string, pc uintptr) Record {
 	return Record{
 		Time:    t,
 		Message: msg,
 		Level:   level,
 		PC:      pc,
-		Context: ctx,
 	}
 }
 

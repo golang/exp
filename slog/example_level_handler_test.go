@@ -35,8 +35,8 @@ func (h *LevelHandler) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 // Handle implements Handler.Handle.
-func (h *LevelHandler) Handle(r slog.Record) error {
-	return h.handler.Handle(r)
+func (h *LevelHandler) Handle(ctx context.Context, r slog.Record) error {
+	return h.handler.Handle(ctx, r)
 }
 
 // WithAttrs implements Handler.WithAttrs.

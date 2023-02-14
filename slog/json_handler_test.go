@@ -39,9 +39,9 @@ func TestJSONHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			h := test.opts.NewJSONHandler(&buf)
-			r := NewRecord(testTime, LevelInfo, "m", 0, nil)
+			r := NewRecord(testTime, LevelInfo, "m", 0)
 			r.AddAttrs(Int("a", 1), Any("m", map[string]int{"b": 2}))
-			if err := h.Handle(r); err != nil {
+			if err := h.Handle(nil, r); err != nil {
 				t.Fatal(err)
 			}
 			got := strings.TrimSuffix(buf.String(), "\n")

@@ -34,9 +34,9 @@ func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...
 	}
 	var pcs [1]uintptr
 	runtime.Callers(calldepth+2, pcs[:])
-	r := NewRecord(time.Now(), level, msg, pcs[0], l.ctx)
+	r := NewRecord(time.Now(), level, msg, pcs[0])
 	r.AddAttrs(attrs...)
-	_ = l.Handler().Handle(r)
+	_ = l.Handler().Handle(l.ctx, r)
 }
 
 // logDepthErr is a trivial wrapper around logDepth, just to make the call

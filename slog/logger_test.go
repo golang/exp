@@ -140,9 +140,9 @@ type wrappingHandler struct {
 func (h wrappingHandler) Enabled(ctx context.Context, level Level) bool {
 	return h.h.Enabled(ctx, level)
 }
-func (h wrappingHandler) WithGroup(name string) Handler { return h.h.WithGroup(name) }
-func (h wrappingHandler) WithAttrs(as []Attr) Handler   { return h.h.WithAttrs(as) }
-func (h wrappingHandler) Handle(r Record) error         { return h.h.Handle(r) }
+func (h wrappingHandler) WithGroup(name string) Handler              { return h.h.WithGroup(name) }
+func (h wrappingHandler) WithAttrs(as []Attr) Handler                { return h.h.WithAttrs(as) }
+func (h wrappingHandler) Handle(ctx context.Context, r Record) error { return h.h.Handle(ctx, r) }
 
 func TestAttrs(t *testing.T) {
 	check := func(got []Attr, want ...Attr) {
@@ -324,7 +324,7 @@ func TestSetAttrs(t *testing.T) {
 		{[]any{"a", 1, "b"}, []Attr{Int("a", 1), String(badKey, "b")}},
 		{[]any{"a", 1, 2, 3}, []Attr{Int("a", 1), Int(badKey, 2), Int(badKey, 3)}},
 	} {
-		r := NewRecord(time.Time{}, 0, "", 0, nil)
+		r := NewRecord(time.Time{}, 0, "", 0)
 		r.setAttrsFromArgs(test.args)
 		got := attrsSlice(r)
 		if !attrsEqual(got, test.want) {
@@ -443,7 +443,7 @@ type captureHandler struct {
 	groups []string
 }
 
-func (h *captureHandler) Handle(r Record) error {
+func (h *captureHandler) Handle(ctx context.Context, r Record) error {
 	h.r = r
 	return nil
 }
@@ -468,7 +468,7 @@ type discardHandler struct {
 }
 
 func (d discardHandler) Enabled(context.Context, Level) bool { return !d.disabled }
-func (discardHandler) Handle(Record) error                   { return nil }
+func (discardHandler) Handle(context.Context, Record) error  { return nil }
 func (d discardHandler) WithAttrs(as []Attr) Handler {
 	d.attrs = concat(d.attrs, as)
 	return d

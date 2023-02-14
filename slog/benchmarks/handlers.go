@@ -34,7 +34,7 @@ func newFastTextHandler(w io.Writer) slog.Handler {
 
 func (h *fastTextHandler) Enabled(context.Context, slog.Level) bool { return true }
 
-func (h *fastTextHandler) Handle(r slog.Record) error {
+func (h *fastTextHandler) Handle(_ context.Context, r slog.Record) error {
 	buf := buffer.New()
 	defer buf.Free()
 
@@ -118,7 +118,7 @@ func newAsyncHandler() *asyncHandler {
 
 func (*asyncHandler) Enabled(context.Context, slog.Level) bool { return true }
 
-func (h *asyncHandler) Handle(r slog.Record) error {
+func (h *asyncHandler) Handle(_ context.Context, r slog.Record) error {
 	h.ringBuffer[h.next] = r.Clone()
 	h.next = (h.next + 1) % len(h.ringBuffer)
 	return nil
@@ -134,8 +134,8 @@ func (*asyncHandler) WithGroup(string) slog.Handler {
 
 type disabledHandler struct{}
 
-func (disabledHandler) Enabled(context.Context, slog.Level) bool { return false }
-func (disabledHandler) Handle(slog.Record) error                 { panic("should not be called") }
+func (disabledHandler) Enabled(context.Context, slog.Level) bool  { return false }
+func (disabledHandler) Handle(context.Context, slog.Record) error { panic("should not be called") }
 
 func (disabledHandler) WithAttrs([]slog.Attr) slog.Handler {
 	panic("disabledHandler: With unimplemented")

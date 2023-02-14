@@ -9,12 +9,12 @@ import (
 )
 
 func TestHandlers(t *testing.T) {
-	r := slog.NewRecord(TestTime, slog.LevelInfo, TestMessage, 0, nil)
+	r := slog.NewRecord(TestTime, slog.LevelInfo, TestMessage, 0)
 	r.AddAttrs(TestAttrs...)
 	t.Run("text", func(t *testing.T) {
 		var b bytes.Buffer
 		h := newFastTextHandler(&b)
-		if err := h.Handle(r); err != nil {
+		if err := h.Handle(nil, r); err != nil {
 			t.Fatal(err)
 		}
 		got := b.String()
@@ -24,7 +24,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("async", func(t *testing.T) {
 		h := newAsyncHandler()
-		if err := h.Handle(r); err != nil {
+		if err := h.Handle(nil, r); err != nil {
 			t.Fatal(err)
 		}
 		got := h.ringBuffer[0]

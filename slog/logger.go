@@ -61,8 +61,8 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 	if len(buf) > 0 && buf[len(buf)-1] == '\n' {
 		buf = buf[:len(buf)-1]
 	}
-	r := NewRecord(time.Now(), w.level, string(buf), pc, nil)
-	return origLen, w.h.Handle(r)
+	r := NewRecord(time.Now(), w.level, string(buf), pc)
+	return origLen, w.h.Handle(nil, r)
 }
 
 // A Logger records structured information about each call to its
@@ -169,13 +169,13 @@ func (l *Logger) Log(level Level, msg string, args ...any) {
 }
 
 func (l *Logger) logPC(err error, pc uintptr, level Level, msg string, args ...any) {
-	r := NewRecord(time.Now(), level, msg, pc, l.ctx)
+	r := NewRecord(time.Now(), level, msg, pc)
 	if err != nil {
 		r.front[0] = Any(ErrorKey, err)
 		r.nFront++
 	}
 	r.setAttrsFromArgs(args)
-	_ = l.Handler().Handle(r)
+	_ = l.Handler().Handle(l.ctx, r)
 }
 
 // LogAttrs is a more efficient version of [Logger.Log] that accepts only Attrs.
