@@ -114,7 +114,10 @@ func (r *Record) AddAttrs(attrs ...Attr) {
 	r.back = append(r.back, attrs[n:]...)
 }
 
-func (r *Record) setAttrsFromArgs(args []any) {
+// Add converts the args to Attrs as described in [Logger.Log],
+// then appends the Attrs to the Record's list of Attrs.
+// It resolves the Attrs before doing so.
+func (r *Record) Add(args ...any) {
 	var a Attr
 	for len(args) > 0 {
 		a, args = argsToAttr(args)

@@ -74,13 +74,13 @@ func ExampleHandlerOptions_customLevels() {
 	}.NewTextHandler(os.Stdout)
 
 	logger := slog.New(th)
-	logger.Log(LevelEmergency, "missing pilots")
+	logger.Log(nil, LevelEmergency, "missing pilots")
 	logger.Error("failed to start engines", fmt.Errorf("missing fuel"))
 	logger.Warn("falling back to default value")
-	logger.Log(LevelNotice, "all systems are running")
+	logger.Log(nil, LevelNotice, "all systems are running")
 	logger.Info("initiating launch")
 	logger.Debug("starting background job")
-	logger.Log(LevelTrace, "button clicked")
+	logger.Log(nil, LevelTrace, "button clicked")
 
 	// Output:
 	// sev=EMERGENCY msg="missing pilots"

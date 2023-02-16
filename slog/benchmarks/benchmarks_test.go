@@ -41,7 +41,7 @@ func BenchmarkAttrs(b *testing.B) {
 					// should only be from Duration.String and Time.String.
 					"5 args",
 					func() {
-						logger.LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(nil, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),
@@ -53,7 +53,7 @@ func BenchmarkAttrs(b *testing.B) {
 				{
 					"5 args ctx",
 					func() {
-						logger.WithContext(ctx).LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(ctx, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),
@@ -65,7 +65,7 @@ func BenchmarkAttrs(b *testing.B) {
 				{
 					"10 args",
 					func() {
-						logger.LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(nil, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),
@@ -82,7 +82,7 @@ func BenchmarkAttrs(b *testing.B) {
 				{
 					"40 args",
 					func() {
-						logger.LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(nil, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),

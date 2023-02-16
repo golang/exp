@@ -171,7 +171,7 @@ func BenchmarkJSONHandler(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				l.LogAttrs(LevelInfo, "this is a typical log message",
+				l.LogAttrs(nil, LevelInfo, "this is a typical log message",
 					String("module", "github.com/google/go-cmp"),
 					String("version", "v1.23.4"),
 					Int("count", 23),
@@ -232,7 +232,7 @@ func BenchmarkPreformatting(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				l.LogAttrs(LevelInfo, "this is a typical log message",
+				l.LogAttrs(nil, LevelInfo, "this is a typical log message",
 					String("module", "github.com/google/go-cmp"),
 					String("version", "v1.23.4"),
 					Int("count", 23),
