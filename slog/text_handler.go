@@ -127,7 +127,7 @@ func byteSlice(a any) ([]byte, bool) {
 	}
 	// Like Printf's %s, we allow both the slice type and the byte element type to be named.
 	t := reflect.TypeOf(a)
-	if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
+	if t != nil && t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
 		return reflect.ValueOf(a).Bytes(), true
 	}
 	return nil, false

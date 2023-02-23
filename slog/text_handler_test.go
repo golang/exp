@@ -48,6 +48,11 @@ func TestTextHandler(t *testing.T) {
 			Any("t", text{""}),
 			`t`, `"!ERROR:text: empty string"`,
 		},
+		{
+			"nil value",
+			Any("a", nil),
+			`a`, `<nil>`,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			for _, opts := range []struct {
