@@ -767,3 +767,80 @@ func BenchmarkReplace(b *testing.B) {
 	}
 
 }
+
+func TestDifference(t *testing.T) {
+	intTypeCases := []struct {
+		name string
+		s, v []int
+		want []int
+	}{
+		{
+			name: "empty first slice",
+			s:    []int{},
+			v:    []int{1, 4},
+			want: []int{},
+		},
+		{
+			name: "empty second slice",
+			s:    []int{1, 3},
+			v:    []int{},
+			want: []int{1, 3},
+		},
+		{
+			name: "duplicates int",
+			s:    []int{2, 4, 1, 2},
+			v:    []int{1, 3, 1},
+			want: []int{2, 4, 2},
+		},
+		{
+			name: "regular use",
+			s:    []int{1, 2, 3},
+			v:    []int{3, 4, 5},
+			want: []int{1, 2},
+		},
+		{
+			name: "nil value",
+			s:    nil,
+			v:    nil,
+			want: nil,
+		},
+		{
+			name: "different size",
+			s:    []int{1, 5},
+			v:    []int{5, 10, 25},
+			want: []int{1},
+		},
+	}
+	strTypeCases := []struct {
+		name string
+		s, v []string
+		want []string
+	}{
+		{
+			name: "duplicates string",
+			s:    []string{"a", "b", "c"},
+			v:    []string{"b", "b", "z"},
+			want: []string{"a", "c"},
+		},
+		{
+			name: "contain substring",
+			s:    []string{"abc", "h", "i"},
+			v:    []string{"ab", "g", "z"},
+			want: []string{"abc", "h", "i"},
+		},
+	}
+	for _, test := range intTypeCases {
+		t.Run(test.name, func(tt *testing.T) {
+			if got := Difference(test.s, test.v); !Equal(got, test.want) {
+				tt.Errorf("Difference(%v) = %v, want %v", test.s, got, test.want)
+			}
+		})
+	}
+	for _, test := range strTypeCases {
+		t.Run(test.name, func(tt *testing.T) {
+			if got := Difference(test.s, test.v); !Equal(got, test.want) {
+				tt.Errorf("Difference(%v) = %v, want %v", test.s, got, test.want)
+			}
+		})
+	}
+}
