@@ -30,15 +30,16 @@ type Handler interface {
 	// The handler ignores records whose level is lower.
 	// It is called early, before any arguments are processed,
 	// to save effort if the log event should be discarded.
-	// The Logger's context is passed so Enabled can use its values
-	// to make a decision. The context may be nil.
+	// If called from a Logger method, the first argument is the context
+	// passed to that method, or context.Background() if nil was passed
+	// or the method does not take a context.
+	// The context is passed so Enabled can use its values
+	// to make a decision.
 	Enabled(context.Context, Level) bool
 
 	// Handle handles the Record.
-	// It will only be called if Enabled returns true.
-	//
-	// The first argument is the context of the Logger that created the Record,
-	// which may be nil.
+	// It will only be called Enabled returns true.
+	// The Context argument is as for Enabled.
 	// It is present solely to provide Handlers access to the context's values.
 	// Canceling the context should not affect record processing.
 	// (Among other things, log messages may be necessary to debug a

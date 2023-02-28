@@ -6,6 +6,7 @@ package slog
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -79,7 +80,7 @@ func TestTextHandler(t *testing.T) {
 					h := opts.opts.NewTextHandler(&buf)
 					r := NewRecord(testTime, LevelInfo, "a message", 0)
 					r.AddAttrs(test.attr)
-					if err := h.Handle(nil, r); err != nil {
+					if err := h.Handle(context.Background(), r); err != nil {
 						t.Fatal(err)
 					}
 					got := buf.String()
@@ -120,7 +121,7 @@ func TestTextHandlerSource(t *testing.T) {
 	var buf bytes.Buffer
 	h := HandlerOptions{AddSource: true}.NewTextHandler(&buf)
 	r := NewRecord(testTime, LevelInfo, "m", callerPC(2))
-	if err := h.Handle(nil, r); err != nil {
+	if err := h.Handle(context.Background(), r); err != nil {
 		t.Fatal(err)
 	}
 	if got := buf.String(); !sourceRegexp.MatchString(got) {
@@ -149,7 +150,7 @@ func TestTextHandlerPreformatted(t *testing.T) {
 	// Also test omitting time.
 	r := NewRecord(time.Time{}, 0 /* 0 Level is INFO */, "m", 0)
 	r.AddAttrs(Int("a", 1))
-	if err := h.Handle(nil, r); err != nil {
+	if err := h.Handle(context.Background(), r); err != nil {
 		t.Fatal(err)
 	}
 	got := strings.TrimSuffix(buf.String(), "\n")
@@ -165,11 +166,11 @@ func TestTextHandlerAlloc(t *testing.T) {
 		r.AddAttrs(Int("x = y", i))
 	}
 	var h Handler = NewTextHandler(io.Discard)
-	wantAllocs(t, 0, func() { h.Handle(nil, r) })
+	wantAllocs(t, 0, func() { h.Handle(context.Background(), r) })
 
 	h = h.WithGroup("s")
 	r.AddAttrs(Group("g", Int("a", 1)))
-	wantAllocs(t, 0, func() { h.Handle(nil, r) })
+	wantAllocs(t, 0, func() { h.Handle(context.Background(), r) })
 }
 
 func TestNeedsQuoting(t *testing.T) {

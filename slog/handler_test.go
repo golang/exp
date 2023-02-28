@@ -8,6 +8,7 @@ package slog
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -19,6 +20,7 @@ import (
 )
 
 func TestDefaultHandle(t *testing.T) {
+	ctx := context.Background()
 	preAttrs := []Attr{Int("pre", 0)}
 	attrs := []Attr{Int("a", 1), String("b", "two")}
 	for _, test := range []struct {
@@ -93,7 +95,7 @@ func TestDefaultHandle(t *testing.T) {
 			}
 			r := NewRecord(time.Time{}, LevelInfo, "message", 0)
 			r.AddAttrs(test.attrs...)
-			if err := h.Handle(nil, r); err != nil {
+			if err := h.Handle(ctx, r); err != nil {
 				t.Fatal(err)
 			}
 			if got != test.want {
@@ -105,6 +107,7 @@ func TestDefaultHandle(t *testing.T) {
 
 // Verify the common parts of TextHandler and JSONHandler.
 func TestJSONAndTextHandlers(t *testing.T) {
+	ctx := context.Background()
 
 	// ReplaceAttr functions
 
@@ -313,7 +316,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 						h = test.with(h)
 					}
 					buf.Reset()
-					if err := h.Handle(nil, r); err != nil {
+					if err := h.Handle(ctx, r); err != nil {
 						t.Fatal(err)
 					}
 					got := strings.TrimSuffix(buf.String(), "\n")

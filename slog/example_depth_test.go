@@ -5,6 +5,7 @@
 package slog_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,13 +19,13 @@ import (
 // The log record contains the source position of the caller of Infof.
 func Infof(format string, args ...any) {
 	l := slog.Default()
-	if !l.Enabled(nil, slog.LevelInfo) {
+	if !l.Enabled(context.Background(), slog.LevelInfo) {
 		return
 	}
 	var pcs [1]uintptr
 	runtime.Callers(2, pcs[:]) // skip [Callers, Infof]
 	r := slog.NewRecord(time.Now(), slog.LevelInfo, fmt.Sprintf(format, args...), pcs[0])
-	_ = l.Handler().Handle(nil, r)
+	_ = l.Handler().Handle(context.Background(), r)
 }
 
 func Example_wrapping() {
@@ -46,5 +47,5 @@ func Example_wrapping() {
 	Infof("message, %s", "formatted")
 
 	// Output:
-	// level=INFO source=example_depth_test.go:46 msg="message, formatted"
+	// level=INFO source=example_depth_test.go:47 msg="message, formatted"
 }

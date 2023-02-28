@@ -50,7 +50,7 @@ type handlerWriter struct {
 }
 
 func (w *handlerWriter) Write(buf []byte) (int, error) {
-	if !w.h.Enabled(nil, w.level) {
+	if !w.h.Enabled(context.Background(), w.level) {
 		return 0, nil
 	}
 	var pc uintptr
@@ -67,7 +67,7 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 		buf = buf[:len(buf)-1]
 	}
 	r := NewRecord(time.Now(), w.level, string(buf), pc)
-	return origLen, w.h.Handle(nil, r)
+	return origLen, w.h.Handle(context.Background(), r)
 }
 
 // A Logger records structured information about each call to its
@@ -136,6 +136,9 @@ func With(args ...any) *Logger {
 
 // Enabled reports whether l emits log records at the given context and level.
 func (l *Logger) Enabled(ctx context.Context, level Level) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return l.Handler().Enabled(ctx, level)
 }
 
@@ -230,6 +233,9 @@ func (l *Logger) log(ctx context.Context, err error, level Level, msg string, ar
 		r.nFront++
 	}
 	r.Add(args...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	_ = l.Handler().Handle(ctx, r)
 }
 
@@ -247,6 +253,9 @@ func (l *Logger) logAttrs(ctx context.Context, level Level, msg string, attrs ..
 	}
 	r := NewRecord(time.Now(), level, msg, pc)
 	r.AddAttrs(attrs...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	_ = l.Handler().Handle(ctx, r)
 }
 

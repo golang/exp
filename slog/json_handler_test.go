@@ -6,6 +6,7 @@ package slog
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ func TestJSONHandler(t *testing.T) {
 			h := test.opts.NewJSONHandler(&buf)
 			r := NewRecord(testTime, LevelInfo, "m", 0)
 			r.AddAttrs(Int("a", 1), Any("m", map[string]int{"b": 2}))
-			if err := h.Handle(nil, r); err != nil {
+			if err := h.Handle(context.Background(), r); err != nil {
 				t.Fatal(err)
 			}
 			got := strings.TrimSuffix(buf.String(), "\n")
