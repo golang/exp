@@ -6,11 +6,17 @@ package benchmarks
 
 import (
 	"context"
+	"flag"
 	"io"
 	"testing"
 
 	"golang.org/x/exp/slog"
+	"golang.org/x/exp/slog/internal"
 )
+
+func init() {
+	flag.BoolVar(&internal.IgnorePC, "nopc", false, "do not invoke runtime.Callers")
+}
 
 // We pass Attrs (or zap.Fields) inline because it affects allocations: building
 // up a list outside of the benchmarked code and passing it in with "..."

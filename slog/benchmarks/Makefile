@@ -15,7 +15,7 @@ slog.bench: *.go ../*.go ../../go.mod
 	go test -run NONE -bench . -count $(count) > $@
 
 slog-nopc.bench: *.go ../*.go ../../go.mod
-	go test -tags nopc -run NONE -bench . -count $(count) > $@
+	go test -nopc -run NONE -bench . -count $(count) > $@
 
 %_benchmarks/out.bench: %_benchmarks/*.go %_benchmarks/go.mod
 	go test -C $*_benchmarks  -bench . -count $(count) > $@

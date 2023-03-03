@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/exp/slog/internal"
 )
 
 var defaultLogger atomic.Value
@@ -52,7 +54,7 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 		return 0, nil
 	}
 	var pc uintptr
-	if w.capturePC {
+	if !internal.IgnorePC && w.capturePC {
 		// skip [runtime.Callers, w.Write, Logger.Output, log.Print]
 		var pcs [1]uintptr
 		runtime.Callers(4, pcs[:])
@@ -215,10 +217,14 @@ func (l *Logger) log(ctx context.Context, err error, level Level, msg string, ar
 	if !l.Enabled(ctx, level) {
 		return
 	}
-	var pcs [1]uintptr
-	// skip [runtime.Callers, this function, this function's caller]
-	runtime.Callers(3, pcs[:])
-	r := NewRecord(time.Now(), level, msg, pcs[0])
+	var pc uintptr
+	if !internal.IgnorePC {
+		var pcs [1]uintptr
+		// skip [runtime.Callers, this function, this function's caller]
+		runtime.Callers(3, pcs[:])
+		pc = pcs[0]
+	}
+	r := NewRecord(time.Now(), level, msg, pc)
 	if err != nil {
 		r.front[0] = Any(ErrorKey, err)
 		r.nFront++
@@ -232,10 +238,14 @@ func (l *Logger) logAttrs(ctx context.Context, level Level, msg string, attrs ..
 	if !l.Enabled(ctx, level) {
 		return
 	}
-	var pcs [1]uintptr
-	// skip [runtime.Callers, this function, this function's caller]
-	runtime.Callers(3, pcs[:])
-	r := NewRecord(time.Now(), level, msg, pcs[0])
+	var pc uintptr
+	if !internal.IgnorePC {
+		var pcs [1]uintptr
+		// skip [runtime.Callers, this function, this function's caller]
+		runtime.Callers(3, pcs[:])
+		pc = pcs[0]
+	}
+	r := NewRecord(time.Now(), level, msg, pc)
 	r.AddAttrs(attrs...)
 	_ = l.Handler().Handle(ctx, r)
 }
