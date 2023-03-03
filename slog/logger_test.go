@@ -491,3 +491,10 @@ func BenchmarkNopLog(b *testing.B) {
 		})
 	})
 }
+
+// callerPC returns the program counter at the given stack depth.
+func callerPC(depth int) uintptr {
+	var pcs [1]uintptr
+	runtime.Callers(depth, pcs[:])
+	return pcs[0]
+}

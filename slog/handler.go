@@ -109,9 +109,8 @@ func (h *defaultHandler) Handle(ctx context.Context, r Record) error {
 	defer state.free()
 	state.appendNonBuiltIns(r)
 
-	// 5 = log.Output depth + handlerWriter.Write + defaultHandler.Handle
-	//
-	return h.output(5, buf.String())
+	// skip [h.output, defaultHandler.Handle, handlerWriter.Write, log.Output]
+	return h.output(4, buf.String())
 }
 
 func (h *defaultHandler) WithAttrs(as []Attr) Handler {
