@@ -33,7 +33,7 @@ func ExampleHandlerOptions_customLevels() {
 		Level: LevelTrace,
 
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// Remove time from the output for predicable test output.
+			// Remove time from the output for predictable test output.
 			if a.Key == slog.TimeKey {
 				return slog.Attr{}
 			}

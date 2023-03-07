@@ -25,6 +25,9 @@ import (
 // Any of the Handler's methods may be called concurrently with itself
 // or with other methods. It is the responsibility of the Handler to
 // manage this concurrency.
+//
+// Users of the slog package should not invoke Handler methods directly.
+// They should use the methods of [Logger] instead.
 type Handler interface {
 	// Enabled reports whether the handler handles records at the given level.
 	// The handler ignores records whose level is lower.
@@ -47,6 +50,7 @@ type Handler interface {
 	//
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time is the zero time, ignore the time.
+	//   - If r.PC is zero, ignore it.
 	//   - If an Attr's key is the empty string and the value is not a group,
 	//     ignore the Attr.
 	//   - If a group's key is empty, inline the group's Attrs.
@@ -57,6 +61,7 @@ type Handler interface {
 	// WithAttrs returns a new Handler whose attributes consist of
 	// both the receiver's attributes and the arguments.
 	// The Handler owns the slice: it may retain, modify or discard it.
+	// [Logger.With] will resolve the Attrs.
 	WithAttrs(attrs []Attr) Handler
 
 	// WithGroup returns a new Handler with the given group appended to
