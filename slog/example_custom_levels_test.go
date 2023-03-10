@@ -5,7 +5,6 @@
 package slog_test
 
 import (
-	"fmt"
 	"os"
 
 	"golang.org/x/exp/slog"
@@ -75,7 +74,7 @@ func ExampleHandlerOptions_customLevels() {
 
 	logger := slog.New(th)
 	logger.Log(nil, LevelEmergency, "missing pilots")
-	logger.Error("failed to start engines", fmt.Errorf("missing fuel"))
+	logger.Error("failed to start engines", "err", "missing fuel")
 	logger.Warn("falling back to default value")
 	logger.Log(nil, LevelNotice, "all systems are running")
 	logger.Info("initiating launch")

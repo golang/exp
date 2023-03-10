@@ -45,8 +45,8 @@ func TestLogTextHandler(t *testing.T) {
 	l.Warn("w", Duration("dur", 3*time.Second))
 	check(`level=WARN msg=w dur=3s`)
 
-	l.Error("bad", io.EOF, "a", 1)
-	check(`level=ERROR msg=bad err=EOF a=1`)
+	l.Error("bad", "a", 1)
+	check(`level=ERROR msg=bad a=1`)
 
 	l.Log(nil, LevelWarn+1, "w", Int("a", 1), String("b", "two"))
 	check(`level=WARN\+1 msg=w a=1 b=two`)
@@ -82,7 +82,7 @@ func TestConnections(t *testing.T) {
 	Warn("msg", "b", 2)
 	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: WARN msg b=2`)
 	logbuf.Reset()
-	Error("msg", io.EOF, "c", 3)
+	Error("msg", "err", io.EOF, "c", 3)
 	checkLogOutput(t, logbuf.String(), `logger_test.go:\d+: ERROR msg err=EOF c=3`)
 
 	// Levels below Info are not printed.
@@ -199,7 +199,7 @@ func TestCallDepth(t *testing.T) {
 	check(3)
 	logger.Warn("")
 	check(4)
-	logger.Error("", nil)
+	logger.Error("")
 	check(5)
 	Debug("")
 	check(6)
@@ -207,7 +207,7 @@ func TestCallDepth(t *testing.T) {
 	check(7)
 	Warn("")
 	check(8)
-	Error("", nil)
+	Error("")
 	check(9)
 	Log(nil, LevelInfo, "")
 	check(10)
@@ -224,7 +224,7 @@ func TestAlloc(t *testing.T) {
 		wantAllocs(t, 0, func() { Info("hello") })
 	})
 	t.Run("Error", func(t *testing.T) {
-		wantAllocs(t, 0, func() { Error("hello", io.EOF) })
+		wantAllocs(t, 0, func() { Error("hello") })
 	})
 	t.Run("logger.Info", func(t *testing.T) {
 		wantAllocs(t, 0, func() { dl.Info("hello") })
@@ -361,10 +361,10 @@ func TestLoggerError(t *testing.T) {
 		return a
 	}
 	l := New(HandlerOptions{ReplaceAttr: removeTime}.NewTextHandler(&buf))
-	l.Error("msg", io.EOF, "a", 1)
+	l.Error("msg", "err", io.EOF, "a", 1)
 	checkLogOutput(t, buf.String(), `level=ERROR msg=msg err=EOF a=1`)
 	buf.Reset()
-	l.Error("msg", io.EOF, "a")
+	l.Error("msg", "err", io.EOF, "a")
 	checkLogOutput(t, buf.String(), `level=ERROR msg=msg err=EOF !BADKEY=a`)
 }
 

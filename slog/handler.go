@@ -185,9 +185,6 @@ const (
 	// SourceKey is the key used by the built-in handlers for the source file
 	// and line of the log call. The associated value is a string.
 	SourceKey = "source"
-	// ErrorKey is the key used for errors by Logger.Error.
-	// The associated value is an [error].
-	ErrorKey = "err"
 )
 
 type commonHandler struct {
