@@ -212,9 +212,7 @@ in "Ctx" do. For example,
 
 It is recommended to pass a context to an output method if one is available.
 
-# Advanced topics
-
-Customizing a type's logging behavior.
+# Customizing a type's logging behavior
 
 If a type implements the [LogValuer] interface, the [Value] returned from its LogValue
 method is used for logging. You can use this to control how values of the type
@@ -226,7 +224,7 @@ A LogValue method may return a Value that itself implements [LogValuer]. The [Va
 method handles these cases carefully, avoiding infinite loops and unbounded recursion.
 Handler authors and others may wish to use Value.Resolve instead of calling LogValue directly.
 
-Wrapping output methods.
+# Wrapping output methods
 
 The logger functions use reflection over the call stack to find the file name
 and line number of the logging call within the application. This can produce
@@ -248,7 +246,7 @@ A correct implementation of Infof will obtain the source location
 The Infof function in the package-level example called "wrapping"
 demonstrates how to do this.
 
-Working with Records.
+# Working with Records
 
 Sometimes a Handler will need to modify a Record
 before passing it on to another Handler or backend.
@@ -262,7 +260,7 @@ create a copy that shares no state with the original,
 or create a new Record with [NewRecord]
 and build up its Attrs by traversing the old ones with [Record.Attrs].
 
-Performance considerations.
+# Performance considerations
 
 If profiling your application demonstrates that logging is taking significant time,
 the following suggestions may help.
