@@ -111,7 +111,7 @@ func appendTextValue(s *handleState, v Value) error {
 			s.buf.WriteString(strconv.Quote(string(bs)))
 			return nil
 		}
-		s.appendString(fmt.Sprint(v.Any()))
+		s.appendString(fmt.Sprintf("%+v", v.Any()))
 	default:
 		*s.buf = v.append(*s.buf)
 	}

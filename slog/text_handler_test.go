@@ -35,9 +35,14 @@ func TestTextHandler(t *testing.T) {
 			`"x = y"`, `"qu\"o"`,
 		},
 		{
-			"Sprint",
+			"String method",
 			Any("name", name{"Ren", "Hoek"}),
 			`name`, `"Hoek, Ren"`,
+		},
+		{
+			"struct",
+			Any("x", &struct{ A, b int }{A: 1, b: 2}),
+			`x`, `"&{A:1 b:2}"`,
 		},
 		{
 			"TextMarshaler",
