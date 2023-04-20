@@ -1,4 +1,4 @@
-package slogtest_test
+package slog_test
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"golang.org/x/exp/slog/slogtest"
 )
 
-func TestBuiltInHandlers(t *testing.T) {
+func TestSlogtest(t *testing.T) {
 	for _, test := range []struct {
 		name  string
 		new   func(io.Writer) slog.Handler
