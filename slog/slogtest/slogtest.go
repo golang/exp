@@ -158,6 +158,26 @@ func TestHandler(h slog.Handler, results func() []map[string]any) error {
 				inGroup("G", inGroup("H", hasAttr("e", "f"))),
 			},
 		},
+		{
+			explanation: withSource("a Handler should call Resolve on attribute values"),
+			f: func(l *slog.Logger) {
+				l.Info("msg", "k", &replace{"replaced"})
+			},
+			checks: []check{hasAttr("k", "replaced")},
+		},
+		{
+			explanation: withSource("a Handler should call Resolve on attribute values in groups"),
+			f: func(l *slog.Logger) {
+				l.Info("msg",
+					slog.Group("G",
+						slog.String("a", "v1"),
+						slog.Any("b", &replace{"v2"})))
+			},
+			checks: []check{
+				inGroup("G", hasAttr("a", "v1")),
+				inGroup("G", hasAttr("b", "v2")),
+			},
+		},
 	}
 
 	// Run the handler on the test cases.
@@ -250,4 +270,14 @@ func withSource(s string) string {
 		panic("runtime.Caller failed")
 	}
 	return fmt.Sprintf("%s (%s:%d)", s, file, line)
+}
+
+type replace struct {
+	v any
+}
+
+func (r *replace) LogValue() slog.Value { return slog.AnyValue(r.v) }
+
+func (r *replace) String() string {
+	return fmt.Sprintf("<replace(%v)>", r.v)
 }
