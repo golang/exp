@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -398,12 +399,15 @@ func clean(s string) string {
 }
 
 type captureHandler struct {
+	mu     sync.Mutex
 	r      Record
 	attrs  []Attr
 	groups []string
 }
 
 func (h *captureHandler) Handle(ctx context.Context, r Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.r = r
 	return nil
 }
@@ -411,14 +415,22 @@ func (h *captureHandler) Handle(ctx context.Context, r Record) error {
 func (*captureHandler) Enabled(context.Context, Level) bool { return true }
 
 func (c *captureHandler) WithAttrs(as []Attr) Handler {
-	c2 := *c
-	c2.attrs = concat(c2.attrs, as)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var c2 captureHandler
+	c2.r = c.r
+	c2.groups = c.groups
+	c2.attrs = concat(c.attrs, as)
 	return &c2
 }
 
 func (c *captureHandler) WithGroup(name string) Handler {
-	c2 := *c
-	c2.groups = append(slices.Clip(c2.groups), name)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var c2 captureHandler
+	c2.r = c.r
+	c2.attrs = c.attrs
+	c2.groups = append(slices.Clip(c.groups), name)
 	return &c2
 }
 

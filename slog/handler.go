@@ -51,8 +51,9 @@ type Handler interface {
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time is the zero time, ignore the time.
 	//   - If r.PC is zero, ignore it.
-	//   - If an Attr's key is the empty string and the value is not a group,
-	//     ignore the Attr.
+	//   - Attr's values should be resolved.
+	//   - If an Attr's key and value are both the zero value, ignore the Attr.
+	//     This can be tested with attr.Equal(Attr{}).
 	//   - If a group's key is empty, inline the group's Attrs.
 	//   - If a group has no Attrs (even if it has a non-empty key),
 	//     ignore it.
@@ -61,7 +62,6 @@ type Handler interface {
 	// WithAttrs returns a new Handler whose attributes consist of
 	// both the receiver's attributes and the arguments.
 	// The Handler owns the slice: it may retain, modify or discard it.
-	// [Logger.With] will resolve the Attrs.
 	WithAttrs(attrs []Attr) Handler
 
 	// WithGroup returns a new Handler with the given group appended to
@@ -333,8 +333,9 @@ func (s *handleState) appendNonBuiltIns(r Record) {
 	defer s.prefix.Free()
 	s.prefix.WriteString(s.h.groupPrefix)
 	s.openGroups()
-	r.Attrs(func(a Attr) {
+	r.Attrs(func(a Attr) bool {
 		s.appendAttr(a)
+		return true
 	})
 	if s.h.json {
 		// Close all open groups.
@@ -440,26 +441,22 @@ func (s *handleState) closeGroup(name string) {
 // It handles replacement and checking for an empty key.
 // after replacement).
 func (s *handleState) appendAttr(a Attr) {
-	v := a.Value
-	// Elide a non-group with an empty key.
-	if a.Key == "" && v.Kind() != KindGroup {
-		return
-	}
-	if rep := s.h.opts.ReplaceAttr; rep != nil && v.Kind() != KindGroup {
+	if rep := s.h.opts.ReplaceAttr; rep != nil && a.Value.Kind() != KindGroup {
 		var gs []string
 		if s.groups != nil {
 			gs = *s.groups
 		}
-		a = rep(gs, Attr{a.Key, v})
-		if a.Key == "" {
-			return
-		}
-		// Although all attributes in the Record are already resolved,
-		// This one came from the user, so it may not have been.
-		v = a.Value.Resolve()
+		// Resolve before calling ReplaceAttr, so the user doesn't have to.
+		a.Value = a.Value.Resolve()
+		a = rep(gs, a)
 	}
-	if v.Kind() == KindGroup {
-		attrs := v.Group()
+	a.Value = a.Value.Resolve()
+	// Elide empty Attrs.
+	if a.isEmpty() {
+		return
+	}
+	if a.Value.Kind() == KindGroup {
+		attrs := a.Value.Group()
 		// Output only non-empty groups.
 		if len(attrs) > 0 {
 			// Inline a group with an empty key.
@@ -475,7 +472,7 @@ func (s *handleState) appendAttr(a Attr) {
 		}
 	} else {
 		s.appendKey(a.Key)
-		s.appendValue(v)
+		s.appendValue(a.Value)
 	}
 }
 

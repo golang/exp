@@ -13,6 +13,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +68,12 @@ func (j jsonMarshaler) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`[%q]`, j.s)), nil
 }
 
+type jsonMarshalerError struct {
+	jsonMarshaler
+}
+
+func (jsonMarshalerError) Error() string { return "oops" }
+
 func TestAppendJSONValue(t *testing.T) {
 	// On most values, jsonAppendAttrValue should agree with json.Marshal.
 	for _, value := range []any{
@@ -82,6 +89,7 @@ func TestAppendJSONValue(t *testing.T) {
 		time.Minute,
 		testTime,
 		jsonMarshaler{"xyz"},
+		jsonMarshalerError{jsonMarshaler{"pqr"}},
 	} {
 		got := jsonValueString(t, AnyValue(value))
 		want, err := marshalJSON(value)
@@ -111,8 +119,8 @@ func TestJSONAppendAttrValueSpecial(t *testing.T) {
 		want  string
 	}{
 		{math.NaN(), `"NaN"`},
-		{math.Inf(+1), `"+Inf"`},
-		{math.Inf(-1), `"-Inf"`},
+		{math.Inf(+1), `"Infinity"`},
+		{math.Inf(-1), `"-Infinity"`},
 		{LevelWarn, `"WARN"`},
 	} {
 		got := jsonValueString(t, AnyValue(test.value))
@@ -202,7 +210,7 @@ func BenchmarkPreformatting(b *testing.B) {
 		}),
 	}
 
-	outFile, err := os.Create("/tmp/bench.log")
+	outFile, err := os.Create(filepath.Join(b.TempDir(), "bench.log"))
 	if err != nil {
 		b.Fatal(err)
 	}

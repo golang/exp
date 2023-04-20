@@ -109,12 +109,10 @@ func TestDefaultHandle(t *testing.T) {
 func TestJSONAndTextHandlers(t *testing.T) {
 	ctx := context.Background()
 
-	// ReplaceAttr functions
-
 	// remove all Attrs
 	removeAll := func(_ []string, a Attr) Attr { return Attr{} }
 
-	attrs := []Attr{String("a", "one"), Int("b", 2), Any("", "ignore me")}
+	attrs := []Attr{String("a", "one"), Int("b", 2), Any("", nil)}
 	preAttrs := []Attr{Int("pre", 3), String("x", "y")}
 
 	for _, test := range []struct {
@@ -131,6 +129,12 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			attrs:    attrs,
 			wantText: "time=2000-01-02T03:04:05.000Z level=INFO msg=message a=one b=2",
 			wantJSON: `{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"message","a":"one","b":2}`,
+		},
+		{
+			name:     "empty key",
+			attrs:    append(slices.Clip(attrs), Any("", "v")),
+			wantText: `time=2000-01-02T03:04:05.000Z level=INFO msg=message a=one b=2 ""=v`,
+			wantJSON: `{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"message","a":"one","b":2,"":"v"}`,
 		},
 		{
 			name:     "cap keys",
@@ -232,6 +236,16 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantJSON: `{"msg":"message","a":1,"name":{"first":"Ren","last":"Hoek"},"b":2}`,
 		},
 		{
+			// Test resolution when there is no ReplaceAttr function.
+			name: "resolve",
+			attrs: []Attr{
+				Any("", &replace{Value{}}), // should be elided
+				Any("name", logValueName{"Ren", "Hoek"}),
+			},
+			wantText: "time=2000-01-02T03:04:05.000Z level=INFO msg=message name.first=Ren name.last=Hoek",
+			wantJSON: `{"time":"2000-01-02T03:04:05Z","level":"INFO","msg":"message","name":{"first":"Ren","last":"Hoek"}}`,
+		},
+		{
 			name:     "with-group",
 			replace:  removeKeys(TimeKey, LevelKey),
 			with:     func(h Handler) Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
@@ -297,7 +311,7 @@ func TestJSONAndTextHandlers(t *testing.T) {
 			wantJSON: `{"msg":"message","a":1,"b":2,"c":3,"d":4}`,
 		},
 	} {
-		r := NewRecord(testTime, LevelInfo, "message", 1)
+		r := NewRecord(testTime, LevelInfo, "message", 0)
 		r.AddAttrs(test.attrs...)
 		var buf bytes.Buffer
 		opts := HandlerOptions{ReplaceAttr: test.replace}

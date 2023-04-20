@@ -67,9 +67,9 @@ func TestHandler(h slog.Handler, results func() []map[string]any) error {
 			},
 		},
 		{
-			explanation: withSource("a Handler should ignore an Attr with an empty key"),
+			explanation: withSource("a Handler should ignore an empty Attr"),
 			f: func(l *slog.Logger) {
-				l.Info("msg", "a", "b", "", "ignore", "c", "d")
+				l.Info("msg", "a", "b", "", nil, "c", "d")
 			},
 			checks: []check{
 				hasAttr("a", "b"),

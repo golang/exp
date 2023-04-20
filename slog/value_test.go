@@ -7,6 +7,7 @@ package slog
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -59,6 +60,7 @@ func TestValueString(t *testing.T) {
 		{StringValue("foo"), "foo"},
 		{TimeValue(testTime), "2000-01-02 03:04:05 +0000 UTC"},
 		{AnyValue(time.Duration(3 * time.Second)), "3s"},
+		{GroupValue(Int("a", 1), Bool("b", true)), "[a=1 b=true]"},
 	} {
 		if got := test.v.String(); got != test.want {
 			t.Errorf("%#v:\ngot  %q\nwant %q", test.v, got, test.want)
@@ -173,18 +175,27 @@ func TestLogValue(t *testing.T) {
 		t.Errorf("expected error, got %T", got)
 	}
 
-	// Test Resolve group.
-	r = &replace{GroupValue(
-		Int("a", 1),
-		Group("b", Any("c", &replace{StringValue("d")})),
-	)}
-	v = AnyValue(r)
+	// Groups are not recursively resolved.
+	c := Any("c", &replace{StringValue("d")})
+	v = AnyValue(&replace{GroupValue(Int("a", 1), Group("b", c))})
 	got2 := v.Resolve().Any().([]Attr)
-	want2 := []Attr{Int("a", 1), Group("b", String("c", "d"))}
+	want2 := []Attr{Int("a", 1), Group("b", c)}
 	if !attrsEqual(got2, want2) {
 		t.Errorf("got %v, want %v", got2, want2)
 	}
 
+	// Verify that panics in Resolve are caught and turn into errors.
+	v = AnyValue(panickingLogValue{})
+	got = v.Resolve().Any()
+	gotErr, ok := got.(error)
+	if !ok {
+		t.Errorf("expected error, got %T", got)
+	}
+	// The error should provide some context information.
+	// We'll just check that this function name appears in it.
+	if got, want := gotErr.Error(), "TestLogValue"; !strings.Contains(got, want) {
+		t.Errorf("got %q, want substring %q", got, want)
+	}
 }
 
 func TestZeroTime(t *testing.T) {
@@ -200,6 +211,10 @@ type replace struct {
 }
 
 func (r *replace) LogValue() Value { return r.v }
+
+type panickingLogValue struct{}
+
+func (panickingLogValue) LogValue() Value { panic("bad") }
 
 // A Value with "unsafe" strings is significantly faster:
 // safe:  1785 ns/op, 0 allocs

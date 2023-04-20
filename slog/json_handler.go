@@ -80,7 +80,7 @@ func (h *JSONHandler) WithGroup(name string) Handler {
 // Values are formatted as with encoding/json.Marshal, with the following
 // exceptions:
 //   - Floating-point NaNs and infinities are formatted as one of the strings
-//     "NaN", "+Inf" or "-Inf".
+//     "NaN", "Infinity" or "-Infinity".
 //   - Levels are formatted as with Level.String.
 //   - HTML characters are not escaped.
 //
@@ -114,9 +114,9 @@ func appendJSONValue(s *handleState, v Value) error {
 		// json.Marshal fails on special floats, so handle them here.
 		switch {
 		case math.IsInf(f, 1):
-			s.buf.WriteString(`"+Inf"`)
+			s.buf.WriteString(`"Infinity"`)
 		case math.IsInf(f, -1):
-			s.buf.WriteString(`"-Inf"`)
+			s.buf.WriteString(`"-Infinity"`)
 		case math.IsNaN(f):
 			s.buf.WriteString(`"NaN"`)
 		default:
@@ -136,13 +136,14 @@ func appendJSONValue(s *handleState, v Value) error {
 		s.appendTime(v.Time())
 	case KindAny:
 		a := v.Any()
-		if err, ok := a.(error); ok {
+		_, jm := a.(json.Marshaler)
+		if err, ok := a.(error); ok && !jm {
 			s.appendString(err.Error())
 		} else {
 			return appendJSONMarshal(s.buf, a)
 		}
 	default:
-		panic(fmt.Sprintf("bad kind: %d", v.Kind()))
+		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
 	}
 	return nil
 }
