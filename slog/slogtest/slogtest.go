@@ -178,6 +178,27 @@ func TestHandler(h slog.Handler, results func() []map[string]any) error {
 				inGroup("G", hasAttr("b", "v2")),
 			},
 		},
+		{
+			explanation: withSource("a Handler should call Resolve on attribute values from WithAttrs"),
+			f: func(l *slog.Logger) {
+				l = l.With("k", &replace{"replaced"})
+				l.Info("msg")
+			},
+			checks: []check{hasAttr("k", "replaced")},
+		},
+		{
+			explanation: withSource("a Handler should call Resolve on attribute values in groups from WithAttrs"),
+			f: func(l *slog.Logger) {
+				l = l.With(slog.Group("G",
+					slog.String("a", "v1"),
+					slog.Any("b", &replace{"v2"})))
+				l.Info("msg")
+			},
+			checks: []check{
+				inGroup("G", hasAttr("a", "v1")),
+				inGroup("G", hasAttr("b", "v2")),
+			},
+		},
 	}
 
 	// Run the handler on the test cases.
