@@ -31,8 +31,8 @@ func BenchmarkAttrs(b *testing.B) {
 		{"disabled", disabledHandler{}},
 		{"async discard", newAsyncHandler()},
 		{"fastText discard", newFastTextHandler(io.Discard)},
-		{"Text discard", slog.NewTextHandler(io.Discard)},
-		{"JSON discard", slog.NewJSONHandler(io.Discard)},
+		{"Text discard", slog.NewTextHandler(io.Discard, nil)},
+		{"JSON discard", slog.NewJSONHandler(io.Discard, nil)},
 	} {
 		logger := slog.New(handler.h)
 		b.Run(handler.name, func(b *testing.B) {

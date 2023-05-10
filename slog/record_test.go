@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog/internal/buffer"
 )
 
 func TestRecordAttrs(t *testing.T) {
@@ -37,30 +36,33 @@ func TestRecordAttrs(t *testing.T) {
 	}
 }
 
-func TestRecordSourceLine(t *testing.T) {
-	// Zero call depth => empty file/line
+func TestRecordSource(t *testing.T) {
+	// Zero call depth => empty *Source.
 	for _, test := range []struct {
 		depth            int
+		wantFunction     string
 		wantFile         string
 		wantLinePositive bool
 	}{
-		{0, "", false},
-		{-16, "", false},
-		{1, "record_test.go", true}, // 1: caller of NewRecord
-		{2, "testing.go", true},
+		{0, "", "", false},
+		{-16, "", "", false},
+		{1, "golang.org/x/exp/slog.TestRecordSource", "record_test.go", true}, // 1: caller of NewRecord
+		{2, "testing.tRunner", "testing.go", true},
 	} {
 		var pc uintptr
 		if test.depth > 0 {
 			pc = callerPC(test.depth + 1)
 		}
 		r := NewRecord(time.Time{}, 0, "", pc)
-		gotFile, gotLine := sourceLine(r)
-		if i := strings.LastIndexByte(gotFile, '/'); i >= 0 {
-			gotFile = gotFile[i+1:]
+		got := r.source()
+		if i := strings.LastIndexByte(got.File, '/'); i >= 0 {
+			got.File = got.File[i+1:]
 		}
-		if gotFile != test.wantFile || (gotLine > 0) != test.wantLinePositive {
-			t.Errorf("depth %d: got (%q, %d), want (%q, %t)",
-				test.depth, gotFile, gotLine, test.wantFile, test.wantLinePositive)
+		if got.Function != test.wantFunction || got.File != test.wantFile || (got.Line > 0) != test.wantLinePositive {
+			t.Errorf("depth %d: got (%q, %q, %d), want (%q, %q, %t)",
+				test.depth,
+				got.Function, got.File, got.Line,
+				test.wantFunction, test.wantFile, test.wantLinePositive)
 		}
 	}
 }
@@ -135,29 +137,6 @@ func BenchmarkPC(b *testing.B) {
 			_ = x
 		})
 	}
-}
-
-func BenchmarkSourceLine(b *testing.B) {
-	r := NewRecord(time.Now(), LevelInfo, "", 5)
-	b.Run("alone", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			file, line := sourceLine(r)
-			_ = file
-			_ = line
-		}
-	})
-	b.Run("stringifying", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			file, line := sourceLine(r)
-			buf := buffer.New()
-			buf.WriteString(file)
-			buf.WriteByte(':')
-			buf.WritePosInt(line)
-			s := buf.String()
-			buf.Free()
-			_ = s
-		}
-	})
 }
 
 func BenchmarkRecord(b *testing.B) {

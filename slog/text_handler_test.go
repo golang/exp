@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -82,7 +81,7 @@ func TestTextHandler(t *testing.T) {
 			} {
 				t.Run(opts.name, func(t *testing.T) {
 					var buf bytes.Buffer
-					h := opts.opts.NewTextHandler(&buf)
+					h := NewTextHandler(&buf, &opts.opts)
 					r := NewRecord(testTime, LevelInfo, "a message", 0)
 					r.AddAttrs(test.attr)
 					if err := h.Handle(context.Background(), r); err != nil {
@@ -122,35 +121,9 @@ func (t text) MarshalText() ([]byte, error) {
 	return []byte(fmt.Sprintf("text{%q}", t.s)), nil
 }
 
-func TestTextHandlerSource(t *testing.T) {
-	var buf bytes.Buffer
-	h := HandlerOptions{AddSource: true}.NewTextHandler(&buf)
-	r := NewRecord(testTime, LevelInfo, "m", callerPC(2))
-	if err := h.Handle(context.Background(), r); err != nil {
-		t.Fatal(err)
-	}
-	if got := buf.String(); !sourceRegexp.MatchString(got) {
-		t.Errorf("got\n%q\nwanted to match %s", got, sourceRegexp)
-	}
-}
-
-var sourceRegexp = regexp.MustCompile(`source="?([A-Z]:)?[^:]+text_handler_test\.go:\d+"? msg`)
-
-func TestSourceRegexp(t *testing.T) {
-	for _, s := range []string{
-		`source=/tmp/path/to/text_handler_test.go:23 msg=m`,
-		`source=C:\windows\path\text_handler_test.go:23 msg=m"`,
-		`source="/tmp/tmp.XcGZ9cG9Xb/with spaces/exp/slog/text_handler_test.go:95" msg=m`,
-	} {
-		if !sourceRegexp.MatchString(s) {
-			t.Errorf("failed to match %s", s)
-		}
-	}
-}
-
 func TestTextHandlerPreformatted(t *testing.T) {
 	var buf bytes.Buffer
-	var h Handler = NewTextHandler(&buf)
+	var h Handler = NewTextHandler(&buf, nil)
 	h = h.WithAttrs([]Attr{Duration("dur", time.Minute), Bool("b", true)})
 	// Also test omitting time.
 	r := NewRecord(time.Time{}, 0 /* 0 Level is INFO */, "m", 0)
@@ -170,7 +143,7 @@ func TestTextHandlerAlloc(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		r.AddAttrs(Int("x = y", i))
 	}
-	var h Handler = NewTextHandler(io.Discard)
+	var h Handler = NewTextHandler(io.Discard, nil)
 	wantAllocs(t, 0, func() { h.Handle(context.Background(), r) })
 
 	h = h.WithGroup("s")

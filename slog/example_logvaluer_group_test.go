@@ -4,9 +4,7 @@
 
 package slog_test
 
-import (
-	"golang.org/x/exp/slog"
-)
+import "golang.org/x/exp/slog"
 
 type Name struct {
 	First, Last string

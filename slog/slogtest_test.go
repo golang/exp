@@ -1,3 +1,7 @@
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package slog_test
 
 import (
@@ -18,8 +22,8 @@ func TestSlogtest(t *testing.T) {
 		new   func(io.Writer) slog.Handler
 		parse func([]byte) (map[string]any, error)
 	}{
-		{"JSON", func(w io.Writer) slog.Handler { return slog.NewJSONHandler(w) }, parseJSON},
-		{"Text", func(w io.Writer) slog.Handler { return slog.NewTextHandler(w) }, parseText},
+		{"JSON", func(w io.Writer) slog.Handler { return slog.NewJSONHandler(w, nil) }, parseJSON},
+		{"Text", func(w io.Writer) slog.Handler { return slog.NewTextHandler(w, nil) }, parseText},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
@@ -38,9 +42,9 @@ func TestSlogtest(t *testing.T) {
 	}
 }
 
-func parseLines(bs []byte, parse func([]byte) (map[string]any, error)) ([]map[string]any, error) {
-	var ms []map[string]any
-	for _, line := range bytes.Split(bs, []byte{'\n'}) {
+func parseLines(src []byte, parse func([]byte) (map[string]any, error)) ([]map[string]any, error) {
+	var records []map[string]any
+	for _, line := range bytes.Split(src, []byte{'\n'}) {
 		if len(line) == 0 {
 			continue
 		}
@@ -48,9 +52,9 @@ func parseLines(bs []byte, parse func([]byte) (map[string]any, error)) ([]map[st
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", string(line), err)
 		}
-		ms = append(ms, m)
+		records = append(records, m)
 	}
-	return ms, nil
+	return records, nil
 }
 
 func parseJSON(bs []byte) (map[string]any, error) {
@@ -71,12 +75,13 @@ func parseText(bs []byte) (map[string]any, error) {
 	top := map[string]any{}
 	s := string(bytes.TrimSpace(bs))
 	for len(s) > 0 {
-		kv, rest, _ := strings.Cut(s, " ")
+		kv, rest, _ := strings.Cut(s, " ") // assumes exactly one space between attrs
 		k, value, found := strings.Cut(kv, "=")
 		if !found {
 			return nil, fmt.Errorf("no '=' in %q", kv)
 		}
 		keys := strings.Split(k, ".")
+		// Populate a tree of maps for a dotted path such as "a.b.c=x".
 		m := top
 		for _, key := range keys[:len(keys)-1] {
 			x, ok := m[key]
