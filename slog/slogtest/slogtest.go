@@ -2,7 +2,6 @@ package slogtest
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -225,7 +224,7 @@ func TestHandler(h slog.Handler, results func() []map[string]any) error {
 			}
 		}
 	}
-	return errors.Join(errs...)
+	return errorsJoin(errs...)
 }
 
 type check func(map[string]any) string
