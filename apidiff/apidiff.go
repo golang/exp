@@ -15,12 +15,12 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"strings"
 )
 
 // Changes reports on the differences between the APIs of the old and new packages.
 // It classifies each difference as either compatible or incompatible (breaking.) For
-// a detailed discussion of what constitutes an incompatible change, see the package
-// documentation.
+// a detailed discussion of what constitutes an incompatible change, see the README.
 func Changes(old, new *types.Package) Report {
 	d := newDiffer(old, new)
 	d.checkPackage()
@@ -32,6 +32,63 @@ func Changes(old, new *types.Package) Report {
 		r.Changes = append(r.Changes, Change{Message: m, Compatible: true})
 	}
 	return r
+}
+
+// ModuleChanges reports on the differences between the APIs of the old and new
+// modules. It classifies each difference as either compatible or incompatible
+// (breaking). This includes the addition and removal of entire packages. For a
+// detailed discussion of what constitutes an incompatible change, see the README.
+func ModuleChanges(old, new *Module) Report {
+	var r Report
+
+	oldPkgs := make(map[string]*types.Package)
+	for _, p := range old.Packages {
+		oldPkgs[old.relativePath(p)] = p
+	}
+
+	newPkgs := make(map[string]*types.Package)
+	for _, p := range new.Packages {
+		newPkgs[new.relativePath(p)] = p
+	}
+
+	for n, op := range oldPkgs {
+		if np, ok := newPkgs[n]; ok {
+			// shared package, compare surfaces
+			rr := Changes(op, np)
+			r.Changes = append(r.Changes, rr.Changes...)
+		} else {
+			// old package was removed
+			r.Changes = append(r.Changes, packageChange(op, "removed", false))
+		}
+	}
+
+	for n, np := range newPkgs {
+		if _, ok := oldPkgs[n]; !ok {
+			// new package was added
+			r.Changes = append(r.Changes, packageChange(np, "added", true))
+		}
+	}
+
+	return r
+}
+
+func packageChange(p *types.Package, change string, compatible bool) Change {
+	return Change{
+		Message:    fmt.Sprintf("package %s: %s", p.Path(), change),
+		Compatible: compatible,
+	}
+}
+
+// Module is a convenience type for representing a Go module with a path and a
+// slice of Packages contained within.
+type Module struct {
+	Path     string
+	Packages []*types.Package
+}
+
+// relativePath computes the module-relative package path of the given Package.
+func (m *Module) relativePath(p *types.Package) string {
+	return strings.TrimPrefix(p.Path(), m.Path)
 }
 
 type differ struct {

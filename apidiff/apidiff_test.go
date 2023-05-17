@@ -14,7 +14,70 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/packages/packagestest"
 )
+
+func TestModuleChanges(t *testing.T) {
+	packagestest.TestAll(t, testModuleChanges)
+}
+
+func testModuleChanges(t *testing.T, x packagestest.Exporter) {
+	e := packagestest.Export(t, x, []packagestest.Module{
+		{
+			Name: "example.com/moda",
+			Files: map[string]any{
+				"foo/foo.go":     "package foo\n\nconst Version = 1",
+				"foo/baz/baz.go": "package baz",
+			},
+		},
+		{
+			Name: "example.com/modb",
+			Files: map[string]any{
+				"foo/foo.go": "package foo\n\nconst Version = 2\nconst Other = 1",
+				"bar/bar.go": "package bar",
+			},
+		},
+	})
+	defer e.Cleanup()
+
+	a, err := loadModule(t, e.Config, "example.com/moda")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := loadModule(t, e.Config, "example.com/modb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := ModuleChanges(a, b)
+	if len(report.Changes) == 0 {
+		t.Fatal("expected some changes, but got none")
+	}
+	wanti := []string{
+		"Version: value changed from 1 to 2",
+		"package example.com/moda/foo/baz: removed",
+	}
+	sort.Strings(wanti)
+
+	got := report.messages(false)
+	sort.Strings(got)
+
+	if diff := cmp.Diff(wanti, got); diff != "" {
+		t.Errorf("incompatibles: mismatch (-want, +got)\n%s", diff)
+	}
+
+	wantc := []string{
+		"Other: added",
+		"package example.com/modb/bar: added",
+	}
+	sort.Strings(wantc)
+
+	got = report.messages(true)
+	sort.Strings(got)
+
+	if diff := cmp.Diff(wantc, got); diff != "" {
+		t.Errorf("compatibles: mismatch (-want, +got)\n%s", diff)
+	}
+}
 
 func TestChanges(t *testing.T) {
 	dir, err := os.MkdirTemp("", "apidiff_test")
@@ -27,11 +90,11 @@ func TestChanges(t *testing.T) {
 	sort.Strings(wanti)
 	sort.Strings(wantc)
 
-	oldpkg, err := load(t, "apidiff/old", dir)
+	oldpkg, err := loadPackage(t, "apidiff/old", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	newpkg, err := load(t, "apidiff/new", dir)
+	newpkg, err := loadPackage(t, "apidiff/new", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +179,31 @@ func splitIntoPackages(t *testing.T, dir string) (incompatibles, compatibles []s
 	return
 }
 
-func load(t *testing.T, importPath, goPath string) (*packages.Package, error) {
+// Copied from cmd/apidiff/main.go.
+func loadModule(t *testing.T, cfg *packages.Config, modulePath string) (*Module, error) {
+	needsGoPackages(t)
+
+	cfg.Mode = cfg.Mode | packages.LoadTypes
+	loaded, err := packages.Load(cfg, fmt.Sprintf("%s/...", modulePath))
+	if err != nil {
+		return nil, err
+	}
+	if len(loaded) == 0 {
+		return nil, fmt.Errorf("found no packages for module %s", modulePath)
+	}
+	var tpkgs []*types.Package
+	for _, p := range loaded {
+		if len(p.Errors) > 0 {
+			// TODO: use errors.Join once Go 1.21 is released.
+			return nil, p.Errors[0]
+		}
+		tpkgs = append(tpkgs, p.Types)
+	}
+
+	return &Module{Path: modulePath, Packages: tpkgs}, nil
+}
+
+func loadPackage(t *testing.T, importPath, goPath string) (*packages.Package, error) {
 	needsGoPackages(t)
 
 	cfg := &packages.Config{
@@ -137,7 +224,7 @@ func load(t *testing.T, importPath, goPath string) (*packages.Package, error) {
 }
 
 func TestExportedFields(t *testing.T) {
-	pkg, err := load(t, "golang.org/x/exp/apidiff/testdata/exported_fields", "")
+	pkg, err := loadPackage(t, "golang.org/x/exp/apidiff/testdata/exported_fields", "")
 	if err != nil {
 		t.Fatal(err)
 	}
