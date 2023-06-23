@@ -187,7 +187,7 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 			}
 			// Prior to generics, any two named types could correspond.
 			// Two named types cannot correspond if their type parameter lists don't match.
-			if !typeParamListsMatch(old.TypeParams(), newn.TypeParams()) {
+			if !d.typeParamListsCorrespond(old.TypeParams(), newn.TypeParams()) {
 				return false
 			}
 		}
@@ -200,14 +200,14 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 	return typesEquivalent(oldc, new)
 }
 
-// Two list of type parameters match if they are the same length, and
-// the constraints of corresponding type parameters are identical.
-func typeParamListsMatch(tps1, tps2 *types.TypeParamList) bool {
+// Two list of type parameters correspond if they are the same length, and
+// the constraints of corresponding type parameters correspond.
+func (d *differ) typeParamListsCorrespond(tps1, tps2 *types.TypeParamList) bool {
 	if tps1.Len() != tps2.Len() {
 		return false
 	}
 	for i := 0; i < tps1.Len(); i++ {
-		if !types.Identical(tps1.At(i).Constraint(), tps2.At(i).Constraint()) {
+		if !d.correspond(tps1.At(i).Constraint(), tps2.At(i).Constraint()) {
 			return false
 		}
 	}

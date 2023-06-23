@@ -967,3 +967,10 @@ type GT2[V comparable] struct {
 }
 
 func (GT2[V]) M(*GT2[V]) {}
+
+// both
+type custom interface {
+	int
+}
+
+type GT3[E custom] map[E]int
