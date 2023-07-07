@@ -30,7 +30,9 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 	// Structure copied from types.Identical.
 	switch old := old.(type) {
 	case *types.Basic:
-		return types.Identical(old, new)
+		if new, ok := new.(*types.Basic); ok {
+			return old.Kind() == new.Kind()
+		}
 
 	case *types.Array:
 		if new, ok := new.(*types.Array); ok {
