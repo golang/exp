@@ -156,50 +156,57 @@ func (d *differ) corrFieldNames(of, nf *types.Var) bool {
 	return of.Name() == nf.Name()
 }
 
-// Establish that old corresponds with new if it does not already
-// correspond to something else.
+// establishCorrespondence records and validates a correspondence between
+// old and new.
+//
+// If this is the first type corresponding to old, it checks that the type
+// declaration is compatible with old and records its correspondence.
+// Otherwise, it checks that new is equivalent to the previously recorded
+// type corresponding to old.
 func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool {
 	oldname := old.Obj()
-	oldc := d.correspondMap[oldname]
-	if oldc == nil {
-		// For now, assume the types don't correspond unless they are from the old
-		// and new packages, respectively.
-		//
-		// This is too conservative. For instance,
-		//    [old] type A = q.B; [new] type A q.C
-		// could be OK if in package q, B is an alias for C.
-		// Or, using p as the name of the current old/new packages:
-		//    [old] type A = q.B; [new] type A int
-		// could be OK if in q,
-		//    [old] type B int; [new] type B = p.A
-		// In this case, p.A and q.B name the same type in both old and new worlds.
-		// Note that this case doesn't imply circular package imports: it's possible
-		// that in the old world, p imports q, but in the new, q imports p.
-		//
-		// However, if we didn't do something here, then we'd incorrectly allow cases
-		// like the first one above in which q.B is not an alias for q.C
-		//
-		// What we should do is check that the old type, in the new world's package
-		// of the same path, doesn't correspond to something other than the new type.
-		// That is a bit hard, because there is no easy way to find a new package
-		// matching an old one.
-		if newn, ok := new.(*types.Named); ok {
-			if old.Obj().Pkg() != d.old || newn.Obj().Pkg() != d.new {
-				return old.Obj().Id() == newn.Obj().Id()
-			}
-			// Prior to generics, any two named types could correspond.
-			// Two named types cannot correspond if their type parameter lists don't match.
-			if !d.typeParamListsCorrespond(old.TypeParams(), newn.TypeParams()) {
-				return false
-			}
-		}
-		// If there is no correspondence, create one.
-		d.correspondMap[oldname] = new
-		// Check that the corresponding types are compatible.
-		d.checkCompatibleDefined(oldname, old, new)
-		return true
+	// If there already is a corresponding new type for old, check that they
+	// are the same.
+	if c := d.correspondMap[oldname]; c != nil {
+		return typesEquivalent(c, new)
 	}
-	return typesEquivalent(oldc, new)
+	// Attempt to establish a correspondence.
+	// Assume the types don't correspond unless they have the same
+	// ID, or are from the old and new packages, respectively.
+	//
+	// This is too conservative. For instance,
+	//    [old] type A = q.B; [new] type A q.C
+	// could be OK if in package q, B is an alias for C.
+	// Or, using p as the name of the current old/new packages:
+	//    [old] type A = q.B; [new] type A int
+	// could be OK if in q,
+	//    [old] type B int; [new] type B = p.A
+	// In this case, p.A and q.B name the same type in both old and new worlds.
+	// Note that this case doesn't imply circular package imports: it's possible
+	// that in the old world, p imports q, but in the new, q imports p.
+	//
+	// However, if we didn't do something here, then we'd incorrectly allow cases
+	// like the first one above in which q.B is not an alias for q.C
+	//
+	// What we should do is check that the old type, in the new world's package
+	// of the same path, doesn't correspond to something other than the new type.
+	// That is a bit hard, because there is no easy way to find a new package
+	// matching an old one.
+	if newn, ok := new.(*types.Named); ok {
+		if old.Obj().Pkg() != d.old || newn.Obj().Pkg() != d.new {
+			return old.Obj().Id() == newn.Obj().Id()
+		}
+		// Prior to generics, any two named types could correspond.
+		// Two named types cannot correspond if their type parameter lists don't match.
+		if !d.typeParamListsCorrespond(old.TypeParams(), newn.TypeParams()) {
+			return false
+		}
+	}
+	// If there is no correspondence, create one.
+	d.correspondMap[oldname] = new
+	// Check that the corresponding types are compatible.
+	d.checkCompatibleDefined(oldname, old, new)
+	return true
 }
 
 // Two list of type parameters correspond if they are the same length, and
