@@ -134,6 +134,16 @@ func ContainsFunc[E any](s []E, f func(E) bool) bool {
 	return IndexFunc(s, f) >= 0
 }
 
+// Filter returns the values that matched
+func Filter[S ~[]E, E any](s S, f func(E) bool) (r S) {
+	for i := range s {
+		if f(s[i]) {
+			r = append(r, s[i])
+		}
+	}
+	return r
+}
+
 // Insert inserts the values v... into s at index i,
 // returning the modified slice.
 // In the returned slice r, r[i] == v[0].

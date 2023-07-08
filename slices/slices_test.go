@@ -407,6 +407,41 @@ func TestContainsFunc(t *testing.T) {
 	}
 }
 
+func TestFilter(t *testing.T) {
+	tests := []struct {
+		s    []int
+		f    func(int) bool
+		want []int
+	}{
+		{
+			[]int{1, 2, 3, 4, 5},
+			func(i int) bool {
+				return i < 3
+			},
+			[]int{1, 2},
+		},
+		{
+			[]int{1, 2, 3, 4, 5},
+			func(i int) bool {
+				return i > 3
+			},
+			[]int{4, 5},
+		},
+		{
+			[]int{1, 2, 3, 4, 5},
+			func(i int) bool {
+				return i == 3
+			},
+			[]int{3},
+		},
+	}
+	for i := range tests {
+		if got := Filter(tests[i].s, tests[i].f); !Equal(got, tests[i].want) {
+			t.Errorf("Filter(%v, tests[i].f) = %v, want = %v", tests[i].s, got, tests[i].want)
+		}
+	}
+}
+
 var insertTests = []struct {
 	s    []int
 	i    int
