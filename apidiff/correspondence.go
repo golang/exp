@@ -229,17 +229,17 @@ func (d *differ) typeParamListsCorrespond(tps1, tps2 *types.TypeParamList) bool 
 //
 // This allows us to match a Type from a method receiver or arg to the Type from
 // the declaration.
-func typesEquivalent(old, new types.Type) bool {
-	if types.Identical(old, new) {
+func typesEquivalent(t1, t2 types.Type) bool {
+	if types.Identical(t1, t2) {
 		return true
 	}
 	// Handle two types with the same type params, one
 	// having constraints and one not.
-	oldn, ok := old.(*types.Named)
+	oldn, ok := t1.(*types.Named)
 	if !ok {
 		return false
 	}
-	newn, ok := new.(*types.Named)
+	newn, ok := t2.(*types.Named)
 	if !ok {
 		return false
 	}
