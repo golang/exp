@@ -8,8 +8,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-
-	"golang.org/x/exp/constraints"
 )
 
 var raceEnabled bool
@@ -84,7 +82,7 @@ func equalNaN[T comparable](v1, v2 T) bool {
 }
 
 // offByOne returns true if integers v1 and v2 differ by 1.
-func offByOne[E constraints.Integer](v1, v2 E) bool {
+func offByOne(v1, v2 int) bool {
 	return v1 == v2+1 || v1 == v2-1
 }
 
@@ -105,10 +103,10 @@ func TestEqualFunc(t *testing.T) {
 
 	s1 := []int{1, 2, 3}
 	s2 := []int{2, 3, 4}
-	if EqualFunc(s1, s1, offByOne[int]) {
+	if EqualFunc(s1, s1, offByOne) {
 		t.Errorf("EqualFunc(%v, %v, offByOne) = true, want false", s1, s1)
 	}
-	if !EqualFunc(s1, s2, offByOne[int]) {
+	if !EqualFunc(s1, s2, offByOne) {
 		t.Errorf("EqualFunc(%v, %v, offByOne) = false, want true", s1, s2)
 	}
 
@@ -141,6 +139,31 @@ var compareIntTests = []struct {
 	want   int
 }{
 	{
+		[]int{1},
+		[]int{1},
+		0,
+	},
+	{
+		[]int{1},
+		[]int{},
+		1,
+	},
+	{
+		[]int{},
+		[]int{1},
+		-1,
+	},
+	{
+		[]int{},
+		[]int{},
+		0,
+	},
+	{
+		[]int{1, 2, 3},
+		[]int{1, 2, 3},
+		0,
+	},
+	{
 		[]int{1, 2, 3},
 		[]int{1, 2, 3, 4},
 		-1,
@@ -158,6 +181,11 @@ var compareIntTests = []struct {
 	{
 		[]int{1, 4, 3},
 		[]int{1, 2, 3},
+		+1,
+	},
+	{
+		[]int{1, 4, 3},
+		[]int{1, 2, 3, 8, 9},
 		+1,
 	},
 }
@@ -166,6 +194,21 @@ var compareFloatTests = []struct {
 	s1, s2 []float64
 	want   int
 }{
+	{
+		[]float64{},
+		[]float64{},
+		0,
+	},
+	{
+		[]float64{1},
+		[]float64{1},
+		0,
+	},
+	{
+		[]float64{math.NaN()},
+		[]float64{math.NaN()},
+		0,
+	},
 	{
 		[]float64{1, 2, math.NaN()},
 		[]float64{1, 2, math.NaN()},
@@ -184,12 +227,22 @@ var compareFloatTests = []struct {
 	{
 		[]float64{1, math.NaN(), 3},
 		[]float64{1, 2, math.NaN()},
-		0,
+		-1,
+	},
+	{
+		[]float64{1, 2, 3},
+		[]float64{1, 2, math.NaN()},
+		+1,
+	},
+	{
+		[]float64{1, 2, 3},
+		[]float64{1, math.NaN(), 3},
+		+1,
 	},
 	{
 		[]float64{1, math.NaN(), 3, 4},
 		[]float64{1, 2, math.NaN()},
-		+1,
+		-1,
 	},
 }
 
@@ -232,16 +285,6 @@ func equalToCmp[T comparable](eq func(T, T) bool) func(T, T) int {
 	}
 }
 
-func cmp[T constraints.Ordered](v1, v2 T) int {
-	if v1 < v2 {
-		return -1
-	} else if v1 > v2 {
-		return 1
-	} else {
-		return 0
-	}
-}
-
 func TestCompareFunc(t *testing.T) {
 	intWant := func(want bool) string {
 		if want {
@@ -261,19 +304,19 @@ func TestCompareFunc(t *testing.T) {
 	}
 
 	for _, test := range compareIntTests {
-		if got := CompareFunc(test.s1, test.s2, cmp[int]); got != test.want {
+		if got := CompareFunc(test.s1, test.s2, cmpCompare[int]); got != test.want {
 			t.Errorf("CompareFunc(%v, %v, cmp[int]) = %d, want %d", test.s1, test.s2, got, test.want)
 		}
 	}
 	for _, test := range compareFloatTests {
-		if got := CompareFunc(test.s1, test.s2, cmp[float64]); got != test.want {
+		if got := CompareFunc(test.s1, test.s2, cmpCompare[float64]); got != test.want {
 			t.Errorf("CompareFunc(%v, %v, cmp[float64]) = %d, want %d", test.s1, test.s2, got, test.want)
 		}
 	}
 
 	s1 := []int{1, 2, 3}
 	s2 := []int{2, 3, 4}
-	if got := CompareFunc(s1, s2, equalToCmp(offByOne[int])); got != 0 {
+	if got := CompareFunc(s1, s2, equalToCmp(offByOne)); got != 0 {
 		t.Errorf("CompareFunc(%v, %v, offByOne) = %d, want 0", s1, s2, got)
 	}
 
@@ -448,6 +491,45 @@ func TestInsert(t *testing.T) {
 		copy := Clone(test.s)
 		if got := Insert(copy, test.i, test.add...); !Equal(got, test.want) {
 			t.Errorf("Insert(%v, %d, %v...) = %v, want %v", test.s, test.i, test.add, got, test.want)
+		}
+	}
+
+	if !raceEnabled {
+		// Allocations should be amortized.
+		const count = 50
+		n := testing.AllocsPerRun(10, func() {
+			s := []int{1, 2, 3}
+			for i := 0; i < count; i++ {
+				s = Insert(s, 0, 1)
+			}
+		})
+		if n > count/2 {
+			t.Errorf("too many allocations inserting %d elements: got %v, want less than %d", count, n, count/2)
+		}
+	}
+}
+
+func TestInsertOverlap(t *testing.T) {
+	const N = 10
+	a := make([]int, N)
+	want := make([]int, 2*N)
+	for n := 0; n <= N; n++ { // length
+		for i := 0; i <= n; i++ { // insertion point
+			for x := 0; x <= N; x++ { // start of inserted data
+				for y := x; y <= N; y++ { // end of inserted data
+					for k := 0; k < N; k++ {
+						a[k] = k
+					}
+					want = want[:0]
+					want = append(want, a[:i]...)
+					want = append(want, a[x:y]...)
+					want = append(want, a[i:n]...)
+					got := Insert(a[:n], i, a[x:y]...)
+					if !Equal(got, want) {
+						t.Errorf("Insert with overlap failed n=%d i=%d x=%d y=%d, got %v want %v", n, i, x, y, got, want)
+					}
+				}
+			}
 		}
 	}
 }
@@ -748,6 +830,34 @@ func TestClip(t *testing.T) {
 	}
 }
 
+func TestReverse(t *testing.T) {
+	even := []int{3, 1, 4, 1, 5, 9} // len = 6
+	Reverse(even)
+	if want := []int{9, 5, 1, 4, 1, 3}; !Equal(even, want) {
+		t.Errorf("Reverse(even) = %v, want %v", even, want)
+	}
+
+	odd := []int{3, 1, 4, 1, 5, 9, 2} // len = 7
+	Reverse(odd)
+	if want := []int{2, 9, 5, 1, 4, 1, 3}; !Equal(odd, want) {
+		t.Errorf("Reverse(odd) = %v, want %v", odd, want)
+	}
+
+	words := strings.Fields("one two three")
+	Reverse(words)
+	if want := strings.Fields("three two one"); !Equal(words, want) {
+		t.Errorf("Reverse(words) = %v, want %v", words, want)
+	}
+
+	singleton := []string{"one"}
+	Reverse(singleton)
+	if want := []string{"one"}; !Equal(singleton, want) {
+		t.Errorf("Reverse(singeleton) = %v, want %v", singleton, want)
+	}
+
+	Reverse[[]string](nil)
+}
+
 // naiveReplace is a baseline implementation to the Replace function.
 func naiveReplace[S ~[]E, E any](s S, i, j int, v ...E) S {
 	s = Delete(s, i, j)
@@ -812,6 +922,33 @@ func TestReplacePanics(t *testing.T) {
 	}
 }
 
+func TestReplaceOverlap(t *testing.T) {
+	const N = 10
+	a := make([]int, N)
+	want := make([]int, 2*N)
+	for n := 0; n <= N; n++ { // length
+		for i := 0; i <= n; i++ { // insertion point 1
+			for j := i; j <= n; j++ { // insertion point 2
+				for x := 0; x <= N; x++ { // start of inserted data
+					for y := x; y <= N; y++ { // end of inserted data
+						for k := 0; k < N; k++ {
+							a[k] = k
+						}
+						want = want[:0]
+						want = append(want, a[:i]...)
+						want = append(want, a[x:y]...)
+						want = append(want, a[j:n]...)
+						got := Replace(a[:n], i, j, a[x:y]...)
+						if !Equal(got, want) {
+							t.Errorf("Insert with overlap failed n=%d i=%d j=%d x=%d y=%d, got %v want %v", n, i, j, x, y, got, want)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 func BenchmarkReplace(b *testing.B) {
 	cases := []struct {
 		name string
@@ -859,4 +996,59 @@ func BenchmarkReplace(b *testing.B) {
 		})
 	}
 
+}
+
+func TestRotate(t *testing.T) {
+	const N = 10
+	s := make([]int, 0, N)
+	for n := 0; n < N; n++ {
+		for r := 0; r < n; r++ {
+			s = s[:0]
+			for i := 0; i < n; i++ {
+				s = append(s, i)
+			}
+			rotateLeft(s, r)
+			for i := 0; i < n; i++ {
+				if s[i] != (i+r)%n {
+					t.Errorf("expected n=%d r=%d i:%d want:%d got:%d", n, r, i, (i+r)%n, s[i])
+				}
+			}
+		}
+	}
+}
+
+func TestInsertGrowthRate(t *testing.T) {
+	b := make([]byte, 1)
+	maxCap := cap(b)
+	nGrow := 0
+	const N = 1e6
+	for i := 0; i < N; i++ {
+		b = Insert(b, len(b)-1, 0)
+		if cap(b) > maxCap {
+			maxCap = cap(b)
+			nGrow++
+		}
+	}
+	want := int(math.Log(N) / math.Log(1.25)) // 1.25 == growth rate for large slices
+	if nGrow > want {
+		t.Errorf("too many grows. got:%d want:%d", nGrow, want)
+	}
+}
+
+func TestReplaceGrowthRate(t *testing.T) {
+	b := make([]byte, 2)
+	maxCap := cap(b)
+	nGrow := 0
+	const N = 1e6
+	for i := 0; i < N; i++ {
+		b = Replace(b, len(b)-2, len(b)-1, 0, 0)
+		if cap(b) > maxCap {
+			maxCap = cap(b)
+			nGrow++
+		}
+	}
+	want := int(math.Log(N) / math.Log(1.25)) // 1.25 == growth rate for large slices
+	if nGrow > want {
+		t.Errorf("too many grows. got:%d want:%d", nGrow, want)
+	}
 }
