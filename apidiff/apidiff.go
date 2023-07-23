@@ -22,13 +22,24 @@ import (
 // It classifies each difference as either compatible or incompatible (breaking.) For
 // a detailed discussion of what constitutes an incompatible change, see the README.
 func Changes(old, new *types.Package) Report {
+	return changesInternal(old, new, old.Path(), new.Path())
+}
+
+// changesInternal contains the core logic for comparing a single package, shared
+// between Changes and ModuleChanges. The root package path arguments refer to the
+// context of this apidiff invocation - when diffing a single package, they will be
+// that package, but when diffing a whole module, they will be the root path of the
+// module. This is used to give change messages appropriate context for object names.
+// The old and new root must be tracked independently, since each side of the diff
+// operation may be a different path.
+func changesInternal(old, new *types.Package, oldRootPackagePath, newRootPackagePath string) Report {
 	d := newDiffer(old, new)
-	d.checkPackage()
+	d.checkPackage(oldRootPackagePath)
 	r := Report{}
-	for _, m := range d.incompatibles.collect() {
+	for _, m := range d.incompatibles.collect(oldRootPackagePath, newRootPackagePath) {
 		r.Changes = append(r.Changes, Change{Message: m, Compatible: false})
 	}
-	for _, m := range d.compatibles.collect() {
+	for _, m := range d.compatibles.collect(oldRootPackagePath, newRootPackagePath) {
 		r.Changes = append(r.Changes, Change{Message: m, Compatible: true})
 	}
 	return r
@@ -54,7 +65,7 @@ func ModuleChanges(old, new *Module) Report {
 	for n, op := range oldPkgs {
 		if np, ok := newPkgs[n]; ok {
 			// shared package, compare surfaces
-			rr := Changes(op, np)
+			rr := changesInternal(op, np, old.Path, new.Path)
 			r.Changes = append(r.Changes, rr.Changes...)
 		} else {
 			// old package was removed
@@ -114,19 +125,19 @@ func newDiffer(old, new *types.Package) *differ {
 	}
 }
 
-func (d *differ) incompatible(obj types.Object, part, format string, args ...interface{}) {
+func (d *differ) incompatible(obj objectWithSide, part, format string, args ...interface{}) {
 	addMessage(d.incompatibles, obj, part, format, args)
 }
 
-func (d *differ) compatible(obj types.Object, part, format string, args ...interface{}) {
+func (d *differ) compatible(obj objectWithSide, part, format string, args ...interface{}) {
 	addMessage(d.compatibles, obj, part, format, args)
 }
 
-func addMessage(ms messageSet, obj types.Object, part, format string, args []interface{}) {
+func addMessage(ms messageSet, obj objectWithSide, part, format string, args []interface{}) {
 	ms.add(obj, part, fmt.Sprintf(format, args...))
 }
 
-func (d *differ) checkPackage() {
+func (d *differ) checkPackage(oldRootPackagePath string) {
 	// Old changes.
 	for _, name := range d.old.Scope().Names() {
 		oldobj := d.old.Scope().Lookup(name)
@@ -135,7 +146,7 @@ func (d *differ) checkPackage() {
 		}
 		newobj := d.new.Scope().Lookup(name)
 		if newobj == nil {
-			d.incompatible(oldobj, "", "removed")
+			d.incompatible(objectWithSide{oldobj, false}, "", "removed")
 			continue
 		}
 		d.checkObjects(oldobj, newobj)
@@ -144,7 +155,7 @@ func (d *differ) checkPackage() {
 	for _, name := range d.new.Scope().Names() {
 		newobj := d.new.Scope().Lookup(name)
 		if newobj.Exported() && d.old.Scope().Lookup(name) == nil {
-			d.compatible(newobj, "", "added")
+			d.compatible(objectWithSide{newobj, true}, "", "added")
 		}
 	}
 
@@ -168,7 +179,7 @@ func (d *differ) checkPackage() {
 				continue
 			}
 			if types.Implements(otn2.Type(), oIface) && !types.Implements(nt2, nIface) {
-				d.incompatible(otn2, "", "no longer implements %s", objectString(otn1))
+				d.incompatible(objectWithSide{otn2, false}, "", "no longer implements %s", objectString(otn1, oldRootPackagePath))
 			}
 		}
 	}
@@ -183,30 +194,30 @@ func (d *differ) checkObjects(old, new types.Object) {
 		}
 	case *types.Var:
 		if new, ok := new.(*types.Var); ok {
-			d.checkCorrespondence(old, "", old.Type(), new.Type())
+			d.checkCorrespondence(objectWithSide{old, false}, "", old.Type(), new.Type())
 			return
 		}
 	case *types.Func:
 		switch new := new.(type) {
 		case *types.Func:
-			d.checkCorrespondence(old, "", old.Type(), new.Type())
+			d.checkCorrespondence(objectWithSide{old, false}, "", old.Type(), new.Type())
 			return
 		case *types.Var:
-			d.compatible(old, "", "changed from func to var")
-			d.checkCorrespondence(old, "", old.Type(), new.Type())
+			d.compatible(objectWithSide{old, false}, "", "changed from func to var")
+			d.checkCorrespondence(objectWithSide{old, false}, "", old.Type(), new.Type())
 			return
 
 		}
 	case *types.TypeName:
 		if new, ok := new.(*types.TypeName); ok {
-			d.checkCorrespondence(old, "", old.Type(), new.Type())
+			d.checkCorrespondence(objectWithSide{old, false}, "", old.Type(), new.Type())
 			return
 		}
 	default:
 		panic("unexpected obj type")
 	}
 	// Here if kind of type changed.
-	d.incompatible(old, "", "changed from %s to %s",
+	d.incompatible(objectWithSide{old, false}, "", "changed from %s to %s",
 		objectKindString(old), objectKindString(new))
 }
 
@@ -216,13 +227,13 @@ func (d *differ) constChanges(old, new *types.Const) {
 	nt := new.Type()
 	// Check for change of type.
 	if !d.correspond(ot, nt) {
-		d.typeChanged(old, "", ot, nt)
+		d.typeChanged(objectWithSide{old, false}, "", ot, nt)
 		return
 	}
 	// Check for change of value.
 	// We know the types are the same, so constant.Compare shouldn't panic.
 	if !constant.Compare(old.Val(), token.EQL, new.Val()) {
-		d.incompatible(old, "", "value changed from %s to %s", old.Val(), new.Val())
+		d.incompatible(objectWithSide{old, false}, "", "value changed from %s to %s", old.Val(), new.Val())
 	}
 }
 
@@ -241,13 +252,13 @@ func objectKindString(obj types.Object) string {
 	}
 }
 
-func (d *differ) checkCorrespondence(obj types.Object, part string, old, new types.Type) {
+func (d *differ) checkCorrespondence(obj objectWithSide, part string, old, new types.Type) {
 	if !d.correspond(old, new) {
 		d.typeChanged(obj, part, old, new)
 	}
 }
 
-func (d *differ) typeChanged(obj types.Object, part string, old, new types.Type) {
+func (d *differ) typeChanged(obj objectWithSide, part string, old, new types.Type) {
 	old = removeNamesFromSignature(old)
 	new = removeNamesFromSignature(new)
 	olds := types.TypeString(old, types.RelativeTo(d.old))

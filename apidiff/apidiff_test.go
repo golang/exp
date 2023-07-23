@@ -53,7 +53,7 @@ func testModuleChanges(t *testing.T, x packagestest.Exporter) {
 		t.Fatal("expected some changes, but got none")
 	}
 	wanti := []string{
-		"Version: value changed from 1 to 2",
+		"./foo.Version: value changed from 1 to 2",
 		"package example.com/moda/foo/baz: removed",
 	}
 	sort.Strings(wanti)
@@ -66,7 +66,7 @@ func testModuleChanges(t *testing.T, x packagestest.Exporter) {
 	}
 
 	wantc := []string{
-		"Other: added",
+		"./foo.Other: added",
 		"package example.com/modb/bar: added",
 	}
 	sort.Strings(wantc)
