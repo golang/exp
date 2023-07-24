@@ -146,10 +146,21 @@ func splitIntoPackages(t *testing.T, file, dir string) (incompatibles, compatibl
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		if err := oldf.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	newf, err := os.Create(filepath.Join(newd, "new.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		if err := newf.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	wl := func(f *os.File, line string) {
 		if _, err := fmt.Fprintln(f, line); err != nil {
