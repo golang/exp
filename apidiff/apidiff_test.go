@@ -80,38 +80,47 @@ func testModuleChanges(t *testing.T, x packagestest.Exporter) {
 }
 
 func TestChanges(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "go")
-	wanti, wantc := splitIntoPackages(t, dir)
-	sort.Strings(wanti)
-	sort.Strings(wantc)
-
-	oldpkg, err := loadPackage(t, "apidiff/old", dir)
+	testfiles, err := filepath.Glob(filepath.Join("testdata", "*.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	newpkg, err := loadPackage(t, "apidiff/new", dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	for _, testfile := range testfiles {
+		name := strings.TrimSuffix(filepath.Base(testfile), ".go")
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "go")
+			wanti, wantc := splitIntoPackages(t, testfile, dir)
+			sort.Strings(wanti)
+			sort.Strings(wantc)
 
-	report := Changes(oldpkg.Types, newpkg.Types)
+			oldpkg, err := loadPackage(t, "apidiff/old", dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			newpkg, err := loadPackage(t, "apidiff/new", dir)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	got := report.messages(false)
-	if diff := cmp.Diff(wanti, got); diff != "" {
-		t.Errorf("incompatibles: mismatch (-want, +got)\n%s", diff)
-	}
-	got = report.messages(true)
-	if diff := cmp.Diff(wantc, got); diff != "" {
-		t.Errorf("compatibles: mismatch (-want, +got)\n%s", diff)
+			report := Changes(oldpkg.Types, newpkg.Types)
+
+			got := report.messages(false)
+			if diff := cmp.Diff(wanti, got); diff != "" {
+				t.Errorf("incompatibles: mismatch (-want, +got)\n%s", diff)
+			}
+			got = report.messages(true)
+			if diff := cmp.Diff(wantc, got); diff != "" {
+				t.Errorf("compatibles: mismatch (-want, +got)\n%s", diff)
+			}
+		})
 	}
 }
 
-func splitIntoPackages(t *testing.T, dir string) (incompatibles, compatibles []string) {
+func splitIntoPackages(t *testing.T, file, dir string) (incompatibles, compatibles []string) {
 	// Read the input file line by line.
 	// Write a line into the old or new package,
 	// dependent on comments.
 	// Also collect expected messages.
-	f, err := os.Open("testdata/tests.go")
+	f, err := os.Open(file)
 	if err != nil {
 		t.Fatal(err)
 	}
