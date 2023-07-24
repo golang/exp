@@ -80,13 +80,8 @@ func testModuleChanges(t *testing.T, x packagestest.Exporter) {
 }
 
 func TestChanges(t *testing.T) {
-	dir, err := os.MkdirTemp("", "apidiff_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir = filepath.Join(dir, "go")
+	dir := filepath.Join(t.TempDir(), "go")
 	wanti, wantc := splitIntoPackages(t, dir)
-	defer os.RemoveAll(dir)
 	sort.Strings(wanti)
 	sort.Strings(wantc)
 
