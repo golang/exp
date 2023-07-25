@@ -1,56 +1,77 @@
 package p
 
 // Splitting types
+//
+// In the old world, there is one type with two names, one of which is an alias.
+// In the new world, there are two distinct types.
+//
+// That is an incompatible change, because client code like
+//
+//     var v *T1 = new(T2)
+//
+// will succeed in the old world, where T1 and T2 name the same type,
+// but fail in the new world.
 
-// OK: in both old and new, {J1, K1, L1} name the same type.
+// OK: in both old and new, A, B,  and C all name the same type.
 // old
 type (
-	J1 = K1
-	K1 = L1
-	L1 int
+	A = B
+	B = C
+	C int
 )
 
 // new
 type (
-	J1 = K1
-	K1 int
-	L1 = J1
+	A = B
+	B int
+	C = A
 )
 
-// Old has one type, K2; new has J2 and K2.
+// An example of splitting:
+
+// Old has one type, D; new has E and D.
 // both
-type K2 int
+type D int
 
 // old
-type J2 = K2
+type E = D
 
 // new
-// i K2: changed from K2 to K2
-type J2 K2 // old K2 corresponds with new J2
-// old K2 also corresponds with new K2: problem
+// i E: changed from D to E
+type E D // old D corresponds with new E
+// old D also corresponds with new D: problem
+
+// Here we have a benign split.
+// f and g are the same type in old and different types in new.
+// But clients have no way of constructing an expression of type f,
+// so they cannot write code that breaks.
 
 // both
-type k3 int
+type f int
 
-var Vj3 j3 // expose j3
+var Vg g // expose g
 
 // old
-type j3 = k3
+type g = f
 
 // new
-// OK: k3 isn't exposed
-type j3 k3
+// OK: f isn't exposed
+type g f
+
+// Here we have another incompatible split, even
+// though the type names are unexported. The problem
+// is that both names are exposed via exported variables.
 
 // both
-type k4 int
+type h int
 
-var Vj4 j4 // expose j4
-var VK4 k4 // expose k4
+var Vj j // expose j
+var Vh h // expose h
 
 // old
-type j4 = k4
+type j = h
 
 // new
-// i Vj4: changed from k4 to j4
-// e.g. p.Vj4 = p.Vk4
-type j4 k4
+// i Vj: changed from h to j
+// e.g. p.Vj = p.Vh
+type j h
