@@ -48,3 +48,37 @@ type custom interface {
 }
 
 type GT3[E custom] map[E]int
+
+// Instantiated types:
+// Two instantiations of generic types
+// with different type parameters are different.
+
+// both
+type H[T any] []T
+
+// old
+var V1 H[int]
+
+type T int
+
+var V2 H[T]
+
+// new
+// i V1: changed from H[int] to H[bool]
+var V1 H[bool]
+
+// i T: changed from int to bool
+type T bool
+
+// OK: we reported on T, so we don't need to here.
+var V2 H[T]
+
+// old
+type t int
+
+// new
+// i t: changed from int to byte
+type t byte
+
+// both
+var V3 H[t]

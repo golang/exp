@@ -124,7 +124,6 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 		}
 		if new, ok := new.(*types.Basic); ok {
 			// Basic types are defined types, too, so we have to support them.
-
 			return d.establishCorrespondence(old, new)
 		}
 
@@ -167,8 +166,8 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 	oldname := old.Obj()
 	// If there already is a corresponding new type for old, check that they
 	// are the same.
-	if c := d.correspondMap[oldname]; c != nil {
-		return typesEquivalent(c, new)
+	if c := d.correspondMap.At(old); c != nil {
+		return types.Identical(c.(types.Type), new)
 	}
 	// Attempt to establish a correspondence.
 	// Assume the types don't correspond unless they have the same
@@ -196,16 +195,47 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 		if old.Obj().Pkg() != d.old || newn.Obj().Pkg() != d.new {
 			return old.Obj().Id() == newn.Obj().Id()
 		}
-		// Prior to generics, any two named types could correspond.
-		// Two named types cannot correspond if their type parameter lists don't match.
-		if !d.typeParamListsCorrespond(old.TypeParams(), newn.TypeParams()) {
-			return false
+		// Two generic named types correspond if their type parameter lists correspond.
+		// Since one or the other of those lists will be empty, it doesn't hurt
+		// to check both.
+		oldOrigin := old.Origin()
+		newOrigin := newn.Origin()
+		if oldOrigin != old {
+			// old is an instantiated type.
+			if newOrigin == newn {
+				// new is not; they cannot correspond.
+				return false
+			}
+			// Two instantiated types correspond if their origins correspond and
+			// their type argument lists correspond.
+			if !d.correspond(oldOrigin, newOrigin) {
+				return false
+			}
+			if !d.typeListsCorrespond(old.TypeArgs(), newn.TypeArgs()) {
+				return false
+			}
+		} else {
+			if !d.typeParamListsCorrespond(old.TypeParams(), newn.TypeParams()) {
+				return false
+			}
 		}
 	}
 	// If there is no correspondence, create one.
-	d.correspondMap[oldname] = new
+	d.correspondMap.Set(old, new)
 	// Check that the corresponding types are compatible.
 	d.checkCompatibleDefined(oldname, old, new)
+	return true
+}
+
+func (d *differ) typeListsCorrespond(tl1, tl2 *types.TypeList) bool {
+	if tl1.Len() != tl2.Len() {
+		return false
+	}
+	for i := 0; i < tl1.Len(); i++ {
+		if !d.correspond(tl1.At(i), tl2.At(i)) {
+			return false
+		}
+	}
 	return true
 }
 
@@ -217,48 +247,6 @@ func (d *differ) typeParamListsCorrespond(tps1, tps2 *types.TypeParamList) bool 
 	}
 	for i := 0; i < tps1.Len(); i++ {
 		if !d.correspond(tps1.At(i).Constraint(), tps2.At(i).Constraint()) {
-			return false
-		}
-	}
-	return true
-}
-
-// typesEquivalent reports whether two types are identical, or if
-// the types have identical type param lists except that one type has nil
-// constraints.
-//
-// This allows us to match a Type from a method receiver or arg to the Type from
-// the declaration.
-func typesEquivalent(t1, t2 types.Type) bool {
-	if types.Identical(t1, t2) {
-		return true
-	}
-	// Handle two types with the same type params, one
-	// having constraints and one not.
-	oldn, ok := t1.(*types.Named)
-	if !ok {
-		return false
-	}
-	newn, ok := t2.(*types.Named)
-	if !ok {
-		return false
-	}
-	oldps := oldn.TypeParams()
-	newps := newn.TypeParams()
-	if oldps.Len() != newps.Len() {
-		return false
-	}
-	if oldps.Len() == 0 {
-		// Not generic types.
-		return false
-	}
-	for i := 0; i < oldps.Len(); i++ {
-		oldp := oldps.At(i)
-		newp := newps.At(i)
-		if oldp.Constraint() == nil || newp.Constraint() == nil {
-			return true
-		}
-		if !types.Identical(oldp.Constraint(), newp.Constraint()) {
 			return false
 		}
 	}

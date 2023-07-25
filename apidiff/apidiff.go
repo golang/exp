@@ -16,6 +16,8 @@ import (
 	"go/token"
 	"go/types"
 	"strings"
+
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 // Changes reports on the differences between the APIs of the old and new packages.
@@ -108,7 +110,7 @@ type differ struct {
 	// Even though it is the named types (*types.Named) that correspond, we use
 	// *types.TypeName as a map key because they are canonical.
 	// The values can be either named types or basic types.
-	correspondMap map[*types.TypeName]types.Type
+	correspondMap typeutil.Map
 
 	// Messages.
 	incompatibles messageSet
@@ -119,7 +121,6 @@ func newDiffer(old, new *types.Package) *differ {
 	return &differ{
 		old:           old,
 		new:           new,
-		correspondMap: map[*types.TypeName]types.Type{},
 		incompatibles: messageSet{},
 		compatibles:   messageSet{},
 	}
@@ -161,28 +162,36 @@ func (d *differ) checkPackage(oldRootPackagePath string) {
 
 	// Whole-package satisfaction.
 	// For every old exposed interface oIface and its corresponding new interface nIface...
-	for otn1, nt1 := range d.correspondMap {
+	d.correspondMap.Iterate(func(k1 types.Type, v1 any) {
+		ot1 := k1.(*types.Named)
+		otn1 := ot1.Obj()
+		nt1 := v1.(types.Type)
 		oIface, ok := otn1.Type().Underlying().(*types.Interface)
 		if !ok {
-			continue
+			return
 		}
 		nIface, ok := nt1.Underlying().(*types.Interface)
 		if !ok {
 			// If nt1 isn't an interface but otn1 is, then that's an incompatibility that
 			// we've already noticed, so there's no need to do anything here.
-			continue
+			return
 		}
 		// For every old type that implements oIface, its corresponding new type must implement
 		// nIface.
-		for otn2, nt2 := range d.correspondMap {
+		d.correspondMap.Iterate(func(k2 types.Type, v2 any) {
+			ot2 := k2.(*types.Named)
+			otn2 := ot2.Obj()
+			nt2 := v2.(types.Type)
 			if otn1 == otn2 {
-				continue
+				return
 			}
 			if types.Implements(otn2.Type(), oIface) && !types.Implements(nt2, nIface) {
+				// TODO(jba): the type name is not sufficient information here; we need the type args
+				// if this is an instantiated generic type.
 				d.incompatible(objectWithSide{otn2, false}, "", "no longer implements %s", objectString(otn1, oldRootPackagePath))
 			}
-		}
-	}
+		})
+	})
 }
 
 func (d *differ) checkObjects(old, new types.Object) {
