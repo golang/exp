@@ -139,7 +139,33 @@ func addMessage(ms messageSet, obj objectWithSide, part, format string, args []i
 }
 
 func (d *differ) checkPackage(oldRootPackagePath string) {
-	// Old changes.
+	// Determine what has changed between old and new.
+
+	// First, establish correspondences between types with the same name, before
+	// looking at aliases. This will avoid confusing messages like "T: changed
+	// from T to T", which can happen if a correspondence between an alias
+	// and a named type is established first.
+	// See testdata/order.go.
+	for _, name := range d.old.Scope().Names() {
+		oldobj := d.old.Scope().Lookup(name)
+		if tn, ok := oldobj.(*types.TypeName); ok {
+			if oldn, ok := tn.Type().(*types.Named); ok {
+				if !oldn.Obj().Exported() {
+					continue
+				}
+				// Does new have a named type of the same name? Look up using
+				// the old named type's name, oldn.Obj().Name(), not the
+				// TypeName tn, which may be an alias.
+				newobj := d.new.Scope().Lookup(oldn.Obj().Name())
+				if newobj != nil {
+					d.checkObjects(oldobj, newobj)
+				}
+			}
+		}
+	}
+
+	// Next, look at all exported symbols in the old world and compare them
+	// with the same-named symbols in the new world.
 	for _, name := range d.old.Scope().Names() {
 		oldobj := d.old.Scope().Lookup(name)
 		if !oldobj.Exported() {
@@ -152,7 +178,8 @@ func (d *differ) checkPackage(oldRootPackagePath string) {
 		}
 		d.checkObjects(oldobj, newobj)
 	}
-	// New additions.
+
+	// Now look at what has been added in the new package.
 	for _, name := range d.new.Scope().Names() {
 		newobj := d.new.Scope().Lookup(name)
 		if newobj.Exported() && d.old.Scope().Lookup(name) == nil {
