@@ -554,6 +554,7 @@ func loadDownloadedModule(ctx context.Context, modPath, version, max string) (m 
 // version control tag to use (with an appropriate prefix, for modules not
 // in the repository root directory).
 func makeReleaseReport(ctx context.Context, base, release moduleInfo) (report, error) {
+	// TODO: use apidiff.ModuleChanges.
 	// Compare each pair of packages.
 	// Ignore internal packages.
 	// If we don't have a base version to compare against just check the new

@@ -2,9 +2,20 @@ Modules example.com/internalcompat/{a,b} are copies. One could be a fork
 of the other. An external package p exposes a type from a package q
 within the same module.
 
-gorelease should not report differences between these packages. The types
+If gorelease ran apidiff on the two modules instead of on the individual
+packages, then it should not report differences between these packages. The types
 are distinct, but they correspond (in apidiff terminology), which is the
-important property when considering differences between modules.
+important property when considering differences between modules. More
+specifically, the fully qualified type names are identical modulo the change
+to the module path.
+
+But at the time gorelease was written, apidiff did not support module
+comparison. If considered at the package level, the two packages
+example.com/internalcompat/a/p and example.com/internalcompat/b/p
+are incompatible, because the packages they refer to are different.
+
+So case 2 below would apply if whole modules were being diffed, but
+it doesn't here because individual packages are being diffed.
 
 There are three use cases to consider:
 
