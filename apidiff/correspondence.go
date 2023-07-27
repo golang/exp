@@ -119,13 +119,7 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 		}
 
 	case *types.Named:
-		if new, ok := new.(*types.Named); ok {
-			return d.establishCorrespondence(old, new)
-		}
-		if new, ok := new.(*types.Basic); ok {
-			// Basic types are defined types, too, so we have to support them.
-			return d.establishCorrespondence(old, new)
-		}
+		return d.establishCorrespondence(old, new)
 
 	case *types.TypeParam:
 		if new, ok := new.(*types.TypeParam); ok {
@@ -191,7 +185,9 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 	// of the same path, doesn't correspond to something other than the new type.
 	// That is a bit hard, because there is no easy way to find a new package
 	// matching an old one.
-	if newn, ok := new.(*types.Named); ok {
+	switch new := new.(type) {
+	case *types.Named:
+		newn := new
 		oobj := old.Obj()
 		nobj := newn.Obj()
 		if oobj.Pkg() != d.old || nobj.Pkg() != d.new {
@@ -233,6 +229,14 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 				return false
 			}
 		}
+	case *types.Basic:
+		if old.Obj().Pkg() != d.old {
+			// A named type from a package other than old never corresponds to a basic type.
+			return false
+		}
+	default:
+		// Only named and basic types can correspond.
+		return false
 	}
 	// If there is no correspondence, create one.
 	d.correspondMap.Set(old, new)

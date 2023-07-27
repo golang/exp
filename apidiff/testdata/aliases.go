@@ -13,3 +13,17 @@ type A = t1
 // new
 // i t1: changed from int to bool
 type A = t2
+
+// old
+type B = int
+
+// new
+// i B: changed from int to B
+type B int
+
+// old
+type C int
+
+// new
+// OK: merging types
+type C = int
