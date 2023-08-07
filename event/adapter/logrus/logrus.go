@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build !disable_events
-// +build !disable_events
 
 // Package logrus provides a logrus Formatter for events.
 // To use for the global logger:

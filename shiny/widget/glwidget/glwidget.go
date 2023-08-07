@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build !android
-// +build !android
 
 // Package glwidget provides a widget containing a GL ES framebuffer.
 package glwidget
