@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,7 @@ var callTests = []invoker{
 		notify{"unblock", "a"},
 		collect{"a", true, false},
 	}},
+	callErr{"error", func() {}, "marshaling call parameters: json: unsupported type"},
 }
 
 type binder struct {
@@ -88,6 +90,12 @@ type call struct {
 	method string
 	params interface{}
 	expect interface{}
+}
+
+type callErr struct {
+	method    string
+	params    interface{}
+	expectErr string
 }
 
 type async struct {
@@ -173,6 +181,18 @@ func (test call) Invoke(t *testing.T, ctx context.Context, h *handler) {
 		t.Fatalf("%v:Call failed: %v", test.method, err)
 	}
 	verifyResults(t, test.method, results, test.expect)
+}
+
+func (test callErr) Name() string { return test.method }
+func (test callErr) Invoke(t *testing.T, ctx context.Context, h *handler) {
+	var results interface{}
+	if err := h.conn.Call(ctx, test.method, test.params).Await(ctx, &results); err != nil {
+		if serr := err.Error(); !strings.Contains(serr, test.expectErr) {
+			t.Fatalf("%v:Call failed but with unexpected error: %q does not contain %q", test.method, serr, test.expectErr)
+		}
+		return
+	}
+	t.Fatalf("%v:Call succeeded (%v) but should have failed with error containing %q", test.method, results, test.expectErr)
 }
 
 func (test echo) Invoke(t *testing.T, ctx context.Context, h *handler) {

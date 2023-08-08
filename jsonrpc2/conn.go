@@ -144,18 +144,18 @@ func (c *Connection) Call(ctx context.Context, method string, params interface{}
 		id:        Int64ID(atomic.AddInt64(&c.seq, 1)),
 		resultBox: make(chan asyncResult, 1),
 	}
-	// generate a new request identifier
-	call, err := NewCall(result.id, method, params)
-	if err != nil {
-		//set the result to failed
-		result.resultBox <- asyncResult{err: errors.Errorf("marshaling call parameters: %w", err)}
-		return result
-	}
-	//TODO: rewrite this using the new target/prototype stuff
+	// TODO: rewrite this using the new target/prototype stuff
 	ctx = event.Start(ctx, method,
 		Method(method), RPCDirection(Outbound), RPCID(fmt.Sprintf("%q", result.id)))
 	Started.Record(ctx, 1, Method(method))
 	result.ctx = ctx
+	// generate a new request identifier
+	call, err := NewCall(result.id, method, params)
+	if err != nil {
+		// set the result to failed
+		result.resultBox <- asyncResult{err: errors.Errorf("marshaling call parameters: %w", err)}
+		return result
+	}
 	// We have to add ourselves to the pending map before we send, otherwise we
 	// are racing the response.
 	// rchan is buffered in case the response arrives without a listener.
@@ -355,7 +355,7 @@ func (c *Connection) manageQueue(ctx context.Context, preempter Preempter, fromR
 			select {
 			case nextReq, ok = <-fromRead:
 			case toDeliver <- q[0]:
-				//TODO: this causes a lot of shuffling, should we use a growing ring buffer? compaction?
+				// TODO: this causes a lot of shuffling, should we use a growing ring buffer? compaction?
 				q = q[1:]
 			}
 		}
@@ -413,7 +413,7 @@ func (c *Connection) reply(entry *incoming, result interface{}, rerr error) {
 	}
 	if err := c.respond(entry, result, rerr); err != nil {
 		// no way to propagate this error
-		//TODO: should we do more than just log it?
+		// TODO: should we do more than just log it?
 		event.Error(entry.baseCtx, "jsonrpc2 message delivery failed", err)
 	}
 }
@@ -441,7 +441,7 @@ func (c *Connection) respond(entry *incoming, result interface{}, rerr error) er
 			err = errors.Errorf("%w: %q notification failed: %v", ErrInternal, entry.request.Method, rerr)
 			rerr = nil
 		case result != nil:
-			//notification produced a response, which is an error
+			// notification produced a response, which is an error
 			err = errors.Errorf("%w: %q produced unwanted response", ErrInternal, entry.request.Method)
 		default:
 			// normal notification finish
