@@ -602,10 +602,7 @@ func layout(f *Frame, l int32) {
 			if r == ' ' {
 				breakPoint = reader.bAndK()
 			}
-			a, ok := f.face.GlyphAdvance(r)
-			if !ok {
-				panic("TODO: is falling back on the U+FFFD glyph the responsibility of the caller or the Face?")
-			}
+			a, _ := f.face.GlyphAdvance(r)
 			advance += a
 			if r != ' ' && advance > f.maxWidth && breakPoint.b != 0 {
 				breakLine(f, l, breakPoint.b, breakPoint.k)
