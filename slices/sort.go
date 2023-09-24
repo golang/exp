@@ -7,6 +7,7 @@
 package slices
 
 import (
+	"errors"
 	"math/bits"
 
 	"golang.org/x/exp/constraints"
@@ -58,64 +59,68 @@ func IsSortedFunc[S ~[]E, E any](x S, cmp func(a, b E) int) bool {
 	return true
 }
 
-// Min returns the minimal value in x. It panics if x is empty.
+// Min returns the minimal value in x. It returns the error if x is empty.
 // For floating-point numbers, Min propagates NaNs (any NaN value in x
 // forces the output to be NaN).
-func Min[S ~[]E, E constraints.Ordered](x S) E {
+func Min[S ~[]E, E constraints.Ordered](x S) (E, error) {
+	var m E
 	if len(x) < 1 {
-		panic("slices.Min: empty list")
+		return m, errors.New("slices.Min: empty list")
 	}
-	m := x[0]
+	m = x[0]
 	for i := 1; i < len(x); i++ {
 		m = min(m, x[i])
 	}
-	return m
+	return m, nil
 }
 
 // MinFunc returns the minimal value in x, using cmp to compare elements.
-// It panics if x is empty. If there is more than one minimal element
+// It returns the error if x is empty. If there is more than one minimal element
 // according to the cmp function, MinFunc returns the first one.
-func MinFunc[S ~[]E, E any](x S, cmp func(a, b E) int) E {
+func MinFunc[S ~[]E, E any](x S, cmp func(a, b E) int) (E, error) {
+	var m E
 	if len(x) < 1 {
-		panic("slices.MinFunc: empty list")
+		return m, errors.New("slices.MinFunc: empty list")
 	}
-	m := x[0]
+	m = x[0]
 	for i := 1; i < len(x); i++ {
 		if cmp(x[i], m) < 0 {
 			m = x[i]
 		}
 	}
-	return m
+	return m, nil
 }
 
-// Max returns the maximal value in x. It panics if x is empty.
+// Max returns the maximal value in x. It returns the error if x is empty.
 // For floating-point E, Max propagates NaNs (any NaN value in x
 // forces the output to be NaN).
-func Max[S ~[]E, E constraints.Ordered](x S) E {
+func Max[S ~[]E, E constraints.Ordered](x S) (E, error) {
+	var m E
 	if len(x) < 1 {
-		panic("slices.Max: empty list")
+		return m, errors.New("slices.Max: empty list")
 	}
-	m := x[0]
+	m = x[0]
 	for i := 1; i < len(x); i++ {
 		m = max(m, x[i])
 	}
-	return m
+	return m, nil
 }
 
 // MaxFunc returns the maximal value in x, using cmp to compare elements.
-// It panics if x is empty. If there is more than one maximal element
+// It returns the error if x is empty. If there is more than one maximal element
 // according to the cmp function, MaxFunc returns the first one.
-func MaxFunc[S ~[]E, E any](x S, cmp func(a, b E) int) E {
+func MaxFunc[S ~[]E, E any](x S, cmp func(a, b E) int) (E, error) {
+	var m E
 	if len(x) < 1 {
-		panic("slices.MaxFunc: empty list")
+		return m, errors.New("slices.MaxFunc: empty list")
 	}
-	m := x[0]
+	m = x[0]
 	for i := 1; i < len(x); i++ {
 		if cmp(x[i], m) > 0 {
 			m = x[i]
 		}
 	}
-	return m
+	return m, nil
 }
 
 // BinarySearch searches for target in a sorted slice and returns the position

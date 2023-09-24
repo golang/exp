@@ -5,6 +5,7 @@
 package slices
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -188,35 +189,48 @@ func TestMinMax(t *testing.T) {
 		data    []int
 		wantMin int
 		wantMax int
+		wantErr error
 	}{
-		{[]int{7}, 7, 7},
-		{[]int{1, 2}, 1, 2},
-		{[]int{2, 1}, 1, 2},
-		{[]int{1, 2, 3}, 1, 3},
-		{[]int{3, 2, 1}, 1, 3},
-		{[]int{2, 1, 3}, 1, 3},
-		{[]int{2, 2, 3}, 2, 3},
-		{[]int{3, 2, 3}, 2, 3},
-		{[]int{0, 2, -9}, -9, 2},
+		{[]int{7}, 7, 7, nil},
+		{[]int{1, 2}, 1, 2, nil},
+		{[]int{2, 1}, 1, 2, nil},
+		{[]int{1, 2, 3}, 1, 3, nil},
+		{[]int{3, 2, 1}, 1, 3, nil},
+		{[]int{2, 1, 3}, 1, 3, nil},
+		{[]int{2, 2, 3}, 2, 3, nil},
+		{[]int{3, 2, 3}, 2, 3, nil},
+		{[]int{0, 2, -9}, -9, 2, nil},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%v", tt.data), func(t *testing.T) {
-			gotMin := Min(tt.data)
+			gotMin, err := Min(tt.data)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("Min gotErr %v, wantErr %v", err, tt.wantErr)
+			}
 			if gotMin != tt.wantMin {
 				t.Errorf("Min got %v, want %v", gotMin, tt.wantMin)
 			}
 
-			gotMinFunc := MinFunc(tt.data, intCmp)
+			gotMinFunc, err := MinFunc(tt.data, intCmp)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("MinFunc gotErr %v, wantErr %v", err, tt.wantErr)
+			}
 			if gotMinFunc != tt.wantMin {
 				t.Errorf("MinFunc got %v, want %v", gotMinFunc, tt.wantMin)
 			}
 
-			gotMax := Max(tt.data)
+			gotMax, err := Max(tt.data)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("Max gotErr %v, wantErr %v", err, tt.wantErr)
+			}
 			if gotMax != tt.wantMax {
 				t.Errorf("Max got %v, want %v", gotMax, tt.wantMax)
 			}
 
-			gotMaxFunc := MaxFunc(tt.data, intCmp)
+			gotMaxFunc, err := MaxFunc(tt.data, intCmp)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("MaxFunc gotErr %v, wantErr %v", err, tt.wantErr)
+			}
 			if gotMaxFunc != tt.wantMax {
 				t.Errorf("MaxFunc got %v, want %v", gotMaxFunc, tt.wantMax)
 			}
@@ -230,13 +244,20 @@ func TestMinMax(t *testing.T) {
 		{2, "b"},
 	}
 
-	gotMin := MinFunc(svals, cmpS)
+	gotMin, err := MinFunc(svals, cmpS)
+	var wantErr error
+	if !errors.Is(err, wantErr) {
+		t.Errorf("MinFunc(%v) err %v, wantErr %v", svals, err, wantErr)
+	}
 	wantMin := S{1, "a"}
 	if gotMin != wantMin {
 		t.Errorf("MinFunc(%v) = %v, want %v", svals, gotMin, wantMin)
 	}
 
-	gotMax := MaxFunc(svals, cmpS)
+	gotMax, err := MaxFunc(svals, cmpS)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("MaxFunc(%v) err %v, wantErr %v", svals, err, wantErr)
+	}
 	wantMax := S{2, "a"}
 	if gotMax != wantMax {
 		t.Errorf("MaxFunc(%v) = %v, want %v", svals, gotMax, wantMax)
@@ -245,11 +266,22 @@ func TestMinMax(t *testing.T) {
 
 func TestMinMaxNaNs(t *testing.T) {
 	fs := []float64{1.0, 999.9, 3.14, -400.4, -5.14}
-	if Min(fs) != -400.4 {
-		t.Errorf("got min %v, want -400.4", Min(fs))
+
+	gotMin, err := Min(fs)
+	var wantErr error
+	if !errors.Is(err, wantErr) {
+		t.Errorf("got min err %v, wantErr %v", err, wantErr)
 	}
-	if Max(fs) != 999.9 {
-		t.Errorf("got max %v, want 999.9", Max(fs))
+	if gotMin != -400.4 {
+		t.Errorf("got min %v, want -400.4", gotMin)
+	}
+
+	gotMax, err := Max(fs)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("got max err %v, wantErr %v", err, wantErr)
+	}
+	if gotMax != 999.9 {
+		t.Errorf("got max %v, want 999.9", gotMax)
 	}
 
 	// No matter which element of fs is replaced with a NaN, both Min and Max
@@ -258,36 +290,51 @@ func TestMinMaxNaNs(t *testing.T) {
 		testfs := Clone(fs)
 		testfs[i] = math.NaN()
 
-		fmin := Min(testfs)
+		fmin, err := Min(testfs)
+		var wantErr error
+		if !errors.Is(err, wantErr) {
+			t.Errorf("got min err %v, wantErr %v", err, wantErr)
+		}
 		if !math.IsNaN(fmin) {
 			t.Errorf("got min %v, want NaN", fmin)
 		}
 
-		fmax := Max(testfs)
+		fmax, err := Max(testfs)
+		if !errors.Is(err, wantErr) {
+			t.Errorf("got max err %v, wantErr %v", err, wantErr)
+		}
 		if !math.IsNaN(fmax) {
 			t.Errorf("got max %v, want NaN", fmax)
 		}
 	}
 }
 
-func TestMinMaxPanics(t *testing.T) {
+func TestMinMaxError(t *testing.T) {
 	intCmp := func(a, b int) int { return a - b }
 	emptySlice := []int{}
 
-	if !panics(func() { Min(emptySlice) }) {
-		t.Errorf("Min([]): got no panic, want panic")
+	_, err := Min(emptySlice)
+	wantErr := errors.New("slices.Min: empty list")
+	if err.Error() != wantErr.Error() {
+		t.Errorf("Min([]): err %v, wantErr %v", err, wantErr)
 	}
 
-	if !panics(func() { Max(emptySlice) }) {
-		t.Errorf("Max([]): got no panic, want panic")
+	_, err = Max(emptySlice)
+	wantErr = errors.New("slices.Max: empty list")
+	if err.Error() != wantErr.Error() {
+		t.Errorf("Max([]): err %v, wantErr %v", err, wantErr)
 	}
 
-	if !panics(func() { MinFunc(emptySlice, intCmp) }) {
-		t.Errorf("MinFunc([]): got no panic, want panic")
+	_, err = MinFunc(emptySlice, intCmp)
+	wantErr = errors.New("slices.MinFunc: empty list")
+	if err.Error() != wantErr.Error() {
+		t.Errorf("MinFunc([]): err %v, wantErr %v", err, wantErr)
 	}
 
-	if !panics(func() { MaxFunc(emptySlice, intCmp) }) {
-		t.Errorf("MaxFunc([]): got no panic, want panic")
+	_, err = MaxFunc(emptySlice, intCmp)
+	wantErr = errors.New("slices.MaxFunc: empty list")
+	if err.Error() != wantErr.Error() {
+		t.Errorf("MaxFunc([]): err %v, wantErr %v", err, wantErr)
 	}
 }
 
