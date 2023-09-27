@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build ignore
-// +build ignore
 
 // This program generates the table keysymCodePoints from /usr/include/X11/keysymdef.h
 package main

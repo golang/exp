@@ -5,7 +5,6 @@
 package slog
 
 import (
-	"context"
 	"runtime"
 	"time"
 
@@ -28,14 +27,13 @@ type Record struct {
 	// The level of the event.
 	Level Level
 
-	// The context of the Logger that created the Record. Present
-	// solely to provide Handlers access to the context's values.
-	// Canceling the context should not affect record processing.
-	Context context.Context
-
-	// The pc at the time the record was constructed, as determined
-	// by runtime.Callers using the calldepth argument to NewRecord.
-	pc uintptr
+	// The program counter at the time the record was constructed, as determined
+	// by runtime.Callers. If zero, no program counter is available.
+	//
+	// The only valid use for this value is as an argument to
+	// [runtime.CallersFrames]. In particular, it must not be passed to
+	// [runtime.FuncForPC].
+	PC uintptr
 
 	// Allocation optimization: an inline array sized to hold
 	// the majority of log calls (based on examination of open-source
@@ -54,38 +52,16 @@ type Record struct {
 
 // NewRecord creates a Record from the given arguments.
 // Use [Record.AddAttrs] to add attributes to the Record.
-// If calldepth is greater than zero, [Record.SourceLine] will
-// return the file and line number at that depth,
-// where 1 means the caller of NewRecord.
 //
 // NewRecord is intended for logging APIs that want to support a [Handler] as
 // a backend.
-func NewRecord(t time.Time, level Level, msg string, calldepth int, ctx context.Context) Record {
-	var p uintptr
-	if calldepth > 0 {
-		p = pc(calldepth + 1)
-	}
+func NewRecord(t time.Time, level Level, msg string, pc uintptr) Record {
 	return Record{
 		Time:    t,
 		Message: msg,
 		Level:   level,
-		Context: ctx,
-		pc:      p,
+		PC:      pc,
 	}
-}
-
-// Context returns the context in the Record.
-// If the Record was created from a Logger,
-// this will be the Logger's context.
-
-// SourceLine returns the file and line of the log event.
-// If the Record was created without the necessary information,
-// or if the location is unavailable, it returns ("", 0).
-func (r Record) SourceLine() (file string, line int) {
-	fs := runtime.CallersFrames([]uintptr{r.pc})
-	// TODO: error-checking?
-	f, _ := fs.Next()
-	return f.File, f.Line
 }
 
 // Clone returns a copy of the record with no shared state.
@@ -102,16 +78,21 @@ func (r Record) NumAttrs() int {
 }
 
 // Attrs calls f on each Attr in the Record.
-func (r Record) Attrs(f func(Attr)) {
+// Iteration stops if f returns false.
+func (r Record) Attrs(f func(Attr) bool) {
 	for i := 0; i < r.nFront; i++ {
-		f(r.front[i])
+		if !f(r.front[i]) {
+			return
+		}
 	}
 	for _, a := range r.back {
-		f(a)
+		if !f(a) {
+			return
+		}
 	}
 }
 
-// AddAttrs appends the given attrs to the Record's list of Attrs.
+// AddAttrs appends the given Attrs to the Record's list of Attrs.
 func (r *Record) AddAttrs(attrs ...Attr) {
 	n := copy(r.front[r.nFront:], attrs)
 	r.nFront += n
@@ -119,14 +100,16 @@ func (r *Record) AddAttrs(attrs ...Attr) {
 	// and seeing if the Attr there is non-zero.
 	if cap(r.back) > len(r.back) {
 		end := r.back[:len(r.back)+1][len(r.back)]
-		if end != (Attr{}) {
+		if !end.isEmpty() {
 			panic("copies of a slog.Record were both modified")
 		}
 	}
 	r.back = append(r.back, attrs[n:]...)
 }
 
-func (r *Record) setAttrsFromArgs(args []any) {
+// Add converts the args to Attrs as described in [Logger.Log],
+// then appends the Attrs to the Record's list of Attrs.
+func (r *Record) Add(args ...any) {
 	var a Attr
 	for len(args) > 0 {
 		a, args = argsToAttr(args)
@@ -176,5 +159,49 @@ func argsToAttr(args []any) (Attr, []any) {
 
 	default:
 		return Any(badKey, x), args[1:]
+	}
+}
+
+// Source describes the location of a line of source code.
+type Source struct {
+	// Function is the package path-qualified function name containing the
+	// source line. If non-empty, this string uniquely identifies a single
+	// function in the program. This may be the empty string if not known.
+	Function string `json:"function"`
+	// File and Line are the file name and line number (1-based) of the source
+	// line. These may be the empty string and zero, respectively, if not known.
+	File string `json:"file"`
+	Line int    `json:"line"`
+}
+
+// attrs returns the non-zero fields of s as a slice of attrs.
+// It is similar to a LogValue method, but we don't want Source
+// to implement LogValuer because it would be resolved before
+// the ReplaceAttr function was called.
+func (s *Source) group() Value {
+	var as []Attr
+	if s.Function != "" {
+		as = append(as, String("function", s.Function))
+	}
+	if s.File != "" {
+		as = append(as, String("file", s.File))
+	}
+	if s.Line != 0 {
+		as = append(as, Int("line", s.Line))
+	}
+	return GroupValue(as...)
+}
+
+// source returns a Source for the log event.
+// If the Record was created without the necessary information,
+// or if the location is unavailable, it returns a non-nil *Source
+// with zero fields.
+func (r Record) source() *Source {
+	fs := runtime.CallersFrames([]uintptr{r.PC})
+	f, _ := fs.Next()
+	return &Source{
+		Function: f.Function,
+		File:     f.File,
+		Line:     f.Line,
 	}
 }

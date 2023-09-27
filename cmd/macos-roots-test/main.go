@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build darwin
-// +build darwin
 
 // Command macOS-roots-test runs crypto/x509.TestSystemRoots as a
 // stand-alone binary for crowdsourced testing.

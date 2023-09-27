@@ -72,7 +72,7 @@ func (p *parser) parseToken() *Token {
 	return &Token{pos, value}
 }
 
-// ParseTerm returns nil if no term was found.
+// parseTerm returns nil if no term was found.
 func (p *parser) parseTerm() (x Expression) {
 	pos := p.pos
 

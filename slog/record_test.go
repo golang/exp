@@ -5,12 +5,12 @@
 package slog
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog/internal/buffer"
 )
 
 func TestRecordAttrs(t *testing.T) {
@@ -23,27 +23,46 @@ func TestRecordAttrs(t *testing.T) {
 	if got := attrsSlice(r); !attrsEqual(got, as) {
 		t.Errorf("got %v, want %v", got, as)
 	}
+
+	// Early return.
+	var got []Attr
+	r.Attrs(func(a Attr) bool {
+		got = append(got, a)
+		return len(got) < 2
+	})
+	want := as[:2]
+	if !attrsEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }
 
-func TestRecordSourceLine(t *testing.T) {
-	// Zero call depth => empty file/line
+func TestRecordSource(t *testing.T) {
+	// Zero call depth => empty *Source.
 	for _, test := range []struct {
 		depth            int
+		wantFunction     string
 		wantFile         string
 		wantLinePositive bool
 	}{
-		{0, "", false},
-		{-16, "", false},
-		{1, "record.go", true},
+		{0, "", "", false},
+		{-16, "", "", false},
+		{1, "golang.org/x/exp/slog.TestRecordSource", "record_test.go", true}, // 1: caller of NewRecord
+		{2, "testing.tRunner", "testing.go", true},
 	} {
-		r := NewRecord(time.Time{}, 0, "", test.depth, nil)
-		gotFile, gotLine := r.SourceLine()
-		if i := strings.LastIndexByte(gotFile, '/'); i >= 0 {
-			gotFile = gotFile[i+1:]
+		var pc uintptr
+		if test.depth > 0 {
+			pc = callerPC(test.depth + 1)
 		}
-		if gotFile != test.wantFile || (gotLine > 0) != test.wantLinePositive {
-			t.Errorf("depth %d: got (%q, %d), want (%q, %t)",
-				test.depth, gotFile, gotLine, test.wantFile, test.wantLinePositive)
+		r := NewRecord(time.Time{}, 0, "", pc)
+		got := r.source()
+		if i := strings.LastIndexByte(got.File, '/'); i >= 0 {
+			got.File = got.File[i+1:]
+		}
+		if got.Function != test.wantFunction || got.File != test.wantFile || (got.Line > 0) != test.wantLinePositive {
+			t.Errorf("depth %d: got (%q, %q, %d), want (%q, %q, %t)",
+				test.depth,
+				got.Function, got.File, got.Line,
+				test.wantFunction, test.wantFile, test.wantLinePositive)
 		}
 	}
 }
@@ -67,7 +86,7 @@ func TestAliasingAndClone(t *testing.T) {
 
 	// Create a record whose Attrs overflow the inline array,
 	// creating a slice in r.back.
-	r1 := NewRecord(time.Time{}, 0, "", 0, nil)
+	r1 := NewRecord(time.Time{}, 0, "", 0)
 	r1.AddAttrs(intAttrs(0, nAttrsInline+1)...)
 	// Ensure that r1.back's capacity exceeds its length.
 	b := make([]Attr, len(r1.back), len(r1.back)+1)
@@ -90,14 +109,14 @@ func TestAliasingAndClone(t *testing.T) {
 }
 
 func newRecordWithAttrs(as []Attr) Record {
-	r := NewRecord(time.Now(), LevelInfo, "", 0, nil)
+	r := NewRecord(time.Now(), LevelInfo, "", 0)
 	r.AddAttrs(as...)
 	return r
 }
 
 func attrsSlice(r Record) []Attr {
 	s := make([]Attr, 0, r.NumAttrs())
-	r.Attrs(func(a Attr) { s = append(s, a) })
+	r.Attrs(func(a Attr) bool { s = append(s, a); return true })
 	return s
 }
 
@@ -108,35 +127,16 @@ func attrsEqual(as1, as2 []Attr) bool {
 // Currently, pc(2) takes over 400ns, which is too expensive
 // to call it for every log message.
 func BenchmarkPC(b *testing.B) {
-	b.ReportAllocs()
-	var x uintptr
-	for i := 0; i < b.N; i++ {
-		x = pc(3)
+	for depth := 0; depth < 5; depth++ {
+		b.Run(strconv.Itoa(depth), func(b *testing.B) {
+			b.ReportAllocs()
+			var x uintptr
+			for i := 0; i < b.N; i++ {
+				x = callerPC(depth)
+			}
+			_ = x
+		})
 	}
-	_ = x
-}
-
-func BenchmarkSourceLine(b *testing.B) {
-	r := NewRecord(time.Now(), LevelInfo, "", 5, nil)
-	b.Run("alone", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			file, line := r.SourceLine()
-			_ = file
-			_ = line
-		}
-	})
-	b.Run("stringifying", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			file, line := r.SourceLine()
-			buf := buffer.New()
-			buf.WriteString(file)
-			buf.WriteByte(':')
-			buf.WritePosInt(line)
-			s := buf.String()
-			buf.Free()
-			_ = s
-		}
-	})
 }
 
 func BenchmarkRecord(b *testing.B) {
@@ -144,11 +144,11 @@ func BenchmarkRecord(b *testing.B) {
 	var a Attr
 
 	for i := 0; i < b.N; i++ {
-		r := NewRecord(time.Time{}, LevelInfo, "", 0, nil)
+		r := NewRecord(time.Time{}, LevelInfo, "", 0)
 		for j := 0; j < nAttrs; j++ {
 			r.AddAttrs(Int("k", j))
 		}
-		r.Attrs(func(b Attr) { a = b })
+		r.Attrs(func(b Attr) bool { a = b; return true })
 	}
 	_ = a
 }

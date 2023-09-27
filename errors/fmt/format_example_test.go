@@ -40,8 +40,8 @@ func Example_formatting() {
 }
 
 func stripPath(s string) string {
-	rePath := regexp.MustCompile(`( [^ ]*)golang.org`)
-	s = rePath.ReplaceAllString(s, " golang.org")
+	rePath := regexp.MustCompile(`( [^ ]*)/fmt`)
+	s = rePath.ReplaceAllString(s, " golang.org/x/exp/errors/fmt")
 	s = filepath.ToSlash(s)
 	return s
 }

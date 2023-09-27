@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build !disable_events
-// +build !disable_events
 
 // zap provides an implementation of zapcore.Core for events.
 // To use globally:

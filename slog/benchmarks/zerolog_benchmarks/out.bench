@@ -1,0 +1,26 @@
+goos: linux
+goarch: amd64
+pkg: golang.org/x/exp/slog/benchmarks/zerolog_benchmarks
+cpu: Intel(R) Xeon(R) CPU @ 2.20GHz
+BenchmarkAttrs/JSON_discard/5_args-8  	 4137742	       295.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4177807	       290.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4067436	       292.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4089474	       294.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4057003	       300.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 3972150	       290.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4090122	       312.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4305754	       315.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 3576042	       327.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/5_args-8  	 4073211	       290.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3213050	       389.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3510774	       350.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3804168	       319.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3812370	       334.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3738373	       315.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3918612	       321.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3649148	       348.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3699234	       338.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3639038	       330.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkAttrs/JSON_discard/10_args-8 	 3439284	       323.2 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	golang.org/x/exp/slog/benchmarks/zerolog_benchmarks	30.876s

@@ -141,7 +141,7 @@ func TestErrorFormatter(t *testing.T) {
 		fmt: "%+v",
 		want: "something:" +
 			"\n    golang.org/x/exp/errors/fmt_test.TestErrorFormatter" +
-			"\n        .+/golang.org/x/exp/errors/fmt/errors_test.go:98" +
+			"\n        .+/fmt/errors_test.go:98" +
 			"\n    something more",
 		regexp: true,
 	}, {

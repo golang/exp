@@ -16,7 +16,7 @@ func (d *differ) checkCompatible(otn *types.TypeName, old, new types.Type) {
 
 	case *types.Struct:
 		if new, ok := new.(*types.Struct); ok {
-			d.checkCompatibleStruct(otn, old, new)
+			d.checkCompatibleStruct(objectWithSide{otn, false}, old, new)
 			return
 		}
 
@@ -36,21 +36,21 @@ func (d *differ) checkCompatible(otn *types.TypeName, old, new types.Type) {
 		panic("unreachable")
 
 	default:
-		d.checkCorrespondence(otn, "", old, new)
+		d.checkCorrespondence(objectWithSide{otn, false}, "", old, new)
 		return
 
 	}
 	// Here if old and new are different kinds of types.
-	d.typeChanged(otn, "", old, new)
+	d.typeChanged(objectWithSide{otn, false}, "", old, new)
 }
 
 func (d *differ) checkCompatibleChan(otn *types.TypeName, old, new *types.Chan) {
-	d.checkCorrespondence(otn, ", element type", old.Elem(), new.Elem())
+	d.checkCorrespondence(objectWithSide{otn, false}, ", element type", old.Elem(), new.Elem())
 	if old.Dir() != new.Dir() {
 		if new.Dir() == types.SendRecv {
-			d.compatible(otn, "", "removed direction")
+			d.compatible(objectWithSide{otn, false}, "", "removed direction")
 		} else {
-			d.incompatible(otn, "", "changed direction")
+			d.incompatible(objectWithSide{otn, false}, "", "changed direction")
 		}
 	}
 }
@@ -63,9 +63,9 @@ func (d *differ) checkCompatibleBasic(otn *types.TypeName, old, new *types.Basic
 		return
 	}
 	if compatibleBasics[[2]types.BasicKind{old.Kind(), new.Kind()}] {
-		d.compatible(otn, "", "changed from %s to %s", old, new)
+		d.compatible(objectWithSide{otn, false}, "", "changed from %s to %s", old, new)
 	} else {
-		d.typeChanged(otn, "", old, new)
+		d.typeChanged(objectWithSide{otn, false}, "", old, new)
 	}
 }
 
@@ -118,7 +118,7 @@ func (d *differ) checkCompatibleInterface(otn *types.TypeName, old, new *types.I
 		// Perform an equivalence check, but with more information.
 		d.checkMethodSet(otn, old, new, additionsIncompatible)
 		if u := unexportedMethod(new); u != nil {
-			d.incompatible(otn, u.Name(), "added unexported method")
+			d.incompatible(objectWithSide{otn, false}, u.Name(), "added unexported method")
 		}
 	}
 }
@@ -150,7 +150,7 @@ func unexportedMethod(t *types.Interface) *types.Func {
 // struct.
 //
 // Field tags are ignored: they have no compile-time implications.
-func (d *differ) checkCompatibleStruct(obj types.Object, old, new *types.Struct) {
+func (d *differ) checkCompatibleStruct(obj objectWithSide, old, new *types.Struct) {
 	d.checkCompatibleObjectSets(obj, exportedFields(old), exportedFields(new))
 	d.checkCompatibleObjectSets(obj, exportedSelectableFields(old), exportedSelectableFields(new))
 	// Removing comparability from a struct is an incompatible change.
@@ -242,7 +242,7 @@ func unambiguousFields(structs []*types.Struct) map[string]*types.Var {
 
 // Anything removed or change from the old set is an incompatible change.
 // Anything added to the new set is a compatible change.
-func (d *differ) checkCompatibleObjectSets(obj types.Object, old, new map[string]types.Object) {
+func (d *differ) checkCompatibleObjectSets(obj objectWithSide, old, new map[string]types.Object) {
 	for name, oldo := range old {
 		newo := new[name]
 		if newo == nil {
@@ -303,16 +303,16 @@ func (d *differ) checkMethodSet(otn *types.TypeName, oldt, newt types.Type, addc
 			if receiverNamedType(oldMethod).Obj() != otn {
 				part = fmt.Sprintf(", method set of %s", msname)
 			}
-			d.incompatible(oldMethod, part, "removed")
+			d.incompatible(objectWithSide{oldMethod, false}, part, "removed")
 		} else {
-			obj := oldMethod
+			obj := objectWithSide{oldMethod, false}
 			// If a value method is changed to a pointer method and has a signature
 			// change, then we can get two messages for the same method definition: one
 			// for the value method set that says it's removed, and another for the
 			// pointer method set that says it changed. To keep both messages (since
 			// messageSet dedups), use newMethod for the second. (Slight hack.)
 			if !hasPointerReceiver(oldMethod) && hasPointerReceiver(newMethod) {
-				obj = newMethod
+				obj = objectWithSide{newMethod, true}
 			}
 			d.checkCorrespondence(obj, "", oldMethod.Type(), newMethod.Type())
 		}
@@ -322,9 +322,9 @@ func (d *differ) checkMethodSet(otn *types.TypeName, oldt, newt types.Type, addc
 	for name, newMethod := range newMethodSet {
 		if oldMethodSet[name] == nil {
 			if addcompat {
-				d.compatible(newMethod, "", "added")
+				d.compatible(objectWithSide{newMethod, true}, "", "added")
 			} else {
-				d.incompatible(newMethod, "", "added")
+				d.incompatible(objectWithSide{newMethod, true}, "", "added")
 			}
 		}
 	}

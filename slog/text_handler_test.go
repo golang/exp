@@ -6,10 +6,10 @@ package slog
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -34,9 +34,14 @@ func TestTextHandler(t *testing.T) {
 			`"x = y"`, `"qu\"o"`,
 		},
 		{
-			"Sprint",
+			"String method",
 			Any("name", name{"Ren", "Hoek"}),
 			`name`, `"Hoek, Ren"`,
+		},
+		{
+			"struct",
+			Any("x", &struct{ A, b int }{A: 1, b: 2}),
+			`x`, `"&{A:1 b:2}"`,
 		},
 		{
 			"TextMarshaler",
@@ -47,6 +52,11 @@ func TestTextHandler(t *testing.T) {
 			"TextMarshaler error",
 			Any("t", text{""}),
 			`t`, `"!ERROR:text: empty string"`,
+		},
+		{
+			"nil value",
+			Any("a", nil),
+			`a`, `<nil>`,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -71,10 +81,10 @@ func TestTextHandler(t *testing.T) {
 			} {
 				t.Run(opts.name, func(t *testing.T) {
 					var buf bytes.Buffer
-					h := opts.opts.NewTextHandler(&buf)
-					r := NewRecord(testTime, LevelInfo, "a message", 0, nil)
+					h := NewTextHandler(&buf, &opts.opts)
+					r := NewRecord(testTime, LevelInfo, "a message", 0)
 					r.AddAttrs(test.attr)
-					if err := h.Handle(r); err != nil {
+					if err := h.Handle(context.Background(), r); err != nil {
 						t.Fatal(err)
 					}
 					got := buf.String()
@@ -111,40 +121,14 @@ func (t text) MarshalText() ([]byte, error) {
 	return []byte(fmt.Sprintf("text{%q}", t.s)), nil
 }
 
-func TestTextHandlerSource(t *testing.T) {
-	var buf bytes.Buffer
-	h := HandlerOptions{AddSource: true}.NewTextHandler(&buf)
-	r := NewRecord(testTime, LevelInfo, "m", 2, nil)
-	if err := h.Handle(r); err != nil {
-		t.Fatal(err)
-	}
-	if got := buf.String(); !sourceRegexp.MatchString(got) {
-		t.Errorf("got\n%q\nwanted to match %s", got, sourceRegexp)
-	}
-}
-
-var sourceRegexp = regexp.MustCompile(`source="?([A-Z]:)?[^:]+text_handler_test\.go:\d+"? msg`)
-
-func TestSourceRegexp(t *testing.T) {
-	for _, s := range []string{
-		`source=/tmp/path/to/text_handler_test.go:23 msg=m`,
-		`source=C:\windows\path\text_handler_test.go:23 msg=m"`,
-		`source="/tmp/tmp.XcGZ9cG9Xb/with spaces/exp/slog/text_handler_test.go:95" msg=m`,
-	} {
-		if !sourceRegexp.MatchString(s) {
-			t.Errorf("failed to match %s", s)
-		}
-	}
-}
-
 func TestTextHandlerPreformatted(t *testing.T) {
 	var buf bytes.Buffer
-	var h Handler = NewTextHandler(&buf)
+	var h Handler = NewTextHandler(&buf, nil)
 	h = h.WithAttrs([]Attr{Duration("dur", time.Minute), Bool("b", true)})
 	// Also test omitting time.
-	r := NewRecord(time.Time{}, 0 /* 0 Level is INFO */, "m", 0, nil)
+	r := NewRecord(time.Time{}, 0 /* 0 Level is INFO */, "m", 0)
 	r.AddAttrs(Int("a", 1))
-	if err := h.Handle(r); err != nil {
+	if err := h.Handle(context.Background(), r); err != nil {
 		t.Fatal(err)
 	}
 	got := strings.TrimSuffix(buf.String(), "\n")
@@ -155,16 +139,16 @@ func TestTextHandlerPreformatted(t *testing.T) {
 }
 
 func TestTextHandlerAlloc(t *testing.T) {
-	r := NewRecord(time.Now(), LevelInfo, "msg", 0, nil)
+	r := NewRecord(time.Now(), LevelInfo, "msg", 0)
 	for i := 0; i < 10; i++ {
 		r.AddAttrs(Int("x = y", i))
 	}
-	var h Handler = NewTextHandler(io.Discard)
-	wantAllocs(t, 0, func() { h.Handle(r) })
+	var h Handler = NewTextHandler(io.Discard, nil)
+	wantAllocs(t, 0, func() { h.Handle(context.Background(), r) })
 
 	h = h.WithGroup("s")
 	r.AddAttrs(Group("g", Int("a", 1)))
-	wantAllocs(t, 0, func() { h.Handle(r) })
+	wantAllocs(t, 0, func() { h.Handle(context.Background(), r) })
 }
 
 func TestNeedsQuoting(t *testing.T) {
@@ -172,7 +156,7 @@ func TestNeedsQuoting(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{"", false},
+		{"", true},
 		{"ab", false},
 		{"a=b", true},
 		{`"ab"`, true},

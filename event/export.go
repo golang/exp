@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build !disable_events
-// +build !disable_events
 
 package event
 
@@ -48,7 +47,7 @@ type ExporterOptions struct {
 	EnableNamespaces bool
 }
 
-// contextKey is used as the key for storing a contextValue on the context.
+// contextKeyType is used as the key for storing a contextValue on the context.
 type contextKeyType struct{}
 
 var contextKey interface{} = contextKeyType{}

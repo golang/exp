@@ -5,9 +5,11 @@
 package slog_test
 
 import (
+	"context"
 	"os"
 
 	"golang.org/x/exp/slog"
+	"golang.org/x/exp/slog/internal/testutil"
 )
 
 // A LevelHandler wraps a Handler with an Enabled method
@@ -29,13 +31,13 @@ func NewLevelHandler(level slog.Leveler, h slog.Handler) *LevelHandler {
 
 // Enabled implements Handler.Enabled by reporting whether
 // level is at least as large as h's level.
-func (h *LevelHandler) Enabled(level slog.Level) bool {
+func (h *LevelHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level.Level()
 }
 
 // Handle implements Handler.Handle.
-func (h *LevelHandler) Handle(r slog.Record) error {
-	return h.handler.Handle(r)
+func (h *LevelHandler) Handle(ctx context.Context, r slog.Record) error {
+	return h.handler.Handle(ctx, r)
 }
 
 // WithAttrs implements Handler.WithAttrs.
@@ -53,17 +55,16 @@ func (h *LevelHandler) Handler() slog.Handler {
 	return h.handler
 }
 
+// This example shows how to Use a LevelHandler to change the level of an
+// existing Handler while preserving its other behavior.
+//
+// This example demonstrates increasing the log level to reduce a logger's
+// output.
+//
+// Another typical use would be to decrease the log level (to LevelDebug, say)
+// during a part of the program that was suspected of containing a bug.
 func ExampleHandler_levelHandler() {
-	th := slog.HandlerOptions{
-		// Remove time from the output.
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				return slog.Attr{}
-			}
-			return a
-		},
-	}.NewTextHandler(os.Stdout)
-
+	th := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{ReplaceAttr: testutil.RemoveTime})
 	logger := slog.New(NewLevelHandler(slog.LevelWarn, th))
 	logger.Info("not printed")
 	logger.Warn("printed")

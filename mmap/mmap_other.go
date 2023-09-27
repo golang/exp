@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build !linux && !windows && !darwin
-// +build !linux,!windows,!darwin
 
 // Package mmap provides a way to memory-map a file.
 package mmap

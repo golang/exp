@@ -5,7 +5,7 @@ success=false
 -- want --
 # example.com/private/p
 ## incompatible changes
-I.Foo: added
+example.com/private/internal/i.I.Foo: added
 
 # summary
 Cannot suggest a release version.

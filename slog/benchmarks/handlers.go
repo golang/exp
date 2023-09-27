@@ -7,6 +7,7 @@ package benchmarks
 // Handlers for benchmarking.
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -31,9 +32,9 @@ func newFastTextHandler(w io.Writer) slog.Handler {
 	return &fastTextHandler{w: w}
 }
 
-func (h *fastTextHandler) Enabled(slog.Level) bool { return true }
+func (h *fastTextHandler) Enabled(context.Context, slog.Level) bool { return true }
 
-func (h *fastTextHandler) Handle(r slog.Record) error {
+func (h *fastTextHandler) Handle(_ context.Context, r slog.Record) error {
 	buf := buffer.New()
 	defer buf.Free()
 
@@ -47,11 +48,12 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 	buf.WriteByte(' ')
 	buf.WriteString("msg=")
 	buf.WriteString(r.Message)
-	r.Attrs(func(a slog.Attr) {
+	r.Attrs(func(a slog.Attr) bool {
 		buf.WriteByte(' ')
 		buf.WriteString(a.Key)
 		buf.WriteByte('=')
 		h.appendValue(buf, a.Value)
+		return true
 	})
 	buf.WriteByte('\n')
 	_, err := h.w.Write(*buf)
@@ -59,23 +61,22 @@ func (h *fastTextHandler) Handle(r slog.Record) error {
 }
 
 func (h *fastTextHandler) appendValue(buf *buffer.Buffer, v slog.Value) {
-	v = v.Resolve()
 	switch v.Kind() {
-	case slog.StringKind:
+	case slog.KindString:
 		buf.WriteString(v.String())
-	case slog.Int64Kind:
+	case slog.KindInt64:
 		*buf = strconv.AppendInt(*buf, v.Int64(), 10)
-	case slog.Uint64Kind:
+	case slog.KindUint64:
 		*buf = strconv.AppendUint(*buf, v.Uint64(), 10)
-	case slog.Float64Kind:
+	case slog.KindFloat64:
 		*buf = strconv.AppendFloat(*buf, v.Float64(), 'g', -1, 64)
-	case slog.BoolKind:
+	case slog.KindBool:
 		*buf = strconv.AppendBool(*buf, v.Bool())
-	case slog.DurationKind:
+	case slog.KindDuration:
 		*buf = strconv.AppendInt(*buf, v.Duration().Nanoseconds(), 10)
-	case slog.TimeKind:
+	case slog.KindTime:
 		h.appendTime(buf, v.Time())
-	case slog.AnyKind:
+	case slog.KindAny:
 		a := v.Any()
 		switch a := a.(type) {
 		case error:
@@ -116,9 +117,9 @@ func newAsyncHandler() *asyncHandler {
 	return &asyncHandler{}
 }
 
-func (*asyncHandler) Enabled(slog.Level) bool { return true }
+func (*asyncHandler) Enabled(context.Context, slog.Level) bool { return true }
 
-func (h *asyncHandler) Handle(r slog.Record) error {
+func (h *asyncHandler) Handle(_ context.Context, r slog.Record) error {
 	h.ringBuffer[h.next] = r.Clone()
 	h.next = (h.next + 1) % len(h.ringBuffer)
 	return nil
@@ -134,8 +135,8 @@ func (*asyncHandler) WithGroup(string) slog.Handler {
 
 type disabledHandler struct{}
 
-func (disabledHandler) Enabled(slog.Level) bool  { return false }
-func (disabledHandler) Handle(slog.Record) error { panic("should not be called") }
+func (disabledHandler) Enabled(context.Context, slog.Level) bool  { return false }
+func (disabledHandler) Handle(context.Context, slog.Record) error { panic("should not be called") }
 
 func (disabledHandler) WithAttrs([]slog.Attr) slog.Handler {
 	panic("disabledHandler: With unimplemented")

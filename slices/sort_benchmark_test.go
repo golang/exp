@@ -5,8 +5,10 @@
 package slices
 
 import (
+	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -49,6 +51,15 @@ func BenchmarkSortInts(b *testing.B) {
 	}
 }
 
+func makeSortedStrings(n int) []string {
+	x := make([]string, n)
+	for i := 0; i < n; i++ {
+		x[i] = strconv.Itoa(i)
+	}
+	Sort(x)
+	return x
+}
+
 func BenchmarkSlicesSortInts(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -76,6 +87,24 @@ func BenchmarkSlicesSortInts_Reversed(b *testing.B) {
 	}
 }
 
+func BenchmarkIntsAreSorted(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ints := makeSortedInts(N)
+		b.StartTimer()
+		sort.IntsAreSorted(ints)
+	}
+}
+
+func BenchmarkIsSorted(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ints := makeSortedInts(N)
+		b.StartTimer()
+		IsSorted(ints)
+	}
+}
+
 // Since we're benchmarking these sorts against each other, make sure that they
 // generate similar results.
 func TestIntSorts(t *testing.T) {
@@ -95,7 +124,7 @@ func TestIntSorts(t *testing.T) {
 // The following is a benchmark for sorting strings.
 
 // makeRandomStrings generates n random strings with alphabetic runes of
-// varying lenghts.
+// varying lengths.
 func makeRandomStrings(n int) []string {
 	rand.Seed(42)
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -134,11 +163,29 @@ func BenchmarkSortStrings(b *testing.B) {
 	}
 }
 
+func BenchmarkSortStrings_Sorted(b *testing.B) {
+	ss := makeSortedStrings(N)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		sort.Strings(ss)
+	}
+}
+
 func BenchmarkSlicesSortStrings(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		ss := makeRandomStrings(N)
 		b.StartTimer()
+		Sort(ss)
+	}
+}
+
+func BenchmarkSlicesSortStrings_Sorted(b *testing.B) {
+	ss := makeSortedStrings(N)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
 		Sort(ss)
 	}
 }
@@ -173,7 +220,7 @@ func TestStructSorts(t *testing.T) {
 	}
 
 	sort.Sort(ss)
-	SortFunc(ss2, func(a, b *myStruct) bool { return a.n < b.n })
+	SortFunc(ss2, func(a, b *myStruct) int { return a.n - b.n })
 
 	for i := range ss {
 		if *ss[i] != *ss2[i] {
@@ -192,11 +239,46 @@ func BenchmarkSortStructs(b *testing.B) {
 }
 
 func BenchmarkSortFuncStructs(b *testing.B) {
-	lessFunc := func(a, b *myStruct) bool { return a.n < b.n }
+	cmpFunc := func(a, b *myStruct) int { return a.n - b.n }
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		ss := makeRandomStructs(N)
 		b.StartTimer()
-		SortFunc(ss, lessFunc)
+		SortFunc(ss, cmpFunc)
+	}
+}
+
+func BenchmarkBinarySearchFloats(b *testing.B) {
+	for _, size := range []int{16, 32, 64, 128, 512, 1024} {
+		b.Run(fmt.Sprintf("Size%d", size), func(b *testing.B) {
+			floats := make([]float64, size)
+			for i := range floats {
+				floats[i] = float64(i)
+			}
+			midpoint := len(floats) / 2
+			needle := (floats[midpoint] + floats[midpoint+1]) / 2
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				BinarySearch(floats, needle)
+			}
+		})
+	}
+}
+
+func BenchmarkBinarySearchFuncStruct(b *testing.B) {
+	for _, size := range []int{16, 32, 64, 128, 512, 1024} {
+		b.Run(fmt.Sprintf("Size%d", size), func(b *testing.B) {
+			structs := make([]*myStruct, size)
+			for i := range structs {
+				structs[i] = &myStruct{n: i}
+			}
+			midpoint := len(structs) / 2
+			needle := &myStruct{n: (structs[midpoint].n + structs[midpoint+1].n) / 2}
+			lessFunc := func(a, b *myStruct) int { return a.n - b.n }
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				BinarySearchFunc(structs, needle, lessFunc)
+			}
+		})
 	}
 }

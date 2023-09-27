@@ -7,36 +7,52 @@ package slog
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
+	"unsafe"
 
 	"golang.org/x/exp/slices"
 )
 
-// Definitions for Value.
-// The Value type itself can be found in value_{safe,unsafe}.go.
+// A Value can represent any Go value, but unlike type any,
+// it can represent most small values without an allocation.
+// The zero Value corresponds to nil.
+type Value struct {
+	_ [0]func() // disallow ==
+	// num holds the value for Kinds Int64, Uint64, Float64, Bool and Duration,
+	// the string length for KindString, and nanoseconds since the epoch for KindTime.
+	num uint64
+	// If any is of type Kind, then the value is in num as described above.
+	// If any is of type *time.Location, then the Kind is Time and time.Time value
+	// can be constructed from the Unix nanos in num and the location (monotonic time
+	// is not preserved).
+	// If any is of type stringptr, then the Kind is String and the string value
+	// consists of the length in num and the pointer in any.
+	// Otherwise, the Kind is Any and any is the value.
+	// (This implies that Attrs cannot store values of type Kind, *time.Location
+	// or stringptr.)
+	any any
+}
 
 // Kind is the kind of a Value.
 type Kind int
 
-// Unexported version of Kind, just so we can store Kinds in Values.
-// (No user-provided value has this type.)
-type kind Kind
-
 // The following list is sorted alphabetically, but it's also important that
-// AnyKind is 0 so that a zero Value represents nil.
+// KindAny is 0 so that a zero Value represents nil.
 
 const (
-	AnyKind Kind = iota
-	BoolKind
-	DurationKind
-	Float64Kind
-	Int64Kind
-	StringKind
-	TimeKind
-	Uint64Kind
-	GroupKind
-	LogValuerKind
+	KindAny Kind = iota
+	KindBool
+	KindDuration
+	KindFloat64
+	KindInt64
+	KindString
+	KindTime
+	KindUint64
+	KindGroup
+	KindLogValuer
 )
 
 var kindStrings = []string{
@@ -48,7 +64,7 @@ var kindStrings = []string{
 	"String",
 	"Time",
 	"Uint64",
-	"GroupKind",
+	"Group",
 	"LogValuer",
 }
 
@@ -57,6 +73,30 @@ func (k Kind) String() string {
 		return kindStrings[k]
 	}
 	return "<unknown slog.Kind>"
+}
+
+// Unexported version of Kind, just so we can store Kinds in Values.
+// (No user-provided value has this type.)
+type kind Kind
+
+// Kind returns v's Kind.
+func (v Value) Kind() Kind {
+	switch x := v.any.(type) {
+	case Kind:
+		return x
+	case stringptr:
+		return KindString
+	case timeLocation:
+		return KindTime
+	case groupptr:
+		return KindGroup
+	case LogValuer:
+		return KindLogValuer
+	case kind: // a kind is just a wrapper for a Kind
+		return KindAny
+	default:
+		return KindAny
+	}
 }
 
 //////////////// Constructors
@@ -68,17 +108,17 @@ func IntValue(v int) Value {
 
 // Int64Value returns a Value for an int64.
 func Int64Value(v int64) Value {
-	return Value{num: uint64(v), any: Int64Kind}
+	return Value{num: uint64(v), any: KindInt64}
 }
 
 // Uint64Value returns a Value for a uint64.
 func Uint64Value(v uint64) Value {
-	return Value{num: v, any: Uint64Kind}
+	return Value{num: v, any: KindUint64}
 }
 
 // Float64Value returns a Value for a floating-point number.
 func Float64Value(v float64) Value {
-	return Value{num: math.Float64bits(v), any: Float64Kind}
+	return Value{num: math.Float64bits(v), any: KindFloat64}
 }
 
 // BoolValue returns a Value for a bool.
@@ -87,7 +127,7 @@ func BoolValue(v bool) Value {
 	if v {
 		u = 1
 	}
-	return Value{num: u, any: BoolKind}
+	return Value{num: u, any: KindBool}
 }
 
 // Unexported version of *time.Location, just so we can store *time.Locations in
@@ -97,18 +137,19 @@ type timeLocation *time.Location
 // TimeValue returns a Value for a time.Time.
 // It discards the monotonic portion.
 func TimeValue(v time.Time) Value {
+	if v.IsZero() {
+		// UnixNano on the zero time is undefined, so represent the zero time
+		// with a nil *time.Location instead. time.Time.Location method never
+		// returns nil, so a Value with any == timeLocation(nil) cannot be
+		// mistaken for any other Value, time.Time or otherwise.
+		return Value{any: timeLocation(nil)}
+	}
 	return Value{num: uint64(v.UnixNano()), any: timeLocation(v.Location())}
 }
 
 // DurationValue returns a Value for a time.Duration.
 func DurationValue(v time.Duration) Value {
-	return Value{num: uint64(v.Nanoseconds()), any: DurationKind}
-}
-
-// GroupValue returns a new Value for a list of Attrs.
-// The caller must not subsequently mutate the argument slice.
-func GroupValue(as ...Attr) Value {
-	return groupValue(as)
+	return Value{num: uint64(v.Nanoseconds()), any: KindDuration}
 }
 
 // AnyValue returns a Value for the supplied value.
@@ -122,10 +163,10 @@ func GroupValue(as ...Attr) Value {
 // original numeric type is not preserved.
 //
 // Given a time.Time or time.Duration value, AnyValue returns a Value of kind
-// TimeKind or DurationKind. The monotonic time is not preserved.
+// KindTime or KindDuration. The monotonic time is not preserved.
 //
 // For nil, or values of all other types, including named types whose
-// underlying type is numeric, AnyValue returns a value of kind AnyKind.
+// underlying type is numeric, AnyValue returns a value of kind KindAny.
 func AnyValue(v any) Value {
 	switch v := v.(type) {
 	case string:
@@ -178,24 +219,28 @@ func AnyValue(v any) Value {
 // Any returns v's value as an any.
 func (v Value) Any() any {
 	switch v.Kind() {
-	case AnyKind, GroupKind, LogValuerKind:
+	case KindAny:
 		if k, ok := v.any.(kind); ok {
 			return Kind(k)
 		}
 		return v.any
-	case Int64Kind:
+	case KindLogValuer:
+		return v.any
+	case KindGroup:
+		return v.group()
+	case KindInt64:
 		return int64(v.num)
-	case Uint64Kind:
+	case KindUint64:
 		return v.num
-	case Float64Kind:
+	case KindFloat64:
 		return v.float()
-	case StringKind:
+	case KindString:
 		return v.str()
-	case BoolKind:
+	case KindBool:
 		return v.bool()
-	case DurationKind:
+	case KindDuration:
 		return v.duration()
-	case TimeKind:
+	case KindTime:
 		return v.time()
 	default:
 		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
@@ -205,7 +250,7 @@ func (v Value) Any() any {
 // Int64 returns v's value as an int64. It panics
 // if v is not a signed integer.
 func (v Value) Int64() int64 {
-	if g, w := v.Kind(), Int64Kind; g != w {
+	if g, w := v.Kind(), KindInt64; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return int64(v.num)
@@ -214,7 +259,7 @@ func (v Value) Int64() int64 {
 // Uint64 returns v's value as a uint64. It panics
 // if v is not an unsigned integer.
 func (v Value) Uint64() uint64 {
-	if g, w := v.Kind(), Uint64Kind; g != w {
+	if g, w := v.Kind(), KindUint64; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return v.num
@@ -223,55 +268,59 @@ func (v Value) Uint64() uint64 {
 // Bool returns v's value as a bool. It panics
 // if v is not a bool.
 func (v Value) Bool() bool {
-	if g, w := v.Kind(), BoolKind; g != w {
+	if g, w := v.Kind(), KindBool; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return v.bool()
 }
 
-func (a Value) bool() bool {
-	return a.num == 1
+func (v Value) bool() bool {
+	return v.num == 1
 }
 
 // Duration returns v's value as a time.Duration. It panics
 // if v is not a time.Duration.
-func (a Value) Duration() time.Duration {
-	if g, w := a.Kind(), DurationKind; g != w {
+func (v Value) Duration() time.Duration {
+	if g, w := v.Kind(), KindDuration; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 
-	return a.duration()
+	return v.duration()
 }
 
-func (a Value) duration() time.Duration {
-	return time.Duration(int64(a.num))
+func (v Value) duration() time.Duration {
+	return time.Duration(int64(v.num))
 }
 
 // Float64 returns v's value as a float64. It panics
 // if v is not a float64.
 func (v Value) Float64() float64 {
-	if g, w := v.Kind(), Float64Kind; g != w {
+	if g, w := v.Kind(), KindFloat64; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 
 	return v.float()
 }
 
-func (a Value) float() float64 {
-	return math.Float64frombits(a.num)
+func (v Value) float() float64 {
+	return math.Float64frombits(v.num)
 }
 
 // Time returns v's value as a time.Time. It panics
 // if v is not a time.Time.
 func (v Value) Time() time.Time {
-	if g, w := v.Kind(), TimeKind; g != w {
+	if g, w := v.Kind(), KindTime; g != w {
 		panic(fmt.Sprintf("Value kind is %s, not %s", g, w))
 	}
 	return v.time()
 }
 
 func (v Value) time() time.Time {
-	return time.Unix(0, int64(v.num)).In(v.any.(timeLocation))
+	loc := v.any.(timeLocation)
+	if loc == nil {
+		return time.Time{}
+	}
+	return time.Unix(0, int64(v.num)).In(loc)
 }
 
 // LogValuer returns v's value as a LogValuer. It panics
@@ -281,14 +330,21 @@ func (v Value) LogValuer() LogValuer {
 }
 
 // Group returns v's value as a []Attr.
-// It panics if v's Kind is not GroupKind.
+// It panics if v's Kind is not KindGroup.
 func (v Value) Group() []Attr {
-	return v.group()
+	if sp, ok := v.any.(groupptr); ok {
+		return unsafe.Slice((*Attr)(sp), v.num)
+	}
+	panic("Group: bad kind")
+}
+
+func (v Value) group() []Attr {
+	return unsafe.Slice((*Attr)(v.any.(groupptr)), v.num)
 }
 
 //////////////// Other
 
-// Equal reports whether v and w have equal keys and values.
+// Equal reports whether v and w represent the same Go value.
 func (v Value) Equal(w Value) bool {
 	k1 := v.Kind()
 	k2 := w.Kind()
@@ -296,18 +352,18 @@ func (v Value) Equal(w Value) bool {
 		return false
 	}
 	switch k1 {
-	case Int64Kind, Uint64Kind, BoolKind, DurationKind:
+	case KindInt64, KindUint64, KindBool, KindDuration:
 		return v.num == w.num
-	case StringKind:
+	case KindString:
 		return v.str() == w.str()
-	case Float64Kind:
+	case KindFloat64:
 		return v.float() == w.float()
-	case TimeKind:
+	case KindTime:
 		return v.time().Equal(w.time())
-	case AnyKind, LogValuerKind:
+	case KindAny, KindLogValuer:
 		return v.any == w.any // may panic if non-comparable
-	case GroupKind:
-		return slices.EqualFunc(v.uncheckedGroup(), w.uncheckedGroup(), Attr.Equal)
+	case KindGroup:
+		return slices.EqualFunc(v.group(), w.group(), Attr.Equal)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", k1))
 	}
@@ -317,22 +373,24 @@ func (v Value) Equal(w Value) bool {
 // v is formatted as with fmt.Sprint.
 func (v Value) append(dst []byte) []byte {
 	switch v.Kind() {
-	case StringKind:
+	case KindString:
 		return append(dst, v.str()...)
-	case Int64Kind:
+	case KindInt64:
 		return strconv.AppendInt(dst, int64(v.num), 10)
-	case Uint64Kind:
+	case KindUint64:
 		return strconv.AppendUint(dst, v.num, 10)
-	case Float64Kind:
+	case KindFloat64:
 		return strconv.AppendFloat(dst, v.float(), 'g', -1, 64)
-	case BoolKind:
+	case KindBool:
 		return strconv.AppendBool(dst, v.bool())
-	case DurationKind:
+	case KindDuration:
 		return append(dst, v.duration().String()...)
-	case TimeKind:
+	case KindTime:
 		return append(dst, v.time().String()...)
-	case AnyKind, GroupKind, LogValuerKind:
-		return append(dst, fmt.Sprint(v.any)...)
+	case KindGroup:
+		return fmt.Append(dst, v.group())
+	case KindAny, KindLogValuer:
+		return fmt.Append(dst, v.any)
 	default:
 		panic(fmt.Sprintf("bad kind: %s", v.Kind()))
 	}
@@ -350,17 +408,49 @@ const maxLogValues = 100
 
 // Resolve repeatedly calls LogValue on v while it implements LogValuer,
 // and returns the result.
+// If v resolves to a group, the group's attributes' values are not recursively
+// resolved.
 // If the number of LogValue calls exceeds a threshold, a Value containing an
 // error is returned.
-// Resolve's return value is guaranteed not to be of Kind LogValuerKind.
-func (v Value) Resolve() Value {
+// Resolve's return value is guaranteed not to be of Kind KindLogValuer.
+func (v Value) Resolve() (rv Value) {
 	orig := v
+	defer func() {
+		if r := recover(); r != nil {
+			rv = AnyValue(fmt.Errorf("LogValue panicked\n%s", stack(3, 5)))
+		}
+	}()
+
 	for i := 0; i < maxLogValues; i++ {
-		if v.Kind() != LogValuerKind {
+		if v.Kind() != KindLogValuer {
 			return v
 		}
 		v = v.LogValuer().LogValue()
 	}
 	err := fmt.Errorf("LogValue called too many times on Value of type %T", orig.Any())
 	return AnyValue(err)
+}
+
+func stack(skip, nFrames int) string {
+	pcs := make([]uintptr, nFrames+1)
+	n := runtime.Callers(skip+1, pcs)
+	if n == 0 {
+		return "(no stack)"
+	}
+	frames := runtime.CallersFrames(pcs[:n])
+	var b strings.Builder
+	i := 0
+	for {
+		frame, more := frames.Next()
+		fmt.Fprintf(&b, "called from %s (%s:%d)\n", frame.Function, frame.File, frame.Line)
+		if !more {
+			break
+		}
+		i++
+		if i >= nFrames {
+			fmt.Fprintf(&b, "(rest of stack elided)\n")
+			break
+		}
+	}
+	return b.String()
 }

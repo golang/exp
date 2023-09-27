@@ -1,8 +1,9 @@
-# Checking Go Package API Compatibility
+# Checking Go API Compatibility
 
-The `apidiff` tool in this directory determines whether two versions of the same
-package are compatible. The goal is to help the developer make an informed
-choice of semantic version after they have changed the code of their module.
+The `apidiff` tool in this directory determines whether two examples of a
+package or module are compatible. The goal is to help the developer make an
+informed choice of semantic version after they have changed the code of their
+module.
 
 `apidiff` reports two kinds of changes: incompatible ones, which require
 incrementing the major part of the semantic version, and compatible ones, which
@@ -10,12 +11,12 @@ require a minor version increment. If no API changes are reported but there are
 code changes that could affect client code, then the patch version should
 be incremented.
 
-Because `apidiff` ignores package import paths, it may be used to display API
-differences between any two packages, not just different versions of the same
-package.
-
-The current version of `apidiff` compares only packages, not modules.
-
+`apidiff` may be used to display API differences between any two packages or
+modules, not just different versions of the same thing. It does this by ignoring
+the package import paths when directly comparing two packages, and
+by ignoring module paths when comparing two modules. That is to say, when
+comparing two modules, the package import paths **do** matter, but are compared
+_relative_ to their respective module root.
 
 ## Compatibility Desiderata
 
@@ -221,6 +222,111 @@ element types correspond.
 ## Definition of Compatibility
 
 We can now present the definition of compatibility used by `apidiff`.
+
+### Module Compatibility
+
+> A new module is compatible with an old one if:
+>1. Each package present in the old module also appears in the new module,
+> with matching import paths relative to their respective module root, and
+>2. Each package present in both modules fulfills Package Compatibility as
+> defined below.
+>
+>Otherwise the modules are incompatible.
+
+If a package is converted into a nested module of the original module then
+comparing two versions of the module, before and after nested module creation,
+will produce an incompatible package removal message. This removal message does
+not necessarily mean that client code will need to change. If the package API
+retains Package Compatibility after nested module creation, then only the
+`go.mod` of the client code will need to change. Take the following example:
+
+```
+./
+  go.mod
+  go.sum
+  foo.go
+  bar/bar.go
+```
+
+Where `go.mod` is:
+
+```
+module example.com/foo
+
+go 1.20
+```
+
+Where `bar/bar.go` is:
+
+```
+package bar
+
+var V int
+```
+
+And `foo.go` is:
+
+```
+package foo
+
+import "example.com/foo/bar"
+
+_ = bar.V
+```
+
+Creating a nested module with the package `bar` while retaining Package
+Compatibility is _code_ compatible, because the import path of the package does
+not change:
+
+```
+./
+  go.mod
+  go.sum
+  foo.go
+  bar/
+    bar.go
+    go.mod
+    go.sum
+```
+
+Where `bar/go.mod` is:
+```
+module example.com/foo/bar
+
+go 1.20
+```
+
+And the top-level `go.mod` becomes:
+```
+module example.com/foo
+
+go 1.20
+
+// New dependency on nested module.
+require example.com/foo/bar v1.0.0
+```
+
+If during nested module creation either Package Compatibility is broken, like so
+in `bar/bar.go`:
+
+```
+package bar
+
+// Changed from V to T.
+var T int
+```
+
+Or the nested module uses a name other than the original package's import path,
+like so in `bar/go.mod`:
+
+```
+// Completely different module name
+module example.com/qux
+
+go 1.20
+```
+
+Then the move is backwards incompatible for client code.
 
 ### Package Compatibility
 

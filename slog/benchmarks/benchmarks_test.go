@@ -6,11 +6,17 @@ package benchmarks
 
 import (
 	"context"
+	"flag"
 	"io"
 	"testing"
 
 	"golang.org/x/exp/slog"
+	"golang.org/x/exp/slog/internal"
 )
+
+func init() {
+	flag.BoolVar(&internal.IgnorePC, "nopc", false, "do not invoke runtime.Callers")
+}
 
 // We pass Attrs (or zap.Fields) inline because it affects allocations: building
 // up a list outside of the benchmarked code and passing it in with "..."
@@ -25,8 +31,8 @@ func BenchmarkAttrs(b *testing.B) {
 		{"disabled", disabledHandler{}},
 		{"async discard", newAsyncHandler()},
 		{"fastText discard", newFastTextHandler(io.Discard)},
-		{"Text discard", slog.NewTextHandler(io.Discard)},
-		{"JSON discard", slog.NewJSONHandler(io.Discard)},
+		{"Text discard", slog.NewTextHandler(io.Discard, nil)},
+		{"JSON discard", slog.NewJSONHandler(io.Discard, nil)},
 	} {
 		logger := slog.New(handler.h)
 		b.Run(handler.name, func(b *testing.B) {
@@ -41,7 +47,7 @@ func BenchmarkAttrs(b *testing.B) {
 					// should only be from Duration.String and Time.String.
 					"5 args",
 					func() {
-						logger.LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(nil, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),
@@ -53,7 +59,7 @@ func BenchmarkAttrs(b *testing.B) {
 				{
 					"5 args ctx",
 					func() {
-						logger.WithContext(ctx).LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(ctx, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),
@@ -65,7 +71,7 @@ func BenchmarkAttrs(b *testing.B) {
 				{
 					"10 args",
 					func() {
-						logger.LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(nil, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),
@@ -82,7 +88,7 @@ func BenchmarkAttrs(b *testing.B) {
 				{
 					"40 args",
 					func() {
-						logger.LogAttrs(slog.LevelInfo, TestMessage,
+						logger.LogAttrs(nil, slog.LevelInfo, TestMessage,
 							slog.String("string", TestString),
 							slog.Int("status", TestInt),
 							slog.Duration("duration", TestDuration),

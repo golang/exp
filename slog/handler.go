@@ -5,6 +5,7 @@
 package slog
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -24,19 +25,39 @@ import (
 // Any of the Handler's methods may be called concurrently with itself
 // or with other methods. It is the responsibility of the Handler to
 // manage this concurrency.
+//
+// Users of the slog package should not invoke Handler methods directly.
+// They should use the methods of [Logger] instead.
 type Handler interface {
 	// Enabled reports whether the handler handles records at the given level.
 	// The handler ignores records whose level is lower.
-	// Enabled is called early, before any arguments are processed,
+	// It is called early, before any arguments are processed,
 	// to save effort if the log event should be discarded.
-	Enabled(Level) bool
+	// If called from a Logger method, the first argument is the context
+	// passed to that method, or context.Background() if nil was passed
+	// or the method does not take a context.
+	// The context is passed so Enabled can use its values
+	// to make a decision.
+	Enabled(context.Context, Level) bool
 
 	// Handle handles the Record.
-	// It will only be called if Enabled returns true.
+	// It will only be called when Enabled returns true.
+	// The Context argument is as for Enabled.
+	// It is present solely to provide Handlers access to the context's values.
+	// Canceling the context should not affect record processing.
+	// (Among other things, log messages may be necessary to debug a
+	// cancellation-related problem.)
+	//
 	// Handle methods that produce output should observe the following rules:
 	//   - If r.Time is the zero time, ignore the time.
-	//   - If an Attr's key is the empty string, ignore the Attr.
-	Handle(r Record) error
+	//   - If r.PC is zero, ignore it.
+	//   - Attr's values should be resolved.
+	//   - If an Attr's key and value are both the zero value, ignore the Attr.
+	//     This can be tested with attr.Equal(Attr{}).
+	//   - If a group's key is empty, inline the group's Attrs.
+	//   - If a group has no Attrs (even if it has a non-empty key),
+	//     ignore it.
+	Handle(context.Context, Record) error
 
 	// WithAttrs returns a new Handler whose attributes consist of
 	// both the receiver's attributes and the arguments.
@@ -60,6 +81,8 @@ type Handler interface {
 	// should behave like
 	//
 	//     logger.LogAttrs(level, msg, slog.Group("s", slog.Int("a", 1), slog.Int("b", 2)))
+	//
+	// If the name is empty, WithGroup returns the receiver.
 	WithGroup(name string) Handler
 }
 
@@ -76,14 +99,14 @@ func newDefaultHandler(output func(int, string) error) *defaultHandler {
 	}
 }
 
-func (*defaultHandler) Enabled(l Level) bool {
+func (*defaultHandler) Enabled(_ context.Context, l Level) bool {
 	return l >= LevelInfo
 }
 
 // Collect the level, attributes and message in a string and
 // write it with the default log.Logger.
 // Let the log.Logger handle time and file/line.
-func (h *defaultHandler) Handle(r Record) error {
+func (h *defaultHandler) Handle(ctx context.Context, r Record) error {
 	buf := buffer.New()
 	buf.WriteString(r.Level.String())
 	buf.WriteByte(' ')
@@ -92,9 +115,8 @@ func (h *defaultHandler) Handle(r Record) error {
 	defer state.free()
 	state.appendNonBuiltIns(r)
 
-	// 5 = log.Output depth + handlerWriter.Write + defaultHandler.Handle
-	//
-	return h.output(5, buf.String())
+	// skip [h.output, defaultHandler.Handle, handlerWriter.Write, log.Output]
+	return h.output(4, buf.String())
 }
 
 func (h *defaultHandler) WithAttrs(as []Attr) Handler {
@@ -108,10 +130,8 @@ func (h *defaultHandler) WithGroup(name string) Handler {
 // HandlerOptions are options for a TextHandler or JSONHandler.
 // A zero HandlerOptions consists entirely of default values.
 type HandlerOptions struct {
-	// When AddSource is true, the handler adds a ("source", "file:line")
-	// attribute to the output indicating the source code position of the log
-	// statement. AddSource is false by default to skip the cost of computing
-	// this information.
+	// AddSource causes the handler to compute the source code position
+	// of the log statement and add a SourceKey attribute to the output.
 	AddSource bool
 
 	// Level reports the minimum record level that will be logged.
@@ -126,8 +146,8 @@ type HandlerOptions struct {
 	// If ReplaceAttr returns an Attr with Key == "", the attribute is discarded.
 	//
 	// The built-in attributes with keys "time", "level", "source", and "msg"
-	// are passed to this function, except that time and level are omitted
-	// if zero, and source is omitted if AddSourceLine is false.
+	// are passed to this function, except that time is omitted
+	// if zero, and source is omitted if AddSource is false.
 	//
 	// The first argument is a list of currently open groups that contain the
 	// Attr. It must not be retained or modified. ReplaceAttr is never called
@@ -163,9 +183,6 @@ const (
 	// SourceKey is the key used by the built-in handlers for the source file
 	// and line of the log call. The associated value is a string.
 	SourceKey = "source"
-	// ErrorKey is the key used for errors by Logger.Error.
-	// The associated value is an [error].
-	ErrorKey = "err"
 )
 
 type commonHandler struct {
@@ -192,7 +209,7 @@ func (h *commonHandler) clone() *commonHandler {
 	}
 }
 
-// Enabled reports whether l is greater than or equal to the
+// enabled reports whether l is greater than or equal to the
 // minimum level.
 func (h *commonHandler) enabled(l Level) bool {
 	minLevel := LevelInfo
@@ -226,6 +243,9 @@ func (h *commonHandler) withAttrs(as []Attr) *commonHandler {
 }
 
 func (h *commonHandler) withGroup(name string) *commonHandler {
+	if name == "" {
+		return h
+	}
 	h2 := h.clone()
 	h2.groups = append(h2.groups, name)
 	return h2
@@ -263,22 +283,7 @@ func (h *commonHandler) handle(r Record) error {
 	}
 	// source
 	if h.opts.AddSource {
-		file, line := r.SourceLine()
-		if file != "" {
-			key := SourceKey
-			if rep == nil {
-				state.appendKey(key)
-				state.appendSource(file, line)
-			} else {
-				buf := buffer.New()
-				buf.WriteString(file) // TODO: escape?
-				buf.WriteByte(':')
-				buf.WritePosInt(line)
-				s := buf.String()
-				buf.Free()
-				state.appendAttr(String(key, s))
-			}
-		}
+		state.appendAttr(Any(SourceKey, r.source()))
 	}
 	key = MessageKey
 	msg := r.Message
@@ -311,8 +316,9 @@ func (s *handleState) appendNonBuiltIns(r Record) {
 	defer s.prefix.Free()
 	s.prefix.WriteString(s.h.groupPrefix)
 	s.openGroups()
-	r.Attrs(func(a Attr) {
+	r.Attrs(func(a Attr) bool {
 		s.appendAttr(a)
+		return true
 	})
 	if s.h.json {
 		// Close all open groups.
@@ -398,7 +404,6 @@ func (s *handleState) openGroup(name string) {
 	if s.groups != nil {
 		*s.groups = append(*s.groups, name)
 	}
-
 }
 
 // closeGroup ends the group with the given name.
@@ -415,35 +420,51 @@ func (s *handleState) closeGroup(name string) {
 }
 
 // appendAttr appends the Attr's key and value using app.
-// If sep is true, it also prepends a separator.
 // It handles replacement and checking for an empty key.
-// It sets sep to true if it actually did the append (if the key was non-empty
 // after replacement).
 func (s *handleState) appendAttr(a Attr) {
-	if a.Key == "" {
-		return
-	}
-	v := a.Value.Resolve()
-	if rep := s.h.opts.ReplaceAttr; rep != nil && v.Kind() != GroupKind {
+	if rep := s.h.opts.ReplaceAttr; rep != nil && a.Value.Kind() != KindGroup {
 		var gs []string
 		if s.groups != nil {
 			gs = *s.groups
 		}
-		a = rep(gs, Attr{a.Key, v})
-		if a.Key == "" {
-			return
-		}
-		v = a.Value.Resolve()
+		// Resolve before calling ReplaceAttr, so the user doesn't have to.
+		a.Value = a.Value.Resolve()
+		a = rep(gs, a)
 	}
-	if v.Kind() == GroupKind {
-		s.openGroup(a.Key)
-		for _, aa := range v.Group() {
-			s.appendAttr(aa)
+	a.Value = a.Value.Resolve()
+	// Elide empty Attrs.
+	if a.isEmpty() {
+		return
+	}
+	// Special case: Source.
+	if v := a.Value; v.Kind() == KindAny {
+		if src, ok := v.Any().(*Source); ok {
+			if s.h.json {
+				a.Value = src.group()
+			} else {
+				a.Value = StringValue(fmt.Sprintf("%s:%d", src.File, src.Line))
+			}
 		}
-		s.closeGroup(a.Key)
+	}
+	if a.Value.Kind() == KindGroup {
+		attrs := a.Value.Group()
+		// Output only non-empty groups.
+		if len(attrs) > 0 {
+			// Inline a group with an empty key.
+			if a.Key != "" {
+				s.openGroup(a.Key)
+			}
+			for _, aa := range attrs {
+				s.appendAttr(aa)
+			}
+			if a.Key != "" {
+				s.closeGroup(a.Key)
+			}
+		}
 	} else {
 		s.appendKey(a.Key)
-		s.appendValue(v)
+		s.appendValue(a.Value)
 	}
 }
 
@@ -465,26 +486,6 @@ func (s *handleState) appendKey(key string) {
 		s.buf.WriteByte('=')
 	}
 	s.sep = s.h.attrSep()
-}
-
-func (s *handleState) appendSource(file string, line int) {
-	if s.h.json {
-		s.buf.WriteByte('"')
-		*s.buf = appendEscapedJSONString(*s.buf, file)
-		s.buf.WriteByte(':')
-		s.buf.WritePosInt(line)
-		s.buf.WriteByte('"')
-	} else {
-		// text
-		if needsQuoting(file) {
-			s.appendString(file + ":" + strconv.Itoa(line))
-		} else {
-			// common case: no quoting needed.
-			s.appendString(file)
-			s.buf.WriteByte(':')
-			s.buf.WritePosInt(line)
-		}
-	}
 }
 
 func (s *handleState) appendString(str string) {

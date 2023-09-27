@@ -6,6 +6,8 @@ package slog
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -37,13 +39,6 @@ func TestValueEqual(t *testing.T) {
 	}
 }
 
-func TestNilValue(t *testing.T) {
-	n := AnyValue(nil)
-	if g := n.Any(); g != nil {
-		t.Errorf("got %#v, want nil", g)
-	}
-}
-
 func panics(f func()) (b bool) {
 	defer func() {
 		if x := recover(); x != nil {
@@ -65,6 +60,7 @@ func TestValueString(t *testing.T) {
 		{StringValue("foo"), "foo"},
 		{TimeValue(testTime), "2000-01-02 03:04:05 +0000 UTC"},
 		{AnyValue(time.Duration(3 * time.Second)), "3s"},
+		{GroupValue(Int("a", 1), Bool("b", true)), "[a=1 b=true]"},
 	} {
 		if got := test.v.String(); got != test.want {
 			t.Errorf("%#v:\ngot  %q\nwant %q", test.v, got, test.want)
@@ -115,32 +111,6 @@ func TestAnyLevelAlloc(t *testing.T) {
 	_ = a
 }
 
-func TestAnyLevel(t *testing.T) {
-	x := LevelDebug + 100
-	v := AnyValue(x)
-	vv := v.Any()
-	if _, ok := vv.(Level); !ok {
-		t.Errorf("wanted Level, got %T", vv)
-	}
-}
-
-func TestSpecialValueTypes(t *testing.T) {
-	t.Run("time.Location", func(t *testing.T) {
-		want := time.UTC
-		got := AnyValue(want).Any()
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
-	})
-	t.Run("Kind", func(t *testing.T) {
-		want := BoolKind
-		got := AnyValue(want).Any()
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
-	})
-}
-
 func TestAnyValue(t *testing.T) {
 	for _, test := range []struct {
 		in   any
@@ -164,11 +134,27 @@ func TestAnyValue(t *testing.T) {
 	}
 }
 
+func TestValueAny(t *testing.T) {
+	for _, want := range []any{
+		nil,
+		LevelDebug + 100,
+		time.UTC, // time.Locations treated specially...
+		KindBool, // ...as are Kinds
+		[]Attr{Int("a", 1)},
+	} {
+		v := AnyValue(want)
+		got := v.Any()
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	}
+}
+
 func TestLogValue(t *testing.T) {
 	want := "replaced"
 	r := &replace{StringValue(want)}
 	v := AnyValue(r)
-	if g, w := v.Kind(), LogValuerKind; g != w {
+	if g, w := v.Kind(), KindLogValuer; g != w {
 		t.Errorf("got %s, want %s", g, w)
 	}
 	got := v.LogValuer().LogValue().Any()
@@ -188,6 +174,36 @@ func TestLogValue(t *testing.T) {
 	if _, ok := got.(error); !ok {
 		t.Errorf("expected error, got %T", got)
 	}
+
+	// Groups are not recursively resolved.
+	c := Any("c", &replace{StringValue("d")})
+	v = AnyValue(&replace{GroupValue(Int("a", 1), Group("b", c))})
+	got2 := v.Resolve().Any().([]Attr)
+	want2 := []Attr{Int("a", 1), Group("b", c)}
+	if !attrsEqual(got2, want2) {
+		t.Errorf("got %v, want %v", got2, want2)
+	}
+
+	// Verify that panics in Resolve are caught and turn into errors.
+	v = AnyValue(panickingLogValue{})
+	got = v.Resolve().Any()
+	gotErr, ok := got.(error)
+	if !ok {
+		t.Errorf("expected error, got %T", got)
+	}
+	// The error should provide some context information.
+	// We'll just check that this function name appears in it.
+	if got, want := gotErr.Error(), "TestLogValue"; !strings.Contains(got, want) {
+		t.Errorf("got %q, want substring %q", got, want)
+	}
+}
+
+func TestZeroTime(t *testing.T) {
+	z := time.Time{}
+	got := TimeValue(z).Time()
+	if !got.IsZero() {
+		t.Errorf("got %s (%#[1]v), not zero time (%#v)", got, z)
+	}
 }
 
 type replace struct {
@@ -195,6 +211,10 @@ type replace struct {
 }
 
 func (r *replace) LogValue() Value { return r.v }
+
+type panickingLogValue struct{}
+
+func (panickingLogValue) LogValue() Value { panic("bad") }
 
 // A Value with "unsafe" strings is significantly faster:
 // safe:  1785 ns/op, 0 allocs

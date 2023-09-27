@@ -30,7 +30,9 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 	// Structure copied from types.Identical.
 	switch old := old.(type) {
 	case *types.Basic:
-		return types.Identical(old, new)
+		if new, ok := new.(*types.Basic); ok {
+			return old.Kind() == new.Kind()
+		}
 
 	case *types.Array:
 		if new, ok := new.(*types.Array); ok {
@@ -117,14 +119,7 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 		}
 
 	case *types.Named:
-		if new, ok := new.(*types.Named); ok {
-			return d.establishCorrespondence(old, new)
-		}
-		if new, ok := new.(*types.Basic); ok {
-			// Basic types are defined types, too, so we have to support them.
-
-			return d.establishCorrespondence(old, new)
-		}
+		return d.establishCorrespondence(old, new)
 
 	case *types.TypeParam:
 		if new, ok := new.(*types.TypeParam); ok {
@@ -154,102 +149,122 @@ func (d *differ) corrFieldNames(of, nf *types.Var) bool {
 	return of.Name() == nf.Name()
 }
 
-// Establish that old corresponds with new if it does not already
-// correspond to something else.
+// establishCorrespondence records and validates a correspondence between
+// old and new.
+//
+// If this is the first type corresponding to old, it checks that the type
+// declaration is compatible with old and records its correspondence.
+// Otherwise, it checks that new is equivalent to the previously recorded
+// type corresponding to old.
 func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool {
 	oldname := old.Obj()
-	oldc := d.correspondMap[oldname]
-	if oldc == nil {
-		// For now, assume the types don't correspond unless they are from the old
-		// and new packages, respectively.
-		//
-		// This is too conservative. For instance,
-		//    [old] type A = q.B; [new] type A q.C
-		// could be OK if in package q, B is an alias for C.
-		// Or, using p as the name of the current old/new packages:
-		//    [old] type A = q.B; [new] type A int
-		// could be OK if in q,
-		//    [old] type B int; [new] type B = p.A
-		// In this case, p.A and q.B name the same type in both old and new worlds.
-		// Note that this case doesn't imply circular package imports: it's possible
-		// that in the old world, p imports q, but in the new, q imports p.
-		//
-		// However, if we didn't do something here, then we'd incorrectly allow cases
-		// like the first one above in which q.B is not an alias for q.C
-		//
-		// What we should do is check that the old type, in the new world's package
-		// of the same path, doesn't correspond to something other than the new type.
-		// That is a bit hard, because there is no easy way to find a new package
-		// matching an old one.
-		if newn, ok := new.(*types.Named); ok {
-			if old.Obj().Pkg() != d.old || newn.Obj().Pkg() != d.new {
-				return old.Obj().Id() == newn.Obj().Id()
+	// If there already is a corresponding new type for old, check that they
+	// are the same.
+	if c := d.correspondMap.At(old); c != nil {
+		return types.Identical(c.(types.Type), new)
+	}
+	// Attempt to establish a correspondence.
+	// Assume the types don't correspond unless they have the same
+	// ID, or are from the old and new packages, respectively.
+	//
+	// This is too conservative. For instance,
+	//    [old] type A = q.B; [new] type A q.C
+	// could be OK if in package q, B is an alias for C.
+	// Or, using p as the name of the current old/new packages:
+	//    [old] type A = q.B; [new] type A int
+	// could be OK if in q,
+	//    [old] type B int; [new] type B = p.A
+	// In this case, p.A and q.B name the same type in both old and new worlds.
+	// Note that this case doesn't imply circular package imports: it's possible
+	// that in the old world, p imports q, but in the new, q imports p.
+	//
+	// However, if we didn't do something here, then we'd incorrectly allow cases
+	// like the first one above in which q.B is not an alias for q.C
+	//
+	// What we should do is check that the old type, in the new world's package
+	// of the same path, doesn't correspond to something other than the new type.
+	// That is a bit hard, because there is no easy way to find a new package
+	// matching an old one.
+	switch new := new.(type) {
+	case *types.Named:
+		newn := new
+		oobj := old.Obj()
+		nobj := newn.Obj()
+		if oobj.Pkg() != d.old || nobj.Pkg() != d.new {
+			// Compare the fully qualified names of the types.
+			//
+			// TODO(jba): when comparing modules, we should only look at the
+			// paths relative to the module path, because the module paths may differ.
+			// See cmd/gorelease/testdata/internalcompat.
+			var opath, npath string
+			if oobj.Pkg() != nil {
+				opath = oobj.Pkg().Path()
 			}
-			// Prior to generics, any two named types could correspond.
-			// Two named types cannot correspond if their type parameter lists don't match.
-			if !typeParamListsMatch(old.TypeParams(), newn.TypeParams()) {
+			if nobj.Pkg() != nil {
+				npath = nobj.Pkg().Path()
+			}
+			return oobj.Name() == nobj.Name() && opath == npath
+		}
+		// Two generic named types correspond if their type parameter lists correspond.
+		// Since one or the other of those lists will be empty, it doesn't hurt
+		// to check both.
+		oldOrigin := old.Origin()
+		newOrigin := newn.Origin()
+		if oldOrigin != old {
+			// old is an instantiated type.
+			if newOrigin == newn {
+				// new is not; they cannot correspond.
+				return false
+			}
+			// Two instantiated types correspond if their origins correspond and
+			// their type argument lists correspond.
+			if !d.correspond(oldOrigin, newOrigin) {
+				return false
+			}
+			if !d.typeListsCorrespond(old.TypeArgs(), newn.TypeArgs()) {
+				return false
+			}
+		} else {
+			if !d.typeParamListsCorrespond(old.TypeParams(), newn.TypeParams()) {
 				return false
 			}
 		}
-		// If there is no correspondence, create one.
-		d.correspondMap[oldname] = new
-		// Check that the corresponding types are compatible.
-		d.checkCompatibleDefined(oldname, old, new)
-		return true
-	}
-	return typesEquivalent(oldc, new)
-}
-
-// Two list of type parameters match if they are the same length, and
-// the constraints of corresponding type parameters are identical.
-func typeParamListsMatch(tps1, tps2 *types.TypeParamList) bool {
-	if tps1.Len() != tps2.Len() {
+	case *types.Basic:
+		if old.Obj().Pkg() != d.old {
+			// A named type from a package other than old never corresponds to a basic type.
+			return false
+		}
+	default:
+		// Only named and basic types can correspond.
 		return false
 	}
-	for i := 0; i < tps1.Len(); i++ {
-		if !types.Identical(tps1.At(i).Constraint(), tps2.At(i).Constraint()) {
+	// If there is no correspondence, create one.
+	d.correspondMap.Set(old, new)
+	// Check that the corresponding types are compatible.
+	d.checkCompatibleDefined(oldname, old, new)
+	return true
+}
+
+func (d *differ) typeListsCorrespond(tl1, tl2 *types.TypeList) bool {
+	if tl1.Len() != tl2.Len() {
+		return false
+	}
+	for i := 0; i < tl1.Len(); i++ {
+		if !d.correspond(tl1.At(i), tl2.At(i)) {
 			return false
 		}
 	}
 	return true
 }
 
-// typesEquivalent reports whether two types are identical, or if
-// the types have identical type param lists except that one type has nil
-// constraints.
-//
-// This allows us to match a Type from a method receiver or arg to the Type from
-// the declaration.
-func typesEquivalent(old, new types.Type) bool {
-	if types.Identical(old, new) {
-		return true
-	}
-	// Handle two types with the same type params, one
-	// having constraints and one not.
-	oldn, ok := old.(*types.Named)
-	if !ok {
+// Two list of type parameters correspond if they are the same length, and
+// the constraints of corresponding type parameters correspond.
+func (d *differ) typeParamListsCorrespond(tps1, tps2 *types.TypeParamList) bool {
+	if tps1.Len() != tps2.Len() {
 		return false
 	}
-	newn, ok := new.(*types.Named)
-	if !ok {
-		return false
-	}
-	oldps := oldn.TypeParams()
-	newps := newn.TypeParams()
-	if oldps.Len() != newps.Len() {
-		return false
-	}
-	if oldps.Len() == 0 {
-		// Not generic types.
-		return false
-	}
-	for i := 0; i < oldps.Len(); i++ {
-		oldp := oldps.At(i)
-		newp := newps.At(i)
-		if oldp.Constraint() == nil || newp.Constraint() == nil {
-			return true
-		}
-		if !types.Identical(oldp.Constraint(), newp.Constraint()) {
+	for i := 0; i < tps1.Len(); i++ {
+		if !d.correspond(tps1.At(i).Constraint(), tps2.At(i).Constraint()) {
 			return false
 		}
 	}

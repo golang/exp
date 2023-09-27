@@ -2,6 +2,7 @@ package benchmarks
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"golang.org/x/exp/slices"
@@ -9,12 +10,13 @@ import (
 )
 
 func TestHandlers(t *testing.T) {
-	r := slog.NewRecord(TestTime, slog.LevelInfo, TestMessage, 0, nil)
+	ctx := context.Background()
+	r := slog.NewRecord(TestTime, slog.LevelInfo, TestMessage, 0)
 	r.AddAttrs(TestAttrs...)
 	t.Run("text", func(t *testing.T) {
 		var b bytes.Buffer
 		h := newFastTextHandler(&b)
-		if err := h.Handle(r); err != nil {
+		if err := h.Handle(ctx, r); err != nil {
 			t.Fatal(err)
 		}
 		got := b.String()
@@ -24,7 +26,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("async", func(t *testing.T) {
 		h := newAsyncHandler()
-		if err := h.Handle(r); err != nil {
+		if err := h.Handle(ctx, r); err != nil {
 			t.Fatal(err)
 		}
 		got := h.ringBuffer[0]
@@ -36,6 +38,6 @@ func TestHandlers(t *testing.T) {
 
 func attrSlice(r slog.Record) []slog.Attr {
 	var as []slog.Attr
-	r.Attrs(func(a slog.Attr) { as = append(as, a) })
+	r.Attrs(func(a slog.Attr) bool { as = append(as, a); return true })
 	return as
 }
