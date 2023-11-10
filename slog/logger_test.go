@@ -20,7 +20,13 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const timeRE = `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:\d{2})`
+// textTimeRE is a regexp to match log timestamps for Text handler.
+// This is RFC3339Nano with the fixed 3 digit sub-second precision.
+const textTimeRE = `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:\d{2})`
+
+// jsonTimeRE is a regexp to match log timestamps for Text handler.
+// This is RFC3339Nano with an arbitrary sub-second precision.
+const jsonTimeRE = `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})`
 
 func TestLogTextHandler(t *testing.T) {
 	var buf bytes.Buffer
@@ -30,7 +36,7 @@ func TestLogTextHandler(t *testing.T) {
 	check := func(want string) {
 		t.Helper()
 		if want != "" {
-			want = "time=" + timeRE + " " + want
+			want = "time=" + textTimeRE + " " + want
 		}
 		checkLogOutput(t, buf.String(), want)
 		buf.Reset()
@@ -112,7 +118,7 @@ func TestConnections(t *testing.T) {
 	// log.Logger's output goes through the handler.
 	SetDefault(New(NewTextHandler(&slogbuf, &HandlerOptions{AddSource: true})))
 	log.Print("msg2")
-	checkLogOutput(t, slogbuf.String(), "time="+timeRE+` level=INFO source=.*logger_test.go:\d{3} msg=msg2`)
+	checkLogOutput(t, slogbuf.String(), "time="+textTimeRE+` level=INFO source=.*logger_test.go:\d{3} msg=msg2`)
 
 	// The default log.Logger always outputs at Info level.
 	slogbuf.Reset()
@@ -371,7 +377,7 @@ func TestNewLogLogger(t *testing.T) {
 	h := NewTextHandler(&buf, nil)
 	ll := NewLogLogger(h, LevelWarn)
 	ll.Print("hello")
-	checkLogOutput(t, buf.String(), "time="+timeRE+` level=WARN msg=hello`)
+	checkLogOutput(t, buf.String(), "time="+textTimeRE+` level=WARN msg=hello`)
 }
 
 func checkLogOutput(t *testing.T, got, wantRegexp string) {
@@ -506,4 +512,65 @@ func callerPC(depth int) uintptr {
 	var pcs [1]uintptr
 	runtime.Callers(depth, pcs[:])
 	return pcs[0]
+}
+
+// panicTextAndJsonMarshaler is a type that panics in MarshalText and MarshalJSON.
+type panicTextAndJsonMarshaler struct {
+	msg any
+}
+
+func (p panicTextAndJsonMarshaler) MarshalText() ([]byte, error) {
+	panic(p.msg)
+}
+
+func (p panicTextAndJsonMarshaler) MarshalJSON() ([]byte, error) {
+	panic(p.msg)
+}
+
+func TestPanics(t *testing.T) {
+	// Revert any changes to the default logger. This is important because other
+	// tests might change the default logger using SetDefault. Also ensure we
+	// restore the default logger at the end of the test.
+	currentLogger := Default()
+	currentLogWriter := log.Writer()
+	currentLogFlags := log.Flags()
+	t.Cleanup(func() {
+		SetDefault(currentLogger)
+		log.SetOutput(currentLogWriter)
+		log.SetFlags(currentLogFlags)
+	})
+
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	log.SetFlags(log.Lshortfile &^ log.LstdFlags)
+
+	SetDefault(New(newDefaultHandler(log.Output)))
+	for _, pt := range []struct {
+		in  any
+		out string
+	}{
+		{(*panicTextAndJsonMarshaler)(nil), `logger_test.go:\d+: INFO msg p=<nil>`},
+		{panicTextAndJsonMarshaler{io.ErrUnexpectedEOF}, `logger_test.go:\d+: INFO msg p="!PANIC: unexpected EOF"`},
+		{panicTextAndJsonMarshaler{"panicking"}, `logger_test.go:\d+: INFO msg p="!PANIC: panicking"`},
+		{panicTextAndJsonMarshaler{42}, `logger_test.go:\d+: INFO msg p="!PANIC: 42"`},
+	} {
+		Info("msg", "p", pt.in)
+		checkLogOutput(t, logBuf.String(), pt.out)
+		logBuf.Reset()
+	}
+
+	SetDefault(New(NewJSONHandler(&logBuf, nil)))
+	for _, pt := range []struct {
+		in  any
+		out string
+	}{
+		{(*panicTextAndJsonMarshaler)(nil), `{"time":"` + jsonTimeRE + `","level":"INFO","msg":"msg","p":null}`},
+		{panicTextAndJsonMarshaler{io.ErrUnexpectedEOF}, `{"time":"` + jsonTimeRE + `","level":"INFO","msg":"msg","p":"!PANIC: unexpected EOF"}`},
+		{panicTextAndJsonMarshaler{"panicking"}, `{"time":"` + jsonTimeRE + `","level":"INFO","msg":"msg","p":"!PANIC: panicking"}`},
+		{panicTextAndJsonMarshaler{42}, `{"time":"` + jsonTimeRE + `","level":"INFO","msg":"msg","p":"!PANIC: 42"}`},
+	} {
+		Info("msg", "p", pt.in)
+		checkLogOutput(t, logBuf.String(), pt.out)
+		logBuf.Reset()
+	}
 }
