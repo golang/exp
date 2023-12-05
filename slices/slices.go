@@ -382,6 +382,20 @@ func CompactFunc[S ~[]E, E any](s S, eq func(E, E) bool) S {
 	return s[:i]
 }
 
+func CompactAggregate[S ~[]E, E any](s S, eqAgg func(*E, *E) bool) S {
+	if len(s) < 2 {
+		return s
+	}
+	i := 0
+	for k := 1; k < len(s); k++ {
+		if !eqAgg(&s[k], &s[i]) {
+			i++
+			s[i] = s[k]
+		}
+	}
+	return s[:i+1]
+}
+
 // Grow increases the slice's capacity, if necessary, to guarantee space for
 // another n elements. After Grow(n), at least n elements can be appended
 // to the slice without another allocation. If n is negative or too large to

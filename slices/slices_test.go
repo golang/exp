@@ -757,6 +757,43 @@ func TestCompactFunc(t *testing.T) {
 	}
 }
 
+func TestCompactAggregation(t *testing.T) {
+	type item struct {
+		id    int
+		value int
+	}
+	items := []item{
+		{1, 1},
+		{1, 2},
+		{1, 3},
+		{1, 4},
+		{2, 5},
+		{2, 6},
+		{2, 7},
+		{1, 8},
+	}
+	want := []item{
+		{1, 10},
+		{2, 18},
+		{1, 8},
+	}
+	got := CompactAggregate(
+		items,
+		func(curr, prev *item) bool {
+			if prev.id == curr.id {
+				prev.value += curr.value
+				return true
+			}
+			return false
+		},
+	)
+	if !EqualFunc(got, want, func(a, b item) bool {
+		return a.id == b.id && a.value == b.value
+	}) {
+		t.Errorf("CompactFunc(%v, SumScores) = %v, want %v", items, got, want)
+	}
+}
+
 func BenchmarkCompactFunc_Large(b *testing.B) {
 	type Large [4 * 1024]byte
 
