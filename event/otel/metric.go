@@ -12,14 +12,13 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	otelunit "go.opentelemetry.io/otel/metric/unit"
 	"golang.org/x/exp/event"
 )
 
 // MetricHandler is an event.Handler for OpenTelemetry metrics.
 // Its Event method handles Metric events and ignores all others.
 type MetricHandler struct {
-	meter metric.MeterMust
+	meter metric.Meter
 	mu    sync.Mutex
 	// A map from event.Metrics to, effectively, otel Meters.
 	// But since the only thing we need from the Meter is recording a value, we
@@ -34,7 +33,7 @@ var _ event.Handler = (*MetricHandler)(nil)
 // NewMetricHandler creates a new MetricHandler.
 func NewMetricHandler(m metric.Meter) *MetricHandler {
 	return &MetricHandler{
-		meter:       metric.Must(m),
+		meter:       m,
 		recordFuncs: map[event.Metric]recordFunc{},
 	}
 }
@@ -68,39 +67,56 @@ func (m *MetricHandler) getRecordFunc(em event.Metric) recordFunc {
 	if f, ok := m.recordFuncs[em]; ok {
 		return f
 	}
-	f := m.newRecordFunc(em)
+	f, err := m.newRecordFunc(em)
+	if err != nil {
+		panic(err)
+	}
 	m.recordFuncs[em] = f
 	return f
 }
 
-func (m *MetricHandler) newRecordFunc(em event.Metric) recordFunc {
+func (m *MetricHandler) newRecordFunc(em event.Metric) (recordFunc, error) {
 	opts := em.Options()
 	name := opts.Namespace + "/" + em.Name()
-	otelOpts := []metric.InstrumentOption{
-		metric.WithDescription(opts.Description),
-		metric.WithUnit(otelunit.Unit(opts.Unit)), // cast OK: same strings
-	}
 	switch em.(type) {
 	case *event.Counter:
-		c := m.meter.NewInt64Counter(name, otelOpts...)
-		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
-			c.Add(ctx, l.Int64(), attrs...)
+		opts := []metric.Int64CounterOption{
+			metric.WithDescription(opts.Description),
+			metric.WithUnit(string(opts.Unit)),
 		}
+		c, err := m.meter.Int64Counter(name, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
+			c.Add(ctx, l.Int64(), metric.WithAttributes(attrs...))
+		}, nil
 
 	case *event.FloatGauge:
-		g := m.meter.NewFloat64UpDownCounter(name, otelOpts...)
-		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
-			g.Add(ctx, l.Float64(), attrs...)
+		g, err := m.meter.Float64UpDownCounter(name,
+			metric.WithDescription(opts.Description),
+			metric.WithUnit(string(opts.Unit)))
+		if err != nil {
+			return nil, err
 		}
+		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
+			g.Add(ctx, l.Float64(), metric.WithAttributes(attrs...))
+		}, nil
 
 	case *event.DurationDistribution:
-		r := m.meter.NewInt64Histogram(name, otelOpts...)
-		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
-			r.Record(ctx, l.Duration().Nanoseconds(), attrs...)
+		r, err := m.meter.Int64Histogram(name,
+			metric.WithDescription(opts.Description),
+			metric.WithUnit(string(opts.Unit)))
+		if err != nil {
+			return nil, err
 		}
 
+		return func(ctx context.Context, l event.Label, attrs []attribute.KeyValue) {
+			r.Record(ctx, l.Duration().Nanoseconds(), metric.WithAttributes(attrs...))
+		}, nil
+
 	default:
-		return nil
+		return nil, nil
 	}
 }
 
