@@ -25,6 +25,18 @@ func Values[M ~map[K]V, K comparable, V any](m M) []V {
 	return r
 }
 
+// Kvs returns the keys and values of the map m.
+// The keys and values will be in an indeterminate order.
+func Kvs[M ~map[K]V, K comparable, V any](m M) ([]K, []V) {
+	rK := make([]K, 0, len(m))
+	rV := make([]V, 0, len(m))
+	for k, v := range m {
+		rK = append(rK, k)
+		rV = append(rV, v)
+	}
+	return rK, rV
+}
+
 // Equal reports whether two maps contain the same key/value pairs.
 // Values are compared using ==.
 func Equal[M1, M2 ~map[K]V, K, V comparable](m1 M1, m2 M2) bool {
