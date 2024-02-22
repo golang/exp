@@ -9,7 +9,6 @@
 package trace
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -47,7 +46,10 @@ func (b *batch) isFreqBatch() bool {
 }
 
 // readBatch reads the next full batch from r.
-func readBatch(r *bufio.Reader) (batch, uint64, error) {
+func readBatch(r interface {
+	io.Reader
+	io.ByteReader
+}) (batch, uint64, error) {
 	// Read batch header byte.
 	b, err := r.ReadByte()
 	if err != nil {
