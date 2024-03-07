@@ -23,6 +23,18 @@ func init() {
 // Default returns the default Logger.
 func Default() *Logger { return defaultLogger.Load().(*Logger) }
 
+func DefaultOfContext(ctx context.Context) *Logger {
+	if v := ctx.Value(defaultContextValKey); v != nil {
+		return v.(*Logger)
+	} else {
+		return Default()
+	}
+}
+
+func NewContext(parent context.Context, l *Logger) context.Context {
+	return context.WithValue(parent, defaultContextValKey, l)
+}
+
 // SetDefault makes l the default Logger.
 // After this call, output from the log package's default Logger
 // (as with [log.Print], etc.) will be logged at LevelInfo using l's Handler.

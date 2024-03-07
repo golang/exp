@@ -574,3 +574,13 @@ func TestPanics(t *testing.T) {
 		logBuf.Reset()
 	}
 }
+
+func TestContext(t *testing.T) {
+	logger := With("traceid", "123456")
+	ctx := context.Background()
+	ctx = NewContext(ctx, logger)
+	gotLogger := DefaultContext(ctx)
+	if gotLogger != logger {
+		t.Errorf("Logger is not equal in context value")
+	}
+}
