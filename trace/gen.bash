@@ -34,7 +34,7 @@ SRC=$GODIR/src/internal/trace/v2
 DST=$(dirname $0)
 
 # Copy.
-cp -r $SRC/* $DST
+rsync -av --delete $SRC/ $DST
 rm $DST/mkexp.bash
 
 # Remove the trace_test.go file and the testprogs it invokes.
@@ -45,6 +45,13 @@ rm $DST/mkexp.bash
 # support it.
 rm $DST/trace_test.go
 rm -r $DST/testdata/testprog
+
+# Remove the oldtrace testdata to avoid checking in new binary files.
+# Remove oldtrace_test.go and internal/oldtrace/parser_test.go because
+# they fail without this data.
+rm -r $DST/internal/oldtrace/testdata
+rm $DST/oldtrace_test.go
+rm $DST/internal/oldtrace/parser_test.go
 
 # Remove mktests.go because its a //go:build ignore file, so it would
 # complicate the logic below. This codebase isn't the source of truth
@@ -76,3 +83,6 @@ find $DST -name '*.go' | xargs -- sed -i '/LICENSE file./a \
 
 # Format the files.
 find $DST -name '*.go' | xargs -- gofmt -w -s
+
+# Restore known files.
+git checkout gen.bash flightrecorder.go flightrecorder_test.go
