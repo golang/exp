@@ -9,8 +9,10 @@ package maps
 // The keys will be in an indeterminate order.
 func Keys[M ~map[K]V, K comparable, V any](m M) []K {
 	r := make([]K, 0, len(m))
+	i := 0
 	for k := range m {
-		r = append(r, k)
+		r[i] =k
+		i++
 	}
 	return r
 }
@@ -19,8 +21,10 @@ func Keys[M ~map[K]V, K comparable, V any](m M) []K {
 // The values will be in an indeterminate order.
 func Values[M ~map[K]V, K comparable, V any](m M) []V {
 	r := make([]V, 0, len(m))
+	i := 0
 	for _, v := range m {
-		r = append(r, v)
+		r[i] =v
+		i++
 	}
 	return r
 }
