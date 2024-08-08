@@ -1507,7 +1507,7 @@ func shortRetractionRationale(rationales []string) (string, bool) {
 // changes.
 func hasGitUncommittedChanges(dir string) (bool, error) {
 	stdout := &bytes.Buffer{}
-	cmd := exec.Command("git", "status", "--porcelain")
+	cmd := exec.Command("git", "diff")
 	cmd.Dir = dir
 	cmd.Stdout = stdout
 	if err := cmd.Run(); err != nil {
