@@ -420,6 +420,23 @@ func Clip[S ~[]E, E any](s S) S {
 	return s[:len(s):len(s)]
 }
 
+
+// ChunkBy takes values from s and and appends them to chunks
+// the appended values will have len <= n
+// if n is 0 default chunk size will be 1
+// if len s == 0 base type [][]T is returned with len == 0
+func ChunkBy[T any](s []T, n int) (chunks [][]T) {
+	if n == 0 {
+		n = 1
+	}
+	if len(s) == 0 {
+		return [][]T{}
+	}
+	for n < len(s) {
+		s, chunks = s[n:], append(chunks, s[0:n:n])
+	}
+	return append(chunks, s)
+} 
 // Rotation algorithm explanation:
 //
 // rotate left by 2
@@ -512,4 +529,5 @@ func Reverse[S ~[]E, E any](s S) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+
 }
