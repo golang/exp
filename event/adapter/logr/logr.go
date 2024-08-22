@@ -69,7 +69,6 @@ func (l *logSink) Error(err error, msg string, keysAndValues ...interface{}) {
 }
 
 func (l *logSink) log(ev *event.Event, msg string, keysAndValues []interface{}) {
-	ev.Labels = append(ev.Labels)
 	ev.Labels = append(ev.Labels, l.labels...)
 	for i := 0; i < len(keysAndValues); i += 2 {
 		ev.Labels = append(ev.Labels, newLabel(keysAndValues[i], keysAndValues[i+1]))
