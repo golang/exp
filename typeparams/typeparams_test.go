@@ -14,6 +14,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"strings"
 	"testing"
 )
 
@@ -35,6 +36,12 @@ func TestAPIConsistency(t *testing.T) {
 		delete(api118, name)
 	}
 	for name, api := range api118 {
+		// Go 1.23 has iterator methods that return Seq.
+		// These methods can't be supported at 1.17.
+		if strings.Contains(api, "Seq") && api117[name] == "" {
+			continue
+		}
+
 		if api != api117[name] {
 			t.Errorf("%q: got %s at 1.18+, but %s at 1.17", name, api, api117[name])
 		}
