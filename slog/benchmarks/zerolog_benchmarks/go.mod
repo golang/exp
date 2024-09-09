@@ -1,6 +1,6 @@
 module golang.org/x/exp/slog/benchmarks/zerolog_benchmarks
 
-go 1.20
+go 1.22.0
 
 require (
 	github.com/rs/zerolog v1.28.0
