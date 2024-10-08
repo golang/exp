@@ -27,3 +27,8 @@ type C int
 // new
 // OK: merging types
 type C = int
+
+// both
+// OK: identical (but this fails on 07ab4e7)
+type TypedBucketRateLimiter[T comparable] struct{}
+type BucketRateLimiter = TypedBucketRateLimiter[any]

@@ -146,11 +146,25 @@ func (d *differ) checkPackage(oldRootPackagePath string) {
 	// from T to T", which can happen if a correspondence between an alias
 	// and a named type is established first.
 	// See testdata/order.go.
+	// Example of what this loop looks for:
+	//    type A = B // old
+	//    type B ... // new
+	//
+	// We want to ensure that old B and new B correspond.
+	//
+	// This loop is unnecessary for correctness; skipping symbols will not introduce bugs.
 	for _, name := range d.old.Scope().Names() {
 		oldobj := d.old.Scope().Lookup(name)
 		if tn, ok := oldobj.(*types.TypeName); ok {
 			if oldn, ok := tn.Type().(*types.Named); ok {
 				if !oldn.Obj().Exported() {
+					continue
+				}
+				// Skip aliases to instantiated generic types. They end up getting
+				// compared to the origin type, which will fail.
+				// For example, we don't want to try to make A[int] correspond with
+				// A[T any].
+				if tn.IsAlias() && isInstantiated(oldn) {
 					continue
 				}
 				// Does new have a named type of the same name? Look up using
