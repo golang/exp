@@ -2,14 +2,11 @@
 package main
 
 import (
-	"archive/zip"
 	"bufio"
-	"errors"
 	"flag"
 	"fmt"
 	"go/token"
 	"go/types"
-	"io"
 	"os"
 	"strings"
 
@@ -48,16 +45,14 @@ func main() {
 		fmt.Fprintf(w, "   Same NOTE for packages applies to modules.\n")
 		flag.PrintDefaults()
 	}
+
 	flag.Parse()
-
-	fset := token.NewFileSet()
-
 	if *exportDataOutfile != "" {
 		if len(flag.Args()) != 1 {
 			flag.Usage()
 			os.Exit(2)
 		}
-		if err := loadAndWrite(fset, flag.Arg(0)); err != nil {
+		if err := loadAndWrite(flag.Arg(0)); err != nil {
 			die("writing export data: %v", err)
 		}
 		os.Exit(0)
@@ -70,13 +65,13 @@ func main() {
 
 	var report apidiff.Report
 	if *moduleMode {
-		oldmod := mustLoadOrReadModule(fset, flag.Arg(0))
-		newmod := mustLoadOrReadModule(fset, flag.Arg(1))
+		oldmod := mustLoadOrReadModule(flag.Arg(0))
+		newmod := mustLoadOrReadModule(flag.Arg(1))
 
 		report = apidiff.ModuleChanges(oldmod, newmod)
 	} else {
-		oldpkg := mustLoadOrReadPackage(fset, flag.Arg(0))
-		newpkg := mustLoadOrReadPackage(fset, flag.Arg(1))
+		oldpkg := mustLoadOrReadPackage(flag.Arg(0))
+		newpkg := mustLoadOrReadPackage(flag.Arg(1))
 		if !*allowInternal {
 			if isInternalPackage(oldpkg.Path(), "") && isInternalPackage(newpkg.Path(), "") {
 				fmt.Fprintf(os.Stderr, "Ignoring internal package %s\n", oldpkg.Path())
@@ -97,42 +92,41 @@ func main() {
 	}
 }
 
-func loadAndWrite(fset *token.FileSet, path string) error {
+func loadAndWrite(path string) error {
 	if *moduleMode {
-		module := mustLoadModule(fset, path)
-		return writeModuleExportData(fset, module, *exportDataOutfile)
+		module := mustLoadModule(path)
+		return writeModuleExportData(module, *exportDataOutfile)
 	}
 
 	// Loading and writing data for only a single package.
-	pkg := mustLoadPackage(fset, path)
+	pkg := mustLoadPackage(path)
 	return writePackageExportData(pkg, *exportDataOutfile)
 }
 
-func mustLoadOrReadPackage(fset *token.FileSet, importPathOrFile string) *types.Package {
+func mustLoadOrReadPackage(importPathOrFile string) *types.Package {
 	fileInfo, err := os.Stat(importPathOrFile)
 	if err == nil && fileInfo.Mode().IsRegular() {
-		pkg, err := readPackageExportData(fset, importPathOrFile)
+		pkg, err := readPackageExportData(importPathOrFile)
 		if err != nil {
 			die("reading export data from %s: %v", importPathOrFile, err)
 		}
 		return pkg
 	} else {
-		return mustLoadPackage(fset, importPathOrFile).Types
+		return mustLoadPackage(importPathOrFile).Types
 	}
 }
 
-func mustLoadPackage(fset *token.FileSet, importPath string) *packages.Package {
-	pkg, err := loadPackage(fset, importPath)
+func mustLoadPackage(importPath string) *packages.Package {
+	pkg, err := loadPackage(importPath)
 	if err != nil {
 		die("loading %s: %v", importPath, err)
 	}
 	return pkg
 }
 
-func loadPackage(fset *token.FileSet, importPath string) (*packages.Package, error) {
-	cfg := &packages.Config{
-		Fset: fset,
-		Mode: packages.NeedName | packages.NeedTypes,
+func loadPackage(importPath string) (*packages.Package, error) {
+	cfg := &packages.Config{Mode: packages.LoadTypes |
+		packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
 	}
 	pkgs, err := packages.Load(cfg, importPath)
 	if err != nil {
@@ -148,16 +142,16 @@ func loadPackage(fset *token.FileSet, importPath string) (*packages.Package, err
 	return pkgs[0], nil
 }
 
-func mustLoadOrReadModule(fset *token.FileSet, modulePathOrFile string) *apidiff.Module {
+func mustLoadOrReadModule(modulePathOrFile string) *apidiff.Module {
 	var module *apidiff.Module
 	fileInfo, err := os.Stat(modulePathOrFile)
 	if err == nil && fileInfo.Mode().IsRegular() {
-		module, err = readModuleExportData(fset, modulePathOrFile)
+		module, err = readModuleExportData(modulePathOrFile)
 		if err != nil {
 			die("reading export data from %s: %v", modulePathOrFile, err)
 		}
 	} else {
-		module = mustLoadModule(fset, modulePathOrFile)
+		module = mustLoadModule(modulePathOrFile)
 	}
 
 	filterInternal(module, *allowInternal)
@@ -165,18 +159,17 @@ func mustLoadOrReadModule(fset *token.FileSet, modulePathOrFile string) *apidiff
 	return module
 }
 
-func mustLoadModule(fset *token.FileSet, modulepath string) *apidiff.Module {
-	module, err := loadModule(fset, modulepath)
+func mustLoadModule(modulepath string) *apidiff.Module {
+	module, err := loadModule(modulepath)
 	if err != nil {
 		die("loading %s: %v", modulepath, err)
 	}
 	return module
 }
 
-func loadModule(fset *token.FileSet, modulepath string) (*apidiff.Module, error) {
-	cfg := &packages.Config{
-		Fset: fset,
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedModule,
+func loadModule(modulepath string) (*apidiff.Module, error) {
+	cfg := &packages.Config{Mode: packages.LoadTypes |
+		packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps | packages.NeedModule,
 	}
 	loaded, err := packages.Load(cfg, fmt.Sprintf("%s/...", modulepath))
 	if err != nil {
@@ -197,134 +190,70 @@ func loadModule(fset *token.FileSet, modulepath string) (*apidiff.Module, error)
 	return &apidiff.Module{Path: loaded[0].Module.Path, Packages: tpkgs}, nil
 }
 
-func readModuleExportData(fset *token.FileSet, filename string) (*apidiff.Module, error) {
-	f, err := zip.OpenReader(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	imports := make(map[string]*types.Package)
-
-	var modPath string
-	var pkgs []*types.Package
-	for _, entry := range f.File {
-		if err := func() error {
-			r, err := entry.Open()
-			if err != nil {
-				return err
-			}
-			defer r.Close()
-			if entry.Name == "module" {
-				data, err := io.ReadAll(r)
-				if err != nil {
-					return err
-				}
-				modPath = string(data)
-			} else {
-				pkg, err := gcexportdata.Read(r, fset, imports, strings.TrimSuffix(entry.Name, ".x"))
-				if err != nil {
-					return err
-				}
-				if imports[entry.Name] != nil {
-					panic("not in topological order")
-				}
-				imports[entry.Name] = pkg
-				pkgs = append(pkgs, pkg)
-			}
-			return nil
-		}(); err != nil {
-			return nil, err
-		}
-	}
-	return &apidiff.Module{Path: modPath, Packages: pkgs}, nil
-}
-
-func writeModuleExportData(fset *token.FileSet, module *apidiff.Module, filename string) (err error) {
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = errors.Join(err, f.Close())
-	}()
-
-	fmt.Fprintln(f, module.Path)
-
-	// Write types for each package into a zip archive.
-
-	// First write the module path.
-	w := zip.NewWriter(f)
-	entry, err := w.Create("module")
-	if err != nil {
-		return err
-	}
-	if _, err := io.WriteString(entry, module.Path); err != nil {
-		return err
-	}
-
-	// Then emit packages, dependencies first.
-	seen := map[*types.Package]bool{types.Unsafe: true}
-	var emit func(pkg *types.Package) error
-	emit = func(pkg *types.Package) error {
-		if pkg.Name() == "main" {
-			return nil // nonimportable
-		}
-		if !seen[pkg] {
-			seen[pkg] = true
-			for _, dep := range pkg.Imports() {
-				emit(dep)
-			}
-			entry, err := w.Create(pkg.Path() + ".x")
-			if err != nil {
-				return err
-			}
-			if err := gcexportdata.Write(entry, fset, pkg); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	for _, pkg := range module.Packages {
-		if err := emit(pkg); err != nil {
-			return err
-		}
-	}
-
-	return w.Close()
-}
-
-func readPackageExportData(fset *token.FileSet, filename string) (*types.Package, error) {
+func readModuleExportData(filename string) (*apidiff.Module, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	r := bufio.NewReader(f)
+	modPath, err := r.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	modPath = modPath[:len(modPath)-1] // remove delimiter
+	m := map[string]*types.Package{}
+	pkgs, err := gcexportdata.ReadBundle(r, token.NewFileSet(), m)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apidiff.Module{Path: modPath, Packages: pkgs}, nil
+}
+
+func writeModuleExportData(module *apidiff.Module, filename string) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(f, module.Path)
+	// TODO: Determine if token.NewFileSet is appropriate here.
+	if err := gcexportdata.WriteBundle(f, token.NewFileSet(), module.Packages); err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func readPackageExportData(filename string) (*types.Package, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	r := bufio.NewReader(f)
+	m := map[string]*types.Package{}
 	pkgPath, err := r.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
 	pkgPath = pkgPath[:len(pkgPath)-1] // remove delimiter
-	imports := make(map[string]*types.Package)
-	return gcexportdata.Read(r, fset, imports, pkgPath)
+	return gcexportdata.Read(r, token.NewFileSet(), m, pkgPath)
 }
 
-func writePackageExportData(pkg *packages.Package, filename string) (err error) {
+func writePackageExportData(pkg *packages.Package, filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = errors.Join(err, f.Close())
-	}()
-
 	// Include the package path in the file. The exportdata format does
 	// not record the path of the package being written.
-	if _, err := fmt.Fprintln(f, pkg.PkgPath); err != nil {
-		return err
+	fmt.Fprintln(f, pkg.PkgPath)
+	err1 := gcexportdata.Write(f, pkg.Fset, pkg.Types)
+	err2 := f.Close()
+	if err1 != nil {
+		return err1
 	}
-	return gcexportdata.Write(f, pkg.Fset, pkg.Types)
+	return err2
 }
 
 func die(format string, args ...interface{}) {
