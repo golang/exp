@@ -23,7 +23,7 @@ import (
 
 var printgolden = flag.Bool("printgolden", false, "print golden results for regression test")
 
-// TestSource verifies that the output of the default Source is locked down.
+// TestSourceRegress verifies that the output of the default Source is locked down.
 func TestSourceRegress(t *testing.T) {
 	src := NewSource(1)
 	var got [20]uint64
