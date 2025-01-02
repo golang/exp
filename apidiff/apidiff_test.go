@@ -17,6 +17,9 @@ import (
 	"golang.org/x/tools/go/packages/packagestest"
 )
 
+// The version to write into the go.mod file used to load the packages being tested.
+const testGoVersion = "1.22"
+
 func TestModuleChanges(t *testing.T) {
 	packagestest.TestAll(t, testModuleChanges)
 }
@@ -129,7 +132,8 @@ func splitIntoPackages(t *testing.T, file, dir string) (incompatibles, compatibl
 	if err := os.MkdirAll(filepath.Join(dir, "src", "apidiff"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "src", "apidiff", "go.mod"), []byte("module apidiff\ngo 1.22\n"), 0600); err != nil {
+	goMod := fmt.Sprintf("module apidiff\ngo %s\n", testGoVersion)
+	if err := os.WriteFile(filepath.Join(dir, "src", "apidiff", "go.mod"), []byte(goMod), 0600); err != nil {
 		t.Fatal(err)
 	}
 
