@@ -309,6 +309,8 @@ func (d *differ) checkCorrespondence(obj objectWithSide, part string, old, new t
 }
 
 func (d *differ) typeChanged(obj objectWithSide, part string, old, new types.Type) {
+	old = types.Unalias(old)
+	new = types.Unalias(new)
 	old = removeNamesFromSignature(old)
 	new = removeNamesFromSignature(new)
 	olds := types.TypeString(old, types.RelativeTo(d.old))

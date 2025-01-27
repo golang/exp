@@ -27,6 +27,8 @@ func (d *differ) correspond(old, new types.Type) bool {
 //
 // Compare this to the implementation of go/types.Identical.
 func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
+	old = types.Unalias(old)
+	new = types.Unalias(new)
 	// Structure copied from types.Identical.
 	switch old := old.(type) {
 	case *types.Basic:
