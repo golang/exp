@@ -20,8 +20,10 @@ func Keys[M ~map[K]V, K comparable, V any](m M) []K {
 	// return slices.AppendSeq(make([]K, 0, len(m)), maps.Keys(m)).
 
 	r := make([]K, 0, len(m))
+	i := 0
 	for k := range m {
-		r = append(r, k)
+		r[i] =k
+		i++
 	}
 	return r
 }
@@ -33,8 +35,10 @@ func Values[M ~map[K]V, K comparable, V any](m M) []V {
 	// return slices.AppendSeq(make([]V, 0, len(m)), maps.Values(m)).
 
 	r := make([]V, 0, len(m))
+	i := 0
 	for _, v := range m {
-		r = append(r, v)
+		r[i] =v
+		i++
 	}
 	return r
 }
