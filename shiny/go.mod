@@ -1,6 +1,6 @@
 module golang.org/x/exp/shiny
 
-go 1.18
+go 1.23.0
 
 require (
 	dmitri.shuralyov.com/gpu/mtl v0.0.0-20221208032759-85de2813cf6b

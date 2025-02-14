@@ -1,6 +1,6 @@
 module golang.org/x/exp/event
 
-go 1.18
+go 1.23.0
 
 require (
 	github.com/go-kit/kit v0.12.0
