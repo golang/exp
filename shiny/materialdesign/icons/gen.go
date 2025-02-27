@@ -570,7 +570,7 @@ func atof(s []byte) (float32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("could not parse %q as a float32: %v", s, err)
 	}
-	return float32(f), err
+	return float32(f), nil
 }
 
 func normalize(args *[6]float32, n int, op byte, size float32, offset f32.Vec2, relative bool) {
