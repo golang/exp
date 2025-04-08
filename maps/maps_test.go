@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"golang.org/x/exp/slices"
 )
 
@@ -45,6 +47,15 @@ func TestValues(t *testing.T) {
 	sort.Strings(got2)
 	if !slices.Equal(got2, want2) {
 		t.Errorf("Values(%v) = %v, want %v", m2, got2, want2)
+	}
+}
+
+func TestKvs(t *testing.T) {
+	ks, vs := Kvs(m1)
+	for idx, k := range ks {
+		if !cmp.Equal(m1[k], vs[idx]) {
+			t.Errorf("key %v want value %v, but  %v", k, m1[k], vs[idx])
+		}
 	}
 }
 
