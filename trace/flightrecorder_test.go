@@ -11,6 +11,7 @@ import (
 	"context"
 	"io"
 	"runtime/trace"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -196,7 +197,6 @@ func TestFlightRecorderLog(t *testing.T) {
 }
 
 func TestFlightRecorderOneGeneration(t *testing.T) {
-	t.Skip("requires update for Go 1.25's additional Sync event, go.dev/issue/73558")
 	test := func(t *testing.T, fr *FlightRecorder) {
 		tr := testFlightRecorder(t, fr, func(snapshot func()) {
 			// Sleep to let a few generations pass.
@@ -210,8 +210,9 @@ func TestFlightRecorderOneGeneration(t *testing.T) {
 			t.Fatalf("unexpected error creating trace reader: %v", err)
 		}
 
-		// Make sure there's only exactly one Sync event.
-		sync := 0
+		// Make sure there are exactly two Sync events: at the start and end.
+		var syncs []int
+		evs := 0
 		for {
 			ev, err := r.ReadEvent()
 			if err == io.EOF {
@@ -221,11 +222,13 @@ func TestFlightRecorderOneGeneration(t *testing.T) {
 				t.Fatalf("unexpected error reading trace: %v", err)
 			}
 			if ev.Kind() == EventSync {
-				sync++
+				syncs = append(syncs, evs)
 			}
+			evs++
 		}
-		if sync != 1 {
-			t.Errorf("expected one sync event, found %d", sync)
+		if ends := []int{0, evs - 1}; !slices.Equal(syncs, ends) {
+			t.Errorf("expected two sync events (one at each end of the trace), found %d at %d instead of %d",
+				len(syncs), syncs[:min(len(syncs), 5)], ends)
 		}
 	}
 	t.Run("SetPeriod", func(t *testing.T) {
