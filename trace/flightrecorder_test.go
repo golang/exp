@@ -196,6 +196,7 @@ func TestFlightRecorderLog(t *testing.T) {
 }
 
 func TestFlightRecorderOneGeneration(t *testing.T) {
+	t.Skip("requires update for Go 1.25's additional Sync event, go.dev/issue/73558")
 	test := func(t *testing.T, fr *FlightRecorder) {
 		tr := testFlightRecorder(t, fr, func(snapshot func()) {
 			// Sleep to let a few generations pass.
