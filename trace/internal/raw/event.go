@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/exp/trace/internal/event"
+	"golang.org/x/exp/trace/internal/tracev2"
 	"golang.org/x/exp/trace/internal/version"
 )
 
@@ -24,7 +24,7 @@ import (
 // trace format's framing. (But not interpreted.)
 type Event struct {
 	Version version.Version
-	Ev      event.Type
+	Ev      tracev2.EventType
 	Args    []uint64
 	Data    []byte
 }

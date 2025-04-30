@@ -18,8 +18,7 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/exp/trace/internal/event"
-	"golang.org/x/exp/trace/internal/event/go122"
+	"golang.org/x/exp/trace/internal/tracev2"
 )
 
 // generation contains all the trace data for a single
@@ -31,6 +30,7 @@ type generation struct {
 	batches    map[ThreadID][]batch
 	batchMs    []ThreadID
 	cpuSamples []cpuSample
+	minTs      timestamp
 	*evTable
 }
 
@@ -104,6 +104,9 @@ func readGeneration(r *bufio.Reader, spill *spilledBatch) (*generation, *spilled
 			// problem as soon as we see it.
 			return nil, nil, fmt.Errorf("generations out of order")
 		}
+		if g.minTs == 0 || b.time < g.minTs {
+			g.minTs = b.time
+		}
 		if err := processBatch(g, b); err != nil {
 			return nil, nil, err
 		}
@@ -166,11 +169,11 @@ func processBatch(g *generation, b batch) error {
 			return fmt.Errorf("found multiple frequency events")
 		}
 		g.freq = freq
-	case b.exp != event.NoExperiment:
-		if g.expData == nil {
-			g.expData = make(map[event.Experiment]*ExperimentalData)
+	case b.exp != tracev2.NoExperiment:
+		if g.expBatches == nil {
+			g.expBatches = make(map[tracev2.Experiment][]ExperimentalBatch)
 		}
-		if err := addExperimentalData(g.expData, b); err != nil {
+		if err := addExperimentalBatch(g.expBatches, b); err != nil {
 			return err
 		}
 	default:
@@ -222,7 +225,7 @@ func addStrings(stringTable *dataTable[stringID, string], b batch) error {
 	}
 	r := bytes.NewReader(b.data)
 	hdr, err := r.ReadByte() // Consume the EvStrings byte.
-	if err != nil || event.Type(hdr) != go122.EvStrings {
+	if err != nil || tracev2.EventType(hdr) != tracev2.EvStrings {
 		return fmt.Errorf("missing strings batch header")
 	}
 
@@ -233,7 +236,7 @@ func addStrings(stringTable *dataTable[stringID, string], b batch) error {
 		if err != nil {
 			return err
 		}
-		if event.Type(ev) != go122.EvString {
+		if tracev2.EventType(ev) != tracev2.EvString {
 			return fmt.Errorf("expected string event, got %d", ev)
 		}
 
@@ -248,8 +251,8 @@ func addStrings(stringTable *dataTable[stringID, string], b batch) error {
 		if err != nil {
 			return err
 		}
-		if len > go122.MaxStringSize {
-			return fmt.Errorf("invalid string size %d, maximum is %d", len, go122.MaxStringSize)
+		if len > tracev2.MaxEventTrailerDataSize {
+			return fmt.Errorf("invalid string size %d, maximum is %d", len, tracev2.MaxEventTrailerDataSize)
 		}
 
 		// Copy out the string.
@@ -280,7 +283,7 @@ func addStacks(stackTable *dataTable[stackID, stack], pcs map[uint64]frame, b ba
 	}
 	r := bytes.NewReader(b.data)
 	hdr, err := r.ReadByte() // Consume the EvStacks byte.
-	if err != nil || event.Type(hdr) != go122.EvStacks {
+	if err != nil || tracev2.EventType(hdr) != tracev2.EvStacks {
 		return fmt.Errorf("missing stacks batch header")
 	}
 
@@ -290,7 +293,7 @@ func addStacks(stackTable *dataTable[stackID, stack], pcs map[uint64]frame, b ba
 		if err != nil {
 			return err
 		}
-		if event.Type(ev) != go122.EvStack {
+		if tracev2.EventType(ev) != tracev2.EvStack {
 			return fmt.Errorf("expected stack event, got %d", ev)
 		}
 
@@ -305,8 +308,8 @@ func addStacks(stackTable *dataTable[stackID, stack], pcs map[uint64]frame, b ba
 		if err != nil {
 			return err
 		}
-		if nFrames > go122.MaxFramesPerStack {
-			return fmt.Errorf("invalid stack size %d, maximum is %d", nFrames, go122.MaxFramesPerStack)
+		if nFrames > tracev2.MaxFramesPerStack {
+			return fmt.Errorf("invalid stack size %d, maximum is %d", nFrames, tracev2.MaxFramesPerStack)
 		}
 
 		// Each frame consists of 4 fields: pc, funcID (string), fileID (string), line.
@@ -358,7 +361,7 @@ func addCPUSamples(samples []cpuSample, b batch) ([]cpuSample, error) {
 	}
 	r := bytes.NewReader(b.data)
 	hdr, err := r.ReadByte() // Consume the EvCPUSamples byte.
-	if err != nil || event.Type(hdr) != go122.EvCPUSamples {
+	if err != nil || tracev2.EventType(hdr) != tracev2.EvCPUSamples {
 		return nil, fmt.Errorf("missing CPU samples batch header")
 	}
 
@@ -368,7 +371,7 @@ func addCPUSamples(samples []cpuSample, b batch) ([]cpuSample, error) {
 		if err != nil {
 			return nil, err
 		}
-		if event.Type(ev) != go122.EvCPUSample {
+		if tracev2.EventType(ev) != tracev2.EvCPUSample {
 			return nil, fmt.Errorf("expected CPU sample event, got %d", ev)
 		}
 
@@ -439,18 +442,13 @@ func parseFreq(b batch) (frequency, error) {
 	return frequency(1.0 / (float64(f) / 1e9)), nil
 }
 
-// addExperimentalData takes an experimental batch and adds it to the ExperimentalData
-// for the experiment its a part of.
-func addExperimentalData(expData map[event.Experiment]*ExperimentalData, b batch) error {
-	if b.exp == event.NoExperiment {
-		return fmt.Errorf("internal error: addExperimentalData called on non-experimental batch")
+// addExperimentalBatch takes an experimental batch and adds it to the list of experimental
+// batches for the experiment its a part of.
+func addExperimentalBatch(expBatches map[tracev2.Experiment][]ExperimentalBatch, b batch) error {
+	if b.exp == tracev2.NoExperiment {
+		return fmt.Errorf("internal error: addExperimentalBatch called on non-experimental batch")
 	}
-	ed, ok := expData[b.exp]
-	if !ok {
-		ed = new(ExperimentalData)
-		expData[b.exp] = ed
-	}
-	ed.Batches = append(ed.Batches, ExperimentalBatch{
+	expBatches[b.exp] = append(expBatches[b.exp], ExperimentalBatch{
 		Thread: b.m,
 		Data:   b.data,
 	})

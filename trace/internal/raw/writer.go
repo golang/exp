@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/exp/trace/internal/event"
+	"golang.org/x/exp/trace/internal/tracev2"
 	"golang.org/x/exp/trace/internal/version"
 )
 
@@ -27,7 +27,7 @@ type Writer struct {
 	w     io.Writer
 	buf   []byte
 	v     version.Version
-	specs []event.Spec
+	specs []tracev2.EventSpec
 }
 
 // NewWriter creates a new byte format writer.

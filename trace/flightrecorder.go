@@ -19,7 +19,7 @@ import (
 	"time"
 	_ "unsafe" // for go:linkname
 
-	"golang.org/x/exp/trace/internal/event/go122"
+	"golang.org/x/exp/trace/internal/tracev2"
 )
 
 // FlightRecorder represents a flight recording configuration.
@@ -309,7 +309,7 @@ func (r *FlightRecorder) WriteTo(w io.Writer) (total int, err error) {
 	for _, gen := range gens {
 		for _, batch := range gen.batches {
 			// Rewrite the batch header event with four arguments: gen, M ID, timestamp, and data length.
-			n, err := w.Write([]byte{byte(go122.EvEventBatch)})
+			n, err := w.Write([]byte{byte(tracev2.EvEventBatch)})
 			total += n
 			if err != nil {
 				return total, err

@@ -6,7 +6,7 @@
 
 //go:build go1.23
 
-package oldtrace
+package tracev1
 
 import "errors"
 

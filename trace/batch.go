@@ -14,8 +14,7 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/exp/trace/internal/event"
-	"golang.org/x/exp/trace/internal/event/go122"
+	"golang.org/x/exp/trace/internal/tracev2"
 )
 
 // timestamp is an unprocessed timestamp.
@@ -27,23 +26,23 @@ type batch struct {
 	m    ThreadID
 	time timestamp
 	data []byte
-	exp  event.Experiment
+	exp  tracev2.Experiment
 }
 
 func (b *batch) isStringsBatch() bool {
-	return b.exp == event.NoExperiment && len(b.data) > 0 && event.Type(b.data[0]) == go122.EvStrings
+	return b.exp == tracev2.NoExperiment && len(b.data) > 0 && tracev2.EventType(b.data[0]) == tracev2.EvStrings
 }
 
 func (b *batch) isStacksBatch() bool {
-	return b.exp == event.NoExperiment && len(b.data) > 0 && event.Type(b.data[0]) == go122.EvStacks
+	return b.exp == tracev2.NoExperiment && len(b.data) > 0 && tracev2.EventType(b.data[0]) == tracev2.EvStacks
 }
 
 func (b *batch) isCPUSamplesBatch() bool {
-	return b.exp == event.NoExperiment && len(b.data) > 0 && event.Type(b.data[0]) == go122.EvCPUSamples
+	return b.exp == tracev2.NoExperiment && len(b.data) > 0 && tracev2.EventType(b.data[0]) == tracev2.EvCPUSamples
 }
 
 func (b *batch) isFreqBatch() bool {
-	return b.exp == event.NoExperiment && len(b.data) > 0 && event.Type(b.data[0]) == go122.EvFrequency
+	return b.exp == tracev2.NoExperiment && len(b.data) > 0 && tracev2.EventType(b.data[0]) == tracev2.EvFrequency
 }
 
 // readBatch reads the next full batch from r.
@@ -56,18 +55,18 @@ func readBatch(r interface {
 	if err != nil {
 		return batch{}, 0, err
 	}
-	if typ := event.Type(b); typ != go122.EvEventBatch && typ != go122.EvExperimentalBatch {
-		return batch{}, 0, fmt.Errorf("expected batch event, got %s", go122.EventString(typ))
+	if typ := tracev2.EventType(b); typ != tracev2.EvEventBatch && typ != tracev2.EvExperimentalBatch {
+		return batch{}, 0, fmt.Errorf("expected batch event, got event %d", typ)
 	}
 
 	// Read the experiment of we have one.
-	exp := event.NoExperiment
-	if event.Type(b) == go122.EvExperimentalBatch {
+	exp := tracev2.NoExperiment
+	if tracev2.EventType(b) == tracev2.EvExperimentalBatch {
 		e, err := r.ReadByte()
 		if err != nil {
 			return batch{}, 0, err
 		}
-		exp = event.Experiment(e)
+		exp = tracev2.Experiment(e)
 	}
 
 	// Read the batch header: gen (generation), thread (M) ID, base timestamp
@@ -90,8 +89,8 @@ func readBatch(r interface {
 	if err != nil {
 		return batch{}, gen, fmt.Errorf("error reading batch size: %w", err)
 	}
-	if size > go122.MaxBatchSize {
-		return batch{}, gen, fmt.Errorf("invalid batch size %d, maximum is %d", size, go122.MaxBatchSize)
+	if size > tracev2.MaxBatchSize {
+		return batch{}, gen, fmt.Errorf("invalid batch size %d, maximum is %d", size, tracev2.MaxBatchSize)
 	}
 
 	// Copy out the batch for later processing.

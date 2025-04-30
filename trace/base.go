@@ -16,23 +16,18 @@ import (
 	"math"
 	"strings"
 
-	"golang.org/x/exp/trace/internal/event"
-	"golang.org/x/exp/trace/internal/event/go122"
+	"golang.org/x/exp/trace/internal/tracev2"
 	"golang.org/x/exp/trace/internal/version"
 )
 
-// maxArgs is the maximum number of arguments for "plain" events,
-// i.e. anything that could reasonably be represented as a baseEvent.
-const maxArgs = 5
-
 // timedEventArgs is an array that is able to hold the arguments for any
 // timed event.
-type timedEventArgs [maxArgs - 1]uint64
+type timedEventArgs [tracev2.MaxTimedEventArgs - 1]uint64
 
 // baseEvent is the basic unprocessed event. This serves as a common
 // fundamental data structure across.
 type baseEvent struct {
-	typ  event.Type
+	typ  tracev2.EventType
 	time Time
 	args timedEventArgs
 }
@@ -42,7 +37,7 @@ type baseEvent struct {
 func (e *baseEvent) extra(v version.Version) []uint64 {
 	switch v {
 	case version.Go122:
-		return e.args[len(go122.Specs()[e.typ].Args)-1:]
+		return e.args[len(tracev2.Specs()[e.typ].Args)-1:]
 	}
 	panic(fmt.Sprintf("unsupported version: go 1.%d", v))
 }
@@ -62,9 +57,8 @@ type evTable struct {
 	extraStringIDs map[string]extraStringID
 	nextExtra      extraStringID
 
-	// expData contains extra unparsed data that is accessible
-	// only to ExperimentEvent via an EventExperimental event.
-	expData map[event.Experiment]*ExperimentalData
+	// expBatches contains extra unparsed data relevant to a specific experiment.
+	expBatches map[tracev2.Experiment][]ExperimentalBatch
 }
 
 // addExtraString adds an extra string to the evTable and returns
@@ -244,7 +238,7 @@ func (s cpuSample) asEvent(table *evTable) Event {
 		table: table,
 		ctx:   s.schedCtx,
 		base: baseEvent{
-			typ:  go122.EvCPUSample,
+			typ:  tracev2.EvCPUSample,
 			time: s.time,
 		},
 	}
