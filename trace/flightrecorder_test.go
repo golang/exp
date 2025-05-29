@@ -145,7 +145,7 @@ func TestFlightRecorderConcurrentWriteTo(t *testing.T) {
 		if buf.Len() == 0 {
 			continue
 		}
-		testReader(t, buf, testtrace.ExpectSuccess())
+		testReader(t, buf, testtrace.NewValidator(), testtrace.ExpectSuccess())
 	}
 }
 
@@ -294,6 +294,6 @@ func testFlightRecorder(t *testing.T, fr *FlightRecorder, f flightRecorderTestFu
 	traceBytes := buf.Bytes()
 
 	// Parse the trace to make sure it's not broken.
-	testReader(t, bytes.NewReader(traceBytes), testtrace.ExpectSuccess())
+	testReader(t, bytes.NewReader(traceBytes), testtrace.NewValidator(), testtrace.ExpectSuccess())
 	return traceBytes
 }

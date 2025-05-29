@@ -15,6 +15,7 @@ import (
 	"io"
 
 	"golang.org/x/exp/trace/internal/tracev2"
+	"golang.org/x/exp/trace/internal/version"
 )
 
 // timestamp is an unprocessed timestamp.
@@ -41,8 +42,10 @@ func (b *batch) isCPUSamplesBatch() bool {
 	return b.exp == tracev2.NoExperiment && len(b.data) > 0 && tracev2.EventType(b.data[0]) == tracev2.EvCPUSamples
 }
 
-func (b *batch) isFreqBatch() bool {
-	return b.exp == tracev2.NoExperiment && len(b.data) > 0 && tracev2.EventType(b.data[0]) == tracev2.EvFrequency
+func (b *batch) isSyncBatch(ver version.Version) bool {
+	return (b.exp == tracev2.NoExperiment && len(b.data) > 0) &&
+		((tracev2.EventType(b.data[0]) == tracev2.EvFrequency && ver < version.Go125) ||
+			(tracev2.EventType(b.data[0]) == tracev2.EvSync && ver >= version.Go125))
 }
 
 // readBatch reads the next full batch from r.
