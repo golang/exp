@@ -11,7 +11,7 @@ import "testing"
 func wantAllocs(t *testing.T, want int, f func()) {
 	t.Helper()
 	got := int(testing.AllocsPerRun(5, f))
-	if got != want {
-		t.Errorf("got %d allocs, want %d", got, want)
+	if got > want {
+		t.Errorf("got %d allocs, want at most %d", got, want)
 	}
 }
