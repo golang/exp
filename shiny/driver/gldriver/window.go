@@ -387,3 +387,7 @@ func (w *windowImpl) Publish() screen.PublishResult {
 
 	return res
 }
+
+func (w *windowImpl) SetTitle(title string) {
+	setTitle(w.id, title)
+}
