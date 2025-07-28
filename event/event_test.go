@@ -274,7 +274,7 @@ func (t *testTraceHandler) Event(ctx context.Context, ev *event.Event) context.C
 }
 
 func TestTraceDuration(t *testing.T) {
-	// Verify that a trace can can emit a latency metric.
+	// Verify that a trace can emit a latency metric.
 	dur := event.NewDuration("test", nil)
 	want := time.Second
 

@@ -123,7 +123,7 @@ func (c *sources) scanStack() Source {
 		e, found := c.getCaller(pc)
 		if found {
 			if !e.helper {
-				// exact non helper match match found, return it
+				// exact non helper match found, return it
 				return e.source
 			}
 			// helper found, keep scanning

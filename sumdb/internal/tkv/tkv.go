@@ -19,7 +19,7 @@ type Storage interface {
 
 	// ReadWrite runs f in a read-write transaction.
 	// If f returns an error, the transaction aborts and returns that error.
-	// If f returns nil, the transaction attempts to commit and then then return nil.
+	// If f returns nil, the transaction attempts to commit and then return nil.
 	// Otherwise it tries again. Note that f may be called multiple times and that
 	// the result only describes the effect of the final call to f.
 	// The caller must take care not to use any state computed during

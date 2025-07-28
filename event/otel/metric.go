@@ -22,7 +22,7 @@ type MetricHandler struct {
 	mu    sync.Mutex
 	// A map from event.Metrics to, effectively, otel Meters.
 	// But since the only thing we need from the Meter is recording a value, we
-	// use a function for that that closes over the Meter itself.
+	// use a function for that closes over the Meter itself.
 	recordFuncs map[event.Metric]recordFunc
 }
 
