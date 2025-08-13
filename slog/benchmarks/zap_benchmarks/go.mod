@@ -1,6 +1,6 @@
 module golang.org/x/exp/slog/benchmarks/zap_benchmarks
 
-go 1.23.0
+go 1.24.0
 
 require (
 	go.uber.org/zap v1.24.0

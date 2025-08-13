@@ -1,6 +1,6 @@
 module golang.org/x/exp/jsonrpc2
 
-go 1.23.0
+go 1.24.0
 
 require (
 	golang.org/x/exp/event v0.0.0-20250718183923-645b1fa84792
