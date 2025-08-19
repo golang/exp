@@ -151,6 +151,9 @@ func (w *recorder) Write(p []byte) (n int, err error) {
 	if err != nil {
 		return len(p) - rd.Len(), err
 	}
+	if b.isEndOfGeneration() {
+		gen = r.active.gen
+	}
 
 	// Check if we're entering a new generation.
 	if r.active.gen != 0 && r.active.gen+1 == gen {
@@ -200,18 +203,20 @@ func (w *recorder) Write(p []byte) (n int, err error) {
 	}
 
 	// Append the batch to the current generation.
-	if r.active.gen == 0 {
-		r.active.gen = gen
+	if !b.isEndOfGeneration() {
+		if r.active.gen == 0 {
+			r.active.gen = gen
+		}
+		if r.active.minTime == 0 || r.active.minTime > b.time {
+			r.active.minTime = b.time
+		}
+		r.active.size += 1
+		r.active.size += uvarintSize(gen)
+		r.active.size += uvarintSize(uint64(b.m))
+		r.active.size += uvarintSize(uint64(b.time))
+		r.active.size += uvarintSize(uint64(len(b.data)))
+		r.active.size += len(b.data)
 	}
-	if r.active.minTime == 0 || r.active.minTime > b.time {
-		r.active.minTime = b.time
-	}
-	r.active.size += 1
-	r.active.size += uvarintSize(gen)
-	r.active.size += uvarintSize(uint64(b.m))
-	r.active.size += uvarintSize(uint64(b.time))
-	r.active.size += uvarintSize(uint64(len(b.data)))
-	r.active.size += len(b.data)
 	r.active.batches = append(r.active.batches, b)
 
 	return len(p) - rd.Len(), nil
@@ -322,23 +327,26 @@ func (r *FlightRecorder) WriteTo(w io.Writer) (total int, err error) {
 	// Write all the data.
 	for _, gen := range gens {
 		for _, batch := range gen.batches {
-			// Rewrite the batch header event with four arguments: gen, M ID, timestamp, and data length.
-			n, err := w.Write([]byte{byte(tracev2.EvEventBatch)})
-			total += n
-			if err != nil {
-				return total, err
-			}
-			if err := writeUvarint(gen.gen); err != nil {
-				return total, err
-			}
-			if err := writeUvarint(uint64(batch.m)); err != nil {
-				return total, err
-			}
-			if err := writeUvarint(uint64(batch.time)); err != nil {
-				return total, err
-			}
-			if err := writeUvarint(uint64(len(batch.data))); err != nil {
-				return total, err
+			var n int
+			if !batch.isEndOfGeneration() {
+				// Rewrite the batch header event with four arguments: gen, M ID, timestamp, and data length.
+				n, err := w.Write([]byte{byte(tracev2.EvEventBatch)})
+				total += n
+				if err != nil {
+					return total, err
+				}
+				if err := writeUvarint(gen.gen); err != nil {
+					return total, err
+				}
+				if err := writeUvarint(uint64(batch.m)); err != nil {
+					return total, err
+				}
+				if err := writeUvarint(uint64(batch.time)); err != nil {
+					return total, err
+				}
+				if err := writeUvarint(uint64(len(batch.data))); err != nil {
+					return total, err
+				}
 			}
 
 			// Write batch data.
