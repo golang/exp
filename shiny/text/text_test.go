@@ -20,13 +20,6 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func readAllText(dst []byte, f *Frame) []byte {
 	for p := f.FirstParagraph(); p != nil; p = p.Next(f) {
 		for l := p.FirstLine(f); l != nil; l = l.Next(f) {
