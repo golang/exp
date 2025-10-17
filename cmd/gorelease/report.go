@@ -268,7 +268,7 @@ func (r *report) suggestReleaseVersion() {
 		}
 	}
 	if latestForBaseMajor != "" && latestForBaseMajor != r.base.version {
-		setNotValid(fmt.Sprintf("Can only suggest a release version when compared against the most recent version of this major: %s.", latestForBaseMajor))
+		setNotValid("Can only suggest a release version when compared against the most recent version of this major: %s.", latestForBaseMajor)
 		return
 	}
 
