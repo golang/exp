@@ -43,7 +43,7 @@ the following references for more information:
 
 - The [original proposal](https://go.dev/issue/43651) for type parameters.
 - The [addendum for type sets](https://go.dev/issue/45346).
-- The [latest language specfication](https://tip.golang.org/ref/spec) (still in-progress as of 2021-01-11).
+- The [latest language specification](https://tip.golang.org/ref/spec) (still in-progress as of 2021-01-11).
 - The proposals for new APIs in
   [go/token and go/ast](https://go.dev/issue/47781), and in
   [go/types](https://go.dev/issue/47916).
@@ -385,7 +385,7 @@ Once type-checked, these embedded expressions are represented using the new
 We can also investigate two new methods of interface:
 `types.Interface.IsComparable`, which reports whether the type set of an
 interface is comparable, and `types.Interface.IsMethodSet`, which reports
-whether an interface is expressable using methods alone.
+whether an interface is expressible using methods alone.
 
 ```
 func PrintInterfaceTypes(fset *token.FileSet, file *ast.File) error {
@@ -430,7 +430,7 @@ type hello.Findable interface{comparable}
 ```
 
 The `Findable` type demonstrates another new feature of Go 1.18: the comparable
-built-in. Comparable is a special interface type, not expressable using
+built-in. Comparable is a special interface type, not expressible using
 ordinary Go syntax, whose type-set consists of all comparable types.
 
 ### Implicit interfaces
@@ -697,7 +697,7 @@ as a `types.Type`. This section explains how generic types behave in existing
 Methods on uninstantiated generic types are different from methods on an
 ordinary type. Consider that for an ordinary type `T`, the receiver base type
 of each method in its method set is `T`. However, this can't be the case for
-a generic type: generic types cannot be used without instantation, and neither
+a generic type: generic types cannot be used without instantiation, and neither
 can the type of the receiver variable. Instead, the receiver base type is an
 _instantiated_ type, instantiated with the method's receiver type parameters.
 

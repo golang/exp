@@ -206,7 +206,7 @@ func (p *Printer) quoteBytes(w io.Writer, buf []byte) {
 	io.WriteString(w, `"`)
 }
 
-// time writes a timstamp in the same format as
+// time writes a timestamp in the same format as
 func (p *Printer) time(w io.Writer, t time.Time) {
 	year, month, day := t.Date()
 	hour, minute, second := t.Clock()

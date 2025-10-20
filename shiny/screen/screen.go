@@ -275,7 +275,7 @@ type Uploader interface {
 	//
 	// It is valid to upload a Buffer while another upload of the same Buffer
 	// is in progress, but a Buffer's image.RGBA pixel contents should not be
-	// accessed while it is uploading. A Buffer is re-usable, in that its pixel
+	// accessed while it is uploading. A Buffer is reusable, in that its pixel
 	// contents can be further modified, once all outstanding calls to Upload
 	// have returned.
 	//

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package node provides the structure for a tree of heterogenous widget nodes.
+// Package node provides the structure for a tree of heterogeneous widget nodes.
 //
 // Most programmers should not need to import this package, only the top-level
 // widget package. Only those that write custom widgets need to explicitly
@@ -13,7 +13,7 @@
 // Embed), providing default implementations of all of Node's methods.
 //
 // The split between an outer wrapper (Node) interface type and an inner
-// wrappee (Embed) struct type enables heterogenous nodes, such as a buttons
+// wrappee (Embed) struct type enables heterogeneous nodes, such as a buttons
 // and labels, in a widget tree where every node contains common fields such as
 // position, size and tree structure links (parent, siblings and children).
 //
@@ -126,7 +126,7 @@ type Node interface {
 	// responsible for calling PaintBase on this node (and its children). In
 	// any case, the Paint method should then paint any effects. Many widgets
 	// will neither create their own buffers nor have any effects, so their
-	// Paint methods will simply be the default implemention: do nothing except
+	// Paint methods will simply be the default implementation: do nothing except
 	// call Paint on its children. As mentioned above, the bulk of the work is
 	// typically done in PaintBase.
 	//

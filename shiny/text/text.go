@@ -32,7 +32,7 @@
 //
 // Either way, such modifications can cause re-layout, which can add or remove
 // Paragraphs, Lines and Boxes. The underlying memory for such structs can be
-// re-used, so pointer values, such as of type *Box, should not be held over
+// reused, so pointer values, such as of type *Box, should not be held over
 // such modifications.
 package text // import "golang.org/x/exp/shiny/text"
 
@@ -613,7 +613,7 @@ type bAndK struct {
 //
 // A Frame can have only one active lineReader at any one time. To avoid
 // excessive memory allocation and garbage collection, the lineReader's data is
-// a field of the Frame struct and re-used.
+// a field of the Frame struct and reused.
 type lineReader struct{ f *Frame }
 
 func (z lineReader) bAndK() bAndK {

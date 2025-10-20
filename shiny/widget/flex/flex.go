@@ -297,7 +297,7 @@ func (w *Flex) Layout(t *theme.Theme) {
 			sumClampDiff := 0.0
 			for _, child := range line.child {
 				// TODO: we work in whole pixels but flex calculations are done in
-				// fractional pixels. Take this oppertunity to clamp us to whole
+				// fractional pixels. Take this opportunity to clamp us to whole
 				// pixels and make sure we sum correctly.
 				if child.frozen {
 					continue

@@ -18,7 +18,7 @@ import (
 
 // Sheet is a shell widget that provides *image.RGBA pixel buffers (analogous
 // to blank sheets of paper) for its descendent widgets to paint on, via their
-// PaintBase methods. Such buffers may be cached and their contents re-used for
+// PaintBase methods. Such buffers may be cached and their contents reused for
 // multiple paints, which can make scrolling and animation smoother and more
 // efficient.
 //

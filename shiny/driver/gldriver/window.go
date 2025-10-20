@@ -84,7 +84,7 @@ func (w *windowImpl) NextEvent() interface{} {
 func (w *windowImpl) Release() {
 	// There are two ways a window can be closed: the Operating System or
 	// Desktop Environment can initiate (e.g. in response to a user clicking a
-	// red button), or the Go app can programatically close the window (by
+	// red button), or the Go app can programmatically close the window (by
 	// calling Window.Release).
 	//
 	// When the OS closes a window:

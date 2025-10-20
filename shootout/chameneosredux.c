@@ -286,7 +286,7 @@ void runGame( int n_meeting, int ncolor, const enum Colour* colours )
    /* print total meeting times, should equal n_meeting */
    printf( "%s\n\n", formatNumber(total, str) );
 
-   /* cleaup & quit */
+   /* cleanup & quit */
    pthread_mutex_destroy( &place.mutex );
    free( creatures );
 }

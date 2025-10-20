@@ -13,8 +13,8 @@ import (
 // String wraps a regular string with a small structure that provides more
 // efficient indexing by code point index, as opposed to byte index.
 // Scanning incrementally forwards or backwards is O(1) per index operation
-// (although not as fast a range clause going forwards).  Random access is
-// O(N) in the length of the string, but the overhead is less than always
+// (although not as fast as a range clause going forwards).
+// Random access is O(N) in the length of the string, but the overhead is less than always
 // scanning from the beginning.
 // If the string is ASCII, random access is O(1).
 // Unlike the built-in string type, String has internal mutable state and
