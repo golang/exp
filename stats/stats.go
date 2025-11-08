@@ -148,7 +148,7 @@ func Median[F ~float64](values []F) F { return Quantiles(values, 0.5)[0] }
 // -Inf is treated as smaller than all other values,
 // Inf is treated as larger than all other values, and
 // -0.0 is treated as smaller than 0.0.
-func Quantiles[F ~float64](values []F, quantiles ...F) []F {
+func Quantiles[F, Q ~float64](values []F, quantiles ...Q) []F {
 	if len(values) == 0 {
 		panic("quantiles: empty slice")
 	}
@@ -172,7 +172,7 @@ func Quantiles[F ~float64](values []F, quantiles ...F) []F {
 		// "linear" or "R-7" method. This assumes that the data is either a
 		// population or a sample that includes the most extreme values of the
 		// underlying population.
-		res[i] = hyndmanFanR7(values, q)
+		res[i] = hyndmanFanR7(values, F(q))
 	}
 	return res
 }
