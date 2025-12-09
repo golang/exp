@@ -3,7 +3,7 @@ module golang.org/x/exp/jsonrpc2
 go 1.24.0
 
 require (
-	golang.org/x/exp/event v0.0.0-20251023183803-a4bb9ffd2546
+	golang.org/x/exp/event v0.0.0-20251125195548-87e1e737ad39
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
 )
 
