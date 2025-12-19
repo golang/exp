@@ -11,19 +11,14 @@ package trace_test
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/exp/trace"
-	"golang.org/x/exp/trace/internal/raw"
 	"golang.org/x/exp/trace/internal/testtrace"
-	"golang.org/x/exp/trace/internal/version"
 )
 
 var (
@@ -37,7 +32,6 @@ func TestReaderGolden(t *testing.T) {
 		t.Fatalf("failed to glob for tests: %v", err)
 	}
 	for _, testPath := range matches {
-		testPath := testPath
 		testName, err := filepath.Rel("./testdata", testPath)
 		if err != nil {
 			t.Fatalf("failed to relativize testdata path: %v", err)
@@ -134,52 +128,6 @@ func testReader(t *testing.T, tr io.Reader, v *testtrace.Validator, exp *testtra
 	if err := exp.Check(nil); err != nil {
 		t.Error(err)
 	}
-}
-
-func dumpTraceToText(t *testing.T, b []byte) string {
-	t.Helper()
-
-	br, err := raw.NewReader(bytes.NewReader(b))
-	if err != nil {
-		t.Fatalf("dumping trace: %v", err)
-	}
-	var sb strings.Builder
-	tw, err := raw.NewTextWriter(&sb, version.Current)
-	if err != nil {
-		t.Fatalf("dumping trace: %v", err)
-	}
-	for {
-		ev, err := br.ReadEvent()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatalf("dumping trace: %v", err)
-		}
-		if err := tw.WriteEvent(ev); err != nil {
-			t.Fatalf("dumping trace: %v", err)
-		}
-	}
-	return sb.String()
-}
-
-func dumpTraceToFile(t *testing.T, testName string, stress bool, b []byte) string {
-	t.Helper()
-
-	desc := "default"
-	if stress {
-		desc = "stress"
-	}
-	name := fmt.Sprintf("%s.%s.trace.", testName, desc)
-	f, err := os.CreateTemp("", name)
-	if err != nil {
-		t.Fatalf("creating temp file: %v", err)
-	}
-	defer f.Close()
-	if _, err := io.Copy(f, bytes.NewReader(b)); err != nil {
-		t.Fatalf("writing trace dump to %q: %v", f.Name(), err)
-	}
-	return f.Name()
 }
 
 func TestTraceGenSync(t *testing.T) {
