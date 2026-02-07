@@ -103,8 +103,7 @@ func (v Label) Interface() interface{} {
 
 // String returns a new Value for a string.
 func String(name string, s string) Label {
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	return Label{Name: name, packed: uint64(hdr.Len), untyped: stringptr(hdr.Data)}
+	return Label{Name: name, packed: uint64(len(s)), untyped: stringptr(unsafe.StringData(s))}
 }
 
 // String returns the value as a string.
@@ -112,11 +111,7 @@ func String(name string, s string) Label {
 // representation of the value in all cases.
 func (v Label) String() string {
 	if sp, ok := v.untyped.(stringptr); ok {
-		var s string
-		hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
-		hdr.Data = uintptr(sp)
-		hdr.Len = int(v.packed)
-		return s
+		return unsafe.String((*byte)(unsafe.Pointer(sp)), int(v.packed))
 	}
 	// not a string, convert to one
 	switch {
