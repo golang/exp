@@ -16,7 +16,6 @@ import (
 	"math"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -1272,10 +1271,6 @@ func (e Event) String() string {
 	switch kind := e.Kind(); kind {
 	case EventMetric:
 		m := e.Metric()
-		v := m.Value.String()
-		if m.Value.Kind() == ValueString {
-			v = strconv.Quote(v)
-		}
 		fmt.Fprintf(&sb, " Name=%q Value=%s", m.Name, m.Value)
 	case EventLabel:
 		l := e.Label()
