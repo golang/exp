@@ -14,7 +14,6 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
-	"strings"
 	"testing"
 )
 
@@ -29,21 +28,38 @@ func TestAPIConsistency(t *testing.T) {
 	api118 := getAPI(buildPackage(t, true))
 	api117 := getAPI(buildPackage(t, false))
 
+	knownMissing := map[string]string{
+		// Go 1.23 has iterator methods that return Seq.
+		// These methods can't be supported at 1.17.
+		"*TypeList.Types":           "func()(Seq[Type])",
+		"*TypeParamList.TypeParams": "func()(Seq[*TypeParam])",
+		"*Union.Terms":              "func()(Seq[*Term])",
+
+		// Go 1.27 added String methods to some types (proposal go.dev/issue/79287).
+		// These could be supported at 1.17 (easily) and at 1.27 (already are).
+		// However, supporting them at 1.26/1.25 is annoying - it would require
+		// replacing type aliases in typeparams_go118.go with copies of the
+		// implementation from 1.26/1.25.
+		"Instance.String":       "func()(string)",
+		"*Instance.String":      "func()(string)",
+		"*TypeList.String":      "func()(string)",
+		"*TypeParamList.String": "func()(string)",
+	}
+
 	for name, api := range api117 {
 		if api != api118[name] {
-			t.Errorf("%q: got %s at 1.17, but %s at 1.18+", name, api, api118[name])
+			t.Errorf("%q: got %q at 1.17, but %q at 1.18+", name, api, api118[name])
 		}
 		delete(api118, name)
 	}
 	for name, api := range api118 {
-		// Go 1.23 has iterator methods that return Seq.
-		// These methods can't be supported at 1.17.
-		if strings.Contains(api, "Seq") && api117[name] == "" {
+		if api117[name] == "" && knownMissing[name] == api {
+			t.Logf("%q: got %q at 1.18+; known to be missing at 1.17", name, api)
 			continue
 		}
 
 		if api != api117[name] {
-			t.Errorf("%q: got %s at 1.18+, but %s at 1.17", name, api, api117[name])
+			t.Errorf("%q: got %q at 1.18+, but %q at 1.17", name, api, api117[name])
 		}
 	}
 }
