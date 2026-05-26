@@ -39,15 +39,7 @@ func TestGetIndexExprData(t *testing.T) {
 	}
 }
 
-func SkipIfNotEnabled(t *testing.T) {
-	if !Enabled() {
-		t.Skip("type parameters are not enabled")
-	}
-}
-
 func TestOriginMethodRecursive(t *testing.T) {
-	SkipIfNotEnabled(t)
-
 	src := `package p
 
 type N[A any] int
@@ -119,8 +111,6 @@ func (r *N[C]) n() { }
 }
 
 func TestOriginMethodUses(t *testing.T) {
-	SkipIfNotEnabled(t)
-
 	tests := []string{
 		`type T interface { m() }; func _(t T) { t.m() }`,
 		`type T[P any] interface { m() P }; func _[A any](t T[A]) { t.m() }`,
@@ -165,8 +155,6 @@ func TestOriginMethodUses(t *testing.T) {
 }
 
 func TestGenericAssignableTo(t *testing.T) {
-	SkipIfNotEnabled(t)
-
 	tests := []struct {
 		src  string
 		want bool

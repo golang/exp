@@ -17,10 +17,6 @@ import (
 )
 
 func TestNormalTerms(t *testing.T) {
-	if !Enabled() {
-		t.Skip("typeparams are not enabled")
-	}
-
 	// In the following tests, src must define a type T with (at least) one type
 	// parameter. We will compute the normal terms of the first type parameter.
 	tests := []struct {
