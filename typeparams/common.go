@@ -25,6 +25,10 @@ import (
 
 // Enabled reports whether type parameters are enabled in the current build
 // environment.
+//
+// Deprecated: Type parameters are always enabled. Or use go fix (after go1.26).
+//
+//go:fix inline
 func Enabled() bool {
 	return true
 }
