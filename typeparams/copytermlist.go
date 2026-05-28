@@ -76,8 +76,8 @@ func doCopy() error {
 				}
 				needImport = true
 				c.Replace(&ast.SelectorExpr{
-					X:   ast.NewIdent("types"),
-					Sel: ast.NewIdent(id.Name),
+					X:   &ast.Ident{NamePos: id.Pos(), Name: "types"},
+					Sel: &ast.Ident{NamePos: id.Pos(), Name: id.Name},
 				})
 			}
 			return true
