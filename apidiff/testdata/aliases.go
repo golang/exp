@@ -32,3 +32,15 @@ type C = int
 // OK: identical (but this fails on 07ab4e7)
 type TypedBucketRateLimiter[T comparable] struct{}
 type BucketRateLimiter = TypedBucketRateLimiter[any]
+
+// Check that we deal properly with method receivers that are aliases.
+
+// both
+type t3 int
+type R = t3
+
+// old
+// i R.M: removed
+// i (*R).P: removed
+func (R) M()  {}
+func (*R) P() {}

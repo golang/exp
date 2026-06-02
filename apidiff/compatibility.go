@@ -344,13 +344,13 @@ func exportedMethods(t types.Type) map[string]types.Object {
 }
 
 func receiverType(method types.Object) types.Type {
-	return method.Type().(*types.Signature).Recv().Type()
+	return method.(*types.Func).Signature().Recv().Type()
 }
 
 func receiverNamedType(method types.Object) *types.Named {
-	switch t := receiverType(method).(type) {
+	switch t := types.Unalias(receiverType(method)).(type) {
 	case *types.Pointer:
-		return t.Elem().(*types.Named)
+		return types.Unalias(t.Elem()).(*types.Named)
 	case *types.Named:
 		return t
 	default:
@@ -359,6 +359,6 @@ func receiverNamedType(method types.Object) *types.Named {
 }
 
 func hasPointerReceiver(method types.Object) bool {
-	_, ok := receiverType(method).(*types.Pointer)
+	_, ok := types.Unalias(receiverType(method)).(*types.Pointer)
 	return ok
 }
