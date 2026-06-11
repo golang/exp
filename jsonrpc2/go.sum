@@ -1,6 +1,6 @@
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-golang.org/x/exp/event v0.0.0-20260410095643-746e56fc9e2f h1:YHf3wxw5NqqQAc7dMuxCMInepnLP+u/jBVjet0qpYXw=
-golang.org/x/exp/event v0.0.0-20260410095643-746e56fc9e2f/go.mod h1:k42SSvLLwqm/AUsIHNoVjjzXtDkAkMs4ttVJfiwxIfk=
+golang.org/x/exp/event v0.0.0-20260603202125-055de637280b h1:IpzEcnKaJbfA/HT53pFMUAXzMPT5XdewwIPRg90OQvQ=
+golang.org/x/exp/event v0.0.0-20260603202125-055de637280b/go.mod h1:RUiT8+7zwWmByxLGqLQEh4LSWvL7Mw8K/PMAHE2VtI0=
 golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da h1:noIWHXmPHxILtqtCOPIhSt0ABwskkZKjD3bXGnZGpNY=
 golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da/go.mod h1:NDW/Ps6MPRej6fsCIbMTohpP40sJ/P/vI1MoTEGwX90=
