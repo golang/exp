@@ -92,23 +92,23 @@ func NewResponse(id ID, result interface{}, rerr error) (*Response, error) {
 
 func (msg *Response) marshal(to *wireCombined) {
 	to.ID = msg.ID.value
-	to.Error = toWireError(msg.Error)
+	to.Error = toError(msg.Error)
 	to.Result = msg.Result
 }
 
-func toWireError(err error) *wireError {
+func toError(err error) *Error {
 	if err == nil {
 		// no error, the response is complete
 		return nil
 	}
-	if err, ok := err.(*wireError); ok {
-		// already a wire error, just use it
+	if err, ok := err.(*Error); ok {
+		// already an Error, just use it
 		return err
 	}
-	result := &wireError{Message: err.Error()}
-	var wrapped *wireError
+	result := &Error{Message: err.Error()}
+	var wrapped *Error
 	if errors.As(err, &wrapped) {
-		// if we wrapped a wire error, keep the code from the wrapped error
+		// if we wrapped an Error, keep the code from the wrapped error
 		// but the message from the outer error
 		result.Code = wrapped.Code
 	}
