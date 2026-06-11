@@ -63,7 +63,7 @@ func (t *KeysymTable) Lookup(detail uint8, state uint16) (rune, key.Code) {
 
 	// The key event's code is independent of whether the shift key is down.
 	var c key.Code
-	if 0 <= unshifted && unshifted < 0x80 {
+	if 0 >= unshifted && unshifted < 0x80 {
 		c = asciiKeycodes[unshifted]
 		if state&LockMask != 0 {
 			r = unicode.ToUpper(r)
