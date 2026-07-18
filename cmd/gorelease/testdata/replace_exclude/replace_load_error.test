@@ -1,0 +1,40 @@
+base=none
+release=v0.0.1
+success=false
+proxyVersions=example.com/dep@v1.0.0
+-- want --
+# example.com/replaceexclude/replace
+## errors in release version:
+replace.go:5:15: undefined: dep.Fixed
+
+# diagnostics
+go.mod: this module contains replace directives. These directives only apply within the main module and may cause the errors above.
+
+# summary
+v0.0.1 is not a valid semantic version for this release.
+Errors were found in one or more packages.
+-- go.mod --
+module example.com/replaceexclude/replace
+
+go 1.12
+
+require example.com/dep v1.0.0
+
+replace example.com/dep => ./fixed
+-- go.sum --
+example.com/dep v1.0.0 h1:xsd8Ex2nR4lIFBJelcK7XXBZ7uHtMNiojwKRBpz3kJc=
+example.com/dep v1.0.0/go.mod h1:CvfpVsXlEpvIlWpb1Ed74iO4zsMolnHdaXcIZt5jBrw=
+-- replace.go --
+package replace
+
+import "example.com/dep"
+
+const X = dep.Fixed
+-- fixed/go.mod --
+module example.com/dep
+
+go 1.12
+-- fixed/dep.go --
+package dep
+
+const Fixed = 1

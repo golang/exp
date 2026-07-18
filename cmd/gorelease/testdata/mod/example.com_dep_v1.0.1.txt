@@ -1,0 +1,10 @@
+Module example.com/dep v1.0.1 exports Fixed.
+
+-- go.mod --
+module example.com/dep
+
+go 1.12
+-- dep.go --
+package dep
+
+const Fixed = 1

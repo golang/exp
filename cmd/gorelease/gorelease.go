@@ -413,6 +413,16 @@ func loadLocalModule(ctx context.Context, modRoot, repoRoot, version string) (m 
 
 	m.diagnostics = append(m.diagnostics, prepareDiagnostics...)
 	m.diagnostics = append(m.diagnostics, loadDiagnostics...)
+	if packagesHaveErrors(m.pkgs) {
+		// m.goModFile was parsed with ParseLax, which ignores replace and
+		// exclude directives.
+		modFile, err := modfile.Parse(m.goModPath, m.goModData, nil)
+		if err == nil {
+			if d := constructReplaceExcludeDiagnostic(modFile); d != "" {
+				m.diagnostics = append(m.diagnostics, d)
+			}
+		}
+	}
 
 	highestVersion, err := findSelectedVersion(ctx, tmpLoadDir, m.modPath)
 	if err != nil {
@@ -1321,9 +1331,9 @@ func collectImportPaths(modPath, root string) (importPaths []string, _ error) {
 // from being loaded.
 func loadPackages(ctx context.Context, modPath, modRoot, loadDir string, goModData, goSumData []byte, pkgPaths []string) (pkgs []*packages.Package, diagnostics []string, err error) {
 	// Load packages.
-	// TODO(jayconrod): if there are errors loading packages in the release
-	// version, try loading in the release directory. Errors there would imply
-	// that packages don't load without replace / exclude directives.
+	// If packages fail to load, loadLocalModule may append a diagnostic
+	// explaining that replace and exclude directives in the main module's
+	// go.mod file are not applied here.
 	cfg := &packages.Config{
 		Mode:    packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
 		Dir:     loadDir,
@@ -1352,6 +1362,36 @@ func loadPackages(ctx context.Context, modPath, modRoot, loadDir string, goModDa
 	}
 
 	return pkgs, diagnostics, nil
+}
+
+func packagesHaveErrors(pkgs []*packages.Package) bool {
+	for _, pkg := range pkgs {
+		if len(pkg.Errors) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func constructReplaceExcludeDiagnostic(f *modfile.File) string {
+	if f == nil {
+		return ""
+	}
+	hasReplace := len(f.Replace) > 0
+	hasExclude := len(f.Exclude) > 0
+
+	var dirs string
+	switch {
+	case hasReplace && hasExclude:
+		dirs = "replace and exclude"
+	case hasReplace:
+		dirs = "replace"
+	case hasExclude:
+		dirs = "exclude"
+	default:
+		return ""
+	}
+	return fmt.Sprintf("go.mod: this module contains %s directives. These directives only apply within the main module and may cause the errors above.", dirs)
 }
 
 type packagePair struct {

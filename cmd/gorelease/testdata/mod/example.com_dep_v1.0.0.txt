@@ -1,0 +1,10 @@
+Module example.com/dep v1.0.0 is broken: package dep does not export Fixed.
+
+-- go.mod --
+module example.com/dep
+
+go 1.12
+-- dep.go --
+package dep
+
+const Broken = 1

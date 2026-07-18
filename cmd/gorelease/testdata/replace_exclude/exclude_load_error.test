@@ -1,0 +1,34 @@
+base=none
+release=v0.0.1
+success=false
+proxyVersions=example.com/dep@v1.0.0,example.com/dep@v1.0.1
+-- want --
+# example.com/replaceexclude/exclude
+## errors in release version:
+exclude.go:5:15: undefined: dep.Fixed
+
+# diagnostics
+go.mod: this module contains exclude directives. These directives only apply within the main module and may cause the errors above.
+
+# summary
+v0.0.1 is not a valid semantic version for this release.
+Errors were found in one or more packages.
+-- go.mod --
+module example.com/replaceexclude/exclude
+
+go 1.12
+
+require example.com/dep v1.0.0
+
+exclude example.com/dep v1.0.0
+-- go.sum --
+example.com/dep v1.0.0 h1:xsd8Ex2nR4lIFBJelcK7XXBZ7uHtMNiojwKRBpz3kJc=
+example.com/dep v1.0.0/go.mod h1:CvfpVsXlEpvIlWpb1Ed74iO4zsMolnHdaXcIZt5jBrw=
+example.com/dep v1.0.1 h1:qP3X/Eyoz9bTQYI6mY9skqEZOzXrYLn+p29WdO7cNmY=
+example.com/dep v1.0.1/go.mod h1:CvfpVsXlEpvIlWpb1Ed74iO4zsMolnHdaXcIZt5jBrw=
+-- exclude.go --
+package exclude
+
+import "example.com/dep"
+
+const X = dep.Fixed

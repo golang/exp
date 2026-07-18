@@ -1,0 +1,27 @@
+base=none
+release=v0.0.1
+success=false
+proxyVersions=example.com/dep@v1.0.0
+-- want --
+# example.com/replaceexclude/nodep
+## errors in release version:
+nodep.go:5:15: undefined: dep.Fixed
+
+# summary
+v0.0.1 is not a valid semantic version for this release.
+Errors were found in one or more packages.
+-- go.mod --
+module example.com/replaceexclude/nodep
+
+go 1.12
+
+require example.com/dep v1.0.0
+-- go.sum --
+example.com/dep v1.0.0 h1:xsd8Ex2nR4lIFBJelcK7XXBZ7uHtMNiojwKRBpz3kJc=
+example.com/dep v1.0.0/go.mod h1:CvfpVsXlEpvIlWpb1Ed74iO4zsMolnHdaXcIZt5jBrw=
+-- nodep.go --
+package nodep
+
+import "example.com/dep"
+
+const X = dep.Fixed
