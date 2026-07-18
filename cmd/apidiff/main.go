@@ -7,6 +7,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"go/token"
@@ -140,8 +141,7 @@ func loadPackage(importPath string) (*packages.Package, error) {
 		return nil, fmt.Errorf("found no packages for import %s", importPath)
 	}
 	if len(pkgs[0].Errors) > 0 {
-		// TODO: use errors.Join once Go 1.21 is released.
-		return nil, pkgs[0].Errors[0]
+		return nil, joinPackageErrors(pkgs[0].Errors)
 	}
 	return pkgs[0], nil
 }
@@ -183,12 +183,18 @@ func loadModule(modulepath string) (*apidiff.Module, error) {
 		return nil, fmt.Errorf("found no packages for module %s", modulepath)
 	}
 	var tpkgs []*types.Package
+	var errs []error
 	for _, p := range loaded {
 		if len(p.Errors) > 0 {
-			// TODO: use errors.Join once Go 1.21 is released.
-			return nil, p.Errors[0]
+			for _, e := range p.Errors {
+				errs = append(errs, e)
+			}
+			continue
 		}
 		tpkgs = append(tpkgs, p.Types)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	return &apidiff.Module{Path: loaded[0].Module.Path, Packages: tpkgs}, nil
@@ -263,6 +269,14 @@ func writePackageExportData(pkg *packages.Package, filename string) error {
 func die(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
+}
+
+func joinPackageErrors(errs []packages.Error) error {
+	list := make([]error, len(errs))
+	for i := range errs {
+		list[i] = errs[i]
+	}
+	return errors.Join(list...)
 }
 
 func filterInternal(m *apidiff.Module, allow bool) {

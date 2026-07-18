@@ -2,6 +2,7 @@ package apidiff
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"go/types"
 	"os"
@@ -211,12 +212,18 @@ func loadModule(t *testing.T, cfg *packages.Config, modulePath string) (*Module,
 		return nil, fmt.Errorf("found no packages for module %s", modulePath)
 	}
 	var tpkgs []*types.Package
+	var errs []error
 	for _, p := range loaded {
 		if len(p.Errors) > 0 {
-			// TODO: use errors.Join once Go 1.21 is released.
-			return nil, p.Errors[0]
+			for _, e := range p.Errors {
+				errs = append(errs, e)
+			}
+			continue
 		}
 		tpkgs = append(tpkgs, p.Types)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	return &Module{Path: modulePath, Packages: tpkgs}, nil
@@ -237,9 +244,17 @@ func loadPackage(t *testing.T, importPath, goPath string) (*packages.Package, er
 		return nil, err
 	}
 	if len(pkgs[0].Errors) > 0 {
-		return nil, pkgs[0].Errors[0]
+		return nil, joinPackageErrors(pkgs[0].Errors)
 	}
 	return pkgs[0], nil
+}
+
+func joinPackageErrors(errs []packages.Error) error {
+	list := make([]error, len(errs))
+	for i := range errs {
+		list[i] = errs[i]
+	}
+	return errors.Join(list...)
 }
 
 func TestExportedFields(t *testing.T) {
