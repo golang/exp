@@ -92,7 +92,6 @@ type embedm2 int
 // i embedm.EV1: changed from func() to func(int)
 func (embedm2) EV1(int) {}
 
-// i embedm.EV2, method set of SM: removed
 // i embedm.EV2, method set of *SM: removed
 
 // i (*embedm).EP2, method set of *SM: removed

@@ -302,6 +302,11 @@ func (d *differ) checkMethodSet(otn *types.TypeName, oldt, newt types.Type, addc
 			// object. So use the part string to distinguish them.
 			if receiverNamedType(oldMethod).Obj() != otn {
 				part = fmt.Sprintf(", method set of %s", msname)
+				// The same embedded method removal appears in both the value and
+				// pointer method sets. Report it only once, from the pointer check.
+				if _, ok := oldt.(*types.Pointer); !ok {
+					continue
+				}
 			}
 			d.incompatible(objectWithSide{oldMethod, false}, part, "removed")
 		} else {
