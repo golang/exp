@@ -1082,7 +1082,7 @@ func prepareLoadDir(ctx context.Context, modFile *modfile.File, modPath, modRoot
 	f.AddModuleStmt("gorelease-load-module")
 	f.AddRequire(modPath, version)
 	if !cached {
-		f.AddReplace(modPath, version, modRoot, "")
+		f.AddReplace(modPath, "", modRoot, "")
 	}
 	if modFile != nil {
 		if modFile.Go != nil {
