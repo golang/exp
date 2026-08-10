@@ -50,6 +50,19 @@ var V5 u1
 // new
 var V5 u2 // OK: V5 has changed type, but old u1 corresponds to new u2
 
+// Two exposed, unexported types can swap correspondence.
+// both
+type swap1 int
+type swap2 int
+
+// old
+var SwapA swap1
+var SwapB swap2
+
+// new
+var SwapA swap2 // OK: old swap1 corresponds to new swap2
+var SwapB swap1 // OK: old swap2 corresponds to new swap1
+
 // Splitting a single type into two is an incompatible change.
 // both
 type u3 int

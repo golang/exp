@@ -1,4 +1,3 @@
-// TODO: test swap corresponding types (e.g. u1 <-> u2 and u2 <-> u1)
 // TODO: test exported alias refers to something in another package -- does correspondence work then?
 // TODO: CODE COVERAGE
 // TODO: note that we may miss correspondences because we bail early when we compare a signature (e.g. when lengths differ; we could do up to the shorter)
