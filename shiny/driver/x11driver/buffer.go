@@ -101,10 +101,6 @@ func (b *bufferImpl) cleanUp() {
 	b.cleanedUp = true
 	b.mu.Unlock()
 
-	b.s.mu.Lock()
-	delete(b.s.buffers, b.xs)
-	b.s.mu.Unlock()
-
 	if b.degenerate() {
 		return
 	}

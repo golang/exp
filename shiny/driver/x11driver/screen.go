@@ -58,7 +58,6 @@ type screenImpl struct {
 	uniformP  render.Picture
 
 	mu              sync.Mutex
-	buffers         map[shm.Seg]*bufferImpl
 	uploads         map[uint16]chan struct{}
 	windows         map[xproto.Window]*windowImpl
 	nPendingUploads int
@@ -69,7 +68,6 @@ func newScreenImpl(xc *xgb.Conn, useShm bool) (*screenImpl, error) {
 	s := &screenImpl{
 		xc:      xc,
 		xsi:     xproto.Setup(xc).DefaultScreen(xc),
-		buffers: map[shm.Seg]*bufferImpl{},
 		uploads: map[uint16]chan struct{}{},
 		windows: map[xproto.Window]*windowImpl{},
 		useShm:  useShm,
@@ -245,15 +243,6 @@ func (s *screenImpl) run() {
 	}
 }
 
-// TODO: is findBuffer and the s.buffers field unused? Delete?
-
-func (s *screenImpl) findBuffer(key shm.Seg) *bufferImpl {
-	s.mu.Lock()
-	b := s.buffers[key]
-	s.mu.Unlock()
-	return b
-}
-
 func (s *screenImpl) findWindow(key xproto.Window) *windowImpl {
 	s.mu.Lock()
 	w := s.windows[key]
@@ -345,10 +334,6 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 		shm.Attach(s.xc, xs, uint32(shmid), readOnly)
 		b.xs = xs
 	}
-
-	s.mu.Lock()
-	s.buffers[b.xs] = b
-	s.mu.Unlock()
 
 	return b, nil
 }
