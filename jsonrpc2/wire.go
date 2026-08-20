@@ -45,11 +45,11 @@ type wireCombined struct {
 	Method     string          `json:"method,omitempty"`
 	Params     json.RawMessage `json:"params,omitempty"`
 	Result     json.RawMessage `json:"result,omitempty"`
-	Error      *wireError      `json:"error,omitempty"`
+	Error      *Error          `json:"error,omitempty"`
 }
 
-// wireError represents a structured error in a Response.
-type wireError struct {
+// Error represents a structured error in a Response.
+type Error struct {
 	// Code is an error code indicating the type of failure.
 	Code int64 `json:"code"`
 	// Message is a short description of the error.
@@ -63,12 +63,12 @@ type wireError struct {
 // only be used to build errors for application specific codes as allowed by the
 // specification.
 func NewError(code int64, message string) error {
-	return &wireError{
+	return &Error{
 		Code:    code,
 		Message: message,
 	}
 }
 
-func (err *wireError) Error() string {
+func (err *Error) Error() string {
 	return err.Message
 }
