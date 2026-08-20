@@ -302,6 +302,14 @@ uintptr_t doNewWindow(int width, int height, char* title) {
 	return (uintptr_t)view;
 }
 
+void doSetTitle(uintptr_t viewID, char* title) {
+	ScreenGLView* view = (ScreenGLView*)viewID;
+	NSString* name = [[NSString alloc] initWithUTF8String:title];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[view.window setTitle:name];
+	});
+}
+
 void doShowWindow(uintptr_t viewID) {
 	ScreenGLView* view = (ScreenGLView*)viewID;
 	dispatch_async(dispatch_get_main_queue(), ^{
