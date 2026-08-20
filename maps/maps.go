@@ -84,3 +84,16 @@ func Copy[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2) {
 func DeleteFunc[M ~map[K]V, K comparable, V any](m M, del func(K, V) bool) {
 	maps.DeleteFunc(m, del)
 }
+
+// Merge returns every key/value pairs from m maps in a single map.
+// The order in which arguments are passed matters,
+// the last maps values will override the first ones if some key is identical
+func Merge[M ~map[K]V, K comparable, V any](m ...M) M {
+	r := make(M)
+	for _, elem := range m {
+		for k, v := range elem {
+			r[k] = v
+		}
+	}
+	return r
+}
