@@ -75,3 +75,25 @@ type j = h
 // i Vj: changed from h to j
 // e.g. p.Vj = p.Vh
 type j h
+
+// Splitting an unexported type across struct fields.
+// Deterministic field iteration ensures Collections claims the correspondence
+// and Databases is reported.
+
+// old
+type uSplit struct{ X int }
+
+type SplitStruct struct {
+	Collections *[]uSplit
+	Databases   *[]uSplit
+}
+
+// new
+type uSplit1 struct{ X int }
+type uSplit2 struct{ X int }
+
+type SplitStruct struct {
+	Collections *[]uSplit1
+	// i SplitStruct.Databases: changed from *[]uSplit to *[]uSplit2
+	Databases *[]uSplit2
+}

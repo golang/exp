@@ -10,10 +10,13 @@
 package apidiff
 
 import (
+	"cmp"
 	"fmt"
 	"go/constant"
 	"go/token"
 	"go/types"
+	"maps"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/types/typeutil"
@@ -63,7 +66,8 @@ func ModuleChanges(old, new *Module) Report {
 		newPkgs[new.relativePath(p)] = p
 	}
 
-	for n, op := range oldPkgs {
+	for _, n := range slices.Sorted(maps.Keys(oldPkgs)) {
+		op := oldPkgs[n]
 		if np, ok := newPkgs[n]; ok {
 			// shared package, compare surfaces
 			rr := changesInternal(op, np, old.Path, new.Path)
@@ -74,7 +78,8 @@ func ModuleChanges(old, new *Module) Report {
 		}
 	}
 
-	for n, np := range newPkgs {
+	for _, n := range slices.Sorted(maps.Keys(newPkgs)) {
+		np := newPkgs[n]
 		if _, ok := oldPkgs[n]; !ok {
 			// new package was added
 			r.Changes = append(r.Changes, packageChange(np, "added", true))
@@ -200,38 +205,48 @@ func (d *differ) checkPackage(oldRootPackagePath string) {
 		}
 	}
 
+	type correspondPair struct {
+		old *types.Named
+		new types.Type
+	}
+	var pairs []correspondPair
+	d.correspondMap.Iterate(func(k types.Type, v any) {
+		pairs = append(pairs, correspondPair{k.(*types.Named), v.(types.Type)})
+	})
+	slices.SortFunc(pairs, func(p1, p2 correspondPair) int {
+		return cmp.Compare(types.TypeString(p1.old, nil), types.TypeString(p2.old, nil))
+	})
+
 	// Whole-package satisfaction.
 	// For every old exposed interface oIface and its corresponding new interface nIface...
-	d.correspondMap.Iterate(func(k1 types.Type, v1 any) {
-		ot1 := k1.(*types.Named)
-		otn1 := ot1.Obj()
-		nt1 := v1.(types.Type)
+	for _, p1 := range pairs {
+		otn1 := p1.old.Obj()
+		nt1 := p1.new
 		oIface, ok := otn1.Type().Underlying().(*types.Interface)
 		if !ok {
-			return
+			continue
 		}
 		nIface, ok := nt1.Underlying().(*types.Interface)
 		if !ok {
 			// If nt1 isn't an interface but otn1 is, then that's an incompatibility that
 			// we've already noticed, so there's no need to do anything here.
-			return
+			continue
 		}
 		// For every old type that implements oIface, its corresponding new type must implement
 		// nIface.
-		d.correspondMap.Iterate(func(k2 types.Type, v2 any) {
-			ot2 := k2.(*types.Named)
-			otn2 := ot2.Obj()
-			nt2 := v2.(types.Type)
+		for _, p2 := range pairs {
+			otn2 := p2.old.Obj()
+			nt2 := p2.new
 			if otn1 == otn2 {
-				return
+				continue
 			}
 			if types.Implements(otn2.Type(), oIface) && !types.Implements(nt2, nIface) {
 				// TODO(jba): the type name is not sufficient information here; we need the type args
 				// if this is an instantiated generic type.
 				d.incompatible(objectWithSide{otn2, false}, "", "no longer implements %s", objectString(otn1, oldRootPackagePath))
 			}
-		})
-	})
+		}
+	}
 }
 
 func (d *differ) checkObjects(old, new types.Object) {

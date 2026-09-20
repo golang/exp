@@ -3,7 +3,9 @@ package apidiff
 import (
 	"fmt"
 	"go/types"
+	"maps"
 	"reflect"
+	"slices"
 )
 
 func (d *differ) checkCompatible(otn *types.TypeName, old, new types.Type) {
@@ -188,7 +190,9 @@ func exportedSelectableFields(s *types.Struct) map[string]types.Object {
 		// We only want to consider unambiguous fields. Ambiguous fields (where there
 		// is more than one field of the same name at the same level) are legal, but
 		// cannot be selected.
-		for name, f := range unambiguousFields(cur) {
+		uf := unambiguousFields(cur)
+		for _, name := range slices.Sorted(maps.Keys(uf)) {
+			f := uf[name]
 			// Record an exported field we haven't seen before. If we have seen it,
 			// it occurred a lower depth, so it shadows this field.
 			if f.Exported() && m[name] == nil {
@@ -243,7 +247,8 @@ func unambiguousFields(structs []*types.Struct) map[string]*types.Var {
 // Anything removed or change from the old set is an incompatible change.
 // Anything added to the new set is a compatible change.
 func (d *differ) checkCompatibleObjectSets(obj objectWithSide, old, new map[string]types.Object) {
-	for name, oldo := range old {
+	for _, name := range slices.Sorted(maps.Keys(old)) {
+		oldo := old[name]
 		newo := new[name]
 		if newo == nil {
 			d.incompatible(obj, name, "removed")
@@ -251,7 +256,7 @@ func (d *differ) checkCompatibleObjectSets(obj objectWithSide, old, new map[stri
 			d.checkCorrespondence(obj, name, oldo.Type(), newo.Type())
 		}
 	}
-	for name := range new {
+	for _, name := range slices.Sorted(maps.Keys(new)) {
 		if old[name] == nil {
 			d.compatible(obj, name, "added")
 		}
@@ -289,7 +294,8 @@ func (d *differ) checkMethodSet(otn *types.TypeName, oldt, newt types.Type, addc
 	if _, ok := oldt.(*types.Pointer); ok {
 		msname = "*" + msname
 	}
-	for name, oldMethod := range oldMethodSet {
+	for _, name := range slices.Sorted(maps.Keys(oldMethodSet)) {
+		oldMethod := oldMethodSet[name]
 		newMethod := newMethodSet[name]
 		if newMethod == nil {
 			var part string
@@ -324,7 +330,8 @@ func (d *differ) checkMethodSet(otn *types.TypeName, oldt, newt types.Type, addc
 	}
 
 	// Check for added methods.
-	for name, newMethod := range newMethodSet {
+	for _, name := range slices.Sorted(maps.Keys(newMethodSet)) {
+		newMethod := newMethodSet[name]
 		if oldMethodSet[name] == nil {
 			if addcompat {
 				d.compatible(objectWithSide{newMethod, true}, "", "added")
