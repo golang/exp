@@ -111,8 +111,7 @@ func (m *Module) relativePath(p *types.Package) string {
 type differ struct {
 	old, new *types.Package
 	// Correspondences between named types.
-	// Even though it is the named types (*types.Named) that correspond, we use
-	// *types.TypeName as a map key because they are canonical.
+	// The keys are *types.Named.
 	// The values can be either named types or basic types.
 	correspondMap typeutil.Map
 

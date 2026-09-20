@@ -97,3 +97,30 @@ type SplitStruct struct {
 	// i SplitStruct.Databases: changed from *[]uSplit to *[]uSplit2
 	Databases *[]uSplit2
 }
+
+// golang/go#81523: splitting an exported type into two new exported types
+// should report all affected struct fields, not just the second one visited.
+
+// old
+// i ESplit: removed
+type ESplit int
+
+type ExportedSplit struct {
+	F1 ESplit
+	F2 ESplit
+}
+
+// new
+type (
+	// c ESplit1: added
+	ESplit1 int
+	// c ESplit2: added
+	ESplit2 int
+
+	ExportedSplit struct {
+		// i ExportedSplit.F1: changed from ESplit to ESplit1
+		F1 ESplit1
+		// i ExportedSplit.F2: changed from ESplit to ESplit2
+		F2 ESplit2
+	}
+)

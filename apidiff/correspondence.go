@@ -165,6 +165,23 @@ func (d *differ) establishCorrespondence(old *types.Named, new types.Type) bool 
 	if c := d.correspondMap.At(old); c != nil {
 		return types.Identical(c.(types.Type), new)
 	}
+	if oldname.Pkg() == d.old && oldname.Exported() && !isInstantiated(old) {
+		// An exported defined type in old can only correspond to a type in new
+		// if old's name in new still refers to that new type (possibly via an alias).
+		newobj := d.new.Scope().Lookup(oldname.Name())
+		ntn, ok := newobj.(*types.TypeName)
+		if !ok {
+			return false
+		}
+		target := types.Unalias(ntn.Type())
+		if targetNamed, ok := target.(*types.Named); ok && isInstantiated(targetNamed) && old.TypeParams().Len() > 0 {
+			target = targetNamed.Origin()
+		}
+		if !types.Identical(new, target) {
+			return false
+		}
+	}
+
 	// Attempt to establish a correspondence.
 	// Assume the types don't correspond unless they have the same
 	// ID, or are from the old and new packages, respectively.
