@@ -4,7 +4,12 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/importer"
+	"go/parser"
+	"go/token"
 	"go/types"
+	"go/version"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,7 +138,11 @@ func splitIntoPackages(t *testing.T, file, dir string) (incompatibles, compatibl
 	if err := os.MkdirAll(filepath.Join(dir, "src", "apidiff"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	goMod := fmt.Sprintf("module apidiff\ngo %s\n", testGoVersion)
+	goVer := testGoVersion
+	if version.Compare(runtime.Version(), "go1.27") >= 0 {
+		goVer = "1.27"
+	}
+	goMod := fmt.Sprintf("module apidiff\ngo %s\n", goVer)
 	if err := os.WriteFile(filepath.Join(dir, "src", "apidiff", "go.mod"), []byte(goMod), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -244,9 +253,85 @@ func loadPackage(t *testing.T, importPath, goPath string) (*packages.Package, er
 		return nil, err
 	}
 	if len(pkgs[0].Errors) > 0 {
+		if version.Compare(runtime.Version(), "go1.27") < 0 && hasGenericMethodSyntaxError(pkgs[0].Errors) {
+			return loadPackageWithGenericMethods(importPath, cfg.Dir)
+		}
 		return nil, joinPackageErrors(pkgs[0].Errors)
 	}
 	return pkgs[0], nil
+}
+
+func hasGenericMethodSyntaxError(errs []packages.Error) bool {
+	for _, e := range errs {
+		if strings.Contains(e.Msg, "method must have no type parameters") {
+			return true
+		}
+	}
+	return false
+}
+
+// loadPackageWithGenericMethods parses and type-checks a package containing Go 1.27
+// generic methods when running under Go 1.26, whose go/types already supports
+// generic methods once TypeParams are attached to the method's ast.FuncDecl.
+func loadPackageWithGenericMethods(importPath, dir string) (*packages.Package, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		filename := filepath.Join(dir, entry.Name())
+		src, err := os.ReadFile(filename)
+		if err != nil {
+			return nil, err
+		}
+		f1, _ := parser.ParseFile(fset, filename, src, 0)
+		if f1 == nil {
+			return nil, fmt.Errorf("failed to parse %s", filename)
+		}
+		srcNoRecv := append([]byte(nil), src...)
+		base := fset.File(f1.Pos()).Base()
+		for _, decl := range f1.Decls {
+			if fdecl, ok := decl.(*ast.FuncDecl); ok && fdecl.Recv != nil {
+				start := int(fdecl.Recv.Pos()) - base
+				end := int(fdecl.Recv.End()) - base
+				for i := start; i < end; i++ {
+					if srcNoRecv[i] != '\n' {
+						srcNoRecv[i] = ' '
+					}
+				}
+			}
+		}
+		f2, err := parser.ParseFile(token.NewFileSet(), filename, srcNoRecv, 0)
+		if err != nil {
+			return nil, err
+		}
+		for i, decl := range f1.Decls {
+			if fdecl, ok := decl.(*ast.FuncDecl); ok && fdecl.Recv != nil {
+				fdecl.Type.TypeParams = f2.Decls[i].(*ast.FuncDecl).Type.TypeParams
+			}
+		}
+		files = append(files, f1)
+	}
+	var typeErrs []error
+	conf := types.Config{
+		Importer: importer.Default(),
+		Error: func(err error) {
+			if strings.Contains(err.Error(), "methods cannot have type parameters") {
+				return
+			}
+			typeErrs = append(typeErrs, err)
+		},
+	}
+	tpkg, _ := conf.Check(importPath, fset, files, nil)
+	if len(typeErrs) > 0 {
+		return nil, errors.Join(typeErrs...)
+	}
+	return &packages.Package{Types: tpkg}, nil
 }
 
 func joinPackageErrors(errs []packages.Error) error {

@@ -3,6 +3,7 @@ package apidiff
 import (
 	"fmt"
 	"go/types"
+	"maps"
 	"sort"
 )
 
@@ -63,6 +64,17 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 
 	case *types.Signature:
 		if new, ok := new.(*types.Signature); ok {
+			if old.TypeParams().Len() > 0 || new.TypeParams().Len() > 0 {
+				// Comparing constraints, parameters, or results below may recursively
+				// compare other generic signatures (for example, when establishing
+				// correspondence for a named parameter type checks its method set).
+				// Save and restore sigTypeParams so an inner comparison cannot overwrite
+				// the outer signature's type parameter mappings, while still keeping outer
+				// mappings visible to nested non-generic func types.
+				prev := maps.Clone(d.sigTypeParams)
+				defer func() { d.sigTypeParams = prev }()
+				d.recordSigTypeParams(old.TypeParams(), new.TypeParams())
+			}
 			tp := d.typeParamListsCorrespond(old.TypeParams(), new.TypeParams())
 			pe := d.corr(old.Params(), new.Params(), p)
 			re := d.corr(old.Results(), new.Results(), p)
@@ -126,6 +138,12 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 
 	case *types.TypeParam:
 		if new, ok := new.(*types.TypeParam); ok {
+			if target, ok := d.sigTypeParams[old]; ok {
+				return new == target
+			}
+			if _, ok := d.sigTypeParams[new]; ok {
+				return false
+			}
 			if old.Index() == new.Index() {
 				return true
 			}
@@ -135,6 +153,33 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 		panic(fmt.Sprintf("unknown type kind %T", old))
 	}
 	return false
+}
+
+// recordSigTypeParams records a bidirectional positional mapping in d.sigTypeParams
+// between the signature type parameter lists tps1 and tps2 (mapping to nil when
+// one list is longer than the other).
+//
+// Comparing TypeParam.Index() alone is not sufficient because a generic method
+// on a generic type has two independent type parameter lists—the receiver's
+// type parameters and the method signature's type parameters—both of which
+// are 0-indexed. Recording signature type parameters explicitly ensures a
+// signature type parameter at index i cannot match a receiver type parameter
+// that also has index i.
+func (d *differ) recordSigTypeParams(tps1, tps2 *types.TypeParamList) {
+	for i := 0; i < tps1.Len(); i++ {
+		var target *types.TypeParam
+		if i < tps2.Len() {
+			target = tps2.At(i)
+		}
+		d.sigTypeParams[tps1.At(i)] = target
+	}
+	for i := 0; i < tps2.Len(); i++ {
+		var target *types.TypeParam
+		if i < tps1.Len() {
+			target = tps1.At(i)
+		}
+		d.sigTypeParams[tps2.At(i)] = target
+	}
 }
 
 // Compare old and new field names. We are determining correspondence across packages,

@@ -114,6 +114,7 @@ type differ struct {
 	// The keys are *types.Named.
 	// The values can be either named types or basic types.
 	correspondMap typeutil.Map
+	sigTypeParams map[*types.TypeParam]*types.TypeParam
 
 	// Messages.
 	incompatibles messageSet
@@ -124,6 +125,7 @@ func newDiffer(old, new *types.Package) *differ {
 	return &differ{
 		old:           old,
 		new:           new,
+		sigTypeParams: map[*types.TypeParam]*types.TypeParam{},
 		incompatibles: messageSet{},
 		compatibles:   messageSet{},
 	}
