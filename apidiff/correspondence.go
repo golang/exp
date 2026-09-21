@@ -63,9 +63,10 @@ func (d *differ) corr(old, new types.Type, p *ifacePair) bool {
 
 	case *types.Signature:
 		if new, ok := new.(*types.Signature); ok {
+			tp := d.typeParamListsCorrespond(old.TypeParams(), new.TypeParams())
 			pe := d.corr(old.Params(), new.Params(), p)
 			re := d.corr(old.Results(), new.Results(), p)
-			return old.Variadic() == new.Variadic() && pe && re
+			return old.Variadic() == new.Variadic() && tp && pe && re
 		}
 
 	case *types.Tuple:

@@ -82,3 +82,16 @@ type t byte
 
 // both
 var V3 H[t]
+
+// Generic functions:
+
+// old
+func GF1[T any](x T) T { return x }
+func GF2[T any](x T)   {}
+
+// new
+// OK: type param rename
+func GF1[U any](x U) U { return x }
+
+// i GF2: changed from func[T any](T) to func[T comparable](T)
+func GF2[T comparable](x T) {}

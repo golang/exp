@@ -315,6 +315,9 @@ func (d *differ) typeChanged(obj objectWithSide, part string, old, new types.Typ
 	d.incompatible(obj, part, "changed from %s to %s", olds, news)
 }
 
+// removeNamesFromSignature returns a copy of t with parameter and result
+// identifiers removed if t is a *types.Signature, or t unchanged otherwise.
+//
 // go/types always includes the argument and result names when formatting a signature.
 // Since these can change without affecting compatibility, we don't want users to
 // be distracted by them, so we remove them.
@@ -326,12 +329,16 @@ func removeNamesFromSignature(t types.Type) types.Type {
 
 	dename := func(p *types.Tuple) *types.Tuple {
 		var vars []*types.Var
-		for i := 0; i < p.Len(); i++ {
-			v := p.At(i)
+		for v := range p.Variables() {
 			vars = append(vars, types.NewVar(v.Pos(), v.Pkg(), "", v.Type()))
 		}
 		return types.NewTuple(vars...)
 	}
 
-	return types.NewSignature(sig.Recv(), dename(sig.Params()), dename(sig.Results()), sig.Variadic())
+	var tparams []*types.TypeParam
+	for tp := range sig.TypeParams().TypeParams() {
+		tparams = append(tparams, types.NewTypeParam(tp.Obj(), tp.Constraint()))
+	}
+
+	return types.NewSignatureType(nil, nil, tparams, dename(sig.Params()), dename(sig.Results()), sig.Variadic())
 }
