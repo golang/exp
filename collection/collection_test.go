@@ -7,6 +7,8 @@ package collection_test
 import (
 	"iter"
 	"testing"
+
+	"golang.org/x/exp/collection/set"
 )
 
 // The following interfaces define the abstract data types for
@@ -123,7 +125,7 @@ type _AbstractSet[E any, S _AbstractSet[E, S]] interface {
 // expressed using F-bounded polymorphic interfaces to
 // achieve covariant parameter/result specialization.
 
-// var _ _AbstractSet[int, set.Set[int]] = make(set.Set[int])
+var _ _AbstractSet[int, set.Set[int]] = make(set.Set[int])
 
 // var _ _AbstractSet[int, *hash.Set[int]] = new(hash.Set[int])
 
