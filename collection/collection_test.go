@@ -128,7 +128,7 @@ type _AbstractSet[E any, S _AbstractSet[E, S]] interface {
 
 var _ _AbstractSet[int, set.Set[int]] = make(set.Set[int])
 
-// var _ _AbstractSet[int, *hash.Set[int]] = new(hash.Set[int])
+var _ _AbstractSet[int, *hashed.Set[int]] = new(hashed.Set[int])
 
 var _ _AbstractMap[string, int, *hashed.Map[string, int]] = new(hashed.Map[string, int])
 

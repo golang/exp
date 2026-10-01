@@ -49,3 +49,26 @@ func ExampleMap_bigInt() {
 	// Same pointer: false
 	// Get(i100b): one hundred
 }
+
+func ExampleSet_bigInt() {
+	s := hashed.NewSet[*big.Int](bigIntHasher{})
+
+	// Build a set.
+	i100 := big.NewInt(100)
+	i200 := big.NewInt(200)
+	s.Insert(i100)
+	s.Insert(i200)
+	fmt.Println("Set:", s)
+
+	// Look up an entry using a distinct but
+	// numerically equivalent big.Int.
+	i100b := big.NewInt(100)
+	fmt.Println("Same pointer:", i100 == i100b)
+	fmt.Println("Contains(i100b):", s.Contains(i100b))
+
+	// Output:
+	//
+	// Set: {100, 200}
+	// Same pointer: false
+	// Contains(i100b): true
+}
