@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/exp/collection/hashed"
 	"golang.org/x/exp/collection/set"
+	"golang.org/x/exp/collection/sorted"
 )
 
 // The following interfaces define the abstract data types for
@@ -132,7 +133,7 @@ var _ _AbstractSet[int, *hashed.Set[int]] = new(hashed.Set[int])
 
 var _ _AbstractMap[string, int, *hashed.Map[string, int]] = new(hashed.Map[string, int])
 
-// var _ AbstractMap[string, int, *ordered.Map[string, int]] = new(ordered.Map[string, int]) // currently at github.com/jba/omap@v0.4.0/ordered.Map
+var _ _AbstractMap[string, int, *sorted.Map[string, int]] = new(sorted.Map[string, int])
 
 func Test(*testing.T) {} // placeholder
 
