@@ -6,72 +6,244 @@
 // such as [Map].
 package sorted
 
+// The implementation is a treap: a tree that is both a binary search tree ordered
+// by keys (node.key), and a binary min-heap, using random priorities (node.pri)
+// for the heap invariant.
+// See:
+// https://en.wikipedia.org/wiki/Treap
+// https://faculty.washington.edu/aragon/pubs/rst89.pdf
+
 import (
 	"iter"
+	"math/rand/v2"
+
+	"golang.org/x/exp/collection/internal"
 )
 
-// A Map is a mapping from keys to values, where the keys are ordered according to
-// a comparison function specified at construction.
+// A Map is a mapping from keys to values, where the keys are ordered
+// according to a comparison function specified at construction.
 //
 // A Map must be created with [NewMap].
 // Neither a nil pointer nor the zero value are valid maps.
 //
 // Map values must not be copied; use [Map.Clone] instead.
 type Map[K, V any] struct {
-	cmp func(K, K) int
+	root *node[K, V]
+	cmp  func(K, K) int
+	_    internal.NoCopy
+}
+
+// A node is a node in the treap.
+type node[K any, V any] struct {
+	parent *node[K, V]
+	left   *node[K, V]
+	right  *node[K, V]
+	key    K
+	val    V
+	pri    uint64 // priority, for the heap invariant
+	sz     int    // number of keys in this node's subtree
 }
 
 // NewMap returns a new [Map] ordered according to cmp.
 func NewMap[K, V any](cmp func(K, K) int) *Map[K, V] {
-	return nil
+	return &Map[K, V]{cmp: cmp}
+}
+
+// find reports where a node with the key would be: at *pos.
+// If *pos != nil, then key is present in the tree;
+// otherwise *pos is where a new node with the key should be attached.
+//
+// If parent != nil, then pos is either &parent.left or &parent.right
+// depending on how parent.key compares with key.
+// If parent == nil, then pos is m.root.
+func (m *Map[K, V]) find(k K) (pos **node[K, V], parent *node[K, V]) {
+	pos = &m.root
+	for x := *pos; x != nil; x = *pos {
+		cmp := m.cmp(x.key, k)
+		if cmp == 0 {
+			break
+		}
+		parent = x
+		if cmp > 0 {
+			pos = &x.left
+		} else {
+			pos = &x.right
+		}
+	}
+	return pos, parent
 }
 
 // Contains reports whether the map contains an entry with the given key.
 func (m *Map[K, V]) Contains(key K) bool {
-	return false
+	pos, _ := m.find(key)
+	return *pos != nil
 }
 
 // Lookup returns the value of m[key] and reports whether it exists.
 func (m *Map[K, V]) Lookup(key K) (V, bool) {
-	return *new(V), false
+	pos, _ := m.find(key)
+	if x := *pos; x != nil {
+		return x.val, true
+	}
+	var zero V
+	return zero, false
 }
 
 // Get returns the value of m[key], or the zero value if key is not present.
 func (m *Map[K, V]) Get(key K) V {
-	return *new(V)
+	v, _ := m.Lookup(key)
+	return v
 }
 
 // Set updates the map entry for key to value.
 // It returns the previous value for key if present, or the zero value if not.
 // The boolean (present) indicates whether the operation updated an existing entry
 // for that key.
-func (m *Map[K, V]) Set(key K, val V) (old V, added bool) {
-	return
+func (m *Map[K, V]) Set(key K, val V) (old V, present bool) {
+	pos, parent := m.find(key)
+	if x := *pos; x != nil {
+		old = x.val
+		x.val = val
+		return old, true
+	}
+	// Choose a random non-zero priority. 0 is the tombstone marker.
+	pri := rand.Uint64() | 1
+	x := &node[K, V]{key: key, val: val, pri: pri, parent: parent, sz: 1}
+	*pos = x
+	// Walk up, adjusting size.
+	for p := x.parent; p != nil; p = p.parent {
+		p.sz++
+	}
+
+	m.rotateUp(x)
+	return *new(V), false
+}
+
+// Len returns the number of keys in m.
+func (m *Map[K, V]) Len() int { return m.root.size() }
+
+func (n *node[K, V]) size() int {
+	if n == nil {
+		return 0
+	}
+	return n.sz
+}
+
+// -- rotation --
+
+// Rotations re-establish the heap property (each node's priority is less than those
+// of its children) while maintaining the search tree property (each node's key is
+// greater than its left child's and less than its right child's).
+
+// rotateUp rotates x upward in the tree to correct any priority inversions.
+func (m *Map[K, V]) rotateUp(x *node[K, V]) {
+	// Rotate up into tree according to priority.
+	for x.parent != nil && x.parent.pri > x.pri {
+		if x.parent.left == x {
+			m.rotateRight(x.parent)
+		} else {
+			m.rotateLeft(x.parent)
+		}
+	}
+}
+
+// rotateLeft rotates the subtree rooted at node x,
+// turning (x a (y b c)) into (y (x a b) c).
+func (m *Map[K, V]) rotateLeft(x *node[K, V]) {
+	// p -> (x a (y b c))
+	p := x.parent
+	y := x.right
+	b := y.left
+
+	y.left = x
+	x.parent = y
+	x.right = b
+	if b != nil {
+		b.parent = x
+	}
+
+	y.parent = p
+	if p == nil {
+		m.root = y
+	} else if p.left == x {
+		p.left = y
+	} else if p.right == x {
+		p.right = y
+	} else {
+		// unreachable
+		panic("corrupt treap")
+	}
+
+	// Recompute sizes.
+	// x used to include a, b, c and the single node y; it has lost
+	// y and c.
+	x.sz -= 1 + y.right.size()
+	// y used to include just b and c; it now also has the node x
+	// and the subtree a.
+	y.sz += 1 + x.left.size()
+	// parent size doesn't change.
+}
+
+// rotateRight rotates the subtree rooted at node y,
+// turning (y (x a b) c) into (x a (y b c)).
+func (m *Map[K, V]) rotateRight(y *node[K, V]) {
+	// p -> (y (x a b) c)
+	p := y.parent
+	x := y.left
+	b := x.right
+
+	x.right = y
+	y.parent = x
+	y.left = b
+	if b != nil {
+		b.parent = y
+	}
+
+	x.parent = p
+	if p == nil {
+		m.root = x
+	} else if p.left == y {
+		p.left = x
+	} else if p.right == y {
+		p.right = x
+	} else {
+		// unreachable
+		panic("corrupt treap")
+	}
+
+	// Recompute sizes.
+	// x used to include just a and b; now it also includes the node y and
+	// the subtree at c.
+	x.sz += 1 + y.right.size()
+	// y included a, b, c and the node x; it has lost the node x and the
+	// subtree at a.
+	y.sz -= 1 + x.left.size()
+	// parent size doesn't change.
 }
 
 // Delete removes the entry with the given key, if present.
 // It returns the previous value for key if present, or the zero value if not.
 // The boolean (deleted) indicates whether the operation deleted a map entry.
 func (m *Map[K, V]) Delete(key K) (prev V, deleted bool) {
-	return
+	panic("unimplemented")
 }
 
 // DeleteFunc removes all the entries for which f returns true.
 // It reports whether the map changed.
 func (m *Map[K, V]) DeleteFunc(f func(K, V) bool) bool {
-	return false
+	panic("unimplemented")
 }
 
 // Min returns the minimum key in m along with its value.
 // The third return value is false if the map is empty, otherwise true.
 func (m *Map[K, V]) Min() (K, V, bool) {
-	return *new(K), *new(V), false
+	panic("unimplemented")
 }
 
 // Max returns the maximum key in m along with its value.
 // The third return value is false if the map is empty, otherwise true.
 func (m *Map[K, V]) Max() (K, V, bool) {
-	return *new(K), *new(V), false
+	panic("unimplemented")
 }
 
 // All returns an iterator over the map m from smallest to largest key.
@@ -87,48 +259,46 @@ func (m *Map[K, V]) Max() (K, V, bool) {
 // Another example: if the map contains keys 10, 20 and 30, the iterator has yielded
 // 10, and then 20 is deleted, then the next yielded key will be 30.
 func (m *Map[K, V]) All() iter.Seq2[K, V] {
-	return nil
+	panic("unimplemented")
 }
 
 // Keys returns an iterator over the keys in m from smallest to largest.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
 func (m *Map[K, V]) Keys() iter.Seq[K] {
-	return nil
+	panic("unimplemented")
 }
 
 // Values returns an iterator over the values in m from smallest to largest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
 func (m *Map[K, V]) Values() iter.Seq[V] {
-	return nil
+	panic("unimplemented")
 }
 
 // Backward returns an iterator over the map m from largest to smallest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
 func (m *Map[K, V]) Backward() iter.Seq2[K, V] {
-	return nil
+	panic("unimplemented")
 }
 
 // Clear removes all entries from the map.
 func (m *Map[K, V]) Clear() {
+	panic("unimplemented")
 }
 
 // Clone returns a shallow copy of m.
 func (m *Map[K, V]) Clone() *Map[K, V] {
-	return nil
+	panic("unimplemented")
 }
-
-// Len returns the number of keys in m.
-func (m *Map[K, V]) Len() int { return 0 }
 
 // String returns a string representation of m in the form "{k1: v1, k2: v2}".
 func (m *Map[K, V]) String() string {
-	return ""
+	panic("unimplemented")
 }
 
 // Nth returns the key and value at index i.
 // It panics if i < 0 or i >= m.Len().
 // See [Map.Index] for the inverse operation.
-func (m *Map[K, V]) Nth(i int) (K, V) { return *new(K), *new(V) }
+func (m *Map[K, V]) Nth(i int) (K, V) { panic("unimplemented") }
 
 // Index returns the index of key in m, or -1 if key is not present.
 // The index of a key is its position in the sequence of keys.
@@ -136,20 +306,20 @@ func (m *Map[K, V]) Nth(i int) (K, V) { return *new(K), *new(V) }
 // and the largest has index m.Len()-1.
 // See [Map.Nth] for the inverse operation.
 func (m *Map[K, V]) Index(key K) int {
-	return 0
+	panic("unimplemented")
 }
 
 // From returns a [MapSpan] with lower bound lo, inclusive, and no upper bound.
-func (m *Map[K, V]) From(lo K) MapSpan[K, V] { return MapSpan[K, V]{} }
+func (m *Map[K, V]) From(lo K) MapSpan[K, V] { panic("unimplemented") }
 
 // Above returns a [MapSpan] with lower bound lo, exclusive, and no upper bound.
-func (m *Map[K, V]) Above(lo K) MapSpan[K, V] { return MapSpan[K, V]{} }
+func (m *Map[K, V]) Above(lo K) MapSpan[K, V] { panic("unimplemented") }
 
 // To returns a [MapSpan] with upper bound hi, inclusive, and no lower bound.
-func (m *Map[K, V]) To(hi K) MapSpan[K, V] { return MapSpan[K, V]{} }
+func (m *Map[K, V]) To(hi K) MapSpan[K, V] { panic("unimplemented") }
 
 // Below returns a [MapSpan] with upper bound hi, exclusive, and no lower bound.
-func (m *Map[K, V]) Below(hi K) MapSpan[K, V] { return MapSpan[K, V]{} }
+func (m *Map[K, V]) Below(hi K) MapSpan[K, V] { panic("unimplemented") }
 
 // A MapSpan is a subsequence of keys in a [Map].
 // MapSpans created from the same map share the map, as slices
@@ -163,72 +333,73 @@ type MapSpan[K, V any] struct {
 // if hi is within s's current upper bound. Otherwise, it returns a MapSpan with the same
 // bounds as s.
 func (s MapSpan[K, V]) To(hi K) MapSpan[K, V] {
-	return s
+	panic("unimplemented")
 }
 
 // Below returns a [MapSpan] with upper bound hi, exclusive and the same lower bound as s,
 // if hi is within s's current upper bound. Otherwise, it returns a MapSpan with the same
 // bounds as s.
 func (s MapSpan[K, V]) Below(hi K) MapSpan[K, V] {
-	return s
+	panic("unimplemented")
 }
 
 // From returns a [MapSpan] with lower bound lo, inclusive and the same upper bound as s,
 // if lo is within s's current lower bound. Otherwise, it returns a MapSpan with the same
 // bounds as s.
 func (s MapSpan[K, V]) From(lo K) MapSpan[K, V] {
-	return s
+	panic("unimplemented")
 }
 
 // Above returns a [MapSpan] with lower bound lo, exclusive and the same upper bound as s,
 // if lo is within s's current lower bound. Otherwise, it returns a MapSpan with the same
 // bounds as s.
 func (s MapSpan[K, V]) Above(lo K) MapSpan[K, V] {
-	return s
+	panic("unimplemented")
 }
 
 // Min returns the minimum key in s along with its value.
 // The third return value is false if s is empty, otherwise true.
-func (s MapSpan[K, V]) Min() (K, V, bool) { return *new(K), *new(V), false }
+func (s MapSpan[K, V]) Min() (K, V, bool) { panic("unimplemented") }
 
 // Max returns the maximum key in s along with its value.
 // The third return value is false if s is empty, otherwise true.
-func (s MapSpan[K, V]) Max() (K, V, bool) { return *new(K), *new(V), false }
+func (s MapSpan[K, V]) Max() (K, V, bool) { panic("unimplemented") }
 
 // Index returns the index of key within s, or -1 if key is not present or not in bounds.
-func (s MapSpan[K, V]) Index(key K) int { return 0 }
+func (s MapSpan[K, V]) Index(key K) int { panic("unimplemented") }
 
 // Len returns the number of keys in s.
-func (s MapSpan[K, V]) Len() int { return 0 }
+func (s MapSpan[K, V]) Len() int { panic("unimplemented") }
 
 // String returns a string representation of s.
 func (s MapSpan[K, V]) String() string {
-	return ""
+	panic("unimplemented")
 }
 
 // Nth returns the key and value at index i within s.
 // It panics if i < 0 or i >= s.Len().
-func (s MapSpan[K, V]) Nth(i int) (K, V) { return *new(K), *new(V) }
+func (s MapSpan[K, V]) Nth(i int) (K, V) { panic("unimplemented") }
 
 // Clone returns a new [Map] containing only the keys in s.
-func (s MapSpan[K, V]) Clone() *Map[K, V] { return nil }
+func (s MapSpan[K, V]) Clone() *Map[K, V] { panic("unimplemented") }
 
 // Clear deletes all the entries in s from s's underlying map.
 func (s MapSpan[K, V]) Clear() {
+	panic("unimplemented")
 }
 
 // All returns an iterator over s from smallest to largest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) All() iter.Seq2[K, V] { return nil }
+func (s MapSpan[K, V]) All() iter.Seq2[K, V] { panic("unimplemented") }
 
 // Keys returns an iterator over the keys in s from smallest to largest.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) Keys() iter.Seq[K] { return nil }
+func (s MapSpan[K, V]) Keys() iter.Seq[K] { panic("unimplemented") }
 
 // Values returns an iterator over the values in s from smallest to largest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) Values() iter.Seq[V] { return nil }
+func (s MapSpan[K, V]) Values() iter.Seq[V] { panic("unimplemented") }
 
 // Backward returns an iterator over s from largest to smallest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) Backward() iter.Seq2[K, V] { return nil }
+func (s MapSpan[K, V]) Backward() iter.Seq2[K, V] { panic("unimplemented") }
