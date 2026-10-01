@@ -8,6 +8,7 @@ import (
 	"iter"
 	"testing"
 
+	"golang.org/x/exp/collection/hashed"
 	"golang.org/x/exp/collection/set"
 )
 
@@ -129,7 +130,7 @@ var _ _AbstractSet[int, set.Set[int]] = make(set.Set[int])
 
 // var _ _AbstractSet[int, *hash.Set[int]] = new(hash.Set[int])
 
-// var _ _AbstractMap[string, int, *hash.Map[string, int]] = new(hash.Map[string, int])
+var _ _AbstractMap[string, int, *hashed.Map[string, int]] = new(hashed.Map[string, int])
 
 // var _ AbstractMap[string, int, *ordered.Map[string, int]] = new(ordered.Map[string, int]) // currently at github.com/jba/omap@v0.4.0/ordered.Map
 

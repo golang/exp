@@ -62,16 +62,16 @@ func Sort(mapValue reflect.Value) SortedMap {
 		sorted = append(sorted, KeyValue{iter.Key(), iter.Value()})
 	}
 	slices.SortStableFunc(sorted, func(a, b KeyValue) int {
-		return compare(a.Key, b.Key)
+		return Compare(a.Key, b.Key)
 	})
 	return sorted
 }
 
-// compare compares two values of the same type. It returns -1, 0, 1
+// Compare compares two values of the same type. It returns -1, 0, 1
 // according to whether a > b (1), a == b (0), or a < b (-1).
 // If the types differ, it returns -1.
 // See the comment on Sort for the comparison rules.
-func compare(aVal, bVal reflect.Value) int {
+func Compare(aVal, bVal reflect.Value) int {
 	aType, bType := aVal.Type(), bVal.Type()
 	if aType != bType {
 		return -1 // No good answer possible, but don't return 0: they're not equal.
@@ -110,14 +110,14 @@ func compare(aVal, bVal reflect.Value) int {
 		return cmp.Compare(aVal.Pointer(), bVal.Pointer())
 	case reflect.Struct:
 		for i := 0; i < aVal.NumField(); i++ {
-			if c := compare(aVal.Field(i), bVal.Field(i)); c != 0 {
+			if c := Compare(aVal.Field(i), bVal.Field(i)); c != 0 {
 				return c
 			}
 		}
 		return 0
 	case reflect.Array:
 		for i := 0; i < aVal.Len(); i++ {
-			if c := compare(aVal.Index(i), bVal.Index(i)); c != 0 {
+			if c := Compare(aVal.Index(i), bVal.Index(i)); c != 0 {
 				return c
 			}
 		}
@@ -126,11 +126,11 @@ func compare(aVal, bVal reflect.Value) int {
 		if c, ok := nilCompare(aVal, bVal); ok {
 			return c
 		}
-		c := compare(reflect.ValueOf(aVal.Elem().Type()), reflect.ValueOf(bVal.Elem().Type()))
+		c := Compare(reflect.ValueOf(aVal.Elem().Type()), reflect.ValueOf(bVal.Elem().Type()))
 		if c != 0 {
 			return c
 		}
-		return compare(aVal.Elem(), bVal.Elem())
+		return Compare(aVal.Elem(), bVal.Elem())
 	default:
 		// Certain types cannot appear as keys (maps, funcs, slices), but be explicit.
 		panic("bad type in compare: " + aType.String())
