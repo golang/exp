@@ -131,6 +131,8 @@ var _ _AbstractSet[int, set.Set[int]] = make(set.Set[int])
 
 var _ _AbstractSet[int, *hashed.Set[int]] = new(hashed.Set[int])
 
+var _ _AbstractSet[int, *sorted.Set[int]] = new(sorted.Set[int])
+
 var _ _AbstractMap[string, int, *hashed.Map[string, int]] = new(hashed.Map[string, int])
 
 var _ _AbstractMap[string, int, *sorted.Map[string, int]] = new(sorted.Map[string, int])

@@ -18,6 +18,7 @@ import (
 //
 // Map values must not be copied; use [Map.Clone] instead.
 type Map[K, V any] struct {
+	cmp func(K, K) int
 }
 
 // NewMap returns a new [Map] ordered according to cmp.
