@@ -6,12 +6,15 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"go/token"
 	"go/types"
+	"io"
 	"os"
 	"strings"
 
@@ -205,37 +208,94 @@ func loadModule(fset *token.FileSet, modulepath string) (*apidiff.Module, error)
 	return &apidiff.Module{Path: loaded[0].Module.Path, Packages: tpkgs}, nil
 }
 
+// readModuleExportData reads a file written by writeModuleExportData.
+//
+// The file is a zip archive. The entry named "module" holds the
+// module path; each other entry, named by a package path plus ".x",
+// holds the export data of one package of the module.
+//
+// Export data is self-contained: it includes declarations for the
+// parts of dependencies that the package refers to. So each package
+// is decoded independently, with its own imports map. (apidiff
+// compares each pair of packages separately, and identifies types
+// from other packages by name, so it does not need dependencies to
+// be shared across packages.)
 func readModuleExportData(fset *token.FileSet, filename string) (*apidiff.Module, error) {
-	f, err := os.Open(filename)
+	z, err := zip.OpenReader(filename)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	r := bufio.NewReader(f)
-	modPath, err := r.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-	modPath = modPath[:len(modPath)-1] // remove delimiter
-	m := map[string]*types.Package{}
-	pkgs, err := gcexportdata.ReadBundle(r, fset, m)
-	if err != nil {
-		return nil, err
-	}
+	defer z.Close()
 
+	var (
+		modPath string
+		pkgs    []*types.Package
+	)
+	for _, entry := range z.File {
+		data, err := readZipEntry(entry)
+		if err != nil {
+			return nil, err
+		}
+		if entry.Name == "module" {
+			modPath = string(data)
+			continue
+		}
+		pkgPath, ok := strings.CutSuffix(entry.Name, ".x")
+		if !ok {
+			return nil, fmt.Errorf("unexpected zip entry %q", entry.Name)
+		}
+		imports := make(map[string]*types.Package)
+		pkg, err := gcexportdata.Read(bytes.NewReader(data), fset, imports, pkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %v", pkgPath, err)
+		}
+		pkgs = append(pkgs, pkg)
+	}
+	if modPath == "" {
+		return nil, fmt.Errorf("no module path")
+	}
 	return &apidiff.Module{Path: modPath, Packages: pkgs}, nil
 }
 
-func writeModuleExportData(fset *token.FileSet, module *apidiff.Module, filename string) error {
+func readZipEntry(entry *zip.File) ([]byte, error) {
+	r, err := entry.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return io.ReadAll(r)
+}
+
+// writeModuleExportData writes the export data of each package of
+// the module, and only those packages, to a zip archive.
+// See readModuleExportData for the format.
+func writeModuleExportData(fset *token.FileSet, module *apidiff.Module, filename string) (err error) {
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(f, module.Path)
-	if err := gcexportdata.WriteBundle(f, fset, module.Packages); err != nil {
+	defer func() {
+		err = errors.Join(err, f.Close())
+	}()
+
+	w := zip.NewWriter(f)
+	entry, err := w.Create("module")
+	if err != nil {
 		return err
 	}
-	return f.Close()
+	if _, err := io.WriteString(entry, module.Path); err != nil {
+		return err
+	}
+	for _, pkg := range module.Packages {
+		entry, err := w.Create(pkg.Path() + ".x")
+		if err != nil {
+			return err
+		}
+		if err := gcexportdata.Write(entry, fset, pkg); err != nil {
+			return fmt.Errorf("writing %s: %v", pkg.Path(), err)
+		}
+	}
+	return w.Close()
 }
 
 func readPackageExportData(fset *token.FileSet, filename string) (*types.Package, error) {
