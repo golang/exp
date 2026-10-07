@@ -115,7 +115,7 @@ func TestTree(t *testing.T) {
 			data, ok := tiles[tile]
 			if !ok {
 				t.Log(NewTiles(testH, 0, i+1))
-				t.Fatalf("TileForIndex(%d, %d) = %v, not yet stored (i=%d, stored %d)", testH, j, tile.Path(), i, len(storage))
+				t.Errorf("TileForIndex(%d, %d) = %v, not yet stored (i=%d, stored %d)", testH, j, tile.Path(), i, len(storage))
 				continue
 			}
 			h, err := HashFromTile(tile, data, int64(j))
