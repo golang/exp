@@ -145,48 +145,32 @@ func addMessage(ms messageSet, obj objectWithSide, part, format string, args []i
 func (d *differ) checkPackage(oldRootPackagePath string) {
 	// Determine what has changed between old and new.
 
-	// First, establish correspondences between types with the same name, before
-	// looking at aliases. This will avoid confusing messages like "T: changed
-	// from T to T", which can happen if a correspondence between an alias
-	// and a named type is established first.
-	// See testdata/order.go.
-	// Example of what this loop looks for:
-	//    type A = B // old
-	//    type B ... // new
-	//
-	// We want to ensure that old B and new B correspond.
-	//
-	// This loop is unnecessary for correctness; skipping symbols will not introduce bugs.
-	for _, name := range d.old.Scope().Names() {
-		oldobj := d.old.Scope().Lookup(name)
-		if tn, ok := oldobj.(*types.TypeName); ok {
-			if oldn, ok := tn.Type().(*types.Named); ok {
-				if !oldn.Obj().Exported() {
-					continue
-				}
-				// Skip aliases to instantiated generic types. They end up getting
-				// compared to the origin type, which will fail.
-				// For example, we don't want to try to make A[int] correspond with
-				// A[T any].
-				if tn.IsAlias() && isInstantiated(oldn) {
-					continue
-				}
-				// Does new have a named type of the same name? Look up using
-				// the old named type's name, oldn.Obj().Name(), not the
-				// TypeName tn, which may be an alias.
-				newobj := d.new.Scope().Lookup(oldn.Obj().Name())
-				if newobj != nil {
-					d.checkObjects(oldobj, newobj)
-				}
-			}
-		}
+	isDefinedType := func(obj types.Object) bool {
+		tn, ok := obj.(*types.TypeName)
+		return ok && !tn.IsAlias()
 	}
 
-	// Next, look at all exported symbols in the old world and compare them
-	// with the same-named symbols in the new world.
+	// Pass 1: Check exported defined (non-alias) types first.
+	// This records exact-name correspondences (e.g. old B <-> new B) in
+	// correspondMap before aliases (e.g. old A = B) are unaliased in Pass 2.
+	// See testdata/order.go.
 	for _, name := range d.old.Scope().Names() {
 		oldobj := d.old.Scope().Lookup(name)
-		if !oldobj.Exported() {
+		if !oldobj.Exported() || !isDefinedType(oldobj) {
+			continue
+		}
+		newobj := d.new.Scope().Lookup(name)
+		if newobj == nil {
+			d.incompatible(objectWithSide{oldobj, false}, "", "removed")
+			continue
+		}
+		d.checkObjects(oldobj, newobj)
+	}
+
+	// Pass 2: Check all remaining exported symbols (aliases, consts, vars, funcs).
+	for _, name := range d.old.Scope().Names() {
+		oldobj := d.old.Scope().Lookup(name)
+		if !oldobj.Exported() || isDefinedType(oldobj) {
 			continue
 		}
 		newobj := d.new.Scope().Lookup(name)
