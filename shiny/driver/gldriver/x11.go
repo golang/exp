@@ -129,9 +129,6 @@ type uiClosure struct {
 }
 
 func main(f func(screen.Screen)) error {
-	if gl.Version() == "GL_ES_2_0" {
-		return errors.New("gldriver: ES 3 required on X11")
-	}
 	C.startDriver()
 	glctx, worker = gl.NewContext()
 
