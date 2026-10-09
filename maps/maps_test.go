@@ -179,3 +179,16 @@ func TestDeleteFunc(t *testing.T) {
 		t.Errorf("DeleteFunc result = %v, want %v", mc, want)
 	}
 }
+
+func TestMerge(t *testing.T) {
+	m1 := map[int]int{1: 2, 2: 4, 4: 8, 8: 16}
+	m2 := map[int]int{3: 9, 4: 16, 5: 25, 8: 64}
+	m3 := map[int]int{1: 1, 4: 4, 6: 6, 7: 7}
+
+	want := map[int]int{1: 1, 2: 4, 3: 9, 4: 4, 5: 25, 6: 6, 7: 7, 8: 64}
+
+	res := Merge(m1, m2, m3)
+	if !Equal(res, want) {
+		t.Errorf("Merge(%v, %v, %v) = %v, want %v", m1, m2, m3, res, want)
+	}
+}
