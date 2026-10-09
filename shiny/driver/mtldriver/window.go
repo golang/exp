@@ -94,6 +94,10 @@ func (w *windowImpl) Publish() screen.PublishResult {
 	return screen.PublishResult{}
 }
 
+func (w *windowImpl) SetTitle(title string) {
+	w.window.SetTitle(title)
+}
+
 func (w *windowImpl) Upload(dp image.Point, src screen.Buffer, sr image.Rectangle) {
 	draw.Draw(w.rgba, sr.Sub(sr.Min).Add(dp), src.RGBA(), sr.Min, draw.Src)
 }

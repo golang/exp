@@ -169,17 +169,18 @@ func _HIWORD(l uintptr) uint16 {
 //sys	_DispatchMessage(msg *_MSG) (ret int32) = user32.DispatchMessageW
 //sys	_GetClientRect(hwnd syscall.Handle, rect *_RECT) (err error) = user32.GetClientRect
 //sys	_GetWindowRect(hwnd syscall.Handle, rect *_RECT) (err error) = user32.GetWindowRect
-//sys   _GetKeyboardLayout(threadID uint32) (locale syscall.Handle) = user32.GetKeyboardLayout
-//sys   _GetKeyboardState(lpKeyState *byte) (err error) = user32.GetKeyboardState
+//sys	_GetKeyboardLayout(threadID uint32) (locale syscall.Handle) = user32.GetKeyboardLayout
+//sys	_GetKeyboardState(lpKeyState *byte) (err error) = user32.GetKeyboardState
 //sys	_GetKeyState(virtkey int32) (keystatus int16) = user32.GetKeyState
 //sys	_GetMessage(msg *_MSG, hwnd syscall.Handle, msgfiltermin uint32, msgfiltermax uint32) (ret int32, err error) [failretval==-1] = user32.GetMessageW
 //sys	_LoadCursor(hInstance syscall.Handle, cursorName uintptr) (cursor syscall.Handle, err error) = user32.LoadCursorW
 //sys	_LoadIcon(hInstance syscall.Handle, iconName uintptr) (icon syscall.Handle, err error) = user32.LoadIconW
 //sys	_MoveWindow(hwnd syscall.Handle, x int32, y int32, w int32, h int32, repaint bool) (err error) = user32.MoveWindow
 //sys	_PostMessage(hwnd syscall.Handle, uMsg uint32, wParam uintptr, lParam uintptr) (lResult bool) = user32.PostMessageW
-//sys   _PostQuitMessage(exitCode int32) = user32.PostQuitMessage
+//sys	_PostQuitMessage(exitCode int32) = user32.PostQuitMessage
 //sys	_RegisterClass(wc *_WNDCLASS) (atom uint16, err error) = user32.RegisterClassW
 //sys	_ShowWindow(hwnd syscall.Handle, cmdshow int32) (wasvisible bool) = user32.ShowWindow
+//sys	_SetWindowTextW(hwnd syscall.Handle, lpString *uint16) (err error) = user32.SetWindowTextW
 //sys	_ScreenToClient(hwnd syscall.Handle, lpPoint *_POINT) (ok bool) = user32.ScreenToClient
 //sys   _ToUnicodeEx(wVirtKey uint32, wScanCode uint32, lpKeyState *byte, pwszBuff *uint16, cchBuff int32, wFlags uint32, dwhkl syscall.Handle) (ret int32) = user32.ToUnicodeEx
 //sys	_TranslateMessage(msg *_MSG) (done bool) = user32.TranslateMessage
