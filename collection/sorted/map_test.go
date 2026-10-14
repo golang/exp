@@ -128,6 +128,69 @@ func checkSize(t *testing.T, m *Map[int, int]) {
 	check(m.root)
 }
 
+func TestMinMax(t *testing.T) {
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		_, slice := permute(m, N)
+		haveMinKey, haveMinVal, haveMinOK := m.Min()
+		haveMaxKey, haveMaxVal, haveMaxOK := m.Max()
+		var (
+			wantMinKey, wantMinVal int
+			wantMaxKey, wantMaxVal int
+			wok                    bool
+		)
+		if N != 0 {
+			wantMinKey = 1
+			wantMinVal = slice[wantMinKey]
+			wantMaxKey = 2*N - 1
+			wantMaxVal = slice[wantMaxKey]
+			wok = true
+		}
+		if haveMinKey != wantMinKey || haveMinVal != wantMinVal || haveMinOK != wok {
+			t.Errorf("N=%d Min() returned %d, %d, %t want %d, %d, %t", N, haveMinKey, haveMinVal, haveMinOK, wantMinKey, wantMinVal, wok)
+		}
+		if haveMaxKey != wantMaxKey || haveMaxVal != wantMaxVal || haveMaxOK != wok {
+			t.Errorf("N=%d Max() returned %d, %d, %t want %d, %d, %t", N, haveMaxKey, haveMaxVal, haveMaxOK, wantMaxKey, wantMaxVal, wok)
+		}
+	}
+}
+
+func TestMinMaxRange(t *testing.T) {
+	for N := range 11 {
+		for blo, bhi := range bounds(N) {
+			m := NewMap[int, int](cmp.Compare)
+			_, slice := permute(m, N)
+			r := newMapSpan(m, blo, bhi)
+			haveMinKey, haveMinVal, haveMinOK := r.Min()
+			haveMaxKey, haveMaxVal, haveMaxOK := r.Max()
+			var (
+				wantMinKey, wantMinVal int
+				wantMaxKey, wantMaxVal int
+				wok                    bool
+			)
+			for k, v := range slice {
+				if v != 0 && in(k, blo, bhi) {
+					if !wok {
+						wantMinKey = k
+						wantMinVal = v
+						wok = true
+					}
+					wantMaxKey = k
+					wantMaxVal = v
+				}
+			}
+			if haveMinKey != wantMinKey || haveMinVal != wantMinVal || haveMinOK != wok {
+				t.Errorf("N=%d, r=%s: Min() returned %d, %d, %t want %d, %d, %t",
+					N, rdump(r), haveMinKey, haveMinVal, haveMinOK, wantMinKey, wantMinVal, wok)
+			}
+			if haveMaxKey != wantMaxKey || haveMaxVal != wantMaxVal || haveMaxOK != wok {
+				t.Errorf("N=%d, r=%s: Max() returned %d, %d, %t want %d, %d, %t",
+					N, rdump(r), haveMaxKey, haveMaxVal, haveMaxOK, wantMaxKey, wantMaxVal, wok)
+			}
+		}
+	}
+}
+
 func TestAll(t *testing.T) {
 	for N := range 11 {
 		m := NewMap[int, int](cmp.Compare)

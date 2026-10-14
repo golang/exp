@@ -239,15 +239,11 @@ func (m *Map[K, V]) DeleteFunc(f func(K, V) bool) bool {
 
 // Min returns the minimum key in m along with its value.
 // The third return value is false if the map is empty, otherwise true.
-func (m *Map[K, V]) Min() (K, V, bool) {
-	panic("unimplemented")
-}
+func (m *Map[K, V]) Min() (K, V, bool) { return m.Span().Min() }
 
 // Max returns the maximum key in m along with its value.
 // The third return value is false if the map is empty, otherwise true.
-func (m *Map[K, V]) Max() (K, V, bool) {
-	panic("unimplemented")
-}
+func (m *Map[K, V]) Max() (K, V, bool) { return m.Span().Max() }
 
 // All returns an iterator over the map m from smallest to largest key.
 //
@@ -405,7 +401,13 @@ func (s MapSpan[K, V]) Below(hi K) MapSpan[K, V] {
 
 // Min returns the minimum key in s along with its value.
 // The third return value is false if s is empty, otherwise true.
-func (s MapSpan[K, V]) Min() (K, V, bool) { panic("unimplemented") }
+func (s MapSpan[K, V]) Min() (K, V, bool) {
+	n := s.minNode()
+	if n == nil {
+		return *new(K), *new(V), false
+	}
+	return n.key, n.val, true
+}
 
 // minNode returns the node with the smallest key in s,
 // or nil if there is none.
@@ -434,7 +436,13 @@ func (s MapSpan[K, V]) minNode() *node[K, V] {
 
 // Max returns the maximum key in s along with its value.
 // The third return value is false if s is empty, otherwise true.
-func (s MapSpan[K, V]) Max() (K, V, bool) { panic("unimplemented") }
+func (s MapSpan[K, V]) Max() (K, V, bool) {
+	n := s.maxNode()
+	if n == nil {
+		return *new(K), *new(V), false
+	}
+	return n.key, n.val, true
+}
 
 // maxNode returns the node with the largest key in s,
 // or nil if there is none (because the span is empty).
