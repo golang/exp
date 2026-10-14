@@ -31,6 +31,7 @@ const debug = false
 // not safe to call Close and reading methods concurrently.
 type ReaderAt struct {
 	data []byte
+	*io.SectionReader
 }
 
 // Close closes the reader.
@@ -79,6 +80,20 @@ func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	return n, nil
 }
 
+// WriteTo implements the io.WriterTo interface.
+func (r *ReaderAt) WriteTo(w io.Writer) (int64, error) {
+	pos, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, fmt.Errorf("mmap: WriteTo: %w", err)
+	}
+	n, err := w.Write(r.data[pos:])
+	_, seekErr := r.Seek(int64(n), io.SeekCurrent)
+	if seekErr != nil {
+		panic("cannot happen") // neither errWhence nor errOffset are possible with current usage
+	}
+	return int64(n), err
+}
+
 // Open memory-maps the named file for reading.
 func Open(filename string) (*ReaderAt, error) {
 	f, err := os.Open(filename)
@@ -113,7 +128,10 @@ func Open(filename string) (*ReaderAt, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &ReaderAt{data}
+	r := &ReaderAt{
+		data: data,
+	}
+	r.SectionReader = io.NewSectionReader(r, 0, size)
 	if debug {
 		var p *byte
 		if len(data) != 0 {
