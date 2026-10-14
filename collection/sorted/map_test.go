@@ -191,6 +191,50 @@ func TestMinMaxRange(t *testing.T) {
 	}
 }
 
+func TestDeleteFunc(t *testing.T) {
+	m := NewMap[int, int](cmp.Compare)
+	// keys 0..4, values 1..5
+	for k, v := range []int{1, 2, 3, 4, 5} {
+		m.Set(k, v)
+	}
+
+	// Delete even values
+	gotb := m.DeleteFunc(func(k, v int) bool {
+		return v%2 == 0
+	})
+	if !gotb {
+		t.Fatal("got false, want true")
+	}
+
+	got := maps.Collect(m.All())
+	want := map[int]int{0: 1, 2: 3, 4: 5}
+	if !maps.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	// Delete remaining where key > 2
+	gotb = m.DeleteFunc(func(k, v int) bool {
+		return k > 2
+	})
+	if !gotb {
+		t.Fatal("got false, want true")
+	}
+
+	got = maps.Collect(m.All())
+	want = map[int]int{0: 1, 2: 3}
+	if !maps.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	// Delete none
+	gotb = m.DeleteFunc(func(k, v int) bool {
+		return false
+	})
+	if gotb {
+		t.Fatal("got true, want false")
+	}
+}
+
 func TestAll(t *testing.T) {
 	for N := range 11 {
 		m := NewMap[int, int](cmp.Compare)
@@ -541,6 +585,42 @@ func TestRangeNth(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestDelete(t *testing.T) {
+	checkLen := func(m *Map[int, int], n int) {
+		t.Helper()
+		if m.Len() != n {
+			t.Errorf("m.Len() = %d, want %d", m.Len(), n)
+		}
+	}
+
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		checkLen(m, 0)
+		_, slice := permute(m, N)
+		checkLen(m, N)
+		wantLen := N
+		for _, x := range rand.Perm(len(slice)) {
+			prev, ok := m.Delete(x)
+			if prev != slice[x] || ok != (slice[x] > 0) {
+				t.Errorf("Delete(%v) = %d, %t, want %d, %t", x, prev, ok, slice[x], slice[x] > 0)
+			}
+			if ok {
+				wantLen--
+			}
+			checkLen(m, wantLen)
+			slice[x] = 0
+			var have []int
+			for k := range m.All() {
+				have = append(have, k)
+			}
+			want := nonzeroIndexes(slice)
+			if !slices.Equal(have, want) {
+				t.Errorf("after Delete(%v), All() = %v, want %v", x, have, want)
+			}
+		}
+	}
 }
 
 func TestRangeCreation(t *testing.T) {

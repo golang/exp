@@ -224,17 +224,63 @@ func (m *Map[K, V]) rotateRight(y *node[K, V]) {
 	// parent size doesn't change.
 }
 
+// -- deletion --
+
 // Delete removes the entry with the given key, if present.
 // It returns the previous value for key if present, or the zero value if not.
 // The boolean (deleted) indicates whether the operation deleted a map entry.
 func (m *Map[K, V]) Delete(key K) (prev V, deleted bool) {
-	panic("unimplemented")
+	pos, _ := m.find(key)
+	x := *pos
+	if x == nil {
+		return prev, false
+	}
+	m.deleteNode(x)
+	return x.val, true
 }
 
-// DeleteFunc removes all the entries for which f returns true.
+// deleteNode removes x from the treap. x must be in m.
+func (m *Map[K, V]) deleteNode(x *node[K, V]) {
+	// Rotate x down to be a leaf of the tree for removal, respecting priorities.
+	for x.right != nil || x.left != nil {
+		if x.right == nil || x.left != nil && x.left.pri < x.right.pri {
+			m.rotateRight(x)
+		} else {
+			m.rotateLeft(x)
+		}
+	}
+
+	// Remove x, now a leaf.
+	switch p := x.parent; {
+	case p == nil:
+		m.root = nil
+	case p.left == x:
+		p.left = nil
+	default:
+		p.right = nil
+	}
+	x.pri = 0 // mark deleted
+
+	// Walk up, adjusting size.
+	for p := x.parent; p != nil; p = p.parent {
+		p.sz--
+	}
+}
+
+// DeleteFunc removes all the entries for which del returns true.
 // It reports whether the map changed.
-func (m *Map[K, V]) DeleteFunc(f func(K, V) bool) bool {
-	panic("unimplemented")
+func (m *Map[K, V]) DeleteFunc(del func(K, V) bool) bool {
+	changed := false
+	for x := m.Span().minNode(); x != nil; {
+		doDel := del(x.key, x.val)
+		next := x.next(m)
+		if doDel && x.pri != 0 {
+			m.deleteNode(x)
+			changed = true
+		}
+		x = next
+	}
+	return changed
 }
 
 // Min returns the minimum key in m along with its value.
