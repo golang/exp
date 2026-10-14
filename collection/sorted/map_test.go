@@ -8,7 +8,10 @@ import (
 	"bytes"
 	"cmp"
 	"fmt"
+	"iter"
+	"maps"
 	"math/rand/v2"
+	"strings"
 	"testing"
 )
 
@@ -122,4 +125,245 @@ func checkSize(t *testing.T, m *Map[int, int]) {
 		check(n.right)
 	}
 	check(m.root)
+}
+
+func TestRangeCreation(t *testing.T) {
+	m := NewMap[int, int](nil)
+	for _, tc := range []struct {
+		r    MapSpan[int, int]
+		want string
+	}{
+		{m.From(2), "[2, ∞)"},
+		{m.Above(2), "(2, ∞)"},
+		{m.To(2), "(-∞, 2]"},
+		{m.Below(2), "(-∞, 2)"},
+		{m.From(2).To(5), "[2, 5]"},
+		{m.From(2).Below(5), "[2, 5)"},
+		{m.Above(2).To(5), "(2, 5]"},
+		{m.Above(2).Below(5), "(2, 5)"},
+	} {
+		got := rdump(tc.r)
+		if got != tc.want {
+			t.Errorf("got %s, want %s", got, tc.want)
+		}
+	}
+}
+
+func rdump[K, V any](r MapSpan[K, V]) string {
+	var b strings.Builder
+	if !r.lo.present {
+		b.WriteString("(-∞")
+	} else {
+		if r.lo.inclusive {
+			b.WriteByte('[')
+		} else {
+			b.WriteByte('(')
+		}
+		fmt.Fprintf(&b, "%v", r.lo.key)
+	}
+	b.WriteString(", ")
+	if !r.hi.present {
+		b.WriteString("∞)")
+	} else {
+		fmt.Fprintf(&b, "%v", r.hi.key)
+		if r.hi.inclusive {
+			b.WriteByte(']')
+		} else {
+			b.WriteByte(')')
+		}
+	}
+	return b.String()
+}
+
+func newMapSpan[K cmp.Ordered, V any](m *Map[K, V], lo, hi bound[K]) MapSpan[K, V] {
+	return MapSpan[K, V]{m: m, lo: lo, hi: hi}
+}
+
+func inf() bound[int] { return bound[int]{} }
+
+// bounds returns a sequence of all pairs of bound[int] for numbers in [0, n).
+func bounds(n int) iter.Seq2[bound[int], bound[int]] {
+	return func(yield func(_, _ bound[int]) bool) {
+		for hi := range n {
+			for _, bhi := range []bound[int]{including(hi), excluding(hi), inf()} {
+				for lo := range hi + 1 {
+					for _, blo := range []bound[int]{including(lo), excluding(lo), inf()} {
+						if blo == inf() && bhi == inf() {
+							continue
+						}
+						if !yield(blo, bhi) {
+							return
+						}
+					}
+				}
+			}
+		}
+		// Produce an interval past the end. We already generate one before
+		// the beginning, (-∞, 0).
+		if !yield(excluding(n), inf()) {
+			return
+		}
+		// Yield the infinite interval even if n == 0.
+		yield(inf(), inf())
+	}
+}
+
+func TestBounds(t *testing.T) {
+	got := map[string]bool{}
+	for blo, bhi := range bounds(2) {
+		got[rdump(newMapSpan(NewMap[int, int](cmp.Compare), blo, bhi))] = true
+	}
+	wants := []string{
+		"(0, 0)",
+		"(0, 1)",
+		"(0, ∞)",
+		"[0, 0)",
+		"[0, 1)",
+		"[0, ∞)",
+		"(0, 0]",
+		"(0, 1]",
+		"[0, 0]",
+		"[0, 1]",
+
+		"(1, 1)",
+		"(1, ∞)",
+		"[1, 1)",
+		"[1, ∞)",
+		"(1, 1]",
+		"[1, 1]",
+
+		"(-∞, 0)",
+		"(-∞, 0]",
+		"(-∞, 1)",
+		"(-∞, 1]",
+
+		"(2, ∞)",
+		"(-∞, ∞)",
+	}
+
+	want := map[string]bool{}
+	for _, w := range wants {
+		want[w] = true
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestRdump(t *testing.T) {
+	m := NewMap[int, int](nil)
+	for _, test := range []struct {
+		r    MapSpan[int, int]
+		want string
+	}{
+		{newMapSpan(m, inf(), inf()), "(-∞, ∞)"},
+		{newMapSpan(m, including(1), inf()), "[1, ∞)"},
+		{newMapSpan(m, inf(), excluding(3)), "(-∞, 3)"},
+		{newMapSpan(m, including(1), including(3)), "[1, 3]"},
+		{newMapSpan(m, including(1), excluding(3)), "[1, 3)"},
+		{newMapSpan(m, excluding(1), including(3)), "(1, 3]"},
+		{newMapSpan(m, excluding(1), excluding(3)), "(1, 3)"},
+	} {
+		got := rdump(test.r)
+		if got != test.want {
+			t.Errorf("%v: got %q, want %q", test.r, got, test.want)
+		}
+	}
+}
+
+func TestRangeBounds(t *testing.T) {
+	m := NewMap[int, int](cmp.Compare[int])
+	for _, test := range []struct {
+		name string
+		got  MapSpan[int, int]
+		want string
+	}{
+		{
+			"To1",
+			m.span().To(10),
+			"(-∞, 10]",
+		},
+		{
+			"To2",
+			m.span().To(10).To(10),
+			"(-∞, 10]",
+		},
+		{
+			"To3",
+			m.span().Below(10).To(10),
+			"(-∞, 10)",
+		},
+		{
+			"To4",
+			m.span().To(9).To(10),
+			"(-∞, 9]",
+		},
+		{
+			"Below1",
+			m.span().Below(10),
+			"(-∞, 10)",
+		},
+		{
+			"Below2",
+			m.span().To(10).Below(10),
+			"(-∞, 10)",
+		},
+		{
+			"Below3",
+			m.span().Below(10).Below(10),
+			"(-∞, 10)",
+		},
+		{
+			"Below4",
+			m.span().To(9).Below(10),
+			"(-∞, 9]",
+		},
+		{
+			"From1",
+			m.span().From(10),
+			"[10, ∞)",
+		},
+		{
+			"From2",
+			m.span().From(10).From(10),
+			"[10, ∞)",
+		},
+		{
+			"From3",
+			m.span().Above(10).From(10),
+			"(10, ∞)",
+		},
+		{
+			"From4",
+			m.span().From(11).From(10),
+			"[11, ∞)",
+		},
+		{
+			"Above1",
+			m.span().Above(10),
+			"(10, ∞)",
+		},
+		{
+			"Above2",
+			m.span().From(10).Above(10),
+			"(10, ∞)",
+		},
+		{
+			"Above3",
+			m.span().Above(10).Above(10),
+			"(10, ∞)",
+		},
+		{
+			"Above4",
+			m.span().From(11).Above(10),
+			"[11, ∞)",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := rdump(test.got)
+			if got != test.want {
+				t.Errorf("got %s, want %s", got, test.want)
+			}
+		})
+	}
 }

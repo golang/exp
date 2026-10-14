@@ -49,6 +49,8 @@ func NewMap[K, V any](cmp func(K, K) int) *Map[K, V] {
 	return &Map[K, V]{cmp: cmp}
 }
 
+func (m *Map[K, V]) span() MapSpan[K, V] { return MapSpan[K, V]{m: m} }
+
 // find reports where a node with the key would be: at *pos.
 // If *pos != nil, then key is present in the tree;
 // otherwise *pos is where a new node with the key should be attached.
@@ -309,52 +311,103 @@ func (m *Map[K, V]) Index(key K) int {
 	panic("unimplemented")
 }
 
-// From returns a [MapSpan] with lower bound lo, inclusive, and no upper bound.
-func (m *Map[K, V]) From(lo K) MapSpan[K, V] { panic("unimplemented") }
-
-// Above returns a [MapSpan] with lower bound lo, exclusive, and no upper bound.
-func (m *Map[K, V]) Above(lo K) MapSpan[K, V] { panic("unimplemented") }
-
-// To returns a [MapSpan] with upper bound hi, inclusive, and no lower bound.
-func (m *Map[K, V]) To(hi K) MapSpan[K, V] { panic("unimplemented") }
-
-// Below returns a [MapSpan] with upper bound hi, exclusive, and no lower bound.
-func (m *Map[K, V]) Below(hi K) MapSpan[K, V] { panic("unimplemented") }
-
-// A MapSpan is a subsequence of keys in a [Map].
-// MapSpans created from the same map share the map, as slices
-// created from the same array share the array.
-// Modifications made via one MapSpan change the underlying map,
+// A MapSpan is a restricted view of a [Map] consisting only of the items
+// whose keys are between (optional) lower and upper bounds.
+// A MapSpan holds a reference to its Map and observes all modifications
+// made to that map.
+// Modifications made via one MapSpan change the referenced map,
 // so are visible to all MapSpans that share the map.
 type MapSpan[K, V any] struct {
+	m      *Map[K, V]
+	lo, hi bound[K]
 }
 
-// To returns a [MapSpan] with upper bound hi, inclusive and the same lower bound as s,
-// if hi is within s's current upper bound. Otherwise, it returns a MapSpan with the same
-// bounds as s.
-func (s MapSpan[K, V]) To(hi K) MapSpan[K, V] {
-	panic("unimplemented")
+type bound[K any] struct {
+	key       K
+	present   bool // if false, there is no bound (it is +/-infinity)
+	inclusive bool // does the bound include key?
 }
 
-// Below returns a [MapSpan] with upper bound hi, exclusive and the same lower bound as s,
-// if hi is within s's current upper bound. Otherwise, it returns a MapSpan with the same
-// bounds as s.
-func (s MapSpan[K, V]) Below(hi K) MapSpan[K, V] {
-	panic("unimplemented")
+func including[K any](k K) bound[K] {
+	return bound[K]{k, true, true}
 }
 
-// From returns a [MapSpan] with lower bound lo, inclusive and the same upper bound as s,
+func excluding[K any](k K) bound[K] {
+	return bound[K]{k, true, false}
+}
+
+// inLo reports whether k is above s's lower bound.
+func (s MapSpan[K, V]) inLo(k K) bool {
+	if !s.lo.present {
+		return true
+	}
+	if s.lo.inclusive {
+		return s.m.cmp(k, s.lo.key) >= 0
+	}
+	return s.m.cmp(k, s.lo.key) > 0
+}
+
+// inHi reports whether k is below s's upper bound.
+func (s MapSpan[K, V]) inHi(k K) bool {
+	if !s.hi.present {
+		return true
+	}
+	if s.hi.inclusive {
+		return s.m.cmp(k, s.hi.key) <= 0
+	}
+	return s.m.cmp(k, s.hi.key) < 0
+}
+
+// From returns a [MapSpan] with lower bound lo, inclusive, and no upper bound.
+func (m *Map[K, V]) From(lo K) MapSpan[K, V] { return MapSpan[K, V]{m: m, lo: including(lo)} }
+
+// Above returns a [MapSpan] with lower bound lo, exclusive, and no upper bound.
+func (m *Map[K, V]) Above(lo K) MapSpan[K, V] { return MapSpan[K, V]{m: m, lo: excluding(lo)} }
+
+// To returns a [MapSpan] with upper bound hi, inclusive, and no lower bound.
+func (m *Map[K, V]) To(hi K) MapSpan[K, V] { return MapSpan[K, V]{m: m, hi: including(hi)} }
+
+// Below returns a [MapSpan] with upper bound hi, exclusive, and no lower bound.
+func (m *Map[K, V]) Below(hi K) MapSpan[K, V] { return MapSpan[K, V]{m: m, hi: excluding(hi)} }
+
+// From returns a [MapSpan] with lower bound lo, inclusive, and the same upper bound as s,
 // if lo is within s's current lower bound. Otherwise, it returns a MapSpan with the same
 // bounds as s.
 func (s MapSpan[K, V]) From(lo K) MapSpan[K, V] {
-	panic("unimplemented")
+	if s.inLo(lo) {
+		s.lo = including(lo)
+	}
+	return s
 }
 
-// Above returns a [MapSpan] with lower bound lo, exclusive and the same upper bound as s,
+// Above returns a [MapSpan] with lower bound lo, exclusive, and the same upper bound as s,
 // if lo is within s's current lower bound. Otherwise, it returns a MapSpan with the same
 // bounds as s.
 func (s MapSpan[K, V]) Above(lo K) MapSpan[K, V] {
-	panic("unimplemented")
+	if s.inLo(lo) {
+		s.lo = excluding(lo)
+	}
+	return s
+}
+
+// To returns a [MapSpan] with upper bound hi, inclusive, and the same lower bound as s,
+// if hi is within s's current upper bound. Otherwise, it returns a MapSpan with the same
+// bounds as s.
+func (s MapSpan[K, V]) To(hi K) MapSpan[K, V] {
+	if s.inHi(hi) {
+		s.hi = including(hi)
+	}
+	return s
+}
+
+// Below returns a [MapSpan] with upper bound hi, exclusive, and the same lower bound as s,
+// if hi is within s's current upper bound. Otherwise, it returns a MapSpan with the same
+// bounds as s.
+func (s MapSpan[K, V]) Below(hi K) MapSpan[K, V] {
+	if s.inHi(hi) {
+		s.hi = excluding(hi)
+	}
+	return s
 }
 
 // Min returns the minimum key in s along with its value.
