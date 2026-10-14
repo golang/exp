@@ -11,6 +11,7 @@ import (
 	"iter"
 	"maps"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -125,6 +126,215 @@ func checkSize(t *testing.T, m *Map[int, int]) {
 		check(n.right)
 	}
 	check(m.root)
+}
+
+func TestAll(t *testing.T) {
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		_, slice := permute(m, N)
+		var have []int
+		for k, v := range m.All() {
+			if v != slice[k] {
+				t.Errorf("All() returned %d, %d want %d, %d", k, v, k, slice[k])
+			}
+			have = append(have, k)
+			if len(have) > N+5 { // too many; looping?
+				break
+			}
+		}
+		want := nonzeroIndexes(slice)
+		if !slices.Equal(have, want) {
+			t.Errorf("All() = %v, want %v", have, want)
+		}
+	}
+}
+
+func TestBackward(t *testing.T) {
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		_, slice := permute(m, N)
+		var have []int
+		for k, v := range m.Backward() {
+			if v != slice[k] {
+				t.Errorf("All() returned %d, %d want %d, %d", k, v, k, slice[k])
+			}
+			have = append(have, k)
+			if len(have) > N+5 { // too many; looping?
+				break
+			}
+		}
+		want := nonzeroIndexes(slice)
+		slices.Reverse(want)
+		if !slices.Equal(have, want) {
+			t.Errorf("All() = %v, want %v", have, want)
+		}
+	}
+}
+
+func TestKeys(t *testing.T) {
+	t.Run("Map", func(t *testing.T) {
+		for N := range 11 {
+			m := NewMap[int, int](cmp.Compare)
+			_, slice := permute(m, N)
+			var have []int
+			for k := range m.Keys() {
+				have = append(have, k)
+				if len(have) > N+5 {
+					break
+				}
+			}
+			want := nonzeroIndexes(slice)
+			if !slices.Equal(have, want) {
+				t.Errorf("N=%d: Keys() = %v, want %v", N, have, want)
+			}
+		}
+	})
+}
+
+func TestValues(t *testing.T) {
+	t.Run("Map", func(t *testing.T) {
+		for N := range 11 {
+			m := NewMap[int, int](cmp.Compare)
+			_, slice := permute(m, N)
+			var have []int
+			for v := range m.Values() {
+				have = append(have, v)
+				if len(have) > N+5 {
+					break
+				}
+			}
+			var want []int
+			for _, k := range nonzeroIndexes(slice) {
+				want = append(want, slice[k])
+			}
+			if !slices.Equal(have, want) {
+				t.Errorf("N=%d: Values() = %v, want %v", N, have, want)
+			}
+		}
+	})
+}
+
+func TestAllRange(t *testing.T) {
+	check := func(m *Map[int, int], slice []int, blo, bhi bound[int]) {
+		var have []int
+		r := newMapSpan(m, blo, bhi)
+		for k, v := range r.All() {
+			if v != slice[k] {
+				t.Errorf("All() returned %d, %d want %d, %d", k, v, k, slice[k])
+			}
+			have = append(have, k)
+			if len(have) > len(slice)+5 { // too many; looping?
+				break
+			}
+		}
+		var want []int
+		for k, v := range slice {
+			if v != 0 && in(k, blo, bhi) {
+				want = append(want, k)
+			}
+		}
+		if !slices.Equal(have, want) {
+			t.Errorf("All() = %v, want %v", have, want)
+		}
+	}
+
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		_, slice := permute(m, N)
+		for blo, bhi := range bounds(len(slice)) {
+			check(m, slice, blo, bhi)
+		}
+	}
+}
+
+func TestBackwardRange(t *testing.T) {
+	check := func(m *Map[int, int], slice []int, blo, bhi bound[int]) {
+		var have []int
+		r := newMapSpan(m, blo, bhi)
+		for k, v := range r.Backward() {
+			if v != slice[k] {
+				t.Errorf("Backward(%s) returned %d, %d want %d, %d", r, k, v, k, slice[k])
+			}
+			have = append(have, k)
+			if len(have) > len(slice)+5 { // too many; looping?
+				break
+			}
+		}
+		var want []int
+		for k, v := range slice {
+			if v != 0 && in(k, blo, bhi) {
+				want = append(want, k)
+			}
+		}
+		slices.Reverse(want)
+		if !slices.Equal(have, want) {
+			t.Errorf("Backward(%s) = %v, want %v", rdump(r), have, want)
+		}
+	}
+
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		_, slice := permute(m, N)
+		for blo, bhi := range bounds(len(slice)) {
+			check(m, slice, blo, bhi)
+		}
+	}
+}
+
+func TestKeysRange(t *testing.T) {
+	t.Run("Range", func(t *testing.T) {
+		for N := range 11 {
+			m := NewMap[int, int](cmp.Compare)
+			_, slice := permute(m, N)
+			for blo, bhi := range bounds(len(slice)) {
+				r := MapSpan[int, int]{m: m, lo: blo, hi: bhi}
+				var have []int
+				for k := range r.Keys() {
+					have = append(have, k)
+					if len(have) > len(slice)+5 {
+						break
+					}
+				}
+				var want []int
+				for k, v := range slice {
+					if v != 0 && in(k, blo, bhi) {
+						want = append(want, k)
+					}
+				}
+				if !slices.Equal(have, want) {
+					t.Errorf("N=%d, r=%s: Keys() = %v, want %v", N, rdump(r), have, want)
+				}
+			}
+		}
+	})
+}
+
+func TestValuesRange(t *testing.T) {
+	t.Run("Range", func(t *testing.T) {
+		for N := range 11 {
+			m := NewMap[int, int](cmp.Compare)
+			_, slice := permute(m, N)
+			for blo, bhi := range bounds(len(slice)) {
+				r := MapSpan[int, int]{m: m, lo: blo, hi: bhi}
+				var have []int
+				for v := range r.Values() {
+					have = append(have, v)
+					if len(have) > len(slice)+5 {
+						break
+					}
+				}
+				var want []int
+				for k, v := range slice {
+					if v != 0 && in(k, blo, bhi) {
+						want = append(want, v)
+					}
+				}
+				if !slices.Equal(have, want) {
+					t.Errorf("N=%d, r=%s: Values() = %v, want %v", N, rdump(r), have, want)
+				}
+			}
+		}
+	})
 }
 
 func TestRangeCreation(t *testing.T) {
@@ -248,6 +458,28 @@ func TestBounds(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
+}
+
+// nonzeroIndexes returns the indexes i such that s[i] != 0.
+func nonzeroIndexes(s []int) []int {
+	var r []int
+	for k, v := range s {
+		if v != 0 {
+			r = append(r, k)
+		}
+	}
+	return r
+}
+
+// in reports whether n is within the interval specified by lo and hi.
+func in(n int, lo, hi bound[int]) bool {
+	if lo.present && ((lo.inclusive && n < lo.key) || (!lo.inclusive && n <= lo.key)) {
+		return false
+	}
+	if hi.present && ((hi.inclusive && n > hi.key) || (!hi.inclusive && n >= hi.key)) {
+		return false
+	}
+	return true
 }
 
 func TestRdump(t *testing.T) {

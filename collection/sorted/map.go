@@ -261,27 +261,19 @@ func (m *Map[K, V]) Max() (K, V, bool) {
 //
 // Another example: if the map contains keys 10, 20 and 30, the iterator has yielded
 // 10, and then 20 is deleted, then the next yielded key will be 30.
-func (m *Map[K, V]) All() iter.Seq2[K, V] {
-	panic("unimplemented")
-}
+func (m *Map[K, V]) All() iter.Seq2[K, V] { return m.Span().All() }
 
 // Keys returns an iterator over the keys in m from smallest to largest.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (m *Map[K, V]) Keys() iter.Seq[K] {
-	panic("unimplemented")
-}
+func (m *Map[K, V]) Keys() iter.Seq[K] { return m.Span().Keys() }
 
 // Values returns an iterator over the values in m from smallest to largest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (m *Map[K, V]) Values() iter.Seq[V] {
-	panic("unimplemented")
-}
+func (m *Map[K, V]) Values() iter.Seq[V] { return m.Span().Values() }
 
 // Backward returns an iterator over the map m from largest to smallest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (m *Map[K, V]) Backward() iter.Seq2[K, V] {
-	panic("unimplemented")
-}
+func (m *Map[K, V]) Backward() iter.Seq2[K, V] { return m.Span().Backward() }
 
 // Clear removes all entries from the map.
 func (m *Map[K, V]) Clear() {
@@ -415,9 +407,59 @@ func (s MapSpan[K, V]) Below(hi K) MapSpan[K, V] {
 // The third return value is false if s is empty, otherwise true.
 func (s MapSpan[K, V]) Min() (K, V, bool) { panic("unimplemented") }
 
+// minNode returns the node with the smallest key in s,
+// or nil if there is none.
+func (s MapSpan[K, V]) minNode() *node[K, V] {
+	var minn func(*node[K, V]) *node[K, V]
+	minn = func(n *node[K, V]) *node[K, V] {
+		if n == nil {
+			return nil
+		}
+		if !s.inLo(n.key) {
+			return minn(n.right)
+		}
+		if !s.inHi(n.key) {
+			return minn(n.left)
+		}
+		// n.key is in range.
+		// If there is a smaller key, it is in the left subtree.
+		if l := minn(n.left); l != nil {
+			return l
+		}
+		return n
+	}
+
+	return minn(s.m.root)
+}
+
 // Max returns the maximum key in s along with its value.
 // The third return value is false if s is empty, otherwise true.
 func (s MapSpan[K, V]) Max() (K, V, bool) { panic("unimplemented") }
+
+// maxNode returns the node with the largest key in s,
+// or nil if there is none (because the span is empty).
+func (s MapSpan[K, V]) maxNode() *node[K, V] {
+	var maxn func(*node[K, V]) *node[K, V]
+	maxn = func(n *node[K, V]) *node[K, V] {
+		if n == nil {
+			return nil
+		}
+		if !s.inLo(n.key) {
+			return maxn(n.right)
+		}
+		if !s.inHi(n.key) {
+			return maxn(n.left)
+		}
+		// n.key is in range.
+		// If there is a larger key, it is in the right subtree.
+		if r := maxn(n.right); r != nil {
+			return r
+		}
+		return n
+	}
+
+	return maxn(s.m.root)
+}
 
 // Index returns the index of key within s, or -1 if key is not present or not in bounds.
 func (s MapSpan[K, V]) Index(key K) int { panic("unimplemented") }
@@ -444,16 +486,98 @@ func (s MapSpan[K, V]) Clear() {
 
 // All returns an iterator over s from smallest to largest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) All() iter.Seq2[K, V] { panic("unimplemented") }
+func (s MapSpan[K, V]) All() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		x := s.minNode()
+		for x != nil && s.inHi(x.key) && yield(x.key, x.val) {
+			x = x.next(s.m)
+		}
+	}
+}
 
 // Keys returns an iterator over the keys in s from smallest to largest.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) Keys() iter.Seq[K] { panic("unimplemented") }
+func (s MapSpan[K, V]) Keys() iter.Seq[K] {
+	return func(yield func(K) bool) {
+		s.All()(func(k K, _ V) bool { return yield(k) })
+	}
+}
 
 // Values returns an iterator over the values in s from smallest to largest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) Values() iter.Seq[V] { panic("unimplemented") }
+func (s MapSpan[K, V]) Values() iter.Seq[V] {
+	return func(yield func(V) bool) {
+		s.All()(func(_ K, v V) bool { return yield(v) })
+	}
+}
 
 // Backward returns an iterator over s from largest to smallest key.
 // See [Map.All] for the guarantee provided if m is modified during the iteration.
-func (s MapSpan[K, V]) Backward() iter.Seq2[K, V] { panic("unimplemented") }
+func (s MapSpan[K, V]) Backward() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		x := s.maxNode()
+		for x != nil && s.inLo(x.key) && yield(x.key, x.val) {
+			x = x.prev(s.m)
+		}
+	}
+}
+
+// next returns the successor node of n in the treap,
+// even if n has been removed from the treap.
+// n must not be nil.
+func (n *node[K, V]) next(m *Map[K, V]) *node[K, V] {
+	if n.pri == 0 {
+		// n has been deleted.
+		// Find where n.key would be in the current tree: the node with the smallest
+		// key >= n.key.
+		nk := n.key
+		n = m.Span().From(nk).minNode()
+		if n == nil || m.cmp(n.key, nk) != 0 {
+			// The new node's key (if any) is greater than the old n.key.
+			return n
+		}
+	}
+	// If n has a right child, the next node is its leftmost node.
+	if r := n.right; r != nil {
+		for r.left != nil {
+			r = r.left
+		}
+		return r
+	}
+	// Otherwise, the next node is the closest ancestor that contains
+	// n in its left subtree.
+	for n.parent != nil && n.parent.right == n {
+		n = n.parent
+	}
+	return n.parent
+}
+
+// prev returns the predecessor node of n in the treap,
+// even if n has been removed from the treap.
+// n must not be nil.
+func (n *node[K, V]) prev(m *Map[K, V]) *node[K, V] {
+	if n.pri == 0 {
+		// n has been deleted.
+		// Find where n.key would be in the current tree: the node with the largest
+		// key <= n.key.
+		nk := n.key
+		n = m.Span().To(nk).maxNode()
+		if n == nil || m.cmp(n.key, nk) != 0 {
+			// The new node's key (if any) is less than the old n.key.
+			return n
+		}
+	}
+	// If n has a left child, the previous node is its rightmost node.
+	if l := n.left; l != nil {
+		for l.right != nil {
+			l = l.right
+		}
+		return l
+	}
+	// Otherwise, the previous node is the closest ancestor that contains
+	// n in its right subtree.
+	for n.parent != nil && n.parent.left == n {
+		n = n.parent
+	}
+	return n.parent
+}
