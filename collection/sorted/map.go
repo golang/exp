@@ -14,8 +14,10 @@ package sorted
 // https://faculty.washington.edu/aragon/pubs/rst89.pdf
 
 import (
+	"fmt"
 	"iter"
 	"math/rand/v2"
+	"strings"
 
 	"golang.org/x/exp/collection/internal"
 )
@@ -319,17 +321,43 @@ func (m *Map[K, V]) Backward() iter.Seq2[K, V] { return m.Span().Backward() }
 
 // Clear removes all entries from the map.
 func (m *Map[K, V]) Clear() {
-	panic("unimplemented")
+	m.root = nil
 }
 
-// Clone returns a shallow copy of m.
+// Clone returns a new non-nil map with the same entries as m.
 func (m *Map[K, V]) Clone() *Map[K, V] {
-	panic("unimplemented")
+	copy := NewMap[K, V](m.cmp)
+	copy.root = m.root.clone(nil)
+	return copy
+}
+
+func (n *node[K, V]) clone(parent *node[K, V]) *node[K, V] {
+	if n == nil {
+		return nil
+	}
+	x2 := new(*n)
+	x2.left = n.left.clone(x2)
+	x2.right = n.right.clone(x2)
+	x2.parent = parent
+	return x2
 }
 
 // String returns a string representation of m in the form "{k1: v1, k2: v2}".
 func (m *Map[K, V]) String() string {
-	panic("unimplemented")
+	return mapString(m.All())
+}
+
+func mapString[K, V any](items iter.Seq2[K, V]) string {
+	var b strings.Builder
+	b.WriteByte('{')
+	for k, v := range items {
+		if b.Len() > len("{") {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%v: %v", k, v)
+	}
+	b.WriteByte('}')
+	return b.String()
 }
 
 // Nth returns the key and value at index i,
@@ -585,7 +613,7 @@ func (s MapSpan[K, V]) Len() int {
 
 // String returns a string representation of s.
 func (s MapSpan[K, V]) String() string {
-	panic("unimplemented")
+	return mapString(s.All())
 }
 
 // Nth returns the key and value at index i within s.
@@ -594,8 +622,14 @@ func (s MapSpan[K, V]) Nth(i int) (K, V) {
 	return s.m.root.nth(s.minNode().rank() + i)
 }
 
-// Clone returns a new [Map] containing only the keys in s.
-func (s MapSpan[K, V]) Clone() *Map[K, V] { panic("unimplemented") }
+// Clone returns a new non-nil map with the same entries as s.
+func (s MapSpan[K, V]) Clone() *Map[K, V] {
+	m := NewMap[K, V](s.m.cmp)
+	for k, v := range s.All() {
+		m.Set(k, v)
+	}
+	return m
+}
 
 // Clear deletes all the entries in s from s's underlying map.
 func (s MapSpan[K, V]) Clear() {

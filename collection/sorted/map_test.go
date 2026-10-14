@@ -623,6 +623,61 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestClone(t *testing.T) {
+	equal := func(i1, i2 *Map[int, int]) bool {
+		if i1.Len() != i2.Len() {
+			return false
+		}
+		next, stop := iter.Pull2(i2.All())
+		defer stop()
+		for k1, v1 := range i1.All() {
+			k2, v2, ok := next()
+			if !ok || k1 != k2 || v1 != v2 {
+				return false
+			}
+		}
+		return true
+	}
+
+	t.Run("MapFunc", func(t *testing.T) {
+		for N := range 11 {
+			m := NewMap[int, int](func(i1, i2 int) int { return cmp.Compare(i1, i2) })
+			permute(m, N)
+			if !equal(m, m.Clone()) {
+				t.Errorf("N=%d: not equal", N)
+			}
+		}
+	})
+}
+
+func TestRangeClone(t *testing.T) {
+	t.Run("Range", func(t *testing.T) {
+		m := NewMap[int, int](cmp.Compare)
+		// Insert keys 2, 4, 6, 8, 10 with values 1, 2, 3, 4, 5
+		for i := 1; i <= 5; i++ {
+			m.Set(2*i, i)
+		}
+
+		// Clone range [4, 8]
+		clone := m.From(4).To(8).Clone()
+		if clone.Len() != 3 {
+			t.Errorf("Len: got %d, want 3", clone.Len())
+		}
+		for i, key := range []int{4, 6, 8} {
+			k, v := clone.Nth(i)
+			if k != key || v != key/2 {
+				t.Errorf("Nth(%d): got (%d, %d), want (%d, %d)", i, k, v, key, key/2)
+			}
+		}
+
+		// Verify clone is independent
+		clone.Set(5, 99)
+		if m.Len() != 5 {
+			t.Errorf("original modified: Len = %d, want 5", m.Len())
+		}
+	})
+}
+
 func TestRangeCreation(t *testing.T) {
 	m := NewMap[int, int](nil)
 	for _, tc := range []struct {
@@ -884,4 +939,100 @@ func TestRangeBounds(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestString(t *testing.T) {
+	// Map
+	for _, m := range []*Map[int, string]{
+		NewMap[int, string](cmp.Compare),
+	} {
+		if got, want := m.String(), "{}"; got != want {
+			t.Errorf("%T.String() = %q, want %q", m, got, want)
+		}
+		m.Set(1, "one")
+		m.Set(2, "two")
+		if got, want := m.String(), "{1: one, 2: two}"; got != want {
+			t.Errorf("%T.String() = %q, want %q", m, got, want)
+		}
+	}
+
+	// MapSpan
+	mm := NewMap[int, string](cmp.Compare)
+	mm.Set(1, "one")
+	mm.Set(2, "two")
+	mm.Set(3, "three")
+
+	for _, test := range []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"MapSpanEmpty", mm.Above(3).String(), "{}"},
+		{"MapSpanOne", mm.From(2).To(2).String(), "{2: two}"},
+		{"MapSpanFull", mm.From(-1).To(10).String(), "{1: one, 2: two, 3: three}"},
+	} {
+		if test.got != test.want {
+			t.Errorf("%s = %q, want %q", test.name, test.got, test.want)
+		}
+	}
+}
+
+// TestDeleteReinsert checks that iterators behave correctly when the
+// current key is deleted and then re-inserted during iteration.
+func TestDeleteReinsert(t *testing.T) {
+	const N = 10
+	t.Run("All", func(t *testing.T) {
+		for target := range N {
+			m := NewMap[int, int](cmp.Compare[int])
+			for i := range N {
+				m.Set(i, i)
+			}
+			var have []int
+			for k := range m.All() {
+				have = append(have, k)
+				// bound iterations to avoid infinite loop
+				if len(have) > 2*N {
+					break
+				}
+				if k == target {
+					m.Delete(k)
+					m.Set(k, -k)
+				}
+			}
+			var want []int
+			for i := range N {
+				want = append(want, i)
+			}
+			if !slices.Equal(have, want) {
+				t.Fatalf("target %d: All() = %v, want %v", target, have, want)
+			}
+		}
+	})
+	t.Run("Backward", func(t *testing.T) {
+		for target := range N {
+			m := NewMap[int, int](cmp.Compare[int])
+			for i := range N {
+				m.Set(i, i)
+			}
+			var have []int
+			for k := range m.Backward() {
+				have = append(have, k)
+				// bound iterations to avoid infinite loop
+				if len(have) > 2*N {
+					break
+				}
+				if k == target {
+					m.Delete(k)
+					m.Set(k, -k)
+				}
+			}
+			var want []int
+			for i := N - 1; i >= 0; i-- {
+				want = append(want, i)
+			}
+			if !slices.Equal(have, want) {
+				t.Fatalf("target %d: Backward() = %v, want %v", target, have, want)
+			}
+		}
+	})
 }
