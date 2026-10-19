@@ -400,6 +400,149 @@ func TestValuesRange(t *testing.T) {
 	})
 }
 
+func TestNth(t *testing.T) {
+	for N := range 11 {
+		m := NewMap[int, int](cmp.Compare)
+		_, slice := permute(m, N)
+		var haveKeys, haveVals []int
+		for i := range N {
+			k, v := m.Nth(i)
+			haveKeys = append(haveKeys, k)
+			haveVals = append(haveVals, v)
+		}
+		var wantKeys, wantVals []int
+		for k, v := range slice {
+			if v != 0 {
+				wantKeys = append(wantKeys, k)
+				wantVals = append(wantVals, v)
+			}
+		}
+		if !slices.Equal(haveKeys, wantKeys) {
+			t.Errorf("keys: have %v, want %v", haveKeys, wantKeys)
+		}
+		if !slices.Equal(haveVals, wantVals) {
+			t.Errorf("values: have %v, want %v", haveVals, wantVals)
+		}
+	}
+}
+
+func TestIndex(t *testing.T) {
+	t.Run("Map", func(t *testing.T) {
+		m := NewMap[int, int](cmp.Compare)
+		// Empty map
+		if got := m.Index(1); got != -1 {
+			t.Errorf("empty map: got %d, want -1", got)
+		}
+
+		// Insert keys 2, 4, 6, 8, 10
+		for i := 1; i <= 5; i++ {
+			m.Set(2*i, i)
+		}
+
+		// Test existing keys
+		for i := range 5 {
+			key := 2 * (i + 1)
+			if got := m.Index(key); got != i {
+				t.Errorf("Index(%d): got %d, want %d", key, got, i)
+			}
+		}
+
+		// Test non-existing keys
+		for _, key := range []int{1, 3, 5, 100} {
+			if got := m.Index(key); got != -1 {
+				t.Errorf("Index(%d): got %d, want -1", key, got)
+			}
+		}
+	})
+
+	t.Run("Range", func(t *testing.T) {
+		m := NewMap[int, int](cmp.Compare)
+		// Insert keys 2, 4, 6, 8, 10
+		for i := 1; i <= 5; i++ {
+			m.Set(2*i, i)
+		}
+
+		// Range [4, 8] contains 4, 6, 8 at indices 0, 1, 2
+		r := m.From(4).To(8)
+		for i, key := range []int{4, 6, 8} {
+			if got := r.Index(key); got != i {
+				t.Errorf("Range.Index(%d): got %d, want %d", key, got, i)
+			}
+		}
+
+		// Keys in map but outside range
+		for _, key := range []int{2, 10} {
+			if got := r.Index(key); got != -1 {
+				t.Errorf("Range.Index(%d): got %d, want -1", key, got)
+			}
+		}
+
+		// Keys not in map
+		for _, key := range []int{1, 5, 100} {
+			if got := r.Index(key); got != -1 {
+				t.Errorf("Range.Index(%d): got %d, want -1", key, got)
+			}
+		}
+	})
+}
+
+func TestRangeLen(t *testing.T) {
+	t.Run("Range", func(t *testing.T) {
+		m := NewMap[int, int](cmp.Compare)
+		// Empty range on empty map
+		if got := m.From(1).To(10).Len(); got != 0 {
+			t.Errorf("empty map: got %d, want 0", got)
+		}
+
+		// Insert keys 2, 4, 6, 8, 10
+		for i := 1; i <= 5; i++ {
+			m.Set(2*i, i)
+		}
+
+		// Full map
+		if got := m.From(0).To(100).Len(); got != 5 {
+			t.Errorf("full range: got %d, want 5", got)
+		}
+
+		// Range [4, 8] contains 4, 6, 8
+		if got := m.From(4).To(8).Len(); got != 3 {
+			t.Errorf("From(4).To(8): got %d, want 3", got)
+		}
+
+		// Range (4, 8) contains only 6
+		if got := m.Above(4).Below(8).Len(); got != 1 {
+			t.Errorf("Above(4).Below(8): got %d, want 1", got)
+		}
+
+		// Empty range
+		if got := m.From(100).To(200).Len(); got != 0 {
+			t.Errorf("empty range: got %d, want 0", got)
+		}
+	})
+}
+
+func TestRangeNth(t *testing.T) {
+	t.Run("Range", func(t *testing.T) {
+		m := NewMap[int, int](cmp.Compare)
+		// Insert keys 2, 4, 6, 8, 10 with values 1, 2, 3, 4, 5
+		for i := 1; i <= 5; i++ {
+			m.Set(2*i, i)
+		}
+
+		// Range [4, 8] contains 4, 6, 8
+		r := m.From(4).To(8)
+		for i, wantKey := range []int{4, 6, 8} {
+			k, v := r.Nth(i)
+			if k != wantKey {
+				t.Errorf("Nth(%d) key: got %d, want %d", i, k, wantKey)
+			}
+			if v != wantKey/2 {
+				t.Errorf("Nth(%d) value: got %d, want %d", i, v, wantKey/2)
+			}
+		}
+	})
+}
+
 func TestRangeCreation(t *testing.T) {
 	m := NewMap[int, int](nil)
 	for _, tc := range []struct {

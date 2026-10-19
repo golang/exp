@@ -286,10 +286,24 @@ func (m *Map[K, V]) String() string {
 	panic("unimplemented")
 }
 
-// Nth returns the key and value at index i.
-// It panics if i < 0 or i >= m.Len().
+// Nth returns the key and value at index i,
+// which must be nonnegative and less than m.Len().
 // See [Map.Index] for the inverse operation.
-func (m *Map[K, V]) Nth(i int) (K, V) { panic("unimplemented") }
+func (m *Map[K, V]) Nth(i int) (K, V) { return m.root.nth(i) }
+
+func (n *node[K, V]) nth(i int) (K, V) {
+	if n == nil {
+		panic("index out of range")
+	}
+	lsz := n.left.size()
+	if i == lsz {
+		return n.key, n.val
+	}
+	if i < lsz {
+		return n.left.nth(i)
+	}
+	return n.right.nth(i - lsz - 1)
+}
 
 // Index returns the index of key in m, or -1 if key is not present.
 // The index of a key is its position in the sequence of keys.
@@ -297,7 +311,30 @@ func (m *Map[K, V]) Nth(i int) (K, V) { panic("unimplemented") }
 // and the largest has index m.Len()-1.
 // See [Map.Nth] for the inverse operation.
 func (m *Map[K, V]) Index(key K) int {
-	panic("unimplemented")
+	if m.root == nil {
+		return -1
+	}
+	pos, _ := m.find(key)
+	if *pos == nil {
+		return -1
+	}
+	return (*pos).rank()
+}
+
+// rank returns the 0-based index of n in the sorted sequence that the tree
+// rooted at n represents.
+// n must not be nil.
+func (n *node[K, V]) rank() int {
+	if n == nil {
+		panic("nil node")
+	}
+	r := n.left.size()
+	for p := n.parent; p != nil; n, p = p, p.parent {
+		if n == p.right {
+			r += 1 + p.left.size()
+		}
+	}
+	return r
 }
 
 // A MapSpan is a restricted view of a [Map] consisting only of the items
@@ -470,10 +507,35 @@ func (s MapSpan[K, V]) maxNode() *node[K, V] {
 }
 
 // Index returns the index of key within s, or -1 if key is not present or not in bounds.
-func (s MapSpan[K, V]) Index(key K) int { panic("unimplemented") }
+func (s MapSpan[K, V]) Index(key K) int {
+	if !s.inLo(key) || !s.inHi(key) {
+		return -1
+	}
+	pos, _ := s.m.find(key)
+	if *pos == nil {
+		return -1
+	}
+	min := s.minNode()
+	if min == nil {
+		return -1
+	}
+	return (*pos).rank() - min.rank()
+}
 
 // Len returns the number of keys in s.
-func (s MapSpan[K, V]) Len() int { panic("unimplemented") }
+func (s MapSpan[K, V]) Len() int {
+	// Compute in logarithmic time by finding the difference in ranks
+	// of the extremal keys.
+	min := s.minNode()
+	if min == nil {
+		return 0
+	}
+	max := s.maxNode()
+	if max == nil {
+		return 0
+	}
+	return max.rank() - min.rank() + 1
+}
 
 // String returns a string representation of s.
 func (s MapSpan[K, V]) String() string {
@@ -482,7 +544,9 @@ func (s MapSpan[K, V]) String() string {
 
 // Nth returns the key and value at index i within s.
 // It panics if i < 0 or i >= s.Len().
-func (s MapSpan[K, V]) Nth(i int) (K, V) { panic("unimplemented") }
+func (s MapSpan[K, V]) Nth(i int) (K, V) {
+	return s.m.root.nth(s.minNode().rank() + i)
+}
 
 // Clone returns a new [Map] containing only the keys in s.
 func (s MapSpan[K, V]) Clone() *Map[K, V] { panic("unimplemented") }
