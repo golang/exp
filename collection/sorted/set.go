@@ -85,8 +85,8 @@ func (s *Set[T]) Index(e T) int {
 // (if no equivalent element is present),
 // and reports whether the set grew.
 func (s *Set[T]) Insert(e T) bool {
-	_, added := s.m.Set(e, struct{}{})
-	return added
+	_, present := s.m.Set(e, struct{}{})
+	return !present
 }
 
 // Delete removes the given element, if present.
