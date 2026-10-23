@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -444,6 +445,113 @@ func TestValuesRange(t *testing.T) {
 	})
 }
 
+func TestDeleteRange(t *testing.T) {
+	check := func(N int, blo, bhi bound[int]) {
+		t.Helper()
+		m := NewMap[int, int](cmp.Compare)
+		r := newMapSpan(m, blo, bhi)
+		_, slice := permute(m, N)
+		r.Clear()
+		var have []int
+		for k := range m.All() {
+			have = append(have, k)
+		}
+		want := keep(slice, func(k int) bool { return !in(k, blo, bhi) })
+		if !slices.Equal(have, want) {
+			t.Errorf("N=%d, after Clear(%s), All() = %v, want %v",
+				N, rdump(r), have, want)
+		}
+		if g, w := m.Len(), len(have); g != w {
+			t.Errorf("m.Len() = %d, want %d", g, w)
+		}
+		checkSize(t, m)
+	}
+
+	for N := range 11 {
+		for blo, bhi := range bounds(2*N + 1) {
+			check(N, blo, bhi)
+			if blo.present && bhi.present && blo.key < bhi.key {
+				check(N, bhi, blo)
+			}
+		}
+	}
+}
+
+func TestAllDeleteRange(t *testing.T) {
+	var deleteLo, deleteHi int
+	for _, mode := range []string{"prev", "current", "next", "clear"} {
+		for N := range 8 {
+			for target := 1; target <= 2*N-1; target += 2 {
+				m := NewMap[int, int](cmp.Compare)
+				_, slice := permute(m, N)
+				var have []int
+				for k := range m.All() {
+					deleteLo, deleteHi = clearRange(m, true, k, target, mode, slice)
+					have = append(have, k)
+				}
+				want := nonzeroIndexes(slice)
+				if !slices.Equal(have, want) {
+					t.Errorf("All() deleting range [%d, %d] at %d = %v, want %v", deleteLo, deleteHi, target, have, want)
+				}
+				checkSize(t, m)
+			}
+		}
+	}
+}
+
+func TestBackwardDeleteRange(t *testing.T) {
+	for _, mode := range []string{"prev", "current", "next", "clear"} {
+		for N := range 8 {
+			for target := 1; target <= 2*N-1; target += 2 {
+				m := NewMap[int, int](cmp.Compare)
+				_, slice := permute(m, N)
+				var have []int
+				var deleteLo, deleteHi int
+				for k := range m.Backward() {
+					deleteLo, deleteHi = clearRange(m, false, k, target, mode, slice)
+					have = append(have, k)
+				}
+				want := nonzeroIndexes(slice)
+				slices.Reverse(want)
+				if !slices.Equal(have, want) {
+					t.Errorf("Backward() deleting range [%d, %d] at %d = %v, want %v", deleteLo, deleteHi, target, have, want)
+				}
+				checkSize(t, m)
+			}
+		}
+	}
+}
+
+func clearRange(m *Map[int, int], forwards bool, k, target int, mode string, slice []int) (int, int) {
+	var deleteLo, deleteHi int
+	if k == target {
+		switch mode {
+		case "prev":
+			deleteLo, deleteHi = k-5, k-1
+		case "current":
+			deleteLo, deleteHi = k-2, k+2
+		case "next":
+			deleteLo, deleteHi = k+1, k+5
+		case "clear":
+			deleteLo = math.MinInt
+			deleteHi = math.MaxInt - 1
+		}
+		newMapSpan(m, including(deleteLo), including(deleteHi)).Clear()
+		var lo, hi int
+		if forwards {
+			lo = max(deleteLo, k+1)
+			hi = min(len(slice), deleteHi+1)
+		} else {
+			lo = max(deleteLo, 0)
+			hi = min(k, deleteHi+1)
+		}
+		for i := lo; i < hi; i++ {
+			slice[i] = 0
+		}
+	}
+	return deleteLo, deleteHi
+}
+
 func TestNth(t *testing.T) {
 	for N := range 11 {
 		m := NewMap[int, int](cmp.Compare)
@@ -799,6 +907,16 @@ func TestBounds(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
+}
+
+func keep(s []int, f func(int) bool) []int {
+	var r []int
+	for k, v := range s {
+		if v != 0 && f(k) {
+			r = append(r, k)
+		}
+	}
+	return r
 }
 
 // nonzeroIndexes returns the indexes i such that s[i] != 0.

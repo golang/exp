@@ -32,6 +32,7 @@ import (
 type Map[K, V any] struct {
 	root *node[K, V]
 	cmp  func(K, K) int
+	gen  uint64 // generation count, for efficient range deletion
 	_    internal.NoCopy
 }
 
@@ -274,8 +275,10 @@ func (m *Map[K, V]) deleteNode(x *node[K, V]) {
 func (m *Map[K, V]) DeleteFunc(del func(K, V) bool) bool {
 	changed := false
 	for x := m.Span().minNode(); x != nil; {
+		gen := m.gen
 		doDel := del(x.key, x.val)
-		next := x.next(m)
+		next := x.next(m, gen != m.gen)
+		gen = m.gen
 		if doDel && x.pri != 0 {
 			m.deleteNode(x)
 			changed = true
@@ -283,6 +286,102 @@ func (m *Map[K, V]) DeleteFunc(del func(K, V) bool) bool {
 		x = next
 	}
 	return changed
+}
+
+// deleteRange deletes m's entries between the bounds.
+func deleteRange[K, V any](m *Map[K, V], lo, hi bound[K]) {
+	// TODO: rewrite to avoid reinsertions.
+	switch {
+	case !lo.present && !hi.present:
+		// This range includes the whole map.
+		m.Clear()
+	case lo.present && hi.present:
+		if c := m.cmp(lo.key, hi.key); c > 0 || (c == 0 && (!lo.inclusive || !hi.inclusive)) {
+			return
+		}
+		// Both bounds are present.
+		// Delete all entries between them, inclusive; then reinsert
+		// any entries at the exclusive endpoints.
+		loVal, loInMap := m.Lookup(lo.key)
+		hiVal, hiInMap := m.Lookup(hi.key)
+		deleteBetweenInclusive(m, lo.key, hi.key)
+		if !lo.inclusive && loInMap {
+			m.Set(lo.key, loVal)
+		}
+		if !hi.inclusive && hiInMap {
+			m.Set(hi.key, hiVal)
+		}
+	case lo.present:
+		val, ok := m.Lookup(lo.key)
+		// Split m at lo.key. m itself retains only entries
+		// whose key is < lo.key.
+		_ = splitExclusive(m, lo.key)
+		if !lo.inclusive && ok {
+			// lo.key is in the map, and the deletion range excludes it,
+			// so re-insert it.
+			m.Set(lo.key, val)
+		}
+	case hi.present:
+		val, ok := m.Lookup(hi.key)
+		// Split m at hi.key. The return value consists of
+		// entries whose key is > hi.key.
+		after := splitExclusive(m, hi.key)
+		// Keep after, discard m.
+		m.root = after
+		if after != nil {
+			after.parent = nil
+		}
+		if !hi.inclusive && ok {
+			m.Set(hi.key, val)
+		}
+	default:
+		panic("unreachable")
+	}
+}
+
+// deleteBetweenInclusive deletes items from m in [lo, hi].
+// Called deleteRange in rsc.io/omap.
+func deleteBetweenInclusive[K, V any](m *Map[K, V], lo, hi K) {
+	after := splitExclusive(m, hi)
+	_ = splitExclusive(m, lo)
+	if after != nil {
+		// Add after to m.
+		// Both lo and all of after's keys are greater than any key in m.
+		pos, parent := m.find(lo)
+		*pos = after
+		after.parent = parent
+		// Adjust sizes.
+		for p := parent; p != nil; p = p.parent {
+			p.sz = 1 + p.left.size() + p.right.size()
+		}
+		// after is now in the right place by key, but perhaps not by priority.
+		m.rotateUp(after)
+	}
+}
+
+// splitExclusive splits m into two subtrees.
+// The returned node contains all keys > key.
+// m itself contains all keys < key.
+// key itself is not part of either tree.
+// Note that after's parent is not changed; it must be set by the caller.
+func splitExclusive[K, V any](m *Map[K, V], key K) (after *node[K, V]) {
+	pos, parent := m.find(key)
+	if *pos == nil {
+		*pos = &node[K, V]{parent: parent}
+		for p := parent; p != nil; p = p.parent {
+			p.sz++
+		}
+	}
+	x := *pos
+	x.pri = 0
+	x.sz = 0
+	m.rotateUp(x)
+
+	m.root = x.left
+	if x.left != nil {
+		x.left.parent = nil
+	}
+	return x.right
 }
 
 // Min returns the minimum key in m along with its value.
@@ -322,6 +421,9 @@ func (m *Map[K, V]) Backward() iter.Seq2[K, V] { return m.Span().Backward() }
 // Clear removes all entries from the map.
 func (m *Map[K, V]) Clear() {
 	m.root = nil
+	// Each iterator will check its stored generation number against m.gen
+	// before its next yield, detecting that it is invalid.
+	m.gen++
 }
 
 // Clone returns a new non-nil map with the same entries as m.
@@ -633,7 +735,8 @@ func (s MapSpan[K, V]) Clone() *Map[K, V] {
 
 // Clear deletes all the entries in s from s's underlying map.
 func (s MapSpan[K, V]) Clear() {
-	panic("unimplemented")
+	deleteRange(s.m, s.lo, s.hi)
+	s.m.gen++
 }
 
 // All returns an iterator over s from smallest to largest key.
@@ -641,8 +744,10 @@ func (s MapSpan[K, V]) Clear() {
 func (s MapSpan[K, V]) All() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		x := s.minNode()
+		gen := s.m.gen
 		for x != nil && s.inHi(x.key) && yield(x.key, x.val) {
-			x = x.next(s.m)
+			x = x.next(s.m, gen != s.m.gen)
+			gen = s.m.gen
 		}
 	}
 }
@@ -668,8 +773,10 @@ func (s MapSpan[K, V]) Values() iter.Seq[V] {
 func (s MapSpan[K, V]) Backward() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		x := s.maxNode()
+		gen := s.m.gen
 		for x != nil && s.inLo(x.key) && yield(x.key, x.val) {
-			x = x.prev(s.m)
+			x = x.prev(s.m, gen != s.m.gen)
+			gen = s.m.gen
 		}
 	}
 }
@@ -677,9 +784,9 @@ func (s MapSpan[K, V]) Backward() iter.Seq2[K, V] {
 // next returns the successor node of n in the treap,
 // even if n has been removed from the treap.
 // n must not be nil.
-func (n *node[K, V]) next(m *Map[K, V]) *node[K, V] {
-	if n.pri == 0 {
-		// n has been deleted.
+func (n *node[K, V]) next(m *Map[K, V], reset bool) *node[K, V] {
+	if n.pri == 0 || reset {
+		// n has been deleted, or the iterator calling next has been invalidated.
 		// Find where n.key would be in the current tree: the node with the smallest
 		// key >= n.key.
 		nk := n.key
@@ -707,9 +814,9 @@ func (n *node[K, V]) next(m *Map[K, V]) *node[K, V] {
 // prev returns the predecessor node of n in the treap,
 // even if n has been removed from the treap.
 // n must not be nil.
-func (n *node[K, V]) prev(m *Map[K, V]) *node[K, V] {
-	if n.pri == 0 {
-		// n has been deleted.
+func (n *node[K, V]) prev(m *Map[K, V], reset bool) *node[K, V] {
+	if n.pri == 0 || reset {
+		// n has been deleted, or the iterator calling prev has been invalidated.
 		// Find where n.key would be in the current tree: the node with the largest
 		// key <= n.key.
 		nk := n.key
