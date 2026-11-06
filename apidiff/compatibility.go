@@ -127,8 +127,8 @@ func (d *differ) checkCompatibleInterface(otn *types.TypeName, old, new *types.I
 
 // Return an unexported method from the method set of t, or nil if there are none.
 func unexportedMethod(t *types.Interface) *types.Func {
-	for i := 0; i < t.NumMethods(); i++ {
-		if m := t.Method(i); !m.Exported() {
+	for m := range t.Methods() {
+		if !m.Exported() {
 			return m
 		}
 	}
@@ -165,8 +165,7 @@ func (d *differ) checkCompatibleStruct(obj objectWithSide, old, new *types.Struc
 // This is also the set of exported keys for keyed struct literals.
 func exportedFields(s *types.Struct) map[string]types.Object {
 	m := map[string]types.Object{}
-	for i := 0; i < s.NumFields(); i++ {
-		f := s.Field(i)
+	for f := range s.Fields() {
 		if f.Exported() {
 			m[f.Name()] = f
 		}
@@ -230,8 +229,8 @@ func unambiguousFields(structs []*types.Struct) map[string]*types.Var {
 	fields := map[string]*types.Var{}
 	seen := map[string]bool{}
 	for _, s := range structs {
-		for i := 0; i < s.NumFields(); i++ {
-			f := s.Field(i)
+		for f := range s.Fields() {
+			f := f
 			name := f.Name()
 			if seen[name] {
 				delete(fields, name)
@@ -346,8 +345,8 @@ func (d *differ) checkMethodSet(otn *types.TypeName, oldt, newt types.Type, addc
 func exportedMethods(t types.Type) map[string]types.Object {
 	m := map[string]types.Object{}
 	ms := types.NewMethodSet(t)
-	for i := 0; i < ms.Len(); i++ {
-		obj := ms.At(i).Obj()
+	for method := range ms.Methods() {
+		obj := method.Obj()
 		if obj.Exported() {
 			m[obj.Name()] = obj
 		}
