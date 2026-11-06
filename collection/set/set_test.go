@@ -232,9 +232,89 @@ func TestNil(t *testing.T) {
 		t.Errorf("Intersection(s, nil) = %v, want empty", got)
 	}
 
+	// nil is a valid empty Set.
+	e := set.Of[int]()
+	if !n.Equal(e) || !e.Equal(n) {
+		t.Errorf("Equal(nil, empty) or Equal(empty, nil) = false, want true")
+	}
+	if n.Intersects(e) || e.Intersects(n) {
+		t.Errorf("Intersects(nil, empty) or Intersects(empty, nil) = true, want false")
+	}
+
 	if got, want := n.String(), "{}"; got != want {
 		t.Errorf("String(nil) = %q, want %q", got, want)
 	}
+}
+
+func TestBinaryOps(t *testing.T) {
+	var (
+		nilSet set.Set[int]
+		empty  = set.Of[int]()
+		empty2 = set.Of[int]()
+		s      = set.Of(1, 2)
+		sCopy  = set.Of(1, 2)
+	)
+
+	t.Run("NilAndAliasing", func(t *testing.T) {
+		for _, test := range []struct {
+			name                      string
+			x, y                      set.Set[int]
+			union, intersection       []int
+			difference, symmetricDiff []int
+		}{
+			{"NilNil", nilSet, nilSet, nil, nil, nil, nil},
+			{"NilEmpty", nilSet, empty, nil, nil, nil, nil},
+			{"EmptyNil", empty, nilSet, nil, nil, nil, nil},
+			{"EmptyEmpty", empty, empty2, nil, nil, nil, nil},
+			{"NilNonEmpty", nilSet, s, []int{1, 2}, nil, nil, []int{1, 2}},
+			{"NonEmptyNil", s, nilSet, []int{1, 2}, nil, []int{1, 2}, []int{1, 2}},
+			{"EmptyNonEmpty", empty, s, []int{1, 2}, nil, nil, []int{1, 2}},
+			{"NonEmptyEmpty", s, empty, []int{1, 2}, nil, []int{1, 2}, []int{1, 2}},
+			{"AliasedEmpty", empty, empty, nil, nil, nil, nil},
+			{"Aliased", s, s, []int{1, 2}, []int{1, 2}, nil, nil},
+			{"Equal", s, sCopy, []int{1, 2}, []int{1, 2}, nil, nil},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				check := func(t *testing.T, op string, got set.Set[int], want []int) {
+					t.Helper()
+					if got == nil {
+						t.Errorf("%s(%v, %v) returned nil, want non-nil set", op, test.x, test.y)
+						return
+					}
+					if w := set.Of(want...); !got.Equal(w) {
+						t.Errorf("%s(%v, %v) = %v, want %v", op, test.x, test.y, got, w)
+					}
+				}
+				check(t, "Union", test.x.Union(test.y), test.union)
+				check(t, "Intersection", test.x.Intersection(test.y), test.intersection)
+				check(t, "Difference", test.x.Difference(test.y), test.difference)
+				check(t, "SymmetricDifference", test.x.SymmetricDifference(test.y), test.symmetricDiff)
+			})
+		}
+	})
+
+	// Results must not alias the operands, even when x and y are the
+	// same map (the fast paths use Clone).
+	t.Run("ResultsAreCopies", func(t *testing.T) {
+		for _, op := range []struct {
+			name string
+			f    func(set.Set[int], set.Set[int]) set.Set[int]
+		}{
+			{"Union", set.Set[int].Union},
+			{"Intersection", set.Set[int].Intersection},
+			{"Difference", set.Set[int].Difference},
+			{"SymmetricDifference", set.Set[int].SymmetricDifference},
+		} {
+			t.Run(op.name, func(t *testing.T) {
+				x := set.Of(1, 2)
+				got := op.f(x, x)
+				got.Insert(3)
+				if x.Contains(3) {
+					t.Errorf("%s(x, x) result aliases x", op.name)
+				}
+			})
+		}
+	})
 }
 
 func seq[T any](values ...T) iter.Seq[T] { return slices.Values(values) }

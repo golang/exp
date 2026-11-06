@@ -26,6 +26,7 @@ import (
 	"maps"
 	"reflect"
 	"strings"
+	"unsafe"
 
 	"golang.org/x/exp/collection/internal/fmtsort"
 )
@@ -142,22 +143,22 @@ func (x Set[E]) Intersects(y Set[E]) bool {
 
 // Union returns a new set containing the union of x and y.
 func (x Set[E]) Union(y Set[E]) Set[E] {
-	z := make(Set[E])
-	maps.Copy(z, x)
-	if !mapsIdentical(x, y) {
-		maps.Copy(z, y)
+	if mapsIdentical(x, y) {
+		return x.Clone() // x ∪ x = x
 	}
+	z := make(Set[E], max(len(x), len(y)))
+	maps.Copy(z, x)
+	maps.Copy(z, y)
 	return z
 }
 
 // Intersection returns a new set containing the intersection of x and y.
 func (x Set[E]) Intersection(y Set[E]) Set[E] {
-	z := make(Set[E])
-
 	if mapsIdentical(x, y) {
-		maps.Copy(z, x)
-		return z
+		return x.Clone() // x ∩ x = x
 	}
+
+	z := make(Set[E])
 
 	// Iterate over the smaller of the two sets.
 	if len(x) < len(y) {
@@ -296,5 +297,8 @@ func (x Set[E]) SymmetricDifferenceWith(y Set[E]) {
 // mapsIdentical reports whether m1 and m2 refer to the same map header
 // (or are both nil).
 func mapsIdentical[M1 ~map[K]V1, M2 ~map[K]V2, K comparable, V1, V2 any](m1 M1, m2 M2) bool {
-	return reflect.ValueOf(m1).Pointer() == reflect.ValueOf(m2).Pointer()
+	// TODO: use maps.Same if go.dev/issue/78456 is accepted, so that
+	// unsafe is no longer needed.
+	type pointer = unsafe.Pointer
+	return *(*pointer)(pointer(&m1)) == *(*pointer)(pointer(&m2))
 }
