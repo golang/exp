@@ -49,7 +49,8 @@ func NewMap[K, V any](cmp func(K, K) int) *Map[K, V] {
 	return &Map[K, V]{cmp: cmp}
 }
 
-func (m *Map[K, V]) span() MapSpan[K, V] { return MapSpan[K, V]{m: m} }
+// Span returns an unbounded [MapSpan] for the map.
+func (m *Map[K, V]) Span() MapSpan[K, V] { return MapSpan[K, V]{m: m} }
 
 // find reports where a node with the key would be: at *pos.
 // If *pos != nil, then key is present in the tree;

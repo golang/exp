@@ -33,6 +33,9 @@ func (s *Set[T]) Len() int {
 	return s.m.Len()
 }
 
+// Span returns an unbounded [SetSpan] for the set.
+func (s *Set[T]) Span() SetSpan[T] { return SetSpan[T]{ms: s.m.Span()} }
+
 // All returns an iterator over the elements of s from smallest to largest.
 // See [Map.All] for the guarantee provided if s is modified during the iteration.
 func (s *Set[T]) All() iter.Seq[T] {

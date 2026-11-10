@@ -280,82 +280,82 @@ func TestRangeBounds(t *testing.T) {
 	}{
 		{
 			"To1",
-			m.span().To(10),
+			m.Span().To(10),
 			"(-∞, 10]",
 		},
 		{
 			"To2",
-			m.span().To(10).To(10),
+			m.Span().To(10).To(10),
 			"(-∞, 10]",
 		},
 		{
 			"To3",
-			m.span().Below(10).To(10),
+			m.Span().Below(10).To(10),
 			"(-∞, 10)",
 		},
 		{
 			"To4",
-			m.span().To(9).To(10),
+			m.Span().To(9).To(10),
 			"(-∞, 9]",
 		},
 		{
 			"Below1",
-			m.span().Below(10),
+			m.Span().Below(10),
 			"(-∞, 10)",
 		},
 		{
 			"Below2",
-			m.span().To(10).Below(10),
+			m.Span().To(10).Below(10),
 			"(-∞, 10)",
 		},
 		{
 			"Below3",
-			m.span().Below(10).Below(10),
+			m.Span().Below(10).Below(10),
 			"(-∞, 10)",
 		},
 		{
 			"Below4",
-			m.span().To(9).Below(10),
+			m.Span().To(9).Below(10),
 			"(-∞, 9]",
 		},
 		{
 			"From1",
-			m.span().From(10),
+			m.Span().From(10),
 			"[10, ∞)",
 		},
 		{
 			"From2",
-			m.span().From(10).From(10),
+			m.Span().From(10).From(10),
 			"[10, ∞)",
 		},
 		{
 			"From3",
-			m.span().Above(10).From(10),
+			m.Span().Above(10).From(10),
 			"(10, ∞)",
 		},
 		{
 			"From4",
-			m.span().From(11).From(10),
+			m.Span().From(11).From(10),
 			"[11, ∞)",
 		},
 		{
 			"Above1",
-			m.span().Above(10),
+			m.Span().Above(10),
 			"(10, ∞)",
 		},
 		{
 			"Above2",
-			m.span().From(10).Above(10),
+			m.Span().From(10).Above(10),
 			"(10, ∞)",
 		},
 		{
 			"Above3",
-			m.span().Above(10).Above(10),
+			m.Span().Above(10).Above(10),
 			"(10, ∞)",
 		},
 		{
 			"Above4",
-			m.span().From(11).Above(10),
+			m.Span().From(11).Above(10),
 			"[11, ∞)",
 		},
 	} {
