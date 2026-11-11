@@ -275,11 +275,11 @@ func (s *Set[T]) To(hi T) SetSpan[T] { return SetSpan[T]{s.m.To(hi)} }
 // Below returns a [SetSpan] with upper bound hi, exclusive, and no lower bound.
 func (s *Set[T]) Below(hi T) SetSpan[T] { return SetSpan[T]{s.m.Below(hi)} }
 
-// A SetSpan is a subsequence of elements in a [Set].
-// SetSpans created from the same set share the set, as slices
-// created from the same array share the array.
-// Modifications made via one SetSpan change the underlying set,
-// so are visible to all SetSpans that share the set.
+// A SetSpan is a restricted view of a [Set] consisting only of the items
+// whose keys are between (optional) lower and upper bounds.
+//
+// A SetSpan's bounds do not change, but the set it refers to may change over
+// time, so the items it encompasses may also change.
 type SetSpan[T any] struct {
 	ms MapSpan[T, struct{}]
 }

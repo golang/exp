@@ -515,10 +515,9 @@ func (n *node[K, V]) rank() int {
 
 // A MapSpan is a restricted view of a [Map] consisting only of the items
 // whose keys are between (optional) lower and upper bounds.
-// A MapSpan holds a reference to its Map and observes all modifications
-// made to that map.
-// Modifications made via one MapSpan change the referenced map,
-// so are visible to all MapSpans that share the map.
+//
+// A MapSpan's bounds do not change, but the map it refers to may change over
+// time, so the items it encompasses may also change.
 type MapSpan[K, V any] struct {
 	m      *Map[K, V]
 	lo, hi bound[K]
