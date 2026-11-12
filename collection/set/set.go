@@ -13,7 +13,7 @@
 //
 //	var x, y, z set.Set[int]
 //	x = set.Of(1, 2, 3)		// "{1, 2, 3}"
-//	y = set.Of(3, 4, 5)		// "{3, 4, 5"}
+//	y = set.Of(3, 4, 5)		// "{3, 4, 5}"
 //	z = x.Intersection(y)		// "{3}"
 //	for elem := range z {
 //		println(elem)		// "3"
