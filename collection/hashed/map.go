@@ -30,6 +30,11 @@ import (
 // equivalence relation; instead, use Go's built-in map type.
 // (If you need set operations such as Union and Intersection,
 // use the helpers in the collection/set package.)
+//
+// The standard library JSON packages, [encoding/json] and [encoding/json/v2],
+// treat Maps just like built-in maps, with one exception: it is not possible
+// to unmarshal into a Map that was not created with [NewMap], since it has
+// no Hasher.
 type Map[K, V any] struct {
 	seed   maphash.Seed
 	table  map[uint64][]entry[K, V] // maps hash to entries of that hash
