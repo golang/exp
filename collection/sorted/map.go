@@ -410,18 +410,11 @@ func (m *Map[K, V]) Min() (K, V, bool) { return m.Span().Min() }
 // The third return value is false if the map is empty, otherwise true.
 func (m *Map[K, V]) Max() (K, V, bool) { return m.Span().Max() }
 
-// All returns an iterator over the map m from smallest to largest key.
+// All returns an iterator over all map entries in ascending key order.
 //
-// It is safe to modify the map during iteration.
-// All guarantees that when a key is yielded, it is the successor of the key
-// that was previously yielded (or the minimum key in the map, if it is the first
-// key).
-//
-// For example, if the map contains keys 10 and 20, the iterator has yielded 10,
-// and then 15 is inserted, then the next yielded key will be 15.
-//
-// Another example: if the map contains keys 10, 20 and 30, the iterator has yielded
-// 10, and then 20 is deleted, then the next yielded key will be 30.
+// It is safe to modify the map during iteration. The iterator will
+// at each step yield the entry in the map with the smallest key
+// greater than any previously yielded one.
 func (m *Map[K, V]) All() iter.Seq2[K, V] { return m.Span().All() }
 
 // Keys returns an iterator over the keys in m from smallest to largest.
