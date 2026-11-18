@@ -10,10 +10,11 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
-	"io"
 	"reflect"
 	"slices"
 	"strings"
+
+	"golang.org/x/exp/collection/internal"
 )
 
 // MarshalJSONTo implements [json.MarshalerTo].
@@ -27,41 +28,16 @@ import (
 // sorted by their encoded key. (This is always the case when
 // marshaling with encoding/json.)
 func (m *Map[K, V]) MarshalJSONTo(enc *jsontext.Encoder) error {
-	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
-		return err
-	}
-	var err error
 	if deterministic, _ := json.GetOption(enc.Options(), json.Deterministic); deterministic && m.len > 1 {
-		err = m.marshalSorted(enc)
-	} else {
-		err = m.marshalUnsorted(enc)
-	}
-	if err != nil {
-		return err
-	}
-	return enc.WriteToken(jsontext.EndObject)
-}
-
-// marshalUnsorted writes the map entries to enc, which must be
-// positioned within a JSON object, in unspecified order.
-func (m *Map[K, V]) marshalUnsorted(enc *jsontext.Encoder) error {
-	for k, v := range m.All() {
-		// The encoder expects an object name, so it rejects
-		// anything that doesn't encode as a string. Built-in
-		// maps behave the same.
-		//
-		// Keys and values are passed by value, not by address,
-		// so that the json package decides whether to call
-		// marshal methods declared on pointer receivers:
-		// for map keys and values, v2 does and v1 does not.
-		if err := json.MarshalEncode(enc, k); err != nil {
-			return keyError[K](err)
-		}
-		if err := json.MarshalEncode(enc, v); err != nil {
+		if err := enc.WriteToken(jsontext.BeginObject); err != nil {
 			return err
 		}
+		if err := m.marshalSorted(enc); err != nil {
+			return err
+		}
+		return enc.WriteToken(jsontext.EndObject)
 	}
-	return nil
+	return internal.MarshalMapInOrder(enc, m.All())
 }
 
 // marshalSorted writes the map entries to enc, which must be
@@ -92,7 +68,7 @@ func (m *Map[K, V]) marshalSorted(enc *jsontext.Encoder) error {
 	members := make([]member, 0, m.len)
 	for k, v := range m.All() {
 		if err := json.MarshalEncode(tmp, k); err != nil {
-			return keyError[K](err)
+			return internal.KeyError[K](err)
 		}
 		// Don't encode the value here, just record it.
 		// Encode it later in the final output.
@@ -140,16 +116,6 @@ func (m *Map[K, V]) marshalSorted(enc *jsontext.Encoder) error {
 		}
 	}
 	return nil
-}
-
-// keyError adjusts an error from marshaling a key of type K
-// to match the error reported for the key of a built-in map.
-func keyError[K any](err error) error {
-	if errors.Is(err, jsontext.ErrNonStringName) {
-		// The json package fills in the remaining fields.
-		return &json.SemanticError{GoType: reflect.TypeFor[K](), Err: jsontext.ErrNonStringName}
-	}
-	return err
 }
 
 // UnmarshalJSONFrom implements [json.UnmarshalerFrom].
@@ -209,7 +175,7 @@ func (m *Map[K, V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		keyOffset := dec.InputOffset()
 		var k K
 		if err := json.UnmarshalDecode(dec, &k); err != nil {
-			if isFatalUnmarshalError(err, legacyErrors) {
+			if internal.IsFatalUnmarshalError(err, legacyErrors) {
 				return err
 			}
 			if err := dec.SkipValue(); err != nil {
@@ -247,7 +213,7 @@ func (m *Map[K, V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		// Check the error after setting the value, to match existing behavior.
 		m.Set(k, v)
 		if err != nil {
-			if isFatalUnmarshalError(err, legacyErrors) {
+			if internal.IsFatalUnmarshalError(err, legacyErrors) {
 				return err
 			}
 			if firstErr == nil {
@@ -259,29 +225,6 @@ func (m *Map[K, V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return firstErr
 }
 
-// isFatalUnmarshalError reports whether unmarshaling should stop
-// after err, which was returned by [json.UnmarshalDecode].
-// All errors are fatal, except that encoding/json (v1) carries on
-// after an error that is not a syntax or I/O error, such as
-// a mismatch between a JSON value and a Go type, or an error
-// returned by an unmarshal method.
-func isFatalUnmarshalError(err error, legacyErrors bool) bool {
-	if !legacyErrors {
-		return true
-	}
-	// The json package's own classification of I/O errors is
-	// not available here, so only truncated input is recognized.
-	// That is sufficient: after any other I/O error, the next
-	// read from the decoder fails too, and the callers of this
-	// function treat that failure as fatal.
-	var (
-		syntaxErr    *jsonv1.SyntaxError
-		syntacticErr *jsontext.SyntacticError
-	)
-	return errors.As(err, &syntaxErr) || errors.As(err, &syntacticErr) ||
-		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
-}
-
 // MarshalJSONTo implements [json.MarshalerTo].
 //
 // A Set marshals as a JSON array of its elements,
@@ -291,62 +234,7 @@ func isFatalUnmarshalError(err error, legacyErrors bool) bool {
 // sorted by their JSON encoding. (This is always the case when
 // marshaling with encoding/json.) Otherwise their order is unspecified.
 func (s *Set[E]) MarshalJSONTo(enc *jsontext.Encoder) error {
-	if err := enc.WriteToken(jsontext.BeginArray); err != nil {
-		return err
-	}
-	var err error
-	if deterministic, _ := json.GetOption(enc.Options(), json.Deterministic); deterministic && s.Len() > 1 {
-		err = s.marshalSorted(enc)
-	} else {
-		err = s.marshalUnsorted(enc)
-	}
-	if err != nil {
-		return err
-	}
-	return enc.WriteToken(jsontext.EndArray)
-}
-
-// marshalUnsorted writes the set elements to enc, which must be
-// positioned within a JSON array, in unspecified order.
-func (s *Set[E]) marshalUnsorted(enc *jsontext.Encoder) error {
-	var e E // Reuse the same e so it only is copied to the heap once
-	// (it escapes json.MarshalEncode)
-	for e = range s.All() {
-		// Elements are passed by address, so that marshal methods
-		// declared on pointer receivers are called even by v1,
-		// as they are for the elements of a slice.
-		if err := json.MarshalEncode(enc, &e); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// marshalSorted writes the set elements to enc, which must be
-// positioned within a JSON array, in order of their JSON encodings.
-func (s *Set[E]) marshalSorted(enc *jsontext.Encoder) error {
-	// Marshal each element separately, using the encoder's options,
-	// then sort the encodings and write them out.
-	// (The encoder re-indents each value as it is written.)
-	opts := enc.Options()
-	values := make([]jsontext.Value, 0, s.Len())
-	var e E // see similar code in marshalUnsorted
-	for e = range s.All() {
-		b, err := json.Marshal(&e, opts)
-		if err != nil {
-			return err
-		}
-		values = append(values, b)
-	}
-	slices.SortFunc(values, func(x, y jsontext.Value) int {
-		return bytes.Compare(x, y)
-	})
-	for _, v := range values {
-		if err := enc.WriteValue(v); err != nil {
-			return err
-		}
-	}
-	return nil
+	return internal.MarshalSet(enc, s.All(), s.Len(), true)
 }
 
 // UnmarshalJSONFrom implements [json.UnmarshalerFrom].
@@ -361,111 +249,15 @@ func (s *Set[E]) marshalSorted(enc *jsontext.Encoder) error {
 // cannot supply a hasher. In particular, it is an error to unmarshal
 // a JSON array or object into a nil *Set variable or struct field.
 func (s *Set[E]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	kind := dec.PeekKind()
-	switch kind {
-	case jsontext.KindNull:
-		_, _ = dec.ReadToken() // can't fail
-		s.Clear()
-		return nil
-	case jsontext.KindBeginArray, jsontext.KindBeginObject:
-		if s.m.hasher == nil {
-			return errors.New("hashed.Set was not created by NewSet")
-		}
-		_, _ = dec.ReadToken() // can't fail
-	case jsontext.KindInvalid:
-		_, err := dec.ReadToken()
-		return err
-	default:
-		// The json package fills in the remaining fields.
-		return &json.SemanticError{JSONKind: kind, GoType: reflect.TypeFor[Set[E]]()}
-	}
-
-	// This is true when called from encoding/json (v1).
-	legacyErrors, _ := json.GetOption(dec.Options(), jsonv1.ReportErrorsWithLegacySemantics)
-
-	if kind == jsontext.KindBeginObject {
-		return s.unmarshalObject(dec, legacyErrors)
-	}
-	var firstErr error // first non-fatal error
-	for dec.PeekKind() != jsontext.KindEndArray {
-		start := dec.InputOffset()
-		var e E
-		if err := json.UnmarshalDecode(dec, &e); err != nil {
-			// An error is also fatal if the decoder made no progress,
-			// since retrying would fail in the same way forever.
-			if isFatalUnmarshalError(err, legacyErrors) || dec.InputOffset() == start {
-				return err
+	return internal.UnmarshalSet[Set[E]](
+		dec,
+		s.Clear,
+		func() error {
+			if s.m.hasher == nil {
+				return errors.New("hashed.Set was not created by NewSet")
 			}
-			// Omit an element that could not be decoded.
-			if firstErr == nil {
-				firstErr = err
-			}
-			continue
-		}
-		s.Insert(e)
-	}
-	_, _ = dec.ReadToken() // ']' by loop condition
-	return firstErr
-}
-
-// unmarshalObject adds to the set the names of the members of a
-// JSON object. The decoder must be positioned after the object's '{'.
-func (s *Set[E]) unmarshalObject(dec *jsontext.Decoder, legacyErrors bool) error {
-	var firstErr error // first non-fatal error
-	for dec.PeekKind() != jsontext.KindEndObject {
-		// Unmarshal the key.
-		//
-		// Since the decoder expects an object name, the json
-		// package decodes numeric keys from strings and rejects
-		// key types that cannot be decoded from a JSON string,
-		// just as it does for built-in maps.
-		var e E
-		keyErr := json.UnmarshalDecode(dec, &e)
-		if keyErr != nil {
-			if isFatalUnmarshalError(keyErr, legacyErrors) {
-				return keyErr
-			}
-			if firstErr == nil {
-				firstErr = keyErr
-			}
-		}
-
-		// Check the value.
-		val, err := dec.ReadValue()
-		if err != nil {
-			return err
-		}
-		if keyErr != nil {
-			continue // omit an element that could not be decoded
-		}
-		if !isSetMemberValue(val) {
-			// The json package fills in the remaining fields.
-			err := &json.SemanticError{JSONKind: val.Kind(), GoType: reflect.TypeFor[Set[E]](), Err: errSetMemberValue}
-			if !legacyErrors {
-				return err
-			}
-			if firstErr == nil {
-				firstErr = err
-			}
-			continue
-		}
-		s.Insert(e)
-	}
-	_, _ = dec.ReadToken() // '}' by loop condition
-	return firstErr
-}
-
-var errSetMemberValue = errors.New("value of a set element must be a boolean or {}")
-
-// isSetMemberValue reports whether val, a valid JSON value,
-// is a boolean or an empty object.
-func isSetMemberValue(val jsontext.Value) bool {
-	switch val.Kind() {
-	case jsontext.KindTrue, jsontext.KindFalse:
-		return true
-	case jsontext.KindBeginObject:
-		// The value is an object with nothing but whitespace inside.
-		return len(bytes.TrimSpace(val[1:len(val)-1])) == 0
-	}
-	return false
+			return nil
+		},
+		func(e E) { s.Insert(e) },
+	)
 }
