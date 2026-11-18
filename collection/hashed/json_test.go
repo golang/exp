@@ -733,3 +733,37 @@ func TestSetJSONRoundTrip(t *testing.T) {
 		t.Errorf("Unmarshal: got %s, want %s", s2, s)
 	}
 }
+
+// TestUnmarshalJSONKindError checks that unmarshaling a JSON value of
+// the wrong kind returns an error whose Error method does not panic.
+// (With encoding/json, it used to dereference a nil reflect.Type.)
+func TestUnmarshalJSONKindError(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		unmarshal func([]byte, any) error
+	}{
+		{"v1", jsonv1.Unmarshal},
+		{"v2", func(data []byte, x any) error { return json.Unmarshal(data, x) }},
+	} {
+		for _, data := range []string{`[1]`, `{"a":1}`, `"x"`, `5`, `true`} {
+			m := hashed.NewMap[string, int](maphash.ComparableHasher[string]{})
+			s := hashed.NewSet[int](maphash.ComparableHasher[int]{})
+			for _, x := range []any{m, s} {
+				_, isMap := x.(*hashed.Map[string, int])
+				if isMap == (data[0] == '{') || !isMap && data[0] == '[' {
+					continue // the right kind
+				}
+				err := test.unmarshal([]byte(data), x)
+				if err == nil {
+					t.Errorf("%s: %T <- %s: got nil error", test.name, x, data)
+					continue
+				}
+				// Error must not panic, and should mention the Go type.
+				msg := err.Error()
+				if !strings.Contains(msg, "hashed.") {
+					t.Errorf("%s: %T <- %s: error %q does not mention the Go type", test.name, x, data, msg)
+				}
+			}
+		}
+	}
+}

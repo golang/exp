@@ -179,7 +179,7 @@ func (m *Map[K, V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return err
 	default:
 		// The json package fills in the remaining fields.
-		return &json.SemanticError{JSONKind: kind}
+		return &json.SemanticError{JSONKind: kind, GoType: reflect.TypeFor[Map[K, V]]()}
 	}
 
 	opts := dec.Options()
@@ -377,7 +377,7 @@ func (s *Set[E]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return err
 	default:
 		// The json package fills in the remaining fields.
-		return &json.SemanticError{JSONKind: kind}
+		return &json.SemanticError{JSONKind: kind, GoType: reflect.TypeFor[Set[E]]()}
 	}
 
 	// This is true when called from encoding/json (v1).
