@@ -605,7 +605,6 @@ func TestSetUnmarshalJSON(t *testing.T) {
 		// Duplicates are not an error.
 		{data: `[1,2,1,1]`, want: "{1, 2}"},
 		// Errors.
-		{init: []int{7}, data: `{}`, want: "{7}", wantErr: true},
 		{init: []int{7}, data: `"x"`, want: "{7}", wantErr: true},
 		{init: []int{7}, data: `5`, want: "{7}", wantErr: true},
 		// v1 carries on after a type mismatch.
@@ -681,6 +680,16 @@ func TestSetUnmarshalJSONEquivalent(t *testing.T) {
 	if s.Len() != 2 || !s.Contains("hello") || !s.Contains("WORLD") {
 		t.Errorf("got %s, want two elements equivalent to hello and world", s)
 	}
+
+	// Object keys that are equivalent also collapse without error
+	// (distinct JSON names, equivalent according to the hasher).
+	s2 := hashed.NewSet[string](caseInsensitive{})
+	if err := json.Unmarshal([]byte(`{"Hello":true,"world":{},"HELLO":false}`), s2); err != nil {
+		t.Fatal(err)
+	}
+	if s2.Len() != 2 || !s2.Contains("hello") || !s2.Contains("WORLD") {
+		t.Errorf("got %s, want two elements equivalent to hello and world", s2)
+	}
 }
 
 // TestSetUnmarshalJSONUninitialized checks that unmarshaling
@@ -696,14 +705,16 @@ func TestSetUnmarshalJSONUninitialized(t *testing.T) {
 		{"v1", jsonv1.Unmarshal},
 		{"v2", func(data []byte, x any) error { return json.Unmarshal(data, x) }},
 	} {
-		var w wrapper
-		err := test.unmarshal([]byte(`{"S":["a"]}`), &w)
-		if err == nil || !strings.Contains(err.Error(), "NewSet") {
-			t.Errorf("%s: got error %v, want one mentioning NewSet", test.name, err)
+		for _, input := range []string{`{"S":["a"]}`, `{"S":{"a":true}}`} {
+			var w wrapper
+			err := test.unmarshal([]byte(input), &w)
+			if err == nil || !strings.Contains(err.Error(), "NewSet") {
+				t.Errorf("%s (%s): got error %v, want one mentioning NewSet", test.name, input, err)
+			}
 		}
 
 		// A null is fine.
-		w = wrapper{}
+		var w wrapper
 		if err := test.unmarshal([]byte(`{"S":null}`), &w); err != nil {
 			t.Errorf("%s: null: %v", test.name, err)
 		}
@@ -750,7 +761,7 @@ func TestUnmarshalJSONKindError(t *testing.T) {
 			s := hashed.NewSet[int](maphash.ComparableHasher[int]{})
 			for _, x := range []any{m, s} {
 				_, isMap := x.(*hashed.Map[string, int])
-				if isMap == (data[0] == '{') || !isMap && data[0] == '[' {
+				if isMap && data[0] == '{' || !isMap && (data[0] == '[' || data[0] == '{') {
 					continue // the right kind
 				}
 				err := test.unmarshal([]byte(data), x)

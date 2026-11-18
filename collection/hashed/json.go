@@ -351,23 +351,23 @@ func (s *Set[E]) marshalSorted(enc *jsontext.Encoder) error {
 
 // UnmarshalJSONFrom implements [json.UnmarshalerFrom].
 //
-// A JSON array is merged into the set, as a JSON object is merged
-// into a map: each array element, decoded as an element of a slice
-// []E would be, is added to the set, and existing elements are kept.
-// Array elements that are equivalent according to the set's hasher
-// result in a single set element; they are not an error.
-// A JSON null removes all the set's elements.
+// Unmarshaling the Set *s from a JSON array or object causes each array
+// element or object key to be unmarshalled and inserted into the Set in
+// order. All object values must be true, false or {}.
+//
+// Unmarshaling a Set from a JSON 'null' clears it.
 //
 // The set must have been created by [NewSet], since unmarshaling
 // cannot supply a hasher. In particular, it is an error to unmarshal
-// a JSON array into a nil *Set variable or struct field.
+// a JSON array or object into a nil *Set variable or struct field.
 func (s *Set[E]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	switch kind := dec.PeekKind(); kind {
+	kind := dec.PeekKind()
+	switch kind {
 	case jsontext.KindNull:
 		_, _ = dec.ReadToken() // can't fail
 		s.Clear()
 		return nil
-	case jsontext.KindBeginArray:
+	case jsontext.KindBeginArray, jsontext.KindBeginObject:
 		if s.m.hasher == nil {
 			return errors.New("hashed.Set was not created by NewSet")
 		}
@@ -383,6 +383,9 @@ func (s *Set[E]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// This is true when called from encoding/json (v1).
 	legacyErrors, _ := json.GetOption(dec.Options(), jsonv1.ReportErrorsWithLegacySemantics)
 
+	if kind == jsontext.KindBeginObject {
+		return s.unmarshalObject(dec, legacyErrors)
+	}
 	var firstErr error // first non-fatal error
 	for dec.PeekKind() != jsontext.KindEndArray {
 		start := dec.InputOffset()
@@ -403,4 +406,66 @@ func (s *Set[E]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	}
 	_, _ = dec.ReadToken() // ']' by loop condition
 	return firstErr
+}
+
+// unmarshalObject adds to the set the names of the members of a
+// JSON object. The decoder must be positioned after the object's '{'.
+func (s *Set[E]) unmarshalObject(dec *jsontext.Decoder, legacyErrors bool) error {
+	var firstErr error // first non-fatal error
+	for dec.PeekKind() != jsontext.KindEndObject {
+		// Unmarshal the key.
+		//
+		// Since the decoder expects an object name, the json
+		// package decodes numeric keys from strings and rejects
+		// key types that cannot be decoded from a JSON string,
+		// just as it does for built-in maps.
+		var e E
+		keyErr := json.UnmarshalDecode(dec, &e)
+		if keyErr != nil {
+			if isFatalUnmarshalError(keyErr, legacyErrors) {
+				return keyErr
+			}
+			if firstErr == nil {
+				firstErr = keyErr
+			}
+		}
+
+		// Check the value.
+		val, err := dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		if keyErr != nil {
+			continue // omit an element that could not be decoded
+		}
+		if !isSetMemberValue(val) {
+			// The json package fills in the remaining fields.
+			err := &json.SemanticError{JSONKind: val.Kind(), GoType: reflect.TypeFor[Set[E]](), Err: errSetMemberValue}
+			if !legacyErrors {
+				return err
+			}
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		s.Insert(e)
+	}
+	_, _ = dec.ReadToken() // '}' by loop condition
+	return firstErr
+}
+
+var errSetMemberValue = errors.New("value of a set element must be a boolean or {}")
+
+// isSetMemberValue reports whether val, a valid JSON value,
+// is a boolean or an empty object.
+func isSetMemberValue(val jsontext.Value) bool {
+	switch val.Kind() {
+	case jsontext.KindTrue, jsontext.KindFalse:
+		return true
+	case jsontext.KindBeginObject:
+		// The value is an object with nothing but whitespace inside.
+		return len(bytes.TrimSpace(val[1:len(val)-1])) == 0
+	}
+	return false
 }

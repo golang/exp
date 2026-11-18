@@ -202,7 +202,6 @@ func TestUnmarshalJSON(t *testing.T) {
 		// Duplicates are not an error.
 		{data: `[1,2,1,1]`, want: "{1, 2}"},
 		// Errors.
-		{init: []int{7}, data: `{}`, want: "{7}", wantErr: true},
 		{init: []int{7}, data: `"x"`, want: "{7}", wantErr: true},
 		{init: []int{7}, data: `5`, want: "{7}", wantErr: true},
 		// v1 carries on after a type mismatch.
@@ -253,18 +252,20 @@ func TestUnmarshalJSON(t *testing.T) {
 			if test.data == "null" && s != nil {
 				t.Errorf("%s: got non-nil Set", name)
 			}
+			if err != nil {
+				_ = err.Error() // must not panic
+			}
 			if err == nil && test.data != "null" && s == nil {
 				t.Errorf("%s: got nil Set", name)
 			}
 
-			// The same, for a hashed.Set. (A hashed.Set replaces its
-			// contents, so the results agree only if the set was empty.)
+			// The same, for a hashed.Set.
 			hs := newHashed()
 			herr := u.unmarshal([]byte(test.data), hs)
 			if (herr != nil) != (err != nil) {
 				t.Errorf("%s: set.Set error = %v, hashed.Set error = %v", name, err, herr)
 			}
-			if got, want := s.String(), hs.String(); len(test.init) == 0 && got != want {
+			if got, want := s.String(), hs.String(); got != want {
 				t.Errorf("%s: set.Set = %s, hashed.Set = %s", name, got, want)
 			}
 
@@ -318,5 +319,160 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 	if out.Name != in.Name || !out.Tags.Equal(in.Tags) {
 		t.Errorf("Unmarshal: got %v, want %v", out, in)
+	}
+}
+
+// TestUnmarshalJSONObject checks that a set.Set can be unmarshaled from
+// a JSON object whose names are the elements.
+func TestUnmarshalJSONObject(t *testing.T) {
+	type wrapper struct {
+		A int
+		S set.Set[int]
+		B int
+	}
+	for _, test := range []struct {
+		init    []int // initial elements; nil means a nil Set
+		data    string
+		want    string // result of String
+		wantV1  string // result under v1, if different
+		wantErr bool
+	}{
+		{data: `{}`, want: "{}"},
+		{data: ` { } `, want: "{}"},
+		{data: `{"3":true,"1":true,"2":{},"4":false}`, want: "{1, 2, 3, 4}"},
+		{data: ` { "3" : true , "1" : { } , "-2" : false } `, want: "{-2, 1, 3}"},
+		// An object is merged into the existing elements.
+		{init: []int{7, 8}, data: `{}`, want: "{7, 8}"},
+		{init: []int{7, 8}, data: `{"1":true,"8":true}`, want: "{1, 7, 8}"},
+		// Invalid values. v1 carries on after them.
+		{init: []int{7}, data: `{"1":true,"2":5,"3":true}`, want: "{1, 7}", wantV1: "{1, 3, 7}", wantErr: true},
+		{data: `{"1":"x","3":true}`, want: "{}", wantV1: "{3}", wantErr: true},
+		{data: `{"1":[],"3":true}`, want: "{}", wantV1: "{3}", wantErr: true},
+		{data: `{"1":{"a":1},"3":true}`, want: "{}", wantV1: "{3}", wantErr: true},
+		{data: `{"1":{"a":{}},"3":true}`, want: "{}", wantV1: "{3}", wantErr: true},
+		{data: `{"1":null,"3":true}`, want: "{}", wantV1: "{3}", wantErr: true},
+		// Invalid names. v1 carries on after them.
+		{data: `{"1":true,"x":true,"3":true}`, want: "{1}", wantV1: "{1, 3}", wantErr: true},
+		{data: `{"1.5":true,"3":true}`, want: "{}", wantV1: "{3}", wantErr: true},
+		// Syntax errors.
+		{data: `{"1":true`, want: "{1}", wantErr: true},
+		{data: `{"1":true,}`, want: "{1}", wantErr: true},
+		{data: `{"1"}`, want: "{}", wantErr: true},
+		{data: `{"1":}`, want: "{}", wantErr: true},
+		{data: `{1:true}`, want: "{}", wantErr: true},
+		{data: `{"1":true]`, want: "{1}", wantErr: true},
+		{data: `{"1":true,"1":true}`, want: "{1}", wantV1: "{1}", wantErr: true}, // duplicate name (v2 only)
+	} {
+		newSet := func() set.Set[int] {
+			if test.init == nil {
+				return nil
+			}
+			return set.Of(test.init...)
+		}
+		newHashed := func() *hashed.Set[int] {
+			hs := hashed.NewSet[int](maphash.ComparableHasher[int]{})
+			for _, e := range test.init {
+				hs.Insert(e)
+			}
+			return hs
+		}
+		for _, u := range []struct {
+			name      string
+			unmarshal func([]byte, any) error
+		}{
+			{"v1", jsonv1.Unmarshal},
+			{"v2", func(data []byte, x any) error { return json.Unmarshal(data, x) }},
+		} {
+			want := test.want
+			wantErr := test.wantErr
+			if u.name == "v1" && test.wantV1 != "" {
+				want = test.wantV1
+			}
+			if u.name == "v1" && strings.Contains(test.data, `"1":true,"1":true`) {
+				wantErr = false // v1 allows duplicate names
+			}
+			name := fmt.Sprintf("%s: %v <- %s", u.name, test.init, test.data)
+
+			// Top level.
+			s := newSet()
+			err := u.unmarshal([]byte(test.data), &s)
+			if (err != nil) != wantErr {
+				t.Errorf("%s: got error %v, want error = %t", name, err, wantErr)
+			}
+			if err != nil {
+				_ = err.Error() // must not panic
+			}
+			// v1 checks the syntax of the whole input before decoding anything.
+			if got := s.String(); got != want && !(u.name == "v1" && err != nil && got == newSet().String()) {
+				t.Errorf("%s: got %s, want %s", name, got, want)
+			}
+			if err == nil && s == nil {
+				t.Errorf("%s: got nil Set", name)
+			}
+
+			// The same, for a hashed.Set.
+			hs := newHashed()
+			herr := u.unmarshal([]byte(test.data), hs)
+			if (herr != nil) != wantErr {
+				t.Errorf("%s: set.Set error = %v, hashed.Set error = %v", name, err, herr)
+			}
+			if got, hwant := s.String(), hs.String(); got != hwant {
+				t.Errorf("%s: set.Set = %s, hashed.Set = %s", name, got, hwant)
+			}
+
+			// Nested in a struct.
+			w := wrapper{S: newSet()}
+			err = u.unmarshal([]byte(`{"A":1,"S":`+test.data+`,"B":2}`), &w)
+			if (err != nil) != wantErr {
+				t.Errorf("%s (nested): got error %v, want error = %t", name, err, wantErr)
+			}
+			if err == nil || u.name == "v1" && test.wantV1 != "" {
+				if got := w.S.String(); got != want {
+					t.Errorf("%s (nested): got %s, want %s", name, got, want)
+				}
+				if w.A != 1 || w.B != 2 {
+					t.Errorf("%s (nested): got A=%d, B=%d; want 1, 2", name, w.A, w.B)
+				}
+			}
+		}
+	}
+
+	// Element types that cannot be object names are an error.
+	for _, x := range []any{new(set.Set[bool]), new(set.Set[[2]int]), new(set.Set[struct{ X int }])} {
+		if err := json.Unmarshal([]byte(`{"true":true}`), x); err == nil {
+			t.Errorf("%T: got nil error", x)
+		}
+	}
+}
+
+// TestUnmarshalJSONFromMap checks that the JSON for the map types
+// commonly used as sets can be unmarshaled into a set.Set.
+func TestUnmarshalJSONFromMap(t *testing.T) {
+	want := set.Of("apple", "banana", "cherry")
+	for _, m := range []any{
+		map[string]struct{}{"banana": {}, "apple": {}, "cherry": {}},
+		map[string]bool{"banana": true, "apple": true, "cherry": true},
+	} {
+		for _, test := range []struct {
+			name      string
+			marshal   func(any) ([]byte, error)
+			unmarshal func([]byte, any) error
+		}{
+			{"v1", jsonv1.Marshal, jsonv1.Unmarshal},
+			{"v2",
+				func(x any) ([]byte, error) { return json.Marshal(x) },
+				func(data []byte, x any) error { return json.Unmarshal(data, x) }},
+		} {
+			data, err := test.marshal(m)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got set.Set[string]
+			if err := test.unmarshal(data, &got); err != nil {
+				t.Errorf("%s: %s: %v", test.name, data, err)
+			} else if !got.Equal(want) {
+				t.Errorf("%s: %s: got %v, want %v", test.name, data, got, want)
+			}
+		}
 	}
 }
