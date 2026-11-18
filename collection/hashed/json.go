@@ -281,3 +281,126 @@ func isFatalUnmarshalError(err error, legacyErrors bool) bool {
 	return errors.As(err, &syntaxErr) || errors.As(err, &syntacticErr) ||
 		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }
+
+// MarshalJSONTo implements [json.MarshalerTo].
+//
+// A Set marshals as a JSON array of its elements,
+// each encoded as an element of a slice []E would be.
+//
+// If the [json.Deterministic] option is true, the elements are
+// sorted by their JSON encoding. (This is always the case when
+// marshaling with encoding/json.) Otherwise their order is unspecified.
+func (s *Set[E]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+		return err
+	}
+	var err error
+	if deterministic, _ := json.GetOption(enc.Options(), json.Deterministic); deterministic && s.Len() > 1 {
+		err = s.marshalSorted(enc)
+	} else {
+		err = s.marshalUnsorted(enc)
+	}
+	if err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndArray)
+}
+
+// marshalUnsorted writes the set elements to enc, which must be
+// positioned within a JSON array, in unspecified order.
+func (s *Set[E]) marshalUnsorted(enc *jsontext.Encoder) error {
+	var e E // Reuse the same e so it only is copied to the heap once
+	// (it escapes json.MarshalEncode)
+	for e = range s.All() {
+		// Elements are passed by address, so that marshal methods
+		// declared on pointer receivers are called even by v1,
+		// as they are for the elements of a slice.
+		if err := json.MarshalEncode(enc, &e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// marshalSorted writes the set elements to enc, which must be
+// positioned within a JSON array, in order of their JSON encodings.
+func (s *Set[E]) marshalSorted(enc *jsontext.Encoder) error {
+	// Marshal each element separately, using the encoder's options,
+	// then sort the encodings and write them out.
+	// (The encoder re-indents each value as it is written.)
+	opts := enc.Options()
+	values := make([]jsontext.Value, 0, s.Len())
+	var e E // see similar code in marshalUnsorted
+	for e = range s.All() {
+		b, err := json.Marshal(&e, opts)
+		if err != nil {
+			return err
+		}
+		values = append(values, b)
+	}
+	slices.SortFunc(values, func(x, y jsontext.Value) int {
+		return bytes.Compare(x, y)
+	})
+	for _, v := range values {
+		if err := enc.WriteValue(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UnmarshalJSONFrom implements [json.UnmarshalerFrom].
+//
+// A JSON array is merged into the set, as a JSON object is merged
+// into a map: each array element, decoded as an element of a slice
+// []E would be, is added to the set, and existing elements are kept.
+// Array elements that are equivalent according to the set's hasher
+// result in a single set element; they are not an error.
+// A JSON null removes all the set's elements.
+//
+// The set must have been created by [NewSet], since unmarshaling
+// cannot supply a hasher. In particular, it is an error to unmarshal
+// a JSON array into a nil *Set variable or struct field.
+func (s *Set[E]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	switch kind := dec.PeekKind(); kind {
+	case jsontext.KindNull:
+		_, _ = dec.ReadToken() // can't fail
+		s.Clear()
+		return nil
+	case jsontext.KindBeginArray:
+		if s.m.hasher == nil {
+			return errors.New("hashed.Set was not created by NewSet")
+		}
+		_, _ = dec.ReadToken() // can't fail
+	case jsontext.KindInvalid:
+		_, err := dec.ReadToken()
+		return err
+	default:
+		// The json package fills in the remaining fields.
+		return &json.SemanticError{JSONKind: kind}
+	}
+
+	// This is true when called from encoding/json (v1).
+	legacyErrors, _ := json.GetOption(dec.Options(), jsonv1.ReportErrorsWithLegacySemantics)
+
+	var firstErr error // first non-fatal error
+	for dec.PeekKind() != jsontext.KindEndArray {
+		start := dec.InputOffset()
+		var e E
+		if err := json.UnmarshalDecode(dec, &e); err != nil {
+			// An error is also fatal if the decoder made no progress,
+			// since retrying would fail in the same way forever.
+			if isFatalUnmarshalError(err, legacyErrors) || dec.InputOffset() == start {
+				return err
+			}
+			// Omit an element that could not be decoded.
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		s.Insert(e)
+	}
+	_, _ = dec.ReadToken() // ']' by loop condition
+	return firstErr
+}

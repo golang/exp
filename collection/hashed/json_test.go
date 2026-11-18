@@ -5,6 +5,7 @@
 package hashed_test
 
 import (
+	"bytes"
 	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
@@ -14,6 +15,7 @@ import (
 	"io"
 	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -459,5 +461,275 @@ func TestMapUnmarshalJSONReadError(t *testing.T) {
 					test.name, prefix, gotErr, wantErr, errRead)
 			}
 		}
+	}
+}
+
+// TestSetMarshalJSON checks that a hashed.Set marshals like a slice
+// of its elements, sorted by their encodings if marshaling is deterministic.
+func TestSetMarshalJSON(t *testing.T) {
+	testSetMarshal(t, []string{})
+	testSetMarshal(t, []string{"one"})
+	testSetMarshal(t, []string{"b", "a", "", "é", "a\"<\n", "c"})
+	testSetMarshal(t, []int{10, 9, -1, 100})
+	testSetMarshal(t, []float64{1.5, -2, 1e30})
+	testSetMarshal(t, []bool{true, false})
+	testSetMarshal(t, [][2]int{{3, 4}, {1, 2}})
+	testSetMarshal(t, []struct{ X, Y int }{{1, 2}, {0, 5}})
+	testSetMarshal(t, []textKey{{1, 2}, {0, 5}, {1, 1}}) // pointer-receiver method
+	testSetMarshal(t, []ptrValue{{2}, {1}})              // pointer-receiver method
+	testSetMarshal(t, []any{"x", 1.5, nil, true})
+
+	// Errors.
+	testSetMarshal(t, []chan int{make(chan int), make(chan int)})
+	var zero float64
+	testSetMarshal(t, []float64{1, 1 / zero})
+
+	// The order is that of the encodings, not of the elements.
+	s := hashed.NewSet[int](maphash.ComparableHasher[int]{})
+	for _, e := range []int{9, 100, 10} {
+		s.Insert(e)
+	}
+	got, err := json.Marshal(s, json.Deterministic(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `[10,100,9]`; string(got) != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func testSetMarshal[E comparable](t *testing.T, elems []E) {
+	t.Helper()
+	set := hashed.NewSet[E](maphash.ComparableHasher[E]{})
+	for _, e := range elems {
+		set.Insert(e)
+	}
+
+	// To check that marshaling works when the set is nested in something else.
+	type wrapper[S any] struct {
+		A int
+		S S
+		B []S
+	}
+
+	for _, test := range []struct {
+		name    string
+		marshal func(any) ([]byte, error)
+	}{
+		{"v1", jsonv1.Marshal},
+		{"v1 indent", func(x any) ([]byte, error) { return jsonv1.MarshalIndent(x, ">", "  ") }},
+		{"v2 deterministic", func(x any) ([]byte, error) {
+			return json.Marshal(x, json.Deterministic(true))
+		}},
+		{"v2 deterministic options", func(x any) ([]byte, error) {
+			return json.Marshal(x,
+				json.Deterministic(true),
+				json.StringifyNumbers(true),
+				json.FormatNilSliceAsNull(true),
+				jsontext.EscapeForHTML(true),
+				jsontext.WithIndent("\t"))
+		}},
+		{"v2 deterministic marshalers", func(x any) ([]byte, error) {
+			return json.Marshal(x,
+				json.Deterministic(true),
+				json.WithMarshalers(json.MarshalFunc(func(s string) ([]byte, error) {
+					return jsontext.AppendQuote(nil, strings.ToUpper(s))
+				})))
+		}},
+	} {
+		// The expected result is that of marshaling a slice of the
+		// elements sorted by their individual encodings.
+		sorted := slices.Clone(elems)
+		if sorted == nil {
+			sorted = []E{}
+		}
+		slices.SortFunc(sorted, func(x, y E) int {
+			xb, _ := test.marshal(&x)
+			yb, _ := test.marshal(&y)
+			return bytes.Compare(xb, yb)
+		})
+
+		got, gotErr := test.marshal(set)
+		want, wantErr := test.marshal(sorted)
+		checkMarshal(t, fmt.Sprintf("%s: %T", test.name, elems), got, gotErr, want, wantErr)
+
+		got, gotErr = test.marshal(wrapper[*hashed.Set[E]]{1, set, []*hashed.Set[E]{set, set}})
+		want, wantErr = test.marshal(wrapper[[]E]{1, sorted, [][]E{sorted, sorted}})
+		checkMarshal(t, fmt.Sprintf("%s: nested %T", test.name, elems), got, gotErr, want, wantErr)
+	}
+
+	// Without Deterministic, the order of elements is unspecified,
+	// so compare the results of unmarshaling, as multisets.
+	got, gotErr := json.Marshal(set)
+	want, wantErr := json.Marshal(elems)
+	if gotErr == nil && wantErr == nil {
+		canonical := func(data []byte) []byte {
+			var vals []jsontext.Value
+			if err := json.Unmarshal(data, &vals); err != nil {
+				t.Fatalf("v2: %T: Unmarshal(%s): %v", elems, data, err)
+			}
+			slices.SortFunc(vals, func(x, y jsontext.Value) int { return bytes.Compare(x, y) })
+			var out []byte
+			for _, v := range vals {
+				out = append(append(out, v...), ',')
+			}
+			return out
+		}
+		got = canonical(got)
+		want = canonical(want)
+	}
+	checkMarshal(t, fmt.Sprintf("v2: %T", elems), got, gotErr, want, wantErr)
+}
+
+func TestSetUnmarshalJSON(t *testing.T) {
+	type wrapper struct {
+		A int
+		S *hashed.Set[int]
+		B int
+	}
+	for _, test := range []struct {
+		init    []int // initial elements
+		data    string
+		want    string // result of String
+		wantV1  string // result under v1, if different
+		wantErr bool
+	}{
+		{data: `[]`, want: "{}"},
+		{data: `[3,1,2]`, want: "{1, 2, 3}"},
+		{data: ` [ 3 , 1 ] `, want: "{1, 3}"},
+		{data: `null`, want: "{}"},
+		// An array is merged into the existing elements.
+		{init: []int{7, 8}, data: `[]`, want: "{7, 8}"},
+		{init: []int{7, 8}, data: `[1,8]`, want: "{1, 7, 8}"},
+		{init: []int{7, 8}, data: `null`, want: "{}"},
+		// Duplicates are not an error.
+		{data: `[1,2,1,1]`, want: "{1, 2}"},
+		// Errors.
+		{init: []int{7}, data: `{}`, want: "{7}", wantErr: true},
+		{init: []int{7}, data: `"x"`, want: "{7}", wantErr: true},
+		{init: []int{7}, data: `5`, want: "{7}", wantErr: true},
+		// v1 carries on after a type mismatch.
+		{init: []int{7}, data: `[1,"x",3,[4],5]`, want: "{1, 7}", wantV1: "{1, 3, 5, 7}", wantErr: true},
+		{data: `[1,2`, want: "{1, 2}", wantErr: true},
+		{data: `[1,,2]`, want: "{1}", wantErr: true},
+		{data: `[1,]`, want: "{1}", wantErr: true},
+		{data: `[,1]`, want: "{}", wantErr: true},
+		{data: `[1 2]`, want: "{1}", wantErr: true},
+		{data: `[1}`, want: "{1}", wantErr: true},
+	} {
+		newSet := func() *hashed.Set[int] {
+			s := hashed.NewSet[int](maphash.ComparableHasher[int]{})
+			for _, e := range test.init {
+				s.Insert(e)
+			}
+			return s
+		}
+		for _, u := range []struct {
+			name      string
+			unmarshal func([]byte, any) error
+		}{
+			{"v1", jsonv1.Unmarshal},
+			{"v2", func(data []byte, x any) error { return json.Unmarshal(data, x) }},
+		} {
+			want := test.want
+			if u.name == "v1" && test.wantV1 != "" {
+				want = test.wantV1
+			}
+			name := fmt.Sprintf("%s: %v <- %s", u.name, test.init, test.data)
+
+			// Top level.
+			s := newSet()
+			err := u.unmarshal([]byte(test.data), s)
+			if (err != nil) != test.wantErr {
+				t.Errorf("%s: got error %v, want error = %t", name, err, test.wantErr)
+			}
+			// v1 checks the syntax of the whole input before decoding anything.
+			if got := s.String(); got != want && !(u.name == "v1" && err != nil && got == newSet().String()) {
+				t.Errorf("%s: got %s, want %s", name, got, want)
+			}
+
+			// Nested in a struct.
+			w := wrapper{S: newSet()}
+			err = u.unmarshal([]byte(`{"A":1,"S":`+test.data+`,"B":2}`), &w)
+			if (err != nil) != test.wantErr {
+				t.Errorf("%s (nested): got error %v, want error = %t", name, err, test.wantErr)
+			}
+			if err == nil || u.name == "v1" && test.wantV1 != "" {
+				// A null sets a pointer field to nil without calling the method.
+				if w.S == nil {
+					if test.data != "null" {
+						t.Errorf("%s (nested): got nil Set", name)
+					}
+				} else if got := w.S.String(); got != want {
+					t.Errorf("%s (nested): got %s, want %s", name, got, want)
+				}
+				if w.A != 1 || w.B != 2 {
+					t.Errorf("%s (nested): got A=%d, B=%d; want 1, 2", name, w.A, w.B)
+				}
+			}
+		}
+	}
+}
+
+// TestSetUnmarshalJSONEquivalent checks that array elements
+// that are equivalent result in a single set element.
+func TestSetUnmarshalJSONEquivalent(t *testing.T) {
+	s := hashed.NewSet[string](caseInsensitive{})
+	if err := json.Unmarshal([]byte(`["Hello","world","HELLO"]`), s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Len() != 2 || !s.Contains("hello") || !s.Contains("WORLD") {
+		t.Errorf("got %s, want two elements equivalent to hello and world", s)
+	}
+}
+
+// TestSetUnmarshalJSONUninitialized checks that unmarshaling
+// into a Set that was not created by NewSet is an error.
+func TestSetUnmarshalJSONUninitialized(t *testing.T) {
+	type wrapper struct {
+		S *hashed.Set[string]
+	}
+	for _, test := range []struct {
+		name      string
+		unmarshal func([]byte, any) error
+	}{
+		{"v1", jsonv1.Unmarshal},
+		{"v2", func(data []byte, x any) error { return json.Unmarshal(data, x) }},
+	} {
+		var w wrapper
+		err := test.unmarshal([]byte(`{"S":["a"]}`), &w)
+		if err == nil || !strings.Contains(err.Error(), "NewSet") {
+			t.Errorf("%s: got error %v, want one mentioning NewSet", test.name, err)
+		}
+
+		// A null is fine.
+		w = wrapper{}
+		if err := test.unmarshal([]byte(`{"S":null}`), &w); err != nil {
+			t.Errorf("%s: null: %v", test.name, err)
+		}
+		if w.S != nil {
+			t.Errorf("%s: null: got non-nil Set", test.name)
+		}
+	}
+}
+
+func TestSetJSONRoundTrip(t *testing.T) {
+	s := hashed.NewSet[string](caseInsensitive{})
+	for _, e := range []string{"c", "B", "a"} {
+		s.Insert(e)
+	}
+	data, err := json.Marshal(s, json.Deterministic(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), `["B","a","c"]`; got != want {
+		t.Errorf("Marshal: got %s, want %s", got, want)
+	}
+	s2 := hashed.NewSet[string](caseInsensitive{})
+	if err := json.Unmarshal(data, s2); err != nil {
+		t.Fatal(err)
+	}
+	if !s2.Equal(s) {
+		t.Errorf("Unmarshal: got %s, want %s", s2, s)
 	}
 }
