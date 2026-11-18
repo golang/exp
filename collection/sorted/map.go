@@ -29,6 +29,11 @@ import (
 // Neither a nil pointer nor the zero value are valid maps.
 //
 // Map values must not be copied; use [Map.Clone] instead.
+//
+// The standard library JSON packages, [encoding/json] and [encoding/json/v2],
+// marshal Maps as JSON objects in key order and unmarshal them like built-in
+// maps, with one exception: it is not possible to unmarshal into a Map that was
+// not created with [NewMap], since it has no comparison function.
 type Map[K, V any] struct {
 	root *node[K, V]
 	cmp  func(K, K) int
