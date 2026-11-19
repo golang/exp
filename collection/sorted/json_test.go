@@ -21,6 +21,7 @@ import (
 	"testing/iotest"
 
 	"golang.org/x/exp/collection/internal/fmtsort"
+	"golang.org/x/exp/collection/internal/jsontest"
 	"golang.org/x/exp/collection/sorted"
 )
 
@@ -454,24 +455,15 @@ func TestMapUnmarshalJSONUninitialized(t *testing.T) {
 }
 
 func TestMapJSONRoundTrip(t *testing.T) {
-	m := sorted.NewMap[string, []int](caseInsensitive)
+	newMap := func() *sorted.Map[string, []int] {
+		return sorted.NewMap[string, []int](caseInsensitive)
+	}
+	m := newMap()
 	m.Set("c", []int{2, 3})
 	m.Set("a", []int{1})
 	m.Set("B", nil)
-	data, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(data), `{"a":[1],"B":[],"c":[2,3]}`; got != want {
-		t.Errorf("Marshal: got %s, want %s", got, want)
-	}
-	m2 := sorted.NewMap[string, []int](caseInsensitive)
-	if err := json.Unmarshal(data, m2); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := m2.String(), "{a: [1], B: [], c: [2 3]}"; got != want {
-		t.Errorf("Unmarshal: got %s, want %s", got, want)
-	}
+	jsontest.RoundTrip(t, m, `{"a":[1],"B":[],"c":[2,3]}`, newMap,
+		func(a, b *sorted.Map[string, []int]) bool { return a.String() == b.String() })
 }
 
 // TestMapUnmarshalJSONReadError checks that an I/O error
@@ -776,24 +768,14 @@ func TestSetUnmarshalJSONUninitialized(t *testing.T) {
 }
 
 func TestSetJSONRoundTrip(t *testing.T) {
-	s := sorted.NewSet[string](caseInsensitive)
+	newSet := func() *sorted.Set[string] {
+		return sorted.NewSet[string](caseInsensitive)
+	}
+	s := newSet()
 	for _, e := range []string{"c", "B", "a"} {
 		s.Insert(e)
 	}
-	data, err := json.Marshal(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(data), `["a","B","c"]`; got != want {
-		t.Errorf("Marshal: got %s, want %s", got, want)
-	}
-	s2 := sorted.NewSet[string](caseInsensitive)
-	if err := json.Unmarshal(data, s2); err != nil {
-		t.Fatal(err)
-	}
-	if !s2.Equal(s) {
-		t.Errorf("Unmarshal: got %s, want %s", s2, s)
-	}
+	jsontest.RoundTrip(t, s, `["a","B","c"]`, newSet, (*sorted.Set[string]).Equal)
 }
 
 // TestUnmarshalJSONKindError checks that unmarshaling a JSON value of

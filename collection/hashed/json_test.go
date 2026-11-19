@@ -22,6 +22,7 @@ import (
 	"testing/iotest"
 
 	"golang.org/x/exp/collection/hashed"
+	"golang.org/x/exp/collection/internal/jsontest"
 )
 
 // textKey has a MarshalText method with a pointer receiver.
@@ -417,24 +418,15 @@ func TestMapUnmarshalJSONUninitialized(t *testing.T) {
 }
 
 func TestMapJSONRoundTrip(t *testing.T) {
-	m := hashed.NewMap[string, []int](caseInsensitive{})
+	newMap := func() *hashed.Map[string, []int] {
+		return hashed.NewMap[string, []int](caseInsensitive{})
+	}
+	m := newMap()
 	m.Set("a", []int{1})
 	m.Set("B", nil)
 	m.Set("c", []int{2, 3})
-	data, err := json.Marshal(m, json.Deterministic(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(data), `{"B":[],"a":[1],"c":[2,3]}`; got != want {
-		t.Errorf("Marshal: got %s, want %s", got, want)
-	}
-	m2 := hashed.NewMap[string, []int](caseInsensitive{})
-	if err := json.Unmarshal(data, m2); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := m2.String(), "{B: [], a: [1], c: [2 3]}"; got != want {
-		t.Errorf("Unmarshal: got %s, want %s", got, want)
-	}
+	jsontest.RoundTrip(t, m, `{"B":[],"a":[1],"c":[2,3]}`, newMap,
+		func(a, b *hashed.Map[string, []int]) bool { return a.String() == b.String() })
 }
 
 // TestMapUnmarshalJSONReadError checks that an I/O error
@@ -725,24 +717,14 @@ func TestSetUnmarshalJSONUninitialized(t *testing.T) {
 }
 
 func TestSetJSONRoundTrip(t *testing.T) {
-	s := hashed.NewSet[string](caseInsensitive{})
+	newSet := func() *hashed.Set[string] {
+		return hashed.NewSet[string](caseInsensitive{})
+	}
+	s := newSet()
 	for _, e := range []string{"c", "B", "a"} {
 		s.Insert(e)
 	}
-	data, err := json.Marshal(s, json.Deterministic(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(data), `["B","a","c"]`; got != want {
-		t.Errorf("Marshal: got %s, want %s", got, want)
-	}
-	s2 := hashed.NewSet[string](caseInsensitive{})
-	if err := json.Unmarshal(data, s2); err != nil {
-		t.Fatal(err)
-	}
-	if !s2.Equal(s) {
-		t.Errorf("Unmarshal: got %s, want %s", s2, s)
-	}
+	jsontest.RoundTrip(t, s, `["B","a","c"]`, newSet, (*hashed.Set[string]).Equal)
 }
 
 // TestUnmarshalJSONKindError checks that unmarshaling a JSON value of

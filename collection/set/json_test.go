@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"golang.org/x/exp/collection/hashed"
+	"golang.org/x/exp/collection/internal/jsontest"
 	"golang.org/x/exp/collection/set"
 )
 
@@ -301,25 +302,8 @@ func TestUnmarshalJSONInPlace(t *testing.T) {
 }
 
 func TestJSONRoundTrip(t *testing.T) {
-	type T struct {
-		Name string
-		Tags set.Set[string]
-	}
-	in := T{"x", set.Of("c", "B", "a")}
-	data, err := json.Marshal(in, json.Deterministic(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(data), `{"Name":"x","Tags":["B","a","c"]}`; got != want {
-		t.Errorf("Marshal: got %s, want %s", got, want)
-	}
-	var out T
-	if err := json.Unmarshal(data, &out); err != nil {
-		t.Fatal(err)
-	}
-	if out.Name != in.Name || !out.Tags.Equal(in.Tags) {
-		t.Errorf("Unmarshal: got %v, want %v", out, in)
-	}
+	s := set.Of("c", "B", "a")
+	jsontest.RoundTrip(t, s, `["B","a","c"]`, func() set.Set[string] { return nil }, (set.Set[string]).Equal)
 }
 
 // TestUnmarshalJSONObject checks that a set.Set can be unmarshaled from
