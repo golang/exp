@@ -6,11 +6,9 @@ package hashed
 
 import (
 	"bytes"
-	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
-	"reflect"
 	"slices"
 	"strings"
 
@@ -130,99 +128,14 @@ func (m *Map[K, V]) marshalSorted(enc *jsontext.Encoder) error {
 // cannot supply a hasher. In particular, it is an error to unmarshal
 // a JSON object into a nil *Map variable or struct field.
 func (m *Map[K, V]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	switch kind := dec.PeekKind(); kind {
-	case jsontext.KindNull:
-		_, _ = dec.ReadToken() // can't fail
-		m.Clear()
-		return nil
-	case jsontext.KindBeginObject:
-		if m.hasher == nil {
-			return errors.New("hashed.Map was not created by NewMap")
-		}
-		_, _ = dec.ReadToken() // can't fail
-	case jsontext.KindInvalid:
-		_, err := dec.ReadToken()
-		return err
-	default:
-		// The json package fills in the remaining fields.
-		return &json.SemanticError{JSONKind: kind, GoType: reflect.TypeFor[Map[K, V]]()}
+	if m.hasher == nil {
+		return errors.New("hashed.Map was not created by NewMap")
 	}
-
-	opts := dec.Options()
-	allowDuplicates, _ := json.GetOption(opts, jsontext.AllowDuplicateNames)
-	// These are true when called from encoding/json (v1).
-	legacyMerge, _ := json.GetOption(opts, jsonv1.MergeWithLegacySemantics)
-	legacyErrors, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics)
-
-	// If allowDuplicates is false, we need to detect duplicate keys in the input.
-	// We do this with a set of keys.
-	// Optimization: if the map is empty, all of its keys are keys from the input,
-	// so we can check for duplicates against its keys instead of creating a separate
-	// set.
-	var seen *Set[K]
-	if !allowDuplicates && m.len > 0 {
-		seen = NewSet(m.hasher)
-	}
-
-	var firstErr error // first non-fatal error
-	for dec.PeekKind() != jsontext.KindEndObject {
-		// Unmarshal the key.
-		//
-		// Since the decoder expects an object name, the json
-		// package decodes numeric keys from strings and rejects
-		// key types that cannot be decoded from a JSON string,
-		// just as it does for built-in maps.
-		keyOffset := dec.InputOffset()
-		var k K
-		if err := json.UnmarshalDecode(dec, &k); err != nil {
-			if internal.IsFatalUnmarshalError(err, legacyErrors) {
-				return err
-			}
-			if err := dec.SkipValue(); err != nil {
-				return err
-			}
-			if firstErr == nil {
-				firstErr = err
-			}
-			continue
-		}
-
-		v, present := m.Lookup(k)
-		if present {
-			// `seen == nil` means m was initially empty, so both
-			// duplicates must have come from `dec`.
-			if !allowDuplicates && (seen == nil || seen.Contains(k)) {
-				return &jsontext.SyntacticError{
-					ByteOffset:  keyOffset,
-					JSONPointer: dec.StackPointer(),
-					Err:         jsontext.ErrDuplicateName,
-				}
-			}
-			// By default, a JSON value is merged (that is, unmarshaled) into the
-			// existing map value, if any. In v1, the value is replaced.
-			if legacyMerge {
-				v = *new(V)
-			}
-		}
-		if seen != nil {
-			seen.Insert(k)
-		}
-
-		// Unmarshal the value.
-		err := json.UnmarshalDecode(dec, &v)
-		// Check the error after setting the value, to match existing behavior.
-		m.Set(k, v)
-		if err != nil {
-			if internal.IsFatalUnmarshalError(err, legacyErrors) {
-				return err
-			}
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-	_, _ = dec.ReadToken() // '}' by loop condition
-	return firstErr
+	return internal.UnmarshalMap[Map[K, V]](
+		dec,
+		m,
+		func() internal.Set[K] { return NewSet(m.hasher) },
+	)
 }
 
 // MarshalJSONTo implements [json.MarshalerTo].

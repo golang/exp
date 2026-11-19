@@ -64,13 +64,125 @@ func KeyError[K any](err error) error {
 	return err
 }
 
-// IsFatalUnmarshalError reports whether unmarshaling should stop
+// Map is the interface to a map type for [UnmarshalMap].
+type Map[K, V any] interface {
+	Clear()
+	Len() int
+	Lookup(K) (V, bool)
+	Set(K, V) (V, bool)
+}
+
+// Set is the interface to a set of keys for [UnmarshalMap].
+type Set[K any] interface {
+	Contains(K) bool
+	Insert(K) bool
+}
+
+// UnmarshalMap unmarshals a JSON object or null into m, which represents a map
+// of type M.
+//   - On JSON null, it calls m.Clear() and returns nil.
+//   - On a JSON object, if duplicate-key detection requires a separate set,
+//     it calls newSet.
+func UnmarshalMap[M, K, V any](dec *jsontext.Decoder, m Map[K, V], newSet func() Set[K]) error {
+	switch kind := dec.PeekKind(); kind {
+	case jsontext.KindNull:
+		_, _ = dec.ReadToken() // can't fail
+		m.Clear()
+		return nil
+	case jsontext.KindBeginObject:
+		_, _ = dec.ReadToken() // can't fail
+	case jsontext.KindInvalid:
+		_, err := dec.ReadToken()
+		return err
+	default:
+		// The json package fills in the remaining fields.
+		return &json.SemanticError{JSONKind: kind, GoType: reflect.TypeFor[M]()}
+	}
+
+	opts := dec.Options()
+	allowDuplicates, _ := json.GetOption(opts, jsontext.AllowDuplicateNames)
+	// These are true when called from encoding/json (v1).
+	legacyMerge, _ := json.GetOption(opts, jsonv1.MergeWithLegacySemantics)
+	legacyErrors, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics)
+
+	// If allowDuplicates is false, we need to detect duplicate keys in the input.
+	// We do this with a set of keys.
+	// Optimization: if the map is empty, all of its keys are keys from the input,
+	// so we can check for duplicates against its keys instead of creating a separate
+	// set.
+	var seen Set[K]
+	if !allowDuplicates && m.Len() > 0 {
+		seen = newSet()
+	}
+
+	var firstErr error // first non-fatal error
+	for dec.PeekKind() != jsontext.KindEndObject {
+		// Unmarshal the key.
+		//
+		// Since the decoder expects an object name, the json
+		// package decodes numeric keys from strings and rejects
+		// key types that cannot be decoded from a JSON string,
+		// just as it does for built-in maps.
+		keyOffset := dec.InputOffset()
+		var k K
+		if err := json.UnmarshalDecode(dec, &k); err != nil {
+			if isFatalUnmarshalError(err, legacyErrors) {
+				return err
+			}
+			if err := dec.SkipValue(); err != nil {
+				return err
+			}
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+
+		v, present := m.Lookup(k)
+		if present {
+			// `seen == nil` means m was initially empty, so both
+			// duplicates must have come from `dec`.
+			if !allowDuplicates && (seen == nil || seen.Contains(k)) {
+				return &jsontext.SyntacticError{
+					ByteOffset:  keyOffset,
+					JSONPointer: dec.StackPointer(),
+					Err:         jsontext.ErrDuplicateName,
+				}
+			}
+			// By default, a JSON value is merged (that is, unmarshaled) into the
+			// existing map value, if any. In v1, the value is replaced.
+			if legacyMerge {
+				v = *new(V)
+			}
+		}
+		if seen != nil {
+			seen.Insert(k)
+		}
+
+		// Unmarshal the value.
+		err := json.UnmarshalDecode(dec, &v)
+		// Check the error after setting the value, to match existing behavior.
+		m.Set(k, v)
+		if err != nil {
+			if isFatalUnmarshalError(err, legacyErrors) {
+				return err
+			}
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	_, _ = dec.ReadToken() // '}' by loop condition
+	return firstErr
+}
+
+// isFatalUnmarshalError reports whether unmarshaling should stop
 // after err, which was returned by [json.UnmarshalDecode].
 // All errors are fatal, except that encoding/json (v1) carries on
 // after an error that is not a syntax or I/O error, such as
 // a mismatch between a JSON value and a Go type, or an error
 // returned by an unmarshal method.
-func IsFatalUnmarshalError(err error, legacyErrors bool) bool {
+func isFatalUnmarshalError(err error, legacyErrors bool) bool {
 	if !legacyErrors {
 		return true
 	}
@@ -187,7 +299,7 @@ func UnmarshalSet[S, E any](dec *jsontext.Decoder, onNull func(), begin func() e
 		if err := json.UnmarshalDecode(dec, &e); err != nil {
 			// An error is also fatal if the decoder made no progress,
 			// since retrying would fail in the same way forever.
-			if IsFatalUnmarshalError(err, legacyErrors) || dec.InputOffset() == start {
+			if isFatalUnmarshalError(err, legacyErrors) || dec.InputOffset() == start {
 				return err
 			}
 			// Omit an element that could not be decoded.
@@ -216,7 +328,7 @@ func unmarshalSetObject[S, E any](dec *jsontext.Decoder, legacyErrors bool, inse
 		var e E
 		keyErr := json.UnmarshalDecode(dec, &e)
 		if keyErr != nil {
-			if IsFatalUnmarshalError(keyErr, legacyErrors) {
+			if isFatalUnmarshalError(keyErr, legacyErrors) {
 				return keyErr
 			}
 			if firstErr == nil {
