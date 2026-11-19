@@ -236,6 +236,162 @@ func TestDeleteFunc(t *testing.T) {
 	}
 }
 
+// TestDeleteFuncModify checks that DeleteFunc handles modifications
+// made by del during iteration.
+func TestDeleteFuncModify(t *testing.T) {
+	t.Run("ClearAndSet", func(t *testing.T) {
+		// Clearing the map and inserting a new key while returning true
+		// must not delete the detached node and clobber the new root.
+		m := NewMap[int, int](cmp.Compare)
+		m.Set(1, 1)
+		m.DeleteFunc(func(k, v int) bool {
+			if k == 1 {
+				m.Clear()
+				m.Set(2, 2)
+				return true
+			}
+			return false
+		})
+		got := maps.Collect(m.All())
+		want := map[int]int{2: 2}
+		if !maps.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+		checkSize(t, m)
+	})
+
+	t.Run("ClearResurrect", func(t *testing.T) {
+		// Clearing a multi-element map while returning true must leave it
+		// empty, even when the visited node was the root (rotating it down
+		// would otherwise install its former child back as m.root).
+		for range 20 {
+			m := NewMap[int, int](cmp.Compare)
+			m.Set(1, 1)
+			m.Set(2, 2)
+			m.DeleteFunc(func(k, v int) bool {
+				if k == 1 {
+					m.Clear()
+					return true
+				}
+				return false
+			})
+			if got := maps.Collect(m.All()); len(got) != 0 {
+				t.Fatalf("got %v, want empty map", got)
+			}
+			checkSize(t, m)
+		}
+	})
+
+	t.Run("ToClear", func(t *testing.T) {
+		// Clearing a prefix containing the current key while returning true
+		// must not delete the detached node and wipe out remaining entries.
+		m := NewMap[int, int](cmp.Compare)
+		m.Set(1, 1)
+		m.Set(3, 3)
+		m.DeleteFunc(func(k, v int) bool {
+			if k == 1 {
+				m.To(2).Clear()
+				return true
+			}
+			return false
+		})
+		got := maps.Collect(m.All())
+		want := map[int]int{3: 3}
+		if !maps.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+		checkSize(t, m)
+	})
+
+	t.Run("AboveClear", func(t *testing.T) {
+		// Clearing keys strictly above the current key replaces the current
+		// node internally; returning true must still delete the current key.
+		m := NewMap[int, int](cmp.Compare)
+		m.Set(1, 1)
+		m.Set(2, 2)
+		m.Set(3, 3)
+		changed := m.DeleteFunc(func(k, v int) bool {
+			if k == 1 {
+				m.Above(1).Clear()
+				return true
+			}
+			return false
+		})
+		if !changed {
+			t.Errorf("DeleteFunc returned false, want true")
+		}
+		if got := maps.Collect(m.All()); len(got) != 0 {
+			t.Errorf("got %v, want empty map", got)
+		}
+		checkSize(t, m)
+	})
+
+	t.Run("InsertBefore", func(t *testing.T) {
+		// Inserting a key immediately before the deleted key must not
+		// revisit the inserted key or disrupt continuing to the successor.
+		for range 20 {
+			m := NewMap[int, int](cmp.Compare)
+			m.Set(10, 10)
+			m.Set(20, 20)
+			m.Set(30, 30)
+			var visited []int
+			changed := m.DeleteFunc(func(k, v int) bool {
+				visited = append(visited, k)
+				if k == 20 {
+					m.Set(15, 15)
+					return true
+				}
+				return false
+			})
+			if !changed {
+				t.Fatalf("DeleteFunc returned false, want true")
+			}
+			if wantVisited := []int{10, 20, 30}; !slices.Equal(visited, wantVisited) {
+				t.Fatalf("visited %v, want %v", visited, wantVisited)
+			}
+			got := maps.Collect(m.All())
+			want := map[int]int{10: 10, 15: 15, 30: 30}
+			if !maps.Equal(got, want) {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+			checkSize(t, m)
+		}
+	})
+
+	t.Run("InsertAfter", func(t *testing.T) {
+		// Inserting a key immediately after the deleted key must visit the
+		// newly inserted successor next and keep it intact after deleting the
+		// current node.
+		for range 20 {
+			m := NewMap[int, int](cmp.Compare)
+			m.Set(10, 10)
+			m.Set(20, 20)
+			m.Set(30, 30)
+			var visited []int
+			changed := m.DeleteFunc(func(k, v int) bool {
+				visited = append(visited, k)
+				if k == 20 {
+					m.Set(25, 25)
+					return true
+				}
+				return false
+			})
+			if !changed {
+				t.Fatalf("DeleteFunc returned false, want true")
+			}
+			if wantVisited := []int{10, 20, 25, 30}; !slices.Equal(visited, wantVisited) {
+				t.Fatalf("visited %v, want %v", visited, wantVisited)
+			}
+			got := maps.Collect(m.All())
+			want := map[int]int{10: 10, 25: 25, 30: 30}
+			if !maps.Equal(got, want) {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+			checkSize(t, m)
+		}
+	})
+}
+
 func TestAll(t *testing.T) {
 	for N := range 11 {
 		m := NewMap[int, int](cmp.Compare)

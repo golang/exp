@@ -280,13 +280,26 @@ func (m *Map[K, V]) deleteNode(x *node[K, V]) {
 func (m *Map[K, V]) DeleteFunc(del func(K, V) bool) bool {
 	changed := false
 	for x := m.Span().minNode(); x != nil; {
+		// del could modify the map. If it does, we might need
+		// to restart the iteration.
 		gen := m.gen
 		doDel := del(x.key, x.val)
-		next := x.next(m, gen != m.gen)
-		gen = m.gen
-		if doDel && x.pri != 0 {
-			m.deleteNode(x)
-			changed = true
+		cleared := gen != m.gen
+		// If cleared, the entire map or some subsequence was deleted.
+		next := x.next(m, cleared)
+		if doDel {
+			if x.pri == 0 || cleared {
+				// x's key may have been deleted and reinserted,
+				// so x may no longer refer to it in the tree.
+				// We have to delete its key from the root.
+				if _, deleted := m.Delete(x.key); deleted {
+					changed = true
+				}
+			} else {
+				// Fast path: x is in the tree, so remove it.
+				m.deleteNode(x)
+				changed = true
+			}
 		}
 		x = next
 	}
