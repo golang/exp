@@ -6,6 +6,7 @@
 package hashed
 
 import (
+	_ "encoding/json/v2"
 	"fmt"
 	"hash/maphash"
 	"iter"
@@ -35,6 +36,8 @@ import (
 // treat Maps just like built-in maps, with one exception: it is not possible
 // to unmarshal into a Map that was not created with [NewMap], since it has
 // no Hasher.
+// One solution is to use a custom [json.UnmarshalFromFunc] as an option to [json.Unmarshal].
+// For details, see the example on [Map.UnmarshalJSONFrom].
 type Map[K, V any] struct {
 	seed   maphash.Seed
 	table  map[uint64][]entry[K, V] // maps hash to entries of that hash

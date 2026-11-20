@@ -5,6 +5,7 @@
 package sorted
 
 import (
+	_ "encoding/json/v2"
 	"fmt"
 	"iter"
 	"strings"
@@ -19,6 +20,13 @@ import (
 // Neither a nil pointer nor the zero value are valid sets.
 //
 // Set values must not be copied; use [Set.Clone] instead.
+//
+// The standard library JSON packages, [encoding/json] and [encoding/json/v2],
+// marshal Sets as if they were slices, into a JSON array.
+// It is not possible to unmarshal into a Set that was
+// not created with [NewSet], since it has no comparison function.
+// One solution is to use a custom [json.UnmarshalFromFunc] as an option to [json.Unmarshal].
+// For details, see the example on [hashed.Map.UnmarshalJSONFrom].
 type Set[T any] struct {
 	m Map[T, struct{}]
 }

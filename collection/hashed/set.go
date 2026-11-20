@@ -41,6 +41,13 @@ import (
 // For all binary operations on sets, like the set algebra methods
 // [Set.Union], [Set.Intersection] and so on, the two sets must
 // use the same key-equivalence relation.
+//
+// The standard library JSON packages, [encoding/json] and [encoding/json/v2],
+// marshal Sets as if they were slices, into a JSON array.
+// Because a Set requires a hasher, unmarshaling into a nil *Set or zero Set
+// returns an error. Callers must either pre-allocate the Set with [NewSet] or,
+// when using [encoding/json/v2], pass a custom [encoding/json/v2.UnmarshalFromFunc]
+// via [encoding/json/v2.WithUnmarshalers]; see the [Map.UnmarshalJSONFrom] example.
 type Set[E any] struct {
 	m Map[E, unit]
 }

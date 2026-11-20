@@ -5,32 +5,11 @@
 package hashed_test
 
 import (
-	"hash/maphash"
 	"slices"
-	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/exp/collection/hashed"
 )
-
-// caseInsensitive is a string Hasher that ignores letter case.
-type caseInsensitive struct{}
-
-var _ maphash.Hasher[string] = caseInsensitive{}
-
-func (caseInsensitive) Hash(h *maphash.Hash, s string) {
-	var buf [utf8.UTFMax]byte
-	for _, r := range s {
-		n := utf8.EncodeRune(buf[:], unicode.ToLower(r))
-		h.Write(buf[:n])
-	}
-}
-
-func (caseInsensitive) Equal(x, y string) bool {
-	return strings.EqualFold(x, y)
-}
 
 func TestMap(t *testing.T) {
 	m := hashed.NewMap[string, int](caseInsensitive{})

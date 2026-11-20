@@ -5,9 +5,15 @@
 package hashed_test
 
 import (
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"hash/maphash"
+	"log"
 	"math/big"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/exp/collection/hashed"
 )
@@ -71,4 +77,63 @@ func ExampleSet_bigInt() {
 	// Set: {100, 200}
 	// Same pointer: false
 	// Contains(i100b): true
+}
+
+// caseInsensitive is a string [maphash.Hasher] that ignores letter case.
+type caseInsensitive struct{}
+
+var _ maphash.Hasher[string] = caseInsensitive{}
+
+func (caseInsensitive) Hash(h *maphash.Hash, s string) {
+	var buf [utf8.UTFMax]byte
+	for _, r := range s {
+		n := utf8.EncodeRune(buf[:], unicode.ToLower(r))
+		h.Write(buf[:n])
+	}
+}
+
+func (caseInsensitive) Equal(x, y string) bool {
+	return strings.EqualFold(x, y)
+}
+
+// To unmarshal into a nil *hashed.Map (or *hashed.Set, *sorted.Map or *sorted.Set)
+// when you know the hasher or comparison function, use the feature of [encoding/json/v2]
+// that allows you to provide a custom unmarshaler in the Unmarshal call.
+func ExampleMap_UnmarshalJSONFrom() {
+	type request struct {
+		Method  string
+		Headers *hashed.Map[string, string]
+	}
+
+	// UnmarshalJSONFrom cannot initialize a nil *hashed.Map because it does not
+	// know which hasher to use. Install a custom unmarshaler with
+	// json.WithUnmarshalers that allocates the map with the desired hasher
+	// before delegating to (*hashed.Map).UnmarshalJSONFrom.
+	unmarshalers := json.UnmarshalFromFunc(func(dec *jsontext.Decoder, m **hashed.Map[string, string]) error {
+		if dec.PeekKind() == jsontext.KindNull {
+			if _, err := dec.ReadToken(); err != nil {
+				return err
+			}
+			*m = nil
+			return nil
+		}
+		if *m == nil {
+			*m = hashed.NewMap[string, string](caseInsensitive{})
+		}
+		return (*m).UnmarshalJSONFrom(dec)
+	})
+
+	data := []byte(`{"Method":"GET","Headers":{"Content-Type":"application/json","Accept":"*/*"}}`)
+	var req request // req.Headers is nil
+	if err := json.Unmarshal(data, &req, json.WithUnmarshalers(unmarshalers)); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Method:", req.Method)
+	fmt.Println("Headers:", req.Headers)
+	fmt.Println("content-type:", req.Headers.Get("content-type"))
+
+	// Output:
+	// Method: GET
+	// Headers: {Accept: */*, Content-Type: application/json}
+	// content-type: application/json
 }

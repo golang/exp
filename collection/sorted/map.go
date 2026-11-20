@@ -14,6 +14,7 @@ package sorted
 // https://faculty.washington.edu/aragon/pubs/rst89.pdf
 
 import (
+	_ "encoding/json/v2"
 	"fmt"
 	"iter"
 	"math/rand/v2"
@@ -34,6 +35,8 @@ import (
 // marshal Maps as JSON objects in key order and unmarshal them like built-in
 // maps, with one exception: it is not possible to unmarshal into a Map that was
 // not created with [NewMap], since it has no comparison function.
+// One solution is to use a custom [json.UnmarshalFromFunc] as an option to [json.Unmarshal].
+// For details, see the example on [hashed.Map.UnmarshalJSONFrom].
 type Map[K, V any] struct {
 	root *node[K, V]
 	cmp  func(K, K) int
