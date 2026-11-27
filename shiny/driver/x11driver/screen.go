@@ -5,6 +5,7 @@
 package x11driver
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -27,6 +28,8 @@ import (
 // TODO: check that xgb is safe to use concurrently from multiple goroutines.
 // For example, its Conn.WaitForEvent concept is a method, not a channel, so
 // it's not obvious how to interrupt it to service a NewWindow request.
+
+var XConnectionClosed = errors.New("x11driver: X server connection closed")
 
 type screenImpl struct {
 	xc      *xgb.Conn
@@ -123,6 +126,11 @@ func (s *screenImpl) run() {
 
 		noWindowFound := false
 		switch ev := ev.(type) {
+		case nil:
+			s.xc = nil
+			log.Printf("x11driver: X server connection closed")
+			return
+
 		case xproto.DestroyNotifyEvent:
 			s.mu.Lock()
 			delete(s.windows, ev.Window)
@@ -273,6 +281,9 @@ const (
 )
 
 func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr error) {
+	if s.xc == nil {
+		return nil, XConnectionClosed
+	}
 
 	w, h := int64(size.X), int64(size.Y)
 	if w < 0 || maxShmSide < w || h < 0 || maxShmSide < h || maxShmSize < 4*w*h {
@@ -339,6 +350,9 @@ func (s *screenImpl) NewBuffer(size image.Point) (retBuf screen.Buffer, retErr e
 }
 
 func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
+	if s.xc == nil {
+		return nil, XConnectionClosed
+	}
 	w, h := int64(size.X), int64(size.Y)
 	if w < 0 || maxShmSide < w || h < 0 || maxShmSide < h || maxShmSize < 4*w*h {
 		return nil, fmt.Errorf("x11driver: invalid texture size %v", size)
@@ -376,6 +390,10 @@ func (s *screenImpl) NewTexture(size image.Point) (screen.Texture, error) {
 }
 
 func (s *screenImpl) NewWindow(opts *screen.NewWindowOptions) (screen.Window, error) {
+	if s.xc == nil {
+		return nil, XConnectionClosed
+	}
+
 	width, height := 1024, 768
 	if opts != nil {
 		if opts.Width > 0 {
@@ -639,6 +657,10 @@ func (s *screenImpl) setProperty(xw xproto.Window, prop xproto.Atom, values ...x
 }
 
 func (s *screenImpl) drawUniform(xp render.Picture, src2dst *f64.Aff3, src color.Color, sr image.Rectangle, op draw.Op, opts *screen.DrawOptions) {
+	if s.xc == nil {
+		return
+	}
+
 	if sr.Empty() {
 		return
 	}
