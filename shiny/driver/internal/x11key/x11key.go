@@ -8,6 +8,7 @@
 package x11key // import "golang.org/x/exp/shiny/driver/internal/x11key"
 
 import (
+	"runtime"
 	"unicode"
 
 	"golang.org/x/mobile/event/key"
@@ -41,7 +42,7 @@ func (t *KeysymTable) Lookup(detail uint8, state uint16) (rune, key.Code) {
 	if state&t.ModeSwitchMod != 0 {
 		te = t.Table[detail][2:4]
 	}
-	if state&t.ISOLevel3ShiftMod != 0 {
+	if state&t.ISOLevel3ShiftMod != 0 && runtime.GOOS != "linux" {
 		te = t.Table[detail][4:6]
 	}
 
